@@ -1,71 +1,64 @@
-# Multi-stage build for BuildHive API
+# Multi-stage build for BuildHive API - Production Ready
 FROM node:18-alpine AS base
 
-# Install system dependencies
-RUN apk add --no-cache \
+# Install system dependencies and security updates
+RUN apk update && apk upgrade && \
+    apk add --no-cache \
     dumb-init \
-    curl \
-    && rm -rf /var/cache/apk/*
+    tini \
+    && rm -rf /var/cache/apk/* \
+    && rm -rf /tmp/*
 
 # Create app directory
 WORKDIR /app
-
-# Copy package files
-COPY package*.json ./
-COPY prisma ./prisma/
-
-# Development stage
-FROM base AS development
-ENV NODE_ENV=development
-RUN npm ci --include=dev
-COPY . .
-RUN npm run build
-CMD ["npm", "run", "dev"]
 
 # Build stage
 FROM base AS builder
 ENV NODE_ENV=production
 
-# Install all dependencies (including dev dependencies for build)
-RUN npm ci --include=dev
+# Copy package files first (for better caching)
+COPY package*.json ./
+COPY prisma ./prisma/
+
+# Install dependencies (including dev for build)
+RUN npm ci --include=dev --frozen-lockfile
 
 # Copy source code
 COPY . .
 
-# Generate Prisma client
-RUN npx prisma generate
-
-# Build the application
-RUN npm run build
-
-# Remove dev dependencies
-RUN npm prune --production && npm cache clean --force
+# Generate Prisma client and build
+RUN npx prisma generate && \
+    npm run build && \
+    npm prune --production && \
+    npm cache clean --force
 
 # Production stage
 FROM node:18-alpine AS production
 
-# Install system dependencies for production
-RUN apk add --no-cache \
+# Install production system dependencies
+RUN apk update && apk upgrade && \
+    apk add --no-cache \
     dumb-init \
-    curl \
     tini \
-    && rm -rf /var/cache/apk/*
+    && rm -rf /var/cache/apk/* \
+    && rm -rf /tmp/*
 
-# Create non-root user
+# Create non-root user with specific UID/GID
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S buildhive -u 1001 -G nodejs
 
 # Set working directory
 WORKDIR /app
 
-# Copy built application from builder stage
+# Copy built application with proper ownership
 COPY --from=builder --chown=buildhive:nodejs /app/dist ./dist
 COPY --from=builder --chown=buildhive:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=buildhive:nodejs /app/package*.json ./
 COPY --from=builder --chown=buildhive:nodejs /app/prisma ./prisma
 
-# Create logs directory
-RUN mkdir -p logs && chown -R buildhive:nodejs logs
+# Create necessary directories
+RUN mkdir -p logs storage tmp && \
+    chown -R buildhive:nodejs logs storage tmp
 
 # Switch to non-root user
 USER buildhive
@@ -73,17 +66,24 @@ USER buildhive
 # Expose port
 EXPOSE 3000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:3000/api/health || exit 1
+# Production environment variables
+ENV NODE_ENV=production \
+    PORT=3000 \
+    NODE_OPTIONS="--max-old-space-size=1024" \
+    UV_THREADPOOL_SIZE=4
 
-# Set environment variables
-ENV NODE_ENV=production
-ENV PORT=3000
+# Health check using Node.js instead of curl
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD node -e "require('http').get('http://localhost:3000/api/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))"
 
-# Use tini as init system
+# Use tini as PID 1 for proper signal handling
 ENTRYPOINT ["/sbin/tini", "--"]
 
-# Start the application
-CMD ["dumb-init", "node", "dist/server.js"]
+# Start with graceful shutdown support
+CMD ["dumb-init", "node", "--enable-source-maps", "dist/server.js"]
 
+# Labels for production tracking
+LABEL maintainer="FlameGreat-1" \
+      version="1.0.0" \
+      description="BuildHive Construction Marketplace API" \
+      org.opencontainers.image.source="https://github.com/FlameGreat-1/BuildHive-Backend"
