@@ -7,6 +7,7 @@
     "rootDir": "./src",
     "strict": true,
     "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
@@ -21,6 +22,10 @@
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
     "moduleResolution": "node",
+    "allowJs": true,
+    "checkJs": false,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
     "baseUrl": "./src",
     "paths": {
       "@/*": ["*"],
@@ -31,9 +36,25 @@
       "@/routes/*": ["routes/*"],
       "@/services/*": ["services/*"],
       "@/utils/*": ["utils/*"],
-      "@/types/*": ["types/*"]
-    }
+      "@/types/*": ["types/*"],
+      "@/database/*": ["database/*"]
+    },
+    "typeRoots": ["./node_modules/@types", "./src/types"]
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "tests"]
+  "include": [
+    "src/**/*",
+    "prisma/seed.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "tests",
+    "**/*.test.ts",
+    "**/*.spec.ts",
+    "coverage"
+  ],
+  "ts-node": {
+    "require": ["tsconfig-paths/register"],
+    "files": true
+  }
 }

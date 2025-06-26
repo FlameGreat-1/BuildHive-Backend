@@ -1,0 +1,460 @@
+// prisma/schema.prisma - BuildHive User + Profiles Complete - Part 1
+
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ================================
+// AUTHENTICATION ENUMS
+// ================================
+
+enum UserType {
+  CLIENT
+  TRADIE
+  ENTERPRISE
+}
+
+enum UserStatus {
+  PENDING_VERIFICATION
+  ACTIVE
+  SUSPENDED
+  INACTIVE
+  BANNED
+}
+
+enum VerificationStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+  EXPIRED
+}
+
+enum DocumentType {
+  DRIVERS_LICENSE
+  PASSPORT
+  ABN_CERTIFICATE
+  INSURANCE_CERTIFICATE
+  LICENSE_CERTIFICATE
+  QUALIFICATION_CERTIFICATE
+  PORTFOLIO_IMAGE
+  PROFILE_PHOTO
+  OTHER
+}
+
+enum AuditSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum SubscriptionTier {
+  BASIC
+  PROFESSIONAL
+  ENTERPRISE
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELLED
+  EXPIRED
+  SUSPENDED
+}
+
+// ================================
+// USER MODEL
+// ================================
+
+model User {
+  // Primary fields
+  id                      String    @id @default(cuid())
+  email                   String    @unique
+  passwordHash            String
+  firstName               String
+  lastName                String
+  phone                   String    @unique
+  userType                UserType
+  status                  UserStatus @default(PENDING_VERIFICATION)
+  
+  // Verification fields
+  emailVerified           Boolean   @default(false)
+  phoneVerified           Boolean   @default(false)
+  emailVerificationToken  String?
+  phoneVerificationCode   String?
+  passwordResetToken      String?
+  passwordResetExpires    DateTime?
+  
+  // Activity tracking
+  lastLoginAt             DateTime?
+  loginCount              Int       @default(0)
+  profileCompleteness     Int       @default(0)
+  
+  // Metadata
+  metadata                Json?
+  
+  // Base entity fields
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+  createdBy               String?
+  updatedBy               String?
+  version                 Int       @default(1)
+  isDeleted               Boolean   @default(false)
+  deletedAt               DateTime?
+  deletedBy               String?
+  
+  // Relationships
+  clientProfile           ClientProfile?
+  tradieProfile           TradieProfile?
+  enterpriseProfile       EnterpriseProfile?
+  documents               Document[]
+  auditLogs               AuditLog[]
+  
+  @@map("users")
+  @@index([email])
+  @@index([phone])
+  @@index([userType])
+  @@index([status])
+  @@index([createdAt])
+  @@index([isDeleted])
+}
+
+// ================================
+// CLIENT PROFILE
+// ================================
+
+model ClientProfile {
+  id                      String    @id @default(cuid())
+  userId                  String    @unique
+  user                    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Client-specific fields
+  companyName             String?
+  industry                String?
+  website                 String?
+  description             String?
+  preferredContactMethod  String?
+  timezone                String?
+  
+  // Address information
+  address                 String?
+  city                    String?
+  state                   String?
+  postcode                String?
+  country                 String    @default("Australia")
+  
+  // Verification
+  isVerified              Boolean   @default(false)
+  verificationStatus      VerificationStatus @default(PENDING)
+  verificationNotes       String?
+  
+  // Statistics
+  totalJobsPosted         Int       @default(0)
+  totalAmountSpent        Decimal   @default(0) @db.Decimal(10,2)
+  averageRating           Decimal?  @db.Decimal(3,2)
+  totalReviews            Int       @default(0)
+  
+  // Metadata
+  preferences             Json?
+  
+  // Base entity fields
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+  version                 Int       @default(1)
+  
+  @@map("client_profiles")
+  @@index([userId])
+  @@index([isVerified])
+  @@index([city, state])
+}
+
+// ================================
+// TRADIE PROFILE
+// ================================
+
+model TradieProfile {
+  id                      String    @id @default(cuid())
+  userId                  String    @unique
+  user                    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Business information
+  businessName            String?
+  abn                     String?   @unique
+  abnVerified             Boolean   @default(false)
+  tradeLicense            String?
+  licenseVerified         Boolean   @default(false)
+  
+  // Service information
+  services                String[]  // Array of services offered
+  specializations         String[]  // Specific specializations
+  experienceYears         Int?
+  hourlyRate              Decimal?  @db.Decimal(8,2)
+  minimumJobValue         Decimal?  @db.Decimal(8,2)
+  
+  // Location and availability
+  serviceRadius           Int?      // Service radius in kilometers
+  address                 String?
+  city                    String?
+  state                   String?
+  postcode                String?
+  country                 String    @default("Australia")
+  availableWeekdays       String[]  // Days available
+  availableHours          String?   // Available hours
+  
+  // Insurance and certifications
+  hasInsurance            Boolean   @default(false)
+  insuranceProvider       String?
+  insuranceExpiry         DateTime?
+  certifications          String[]  // Array of certifications
+  
+  // Portfolio and description
+  description             String?
+  portfolio               String[]  // Array of portfolio image URLs
+  website                 String?
+  
+  // Verification
+  isVerified              Boolean   @default(false)
+  verificationStatus      VerificationStatus @default(PENDING)
+  verificationNotes       String?
+  backgroundCheckStatus   VerificationStatus @default(PENDING)
+  
+  // Statistics and ratings
+  totalJobsCompleted      Int       @default(0)
+  totalEarnings           Decimal   @default(0) @db.Decimal(10,2)
+  averageRating           Decimal?  @db.Decimal(3,2)
+  totalReviews            Int       @default(0)
+  responseRate            Decimal?  @db.Decimal(5,2) // Percentage
+  onTimeRate              Decimal?  @db.Decimal(5,2) // Percentage
+  
+  // Subscription and features
+  isPremium               Boolean   @default(false)
+  premiumExpiry           DateTime?
+  featuredUntil           DateTime?
+  
+  // Metadata
+  preferences             Json?
+  
+  // Base entity fields
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+  version                 Int       @default(1)
+  
+  @@map("tradie_profiles")
+  @@index([userId])
+  @@index([abn])
+  @@index([isVerified])
+  @@index([city, state])
+  @@index([services])
+  @@index([isPremium])
+  @@index([averageRating])
+}
+
+// ================================
+// ENTERPRISE PROFILE
+// ================================
+
+model EnterpriseProfile {
+  id                      String    @id @default(cuid())
+  userId                  String    @unique
+  user                    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Company information
+  companyName             String
+  abn                     String    @unique
+  abnVerified             Boolean   @default(false)
+  acn                     String?   // Australian Company Number
+  industry                String?
+  companySize             String?   // e.g., "1-10", "11-50", "51-200", etc.
+  foundedYear             Int?
+  
+  // Contact information
+  website                 String?
+  linkedinUrl             String?
+  description             String?
+  
+  // Address information
+  headOfficeAddress       String?
+  city                    String?
+  state                   String?
+  postcode                String?
+  country                 String    @default("Australia")
+  
+  // Service information
+  services                String[]  // Services the enterprise provides
+  serviceAreas            String[]  // Geographic areas they serve
+  projectTypes            String[]  // Types of projects they handle
+  minimumProjectValue     Decimal?  @db.Decimal(10,2)
+  
+  // Team and capacity
+  teamSize                Int?
+  maxConcurrentProjects   Int?
+  
+  // Verification and compliance
+  isVerified              Boolean   @default(false)
+  verificationStatus      VerificationStatus @default(PENDING)
+  verificationNotes       String?
+  hasInsurance            Boolean   @default(false)
+  insuranceProvider       String?
+  insuranceExpiry         DateTime?
+  
+  // Certifications and licenses
+  certifications          String[]
+  licenses                String[]
+  
+  // Statistics
+  totalProjectsCompleted  Int       @default(0)
+  totalRevenue            Decimal   @default(0) @db.Decimal(12,2)
+  averageRating           Decimal?  @db.Decimal(3,2)
+  totalReviews            Int       @default(0)
+  
+  // Subscription
+  subscriptionTier        SubscriptionTier @default(BASIC)
+  subscriptionStatus      SubscriptionStatus @default(ACTIVE)
+  subscriptionExpiry      DateTime?
+  maxTeamMembers          Int       @default(5)
+  maxProjects             Int       @default(10)
+  
+  // Metadata
+  preferences             Json?
+  
+  // Base entity fields
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+  version                 Int       @default(1)
+  
+  // Relationships
+  teamMembers             EnterpriseTeamMember[]
+  
+  @@map("enterprise_profiles")
+  @@index([userId])
+  @@index([abn])
+  @@index([isVerified])
+  @@index([city, state])
+  @@index([subscriptionTier])
+  @@index([services])
+}
+
+// ================================
+// ENTERPRISE TEAM MANAGEMENT
+// ================================
+
+model EnterpriseTeamMember {
+  id                      String    @id @default(cuid())
+  enterpriseProfileId     String
+  enterpriseProfile       EnterpriseProfile @relation(fields: [enterpriseProfileId], references: [id], onDelete: Cascade)
+  
+  // Member information
+  email                   String
+  firstName               String
+  lastName                String
+  role                    String    // e.g., "Project Manager", "Site Supervisor", etc.
+  permissions             String[]  // Array of permissions
+  
+  // Status
+  isActive                Boolean   @default(true)
+  invitedAt               DateTime  @default(now())
+  joinedAt                DateTime?
+  lastActiveAt            DateTime?
+  
+  // Base entity fields
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+  
+  @@map("enterprise_team_members")
+  @@unique([enterpriseProfileId, email])
+  @@index([enterpriseProfileId])
+  @@index([email])
+}
+
+// ================================
+// DOCUMENT MANAGEMENT
+// ================================
+
+model Document {
+  id                      String    @id @default(cuid())
+  userId                  String
+  user                    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Document information
+  fileName                String
+  originalName            String
+  fileSize                Int
+  mimeType                String
+  documentType            DocumentType
+  
+  // Storage information
+  storageUrl              String
+  thumbnailUrl            String?
+  
+  // Verification
+  isVerified              Boolean   @default(false)
+  verificationStatus      VerificationStatus @default(PENDING)
+  verificationNotes       String?
+  verifiedAt              DateTime?
+  verifiedBy              String?
+  
+  // Metadata
+  metadata                Json?
+  
+  // Base entity fields
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+  version                 Int       @default(1)
+  isDeleted               Boolean   @default(false)
+  deletedAt               DateTime?
+  
+  @@map("documents")
+  @@index([userId])
+  @@index([documentType])
+  @@index([verificationStatus])
+  @@index([createdAt])
+  @@index([isDeleted])
+}
+
+// ================================
+// AUDIT LOG
+// ================================
+
+model AuditLog {
+  id                      String    @id @default(cuid())
+  userId                  String?
+  user                    User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  
+  // Audit information
+  action                  String    // CREATE, UPDATE, DELETE, LOGIN, etc.
+  resource                String    // USER, PROFILE, DOCUMENT, etc.
+  resourceId              String?
+  
+  // Change tracking
+  oldValues               Json?
+  newValues               Json?
+  
+  // Request context
+  ipAddress               String?
+  userAgent               String?
+  requestId               String?
+  
+  // Severity and categorization
+  severity                AuditSeverity @default(LOW)
+  category                String?
+  
+  // Additional context
+  description             String?
+  metadata                Json?
+  
+  // Base entity fields
+  createdAt               DateTime  @default(now())
+  
+  @@map("audit_logs")
+  @@index([userId])
+  @@index([action])
+  @@index([resource])
+  @@index([resourceId])
+  @@index([severity])
+  @@index([createdAt])
+}
