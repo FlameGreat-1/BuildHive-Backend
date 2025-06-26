@@ -1,4 +1,4 @@
-// src/app.ts
+// src/app.ts 
 
 import express, { Application, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
@@ -11,10 +11,11 @@ import { logger, createLogContext } from '@/utils/logger';
 import { ERROR_CODES, HTTP_STATUS_CODES } from '@/utils/constants';
 import { connectDatabase } from '@/config/database';
 import { connectRedis } from '@/config/redis';
+import { getApiConfig } from '@/config/api';
+import { discoverRoutes, getApiDocumentation } from '@/utils/routeDiscovery';
 import { 
   initializeRequest,
   securityHeaders,
-  corsHandler,
   requestLogger,
   errorHandler,
   healthCheckBypass,
@@ -23,60 +24,28 @@ import {
 import authRoutes from '@/routes/authRoutes';
 import { ApiResponse } from '@/types/common.types';
 
-// Enterprise application configuration
-interface AppConfig {
-  port: number;
-  nodeEnv: string;
-  corsOrigins: string[];
-  enableCompression: boolean;
-  enableHelmet: boolean;
-  enableRateLimit: boolean;
-  rateLimitMax: number;
-  rateLimitWindow: number;
-  requestTimeout: number;
-  maxRequestSize: string;
-}
-
-// Enterprise Express application class
 export class App {
   private app: Application;
   private server: any;
-  private config: AppConfig;
+  private config: ReturnType<typeof getApiConfig>;
 
   constructor() {
+    this.config = getApiConfig();
     this.app = express();
-    this.config = this.loadConfiguration();
     this.initializeMiddleware();
     this.initializeRoutes();
     this.initializeErrorHandling();
   }
 
-  // Load application configuration
-  private loadConfiguration(): AppConfig {
-    return {
-      port: parseInt(process.env.PORT || '3000'),
-      nodeEnv: process.env.NODE_ENV || 'development',
-      corsOrigins: process.env.CORS_ORIGINS?.split(',') || ['http://localhost:3000'],
-      enableCompression: process.env.ENABLE_COMPRESSION !== 'false',
-      enableHelmet: process.env.ENABLE_HELMET !== 'false',
-      enableRateLimit: process.env.ENABLE_RATE_LIMIT !== 'false',
-      rateLimitMax: parseInt(process.env.RATE_LIMIT_MAX || '100'),
-      rateLimitWindow: parseInt(process.env.RATE_LIMIT_WINDOW || '900000'), // 15 minutes
-      requestTimeout: parseInt(process.env.REQUEST_TIMEOUT || '30000'), // 30 seconds
-      maxRequestSize: process.env.MAX_REQUEST_SIZE || '10mb',
-    };
-  }
-
-  // Initialize enterprise middleware stack
   private initializeMiddleware(): void {
     const logContext = createLogContext()
       .withMetadata({ phase: 'middleware_initialization' })
       .build();
 
-    logger.info('Initializing middleware stack', logContext);
+    logger.info('Initializing production middleware stack', logContext);
 
-    // Trust proxy for load balancers
-    this.app.set('trust proxy', 1);
+    // Trust proxy for production load balancers
+    this.app.set('trust proxy', this.config.security.trustProxy);
 
     // Health check bypass (must be first)
     this.app.use(healthCheckBypass);
@@ -84,57 +53,66 @@ export class App {
     // Request initialization
     this.app.use(initializeRequest);
 
-    // Security middleware
-    if (this.config.enableHelmet) {
-      this.app.use(helmet({
-        contentSecurityPolicy: {
-          directives: {
-            defaultSrc: ["'self'"],
-            styleSrc: ["'self'", "'unsafe-inline'"],
-            scriptSrc: ["'self'"],
-            imgSrc: ["'self'", "data:", "https:"],
-            connectSrc: ["'self'"],
-            fontSrc: ["'self'"],
-            objectSrc: ["'none'"],
-            mediaSrc: ["'self'"],
-            frameSrc: ["'none'"],
-          },
+    // Production security middleware
+    this.app.use(helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          styleSrc: ["'self'", "'unsafe-inline'"],
+          scriptSrc: ["'self'"],
+          imgSrc: ["'self'", "data:", "https:"],
+          connectSrc: ["'self'"],
+          fontSrc: ["'self'"],
+          objectSrc: ["'none'"],
+          mediaSrc: ["'self'"],
+          frameSrc: ["'none'"],
         },
-        crossOriginEmbedderPolicy: false,
-      }));
-    }
+      },
+      crossOriginEmbedderPolicy: false,
+      hsts: {
+        maxAge: 31536000,
+        includeSubDomains: true,
+        preload: true
+      }
+    }));
 
     // Custom security headers
     this.app.use(securityHeaders);
 
-    // CORS configuration
+    // Production CORS configuration
     this.app.use(cors({
       origin: (origin, callback) => {
         if (!origin || this.config.corsOrigins.includes(origin)) {
           callback(null, true);
         } else {
+          logger.warn('CORS origin rejected', 
+            createLogContext()
+              .withMetadata({ 
+                rejectedOrigin: origin,
+                allowedOrigins: this.config.corsOrigins 
+              })
+              .build()
+          );
           callback(new Error('Not allowed by CORS'));
         }
       },
       credentials: true,
-      methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Access-Token', 'X-Device-Fingerprint'],
-      maxAge: 86400, // 24 hours
+      methods: this.config.allowedMethods,
+      allowedHeaders: this.config.allowedHeaders,
+      maxAge: 86400,
     }));
 
-    // Compression middleware
-    if (this.config.enableCompression) {
-      this.app.use(compression({
-        filter: (req, res) => {
-          if (req.headers['x-no-compression']) {
-            return false;
-          }
-          return compression.filter(req, res);
-        },
-        level: 6,
-        threshold: 1024,
-      }));
-    }
+    // Production compression
+    this.app.use(compression({
+      filter: (req, res) => {
+        if (req.headers['x-no-compression']) {
+          return false;
+        }
+        return compression.filter(req, res);
+      },
+      level: 6,
+      threshold: 1024,
+    }));
 
     // Body parsing middleware
     this.app.use(express.json({ 
@@ -148,32 +126,40 @@ export class App {
       limit: this.config.maxRequestSize 
     }));
 
-    // Cookie parser
-    this.app.use(cookieParser(process.env.COOKIE_SECRET || 'default-secret'));
+    // Cookie parser with production secret
+    this.app.use(cookieParser(this.config.security.cookieSecret));
 
-    // Global rate limiting
-    if (this.config.enableRateLimit) {
-      this.app.use(rateLimit({
-        windowMs: this.config.rateLimitWindow,
-        max: this.config.rateLimitMax,
-        message: {
+    // Production rate limiting
+    this.app.use(rateLimit({
+      windowMs: this.config.rateLimiting.windowMs,
+      max: this.config.rateLimiting.maxRequests,
+      message: {
+        success: false,
+        message: 'Too many requests from this IP, please try again later',
+        timestamp: new Date(),
+      },
+      standardHeaders: true,
+      legacyHeaders: false,
+      handler: (req, res) => {
+        logger.warn('Rate limit exceeded', 
+          createLogContext()
+            .withRequest(req)
+            .withMetadata({ 
+              ip: req.ip,
+              userAgent: req.headers['user-agent']
+            })
+            .build()
+        );
+
+        const errorResponse: ApiResponse<null> = {
           success: false,
-          message: 'Too many requests from this IP, please try again later',
+          message: 'Rate limit exceeded',
           timestamp: new Date(),
-        },
-        standardHeaders: true,
-        legacyHeaders: false,
-        handler: (req, res) => {
-          const errorResponse: ApiResponse<null> = {
-            success: false,
-            message: 'Rate limit exceeded',
-            timestamp: new Date(),
-            requestId: req.headers['x-request-id'] as string,
-          };
-          res.status(HTTP_STATUS_CODES.TOO_MANY_REQUESTS).json(errorResponse);
-        },
-      }));
-    }
+          requestId: req.headers['x-request-id'] as string,
+        };
+        res.status(HTTP_STATUS_CODES.TOO_MANY_REQUESTS).json(errorResponse);
+      },
+    }));
 
     // Request timeout
     this.app.use(requestTimeout(this.config.requestTimeout));
@@ -181,16 +167,15 @@ export class App {
     // Request logging
     this.app.use(requestLogger);
 
-    logger.info('Middleware stack initialized successfully', logContext);
+    logger.info('Production middleware stack initialized', logContext);
   }
 
-  // Initialize application routes
   private initializeRoutes(): void {
     const logContext = createLogContext()
       .withMetadata({ phase: 'routes_initialization' })
       .build();
 
-    logger.info('Initializing application routes', logContext);
+    logger.info('Initializing production routes', logContext);
 
     // API routes
     this.app.use('/api/auth', authRoutes);
@@ -202,8 +187,8 @@ export class App {
         message: 'TradeConnect API is running',
         data: {
           service: 'TradeConnect API',
-          version: process.env.APP_VERSION || '1.0.0',
-          environment: this.config.nodeEnv,
+          version: this.config.version,
+          environment: this.config.environment,
           timestamp: new Date(),
         },
         timestamp: new Date(),
@@ -213,24 +198,42 @@ export class App {
       res.status(HTTP_STATUS_CODES.OK).json(response);
     });
 
-    // API documentation endpoint
-    this.app.get('/api', (req: Request, res: Response) => {
-      const response: ApiResponse<any> = {
-        success: true,
-        message: 'TradeConnect API Documentation',
-        data: {
-          endpoints: {
-            auth: '/api/auth',
-            health: '/api/health',
-          },
-          version: process.env.APP_VERSION || '1.0.0',
-          documentation: process.env.API_DOCS_URL || 'https://docs.tradeconnect.com',
-        },
-        timestamp: new Date(),
-        requestId: req.requestId,
-      };
+    // API documentation endpoint (auto-generated from routes)
+    this.app.get('/api/docs', (req: Request, res: Response) => {
+      try {
+        // Discover routes from the actual Express app
+        discoverRoutes(this.app);
+        const documentation = getApiDocumentation();
 
-      res.status(HTTP_STATUS_CODES.OK).json(response);
+        const response: ApiResponse<any> = {
+          success: true,
+          message: 'API Documentation',
+          data: documentation,
+          timestamp: new Date(),
+          requestId: req.requestId,
+        };
+
+        res.status(HTTP_STATUS_CODES.OK).json(response);
+
+      } catch (error) {
+        logger.error('API documentation generation failed', 
+          createLogContext()
+            .withRequest(req)
+            .withMetadata({ 
+              errorMessage: error instanceof Error ? error.message : 'Unknown error'
+            })
+            .build()
+        );
+
+        const errorResponse: ApiResponse<null> = {
+          success: false,
+          message: 'Documentation generation failed',
+          timestamp: new Date(),
+          requestId: req.requestId,
+        };
+
+        res.status(HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR).json(errorResponse);
+      }
     });
 
     // Health check endpoint
@@ -242,9 +245,10 @@ export class App {
           status: 'healthy',
           uptime: process.uptime(),
           timestamp: new Date(),
-          version: process.env.APP_VERSION || '1.0.0',
-          environment: this.config.nodeEnv,
+          version: this.config.version,
+          environment: this.config.environment,
           memory: process.memoryUsage(),
+          baseUrl: this.config.baseUrl,
         },
         timestamp: new Date(),
         requestId: req.requestId,
@@ -276,82 +280,92 @@ export class App {
       res.status(HTTP_STATUS_CODES.NOT_FOUND).json(errorResponse);
     });
 
-    logger.info('Application routes initialized successfully', logContext);
+    logger.info('Production routes initialized', logContext);
   }
 
-  // Initialize error handling
+  // Initialize production error handling
   private initializeErrorHandling(): void {
     const logContext = createLogContext()
       .withMetadata({ phase: 'error_handling_initialization' })
       .build();
 
-    logger.info('Initializing error handling', logContext);
+    logger.info('Initializing production error handling', logContext);
 
     // Global error handler
     this.app.use(errorHandler);
 
     // Unhandled promise rejection handler
     process.on('unhandledRejection', (reason: any, promise: Promise<any>) => {
-      logger.error('Unhandled Promise Rejection', 
+      logger.error('Unhandled Promise Rejection - Production', 
         createLogContext()
           .withError(ERROR_CODES.SYS_UNHANDLED_REJECTION)
           .withMetadata({ 
             reason: reason?.message || reason,
-            stack: reason?.stack 
+            stack: reason?.stack,
+            environment: this.config.environment
           })
           .build()
       );
+
+      // In production, gracefully shutdown on unhandled rejections
+      this.gracefulShutdown('UNHANDLED_REJECTION');
     });
 
     // Uncaught exception handler
     process.on('uncaughtException', (error: Error) => {
-      logger.error('Uncaught Exception', 
+      logger.error('Uncaught Exception - Production', 
         createLogContext()
           .withError(ERROR_CODES.SYS_UNCAUGHT_EXCEPTION)
           .withMetadata({ 
             errorMessage: error.message,
-            stack: error.stack 
+            stack: error.stack,
+            environment: this.config.environment
           })
           .build()
       );
 
-      // Graceful shutdown
+      // Force shutdown on uncaught exceptions in production
       this.gracefulShutdown('UNCAUGHT_EXCEPTION');
     });
 
-    // Graceful shutdown handlers
+    // Production shutdown handlers
     process.on('SIGTERM', () => this.gracefulShutdown('SIGTERM'));
     process.on('SIGINT', () => this.gracefulShutdown('SIGINT'));
+    process.on('SIGUSR2', () => this.gracefulShutdown('SIGUSR2')); // PM2 reload
 
-    logger.info('Error handling initialized successfully', logContext);
+    logger.info('Production error handling initialized', logContext);
   }
 
-  // Initialize database connections
+  // Initialize production database connections
   private async initializeDatabase(): Promise<void> {
     const logContext = createLogContext()
       .withMetadata({ phase: 'database_initialization' })
       .build();
 
     try {
-      logger.info('Initializing database connections', logContext);
+      logger.info('Initializing production database connections', logContext);
 
-      // Connect to PostgreSQL
+      // Connect to PostgreSQL with production settings
       await connectDatabase();
-      logger.info('PostgreSQL connection established', logContext);
+      logger.info('Production PostgreSQL connection established', logContext);
 
-      // Connect to Redis
+      // Connect to Redis with production settings
       await connectRedis();
-      logger.info('Redis connection established', logContext);
+      logger.info('Production Redis connection established', logContext);
 
-      logger.info('Database connections initialized successfully', logContext);
+      // Test database connections
+      await this.testDatabaseConnections();
+
+      logger.info('Production database connections initialized successfully', logContext);
 
     } catch (error) {
-      logger.error('Database initialization failed', 
+      logger.error('Production database initialization failed', 
         createLogContext()
           .withError(ERROR_CODES.SYS_DATABASE_CONNECTION_ERROR)
           .withMetadata({ 
             errorMessage: error instanceof Error ? error.message : 'Unknown error',
-            stack: error instanceof Error ? error.stack : undefined 
+            stack: error instanceof Error ? error.stack : undefined,
+            environment: this.config.environment
           })
           .build()
       );
@@ -359,55 +373,87 @@ export class App {
     }
   }
 
-  // Start the application server
+  // Test database connections
+  private async testDatabaseConnections(): Promise<void> {
+    try {
+      // Test Prisma connection
+      const { prisma } = await import('@/config/database');
+      await prisma.$queryRaw`SELECT 1`;
+      
+      // Test Redis connection
+      const { redis } = await import('@/config/redis');
+      await redis.ping();
+
+      logger.info('Database connection tests passed');
+
+    } catch (error) {
+      logger.error('Database connection test failed', {
+        errorMessage: error instanceof Error ? error.message : 'Unknown error'
+      });
+      throw error;
+    }
+  }
+
+  // Start the production application server
   public async start(): Promise<void> {
     const logContext = createLogContext()
       .withMetadata({ 
         phase: 'application_startup',
         port: this.config.port,
-        environment: this.config.nodeEnv 
+        environment: this.config.environment,
+        baseUrl: this.config.baseUrl
       })
       .build();
 
     try {
-      logger.info('Starting TradeConnect application', logContext);
+      logger.info('Starting TradeConnect production application', logContext);
 
       // Initialize database connections
       await this.initializeDatabase();
 
-      // Create HTTP server
+      // Create HTTPS server for production
       this.server = createServer(this.app);
+
+      // Configure server settings
+      this.server.keepAliveTimeout = 65000;
+      this.server.headersTimeout = 66000;
+      this.server.maxHeadersCount = 1000;
+      this.server.timeout = 120000;
 
       // Start listening
       this.server.listen(this.config.port, () => {
-        logger.info('TradeConnect application started successfully', {
+        logger.info('TradeConnect production application started successfully', {
           ...logContext,
           port: this.config.port,
-          environment: this.config.nodeEnv,
+          environment: this.config.environment,
           processId: process.pid,
+          baseUrl: this.config.baseUrl,
+          version: this.config.version
         });
 
-        logger.business('APPLICATION_STARTED', {
+        logger.business('PRODUCTION_APPLICATION_STARTED', {
           ...logContext,
-          version: process.env.APP_VERSION || '1.0.0',
+          version: this.config.version,
+          baseUrl: this.config.baseUrl
         });
       });
 
-      // Server error handling
+      // Production server error handling
       this.server.on('error', (error: any) => {
-        logger.error('Server error', 
+        logger.error('Production server error', 
           createLogContext()
             .withError(ERROR_CODES.SYS_SERVER_ERROR)
             .withMetadata({ 
               errorMessage: error.message,
               code: error.code,
-              port: this.config.port 
+              port: this.config.port,
+              environment: this.config.environment
             })
             .build()
         );
 
         if (error.code === 'EADDRINUSE') {
-          logger.error(`Port ${this.config.port} is already in use`, logContext);
+          logger.error(`Production port ${this.config.port} is already in use`, logContext);
           process.exit(1);
         }
       });
@@ -415,20 +461,26 @@ export class App {
       // Server listening event
       this.server.on('listening', () => {
         const address = this.server.address();
-        logger.info('Server is listening', {
+        logger.info('Production server is listening', {
           ...logContext,
           address: typeof address === 'string' ? address : address?.address,
           port: typeof address === 'string' ? this.config.port : address?.port,
         });
       });
 
+      // Server connection handling
+      this.server.on('connection', (socket: any) => {
+        socket.setTimeout(120000); // 2 minutes timeout
+      });
+
     } catch (error) {
-      logger.error('Application startup failed', 
+      logger.error('Production application startup failed', 
         createLogContext()
           .withError(ERROR_CODES.SYS_STARTUP_ERROR)
           .withMetadata({ 
             errorMessage: error instanceof Error ? error.message : 'Unknown error',
-            stack: error instanceof Error ? error.stack : undefined 
+            stack: error instanceof Error ? error.stack : undefined,
+            environment: this.config.environment
           })
           .build()
       );
@@ -436,34 +488,35 @@ export class App {
     }
   }
 
-  // Graceful shutdown
+  // Production graceful shutdown
   private gracefulShutdown(signal: string): void {
     const logContext = createLogContext()
       .withMetadata({ 
         phase: 'graceful_shutdown',
         signal,
-        processId: process.pid 
+        processId: process.pid,
+        environment: this.config.environment
       })
       .build();
 
-    logger.info(`Received ${signal}, starting graceful shutdown`, logContext);
+    logger.info(`Production received ${signal}, starting graceful shutdown`, logContext);
 
-    // Set a timeout for forceful shutdown
+    // Set timeout for forceful shutdown (30 seconds in production)
     const shutdownTimeout = setTimeout(() => {
-      logger.error('Graceful shutdown timeout, forcing exit', logContext);
+      logger.error('Production graceful shutdown timeout, forcing exit', logContext);
       process.exit(1);
-    }, 30000); // 30 seconds
+    }, 30000);
 
     // Close server
     if (this.server) {
       this.server.close(async (error: any) => {
         if (error) {
-          logger.error('Error closing server', {
+          logger.error('Error closing production server', {
             ...logContext,
             errorMessage: error.message,
           });
         } else {
-          logger.info('Server closed successfully', logContext);
+          logger.info('Production server closed successfully', logContext);
         }
 
         try {
@@ -471,11 +524,18 @@ export class App {
           await this.closeDatabaseConnections();
           
           clearTimeout(shutdownTimeout);
-          logger.info('Graceful shutdown completed', logContext);
+          logger.info('Production graceful shutdown completed', logContext);
+          
+          logger.business('PRODUCTION_APPLICATION_SHUTDOWN', {
+            ...logContext,
+            signal,
+            uptime: process.uptime()
+          });
+          
           process.exit(0);
 
         } catch (shutdownError) {
-          logger.error('Error during graceful shutdown', {
+          logger.error('Error during production graceful shutdown', {
             ...logContext,
             errorMessage: shutdownError instanceof Error ? shutdownError.message : 'Unknown error',
           });
@@ -489,33 +549,36 @@ export class App {
     }
   }
 
-  // Close database connections
+  // Close production database connections
   private async closeDatabaseConnections(): Promise<void> {
     const logContext = createLogContext()
-      .withMetadata({ phase: 'database_cleanup' })
+      .withMetadata({ 
+        phase: 'database_cleanup',
+        environment: this.config.environment
+      })
       .build();
 
     try {
-      logger.info('Closing database connections', logContext);
+      logger.info('Closing production database connections', logContext);
 
       // Close Redis connection
       const { redis } = await import('@/config/redis');
       if (redis) {
         await redis.quit();
-        logger.info('Redis connection closed', logContext);
+        logger.info('Production Redis connection closed', logContext);
       }
 
       // Close Prisma connection
       const { prisma } = await import('@/config/database');
       if (prisma) {
         await prisma.$disconnect();
-        logger.info('Prisma connection closed', logContext);
+        logger.info('Production Prisma connection closed', logContext);
       }
 
-      logger.info('Database connections closed successfully', logContext);
+      logger.info('Production database connections closed successfully', logContext);
 
     } catch (error) {
-      logger.error('Error closing database connections', {
+      logger.error('Error closing production database connections', {
         ...logContext,
         errorMessage: error instanceof Error ? error.message : 'Unknown error',
       });
@@ -533,19 +596,19 @@ export class App {
     return this.server;
   }
 
-  // Get application configuration
-  public getConfig(): Readonly<AppConfig> {
+  // Get production configuration
+  public getConfig(): Readonly<ReturnType<typeof getApiConfig>> {
     return { ...this.config };
   }
 }
 
-// Create and export application instance
+// Create and export production application instance
 const app = new App();
 
 export default app;
 export { App };
 
-// Export for testing
-export const createApp = (): App => {
+// Export for production deployment
+export const createProductionApp = (): App => {
   return new App();
 };
