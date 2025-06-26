@@ -20,17 +20,28 @@ ENV NODE_ENV=production
 COPY package*.json ./
 COPY prisma ./prisma/
 
-# Install dependencies (including dev for build)
-RUN npm ci --include=dev --frozen-lockfile
+# Smart dependency installation - handles missing package-lock.json
+RUN if [ -f package-lock.json ]; then \
+        echo "📦 Found package-lock.json - using npm ci for faster, reliable builds"; \
+        npm ci --include=dev --frozen-lockfile; \
+    else \
+        echo "⚠️  No package-lock.json found - using npm install (will generate lockfile)"; \
+        npm install --include=dev; \
+        echo "✅ Generated package-lock.json during build"; \
+    fi
 
 # Copy source code
 COPY . .
 
 # Generate Prisma client and build
-RUN npx prisma generate && \
+RUN echo "🔄 Generating Prisma client..." && \
+    npx prisma generate && \
+    echo "🏗️  Building application..." && \
     npm run build && \
+    echo "🧹 Cleaning up dev dependencies..." && \
     npm prune --production && \
-    npm cache clean --force
+    npm cache clean --force && \
+    echo "✅ Build completed successfully"
 
 # Production stage
 FROM node:18-alpine AS production
@@ -56,9 +67,10 @@ COPY --from=builder --chown=buildhive:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=buildhive:nodejs /app/package*.json ./
 COPY --from=builder --chown=buildhive:nodejs /app/prisma ./prisma
 
-# Create necessary directories
+# Create necessary directories with proper permissions
 RUN mkdir -p logs storage tmp && \
-    chown -R buildhive:nodejs logs storage tmp
+    chown -R buildhive:nodejs logs storage tmp && \
+    chmod 755 logs storage tmp
 
 # Switch to non-root user
 USER buildhive
@@ -69,21 +81,41 @@ EXPOSE 3000
 # Production environment variables
 ENV NODE_ENV=production \
     PORT=3000 \
-    NODE_OPTIONS="--max-old-space-size=1024" \
-    UV_THREADPOOL_SIZE=4
+    NODE_OPTIONS="--max-old-space-size=1024 --unhandled-rejections=strict" \
+    UV_THREADPOOL_SIZE=4 \
+    TZ=UTC
 
-# Health check using Node.js instead of curl
+# Health check using Node.js instead of curl (more secure and reliable)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD node -e "require('http').get('http://localhost:3000/api/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))"
+    CMD node -e " \
+        const http = require('http'); \
+        const options = { \
+            hostname: 'localhost', \
+            port: 3000, \
+            path: '/api/health', \
+            method: 'GET', \
+            timeout: 5000 \
+        }; \
+        const req = http.request(options, (res) => { \
+            process.exit(res.statusCode === 200 ? 0 : 1); \
+        }); \
+        req.on('error', () => process.exit(1)); \
+        req.on('timeout', () => process.exit(1)); \
+        req.end(); \
+    "
 
 # Use tini as PID 1 for proper signal handling
 ENTRYPOINT ["/sbin/tini", "--"]
 
-# Start with graceful shutdown support
-CMD ["dumb-init", "node", "--enable-source-maps", "dist/server.js"]
+# Start with graceful shutdown support and better error handling
+CMD ["dumb-init", "node", "--enable-source-maps", "--trace-warnings", "dist/server.js"]
 
-# Labels for production tracking
+# Labels for production tracking and metadata
 LABEL maintainer="FlameGreat-1" \
       version="1.0.0" \
       description="BuildHive Construction Marketplace API" \
-      org.opencontainers.image.source="https://github.com/FlameGreat-1/BuildHive-Backend"
+      org.opencontainers.image.source="https://github.com/FlameGreat-1/BuildHive-Backend" \
+      org.opencontainers.image.documentation="https://github.com/FlameGreat-1/BuildHive-Backend#readme" \
+      org.opencontainers.image.licenses="UNLICENSED" \
+      org.opencontainers.image.title="BuildHive API" \
+      org.opencontainers.image.description="Construction Marketplace Backend API"
