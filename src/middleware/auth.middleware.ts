@@ -3,7 +3,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { logger, createLogContext } from '@/utils/logger';
 import { ERROR_CODES, HTTP_STATUS_CODES, SECURITY_CONSTANTS } from '@/utils/constants';
-import { validateUserToken } from '@/services/AuthService';
+import { validateUserToken } from '@/services/auth.service';
 import { getUserById } from '@/models/User';
 import { getCache, setCache } from '@/config/redis';
 import { 
@@ -121,7 +121,7 @@ export class AuthMiddleware {
         const errorResponse: ApiResponse<null> = {
           success: false,
           message: 'Authentication token is required',
-          timestamp: new Date(),
+          timestamp: new Date().toISOString(),
           requestId: req.requestId,
         };
 
@@ -681,8 +681,7 @@ export class AuthMiddleware {
   private getClientIdentifier(req: Request): string {
     const ipAddress = req.headers['x-forwarded-for'] as string || 
                      req.headers['x-real-ip'] as string || 
-                     req.connection.remoteAddress || 
-                     req.socket.remoteAddress || 
+                     (req.socket as any)?.remoteAddress || 
                      '0.0.0.0';
     
     const userAgent = req.headers['user-agent'] || 'unknown';

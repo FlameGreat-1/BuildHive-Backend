@@ -1,11 +1,8 @@
-// src/config/redis.ts
-
 import { createClient, RedisClientType, RedisClientOptions } from 'redis';
 import { logger, createLogContext } from '@/utils/logger';
 import { CACHE_CONSTANTS, ERROR_CODES, MONITORING_CONSTANTS } from '@/utils/constants';
 import { HealthStatus, ServiceHealth, CacheOptions } from '@/types/common.types';
 
-// Enterprise Redis configuration interface
 interface RedisConfig {
   url: string;
   keyPrefix: string;
@@ -19,7 +16,6 @@ interface RedisConfig {
   maxRetriesPerRequest: number;
 }
 
-// Enterprise Redis connection manager
 class RedisManager {
   private static instance: RedisManager;
   private client: RedisClientType | null = null;
@@ -35,7 +31,6 @@ class RedisManager {
     this.config = this.loadConfiguration();
   }
 
-  // Singleton pattern for enterprise Redis management
   public static getInstance(): RedisManager {
     if (!RedisManager.instance) {
       RedisManager.instance = new RedisManager();
@@ -43,7 +38,6 @@ class RedisManager {
     return RedisManager.instance;
   }
 
-  // Load Redis configuration with enterprise defaults
   private loadConfiguration(): RedisConfig {
     return {
       url: process.env.REDIS_URL || 'redis://localhost:6379',
@@ -59,7 +53,6 @@ class RedisManager {
     };
   }
 
-  // Enterprise Redis client creation
   private createRedisClient(purpose: 'main' | 'subscriber' | 'publisher'): RedisClientType {
     const clientOptions: RedisClientOptions = {
       url: this.config.url,
@@ -90,7 +83,6 @@ class RedisManager {
 
     const client = createClient(clientOptions) as RedisClientType;
 
-    // Enterprise event handlers
     client.on('connect', () => {
       logger.info(`Redis ${purpose} client connecting`, 
         createLogContext().withMetadata({ purpose }).build()
@@ -131,7 +123,6 @@ class RedisManager {
     return client;
   }
 
-  // Enterprise Redis connection with retry logic
   public async connect(): Promise<void> {
     const startTime = Date.now();
     const logContext = createLogContext()
@@ -144,12 +135,10 @@ class RedisManager {
     try {
       logger.info('Connecting to Redis', logContext);
 
-      // Create main client
       if (!this.client) {
         this.client = this.createRedisClient('main');
       }
 
-      // Create pub/sub clients for event-driven architecture
       if (!this.subscriber) {
         this.subscriber = this.createRedisClient('subscriber');
       }
@@ -158,14 +147,12 @@ class RedisManager {
         this.publisher = this.createRedisClient('publisher');
       }
 
-      // Connect all clients
       await Promise.all([
         this.client.connect(),
         this.subscriber.connect(),
         this.publisher.connect(),
       ]);
 
-      // Test connections
       await this.client.ping();
       await this.subscriber.ping();
       await this.publisher.ping();
@@ -198,7 +185,6 @@ class RedisManager {
     }
   }
 
-  // Enterprise cache operations with logging
   public async set(key: string, value: any, options?: CacheOptions): Promise<void> {
     if (!this.client || !this.isConnected) {
       throw new Error('Redis not connected');
@@ -238,7 +224,6 @@ class RedisManager {
     }
   }
 
-  // Enterprise cache get with deserialization
   public async get<T = any>(key: string, options?: CacheOptions): Promise<T | null> {
     if (!this.client || !this.isConnected) {
       throw new Error('Redis not connected');
@@ -277,7 +262,6 @@ class RedisManager {
     }
   }
 
-  // Enterprise cache delete
   public async delete(key: string): Promise<boolean> {
     if (!this.client || !this.isConnected) {
       throw new Error('Redis not connected');
@@ -310,7 +294,6 @@ class RedisManager {
     }
   }
 
-  // Enterprise pub/sub for event-driven architecture
   public async publish(channel: string, message: any): Promise<void> {
     if (!this.publisher || !this.isPublisherConnected) {
       throw new Error('Redis publisher not connected');
@@ -340,7 +323,6 @@ class RedisManager {
     }
   }
 
-  // Enterprise subscription management
   public async subscribe(channel: string, callback: (message: any) => void): Promise<void> {
     if (!this.subscriber || !this.isSubscriberConnected) {
       throw new Error('Redis subscriber not connected');
@@ -390,7 +372,6 @@ class RedisManager {
     }
   }
 
-  // Enterprise health check
   public async healthCheck(): Promise<ServiceHealth> {
     const startTime = Date.now();
 
@@ -433,7 +414,6 @@ class RedisManager {
     }
   }
 
-  // Enterprise graceful disconnect
   public async disconnect(): Promise<void> {
     const logContext = createLogContext()
       .withMetadata({ reason: 'graceful_shutdown' })
@@ -475,12 +455,10 @@ class RedisManager {
     }
   }
 
-  // Enterprise connection status
   public isHealthy(): boolean {
     return this.isConnected && this.isSubscriberConnected && this.isPublisherConnected;
   }
 
-  // Enterprise metrics
   public getMetrics(): Record<string, any> {
     return {
       isConnected: this.isConnected,
@@ -491,22 +469,25 @@ class RedisManager {
       defaultTTL: this.config.defaultTTL,
     };
   }
+
+  public async ping(): Promise<string> {
+    if (!this.client || !this.isConnected) {
+      throw new Error('Redis not connected');
+    }
+    return await this.client.ping();
+  }
 }
 
-// Export singleton instance and helper functions
 export const redisManager = RedisManager.getInstance();
 
-// Enterprise Redis connection helper
 export const connectRedis = async (): Promise<void> => {
   return await redisManager.connect();
 };
 
-// Enterprise Redis health check helper
 export const checkRedisHealth = async (): Promise<ServiceHealth> => {
   return await redisManager.healthCheck();
 };
 
-// Enterprise cache helpers
 export const setCache = async (key: string, value: any, options?: CacheOptions): Promise<void> => {
   return await redisManager.set(key, value, options);
 };
@@ -519,7 +500,6 @@ export const deleteCache = async (key: string): Promise<boolean> => {
   return await redisManager.delete(key);
 };
 
-// Enterprise pub/sub helpers for event-driven architecture
 export const publishEvent = async (channel: string, message: any): Promise<void> => {
   return await redisManager.publish(channel, message);
 };
@@ -527,3 +507,5 @@ export const publishEvent = async (channel: string, message: any): Promise<void>
 export const subscribeToEvents = async (channel: string, callback: (message: any) => void): Promise<void> => {
   return await redisManager.subscribe(channel, callback);
 };
+
+export const redis = redisManager;

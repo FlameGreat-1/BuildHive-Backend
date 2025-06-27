@@ -1,11 +1,8 @@
-// src/config/database.ts
-
 import { PrismaClient } from '@prisma/client';
 import { logger, createLogContext } from '@/utils/logger';
 import { DATABASE_CONSTANTS, ERROR_CODES } from '@/utils/constants';
 import { HealthStatus, ServiceHealth } from '@/types/common.types';
 
-// Enterprise database configuration interface
 interface DatabaseConfig {
   url: string;
   maxConnections: number;
@@ -16,7 +13,6 @@ interface DatabaseConfig {
   enableMetrics: boolean;
 }
 
-// Enterprise database connection manager
 class DatabaseManager {
   private static instance: DatabaseManager;
   private prisma: PrismaClient | null = null;
@@ -29,7 +25,6 @@ class DatabaseManager {
     this.config = this.loadConfiguration();
   }
 
-  // Singleton pattern for enterprise database management
   public static getInstance(): DatabaseManager {
     if (!DatabaseManager.instance) {
       DatabaseManager.instance = new DatabaseManager();
@@ -37,7 +32,6 @@ class DatabaseManager {
     return DatabaseManager.instance;
   }
 
-  // Load database configuration with enterprise defaults
   private loadConfiguration(): DatabaseConfig {
     return {
       url: process.env.DATABASE_URL || '',
@@ -50,7 +44,6 @@ class DatabaseManager {
     };
   }
 
-  // Enterprise database connection with retry logic
   public async connect(): Promise<PrismaClient> {
     if (this.prisma && this.isConnected) {
       return this.prisma;
@@ -71,10 +64,8 @@ class DatabaseManager {
     try {
       logger.info('Attempting database connection', logContext);
 
-      // Validate configuration
       this.validateConfiguration();
 
-      // Create Prisma client with enterprise configuration
       this.prisma = new PrismaClient({
         datasources: {
           db: {
@@ -90,12 +81,10 @@ class DatabaseManager {
         errorFormat: 'pretty',
       });
 
-      // Set up enterprise logging for database operations
       if (this.config.enableLogging) {
         this.setupDatabaseLogging();
       }
 
-      // Test connection with timeout
       await Promise.race([
         this.prisma.$connect(),
         new Promise((_, reject) => 
@@ -103,7 +92,6 @@ class DatabaseManager {
         ),
       ]);
 
-      // Verify connection with a simple query
       await this.prisma.$queryRaw`SELECT 1`;
 
       this.isConnected = true;
@@ -130,16 +118,14 @@ class DatabaseManager {
         errorCode: ERROR_CODES.SYS_DATABASE_ERROR,
       });
 
-      // Retry logic for enterprise resilience
       if (this.connectionAttempts < this.maxRetries) {
-        const retryDelay = Math.pow(2, this.connectionAttempts) * 1000; // Exponential backoff
+        const retryDelay = Math.pow(2, this.connectionAttempts) * 1000;
         logger.info(`Retrying database connection in ${retryDelay}ms`, logContext);
         
         await new Promise(resolve => setTimeout(resolve, retryDelay));
         return this.connect();
       }
 
-      // Max retries exceeded
       logger.error('Database connection failed after maximum retries', {
         ...logContext,
         errorCode: ERROR_CODES.SYS_DATABASE_ERROR,
@@ -150,7 +136,6 @@ class DatabaseManager {
     }
   }
 
-  // Enterprise configuration validation
   private validateConfiguration(): void {
     if (!this.config.url) {
       throw new Error('DATABASE_URL is required');
@@ -173,11 +158,10 @@ class DatabaseManager {
     });
   }
 
-  // Enterprise database logging setup
   private setupDatabaseLogging(): void {
     if (!this.prisma) return;
 
-    this.prisma.$on('query', (event) => {
+    this.prisma.$on('query', (event: any) => {
       logger.database(
         'QUERY',
         event.target || 'unknown',
@@ -192,7 +176,7 @@ class DatabaseManager {
       );
     });
 
-    this.prisma.$on('error', (event) => {
+    this.prisma.$on('error', (event: any) => {
       logger.error('Database error occurred', 
         createLogContext()
           .withError(ERROR_CODES.SYS_DATABASE_ERROR)
@@ -204,7 +188,7 @@ class DatabaseManager {
       );
     });
 
-    this.prisma.$on('info', (event) => {
+    this.prisma.$on('info', (event: any) => {
       logger.info('Database info', 
         createLogContext()
           .withMetadata({
@@ -215,7 +199,7 @@ class DatabaseManager {
       );
     });
 
-    this.prisma.$on('warn', (event) => {
+    this.prisma.$on('warn', (event: any) => {
       logger.warn('Database warning', 
         createLogContext()
           .withMetadata({
@@ -227,7 +211,6 @@ class DatabaseManager {
     });
   }
 
-  // Enterprise health check for database
   public async healthCheck(): Promise<ServiceHealth> {
     const startTime = Date.now();
     
@@ -241,7 +224,6 @@ class DatabaseManager {
         };
       }
 
-      // Simple health check query
       await this.prisma.$queryRaw`SELECT 1`;
       
       const responseTime = Date.now() - startTime;
@@ -271,7 +253,6 @@ class DatabaseManager {
     }
   }
 
-  // Enterprise graceful disconnect
   public async disconnect(): Promise<void> {
     if (this.prisma && this.isConnected) {
       const logContext = createLogContext()
@@ -298,7 +279,6 @@ class DatabaseManager {
     }
   }
 
-  // Get database client (with connection check)
   public getClient(): PrismaClient {
     if (!this.prisma || !this.isConnected) {
       throw new Error('Database not connected. Call connect() first.');
@@ -306,7 +286,6 @@ class DatabaseManager {
     return this.prisma;
   }
 
-  // Enterprise transaction wrapper with logging
   public async transaction<T>(
     operation: (prisma: PrismaClient) => Promise<T>,
     options?: { timeout?: number; isolationLevel?: string }
@@ -353,12 +332,10 @@ class DatabaseManager {
     }
   }
 
-  // Enterprise connection status
   public isHealthy(): boolean {
     return this.isConnected && this.prisma !== null;
   }
 
-  // Enterprise metrics (if enabled)
   public getMetrics(): Record<string, any> {
     return {
       isConnected: this.isConnected,
@@ -370,28 +347,31 @@ class DatabaseManager {
   }
 }
 
-// Export singleton instance and connection function
 export const databaseManager = DatabaseManager.getInstance();
 
-// Enterprise database connection helper
 export const connectDatabase = async (): Promise<PrismaClient> => {
   return await databaseManager.connect();
 };
 
-// Enterprise database health check helper
 export const checkDatabaseHealth = async (): Promise<ServiceHealth> => {
   return await databaseManager.healthCheck();
 };
 
-// Enterprise database client getter
 export const getDatabase = (): PrismaClient => {
   return databaseManager.getClient();
 };
 
-// Enterprise transaction helper
 export const executeTransaction = async <T>(
   operation: (prisma: PrismaClient) => Promise<T>,
   options?: { timeout?: number; isolationLevel?: string }
 ): Promise<T> => {
   return await databaseManager.transaction(operation, options);
 };
+
+export const prisma = (() => {
+  try {
+    return databaseManager.getClient();
+  } catch {
+    return null as any;
+  }
+})();

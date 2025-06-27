@@ -7,6 +7,7 @@ export enum UserType {
 export enum UserStatus {
   PENDING = 'pending',
   ACTIVE = 'active',
+  INACTIVE = 'inactive',
   SUSPENDED = 'suspended',
   REJECTED = 'rejected',
   PENDING_VERIFICATION = 'pending_verification'

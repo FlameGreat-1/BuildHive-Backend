@@ -50,6 +50,28 @@ export interface LogContext {
   metadata?: Record<string, any>;
   error?: string;
   duration?: number;
+  errorMessage?: string;
+  port?: number;
+  version?: string;
+  address?: string;
+  signal?: string;
+  severity?: string;
+  connectionTime?: number;
+  cacheHit?: boolean;
+  nextStep?: string;
+  rememberMe?: boolean;
+  token?: string;
+  code?: string;
+  email?: string;
+  userRole?: string;
+  userPermissions?: string[];
+  clientId?: string;
+  currentCompleteness?: number;
+  profileCompleteness?: number;
+  contentLength?: number;
+  startupTime?: number;
+  shutdownDuration?: number;
+  ipAddress?: string;
 }
 
 export interface PaginationParams {

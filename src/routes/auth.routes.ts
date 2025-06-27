@@ -1,5 +1,3 @@
-// src/routes/authRoutes.ts
-
 import { Router } from 'express';
 import { 
   register,
@@ -12,7 +10,7 @@ import {
   getProfile,
   validateToken,
   healthCheck
-} from '@/controllers/AuthController';
+} from '@/controllers/auth.controller';
 import {
   initializeRequest,
   securityHeaders,
@@ -33,23 +31,20 @@ import {
   clientAuth,
   tradieAuth,
   enterpriseAuth
-} from '@/middleware/AuthMiddleware';
+} from '@/middleware/auth.middleware';
 import { UserType } from '@/types/auth.types';
 import { logger, createLogContext } from '@/utils/logger';
 import { RATE_LIMIT_CONSTANTS } from '@/utils/constants';
 
-// Enterprise authentication router
 const authRouter = Router();
 
-// Apply global middleware to all auth routes
 authRouter.use(initializeRequest);
 authRouter.use(securityHeaders);
 authRouter.use(corsHandler);
 authRouter.use(requestLogger);
 authRouter.use(healthCheckBypass);
-authRouter.use(requestTimeout(30000)); // 30 second timeout
+authRouter.use(requestTimeout(30000));
 
-// Public authentication endpoints (no auth required)
 authRouter.post('/register', 
   rateLimit(RATE_LIMIT_CONSTANTS.REGISTRATION.MAX_REQUESTS, RATE_LIMIT_CONSTANTS.REGISTRATION.WINDOW_MS),
   register
@@ -80,13 +75,11 @@ authRouter.post('/refresh-token',
   refreshToken
 );
 
-// Token validation endpoint (public but requires token)
 authRouter.post('/validate-token', 
   rateLimit(RATE_LIMIT_CONSTANTS.TOKEN_VALIDATION.MAX_REQUESTS, RATE_LIMIT_CONSTANTS.TOKEN_VALIDATION.WINDOW_MS),
   validateToken
 );
 
-// Protected authentication endpoints (require authentication)
 authRouter.post('/logout', 
   authenticate,
   rateLimit(RATE_LIMIT_CONSTANTS.LOGOUT.MAX_REQUESTS, RATE_LIMIT_CONSTANTS.LOGOUT.WINDOW_MS),
@@ -99,7 +92,6 @@ authRouter.get('/profile',
   getProfile
 );
 
-// Role-specific profile endpoints
 authRouter.get('/profile/client', 
   ...clientAuth,
   rateLimit(RATE_LIMIT_CONSTANTS.PROFILE.MAX_REQUESTS, RATE_LIMIT_CONSTANTS.PROFILE.WINDOW_MS),
@@ -118,13 +110,10 @@ authRouter.get('/profile/enterprise',
   getProfile
 );
 
-// Health check endpoint
 authRouter.get('/health', healthCheck);
 
-// Apply error handling middleware
 authRouter.use(errorHandler);
 
-// Log route registration
 logger.info('Authentication routes registered', 
   createLogContext()
     .withMetadata({ 

@@ -20,7 +20,7 @@ export async function checkRedisHealth() {
   try {
     const healthResult = await redisManager.healthCheck();
     return { 
-      status: healthResult.status === 'HEALTHY' ? 'healthy' : 'unhealthy', 
+    status: healthResult.status === HealthStatus.HEALTHY ? 'healthy' : 'unhealthy', 
       service: 'redis' 
     };
   } catch (error) {

@@ -1,5 +1,3 @@
-// src/app.ts 
-
 import express, { Application, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -20,11 +18,11 @@ import {
   errorHandler,
   healthCheckBypass,
   requestTimeout
-} from '@/middleware/AuthMiddleware';
-import authRoutes from '@/routes/authRoutes';
+} from '@/middleware/auth.middleware';
+import authRoutes from '@/routes/auth.routes';
 import { ApiResponse } from '@/types/common.types';
 
-export class App {
+export class BuildHiveApp {
   private app: Application;
   private server: any;
   private config: ReturnType<typeof getApiConfig>;
@@ -44,16 +42,11 @@ export class App {
 
     logger.info('Initializing production middleware stack', logContext);
 
-    // Trust proxy for production load balancers
     this.app.set('trust proxy', this.config.security.trustProxy);
 
-    // Health check bypass (must be first)
     this.app.use(healthCheckBypass);
-
-    // Request initialization
     this.app.use(initializeRequest);
 
-    // Production security middleware
     this.app.use(helmet({
       contentSecurityPolicy: {
         directives: {
@@ -76,10 +69,8 @@ export class App {
       }
     }));
 
-    // Custom security headers
     this.app.use(securityHeaders);
 
-    // Production CORS configuration
     this.app.use(cors({
       origin: (origin, callback) => {
         if (!origin || this.config.corsOrigins.includes(origin)) {
@@ -102,7 +93,6 @@ export class App {
       maxAge: 86400,
     }));
 
-    // Production compression
     this.app.use(compression({
       filter: (req, res) => {
         if (req.headers['x-no-compression']) {
@@ -114,7 +104,6 @@ export class App {
       threshold: 1024,
     }));
 
-    // Body parsing middleware
     this.app.use(express.json({ 
       limit: this.config.maxRequestSize,
       verify: (req: any, res, buf) => {
@@ -126,24 +115,21 @@ export class App {
       limit: this.config.maxRequestSize 
     }));
 
-    // Cookie parser with production secret
     this.app.use(cookieParser(this.config.security.cookieSecret));
 
-    // Production rate limiting
     this.app.use(rateLimit({
       windowMs: this.config.rateLimiting.windowMs,
       max: this.config.rateLimiting.maxRequests,
       message: {
         success: false,
         message: 'Too many requests from this IP, please try again later',
-        timestamp: new Date(),
+        timestamp: new Date().toISOString(),
       },
       standardHeaders: true,
       legacyHeaders: false,
       handler: (req, res) => {
         logger.warn('Rate limit exceeded', 
           createLogContext()
-            .withRequest(req)
             .withMetadata({ 
               ip: req.ip,
               userAgent: req.headers['user-agent']
@@ -154,17 +140,14 @@ export class App {
         const errorResponse: ApiResponse<null> = {
           success: false,
           message: 'Rate limit exceeded',
-          timestamp: new Date(),
-          requestId: req.headers['x-request-id'] as string,
+          timestamp: new Date().toISOString(),
+          requestId: req.headers['x-request-id'] as string || '',
         };
         res.status(HTTP_STATUS_CODES.TOO_MANY_REQUESTS).json(errorResponse);
       },
     }));
 
-    // Request timeout
     this.app.use(requestTimeout(this.config.requestTimeout));
-
-    // Request logging
     this.app.use(requestLogger);
 
     logger.info('Production middleware stack initialized', logContext);
@@ -177,31 +160,27 @@ export class App {
 
     logger.info('Initializing production routes', logContext);
 
-    // API routes
     this.app.use('/api/auth', authRoutes);
 
-    // Root endpoint
     this.app.get('/', (req: Request, res: Response) => {
       const response: ApiResponse<any> = {
         success: true,
-        message: 'TradeConnect API is running',
+        message: 'BuildHive API is running',
         data: {
-          service: 'TradeConnect API',
+          service: 'BuildHive API',
           version: this.config.version,
           environment: this.config.environment,
-          timestamp: new Date(),
+          timestamp: new Date().toISOString(),
         },
-        timestamp: new Date(),
-        requestId: req.requestId,
+        timestamp: new Date().toISOString(),
+        requestId: (req as any).requestId || '',
       };
 
       res.status(HTTP_STATUS_CODES.OK).json(response);
     });
 
-    // API documentation endpoint (auto-generated from routes)
     this.app.get('/api/docs', (req: Request, res: Response) => {
       try {
-        // Discover routes from the actual Express app
         discoverRoutes(this.app);
         const documentation = getApiDocumentation();
 
@@ -209,8 +188,8 @@ export class App {
           success: true,
           message: 'API Documentation',
           data: documentation,
-          timestamp: new Date(),
-          requestId: req.requestId,
+          timestamp: new Date().toISOString(),
+          requestId: (req as any).requestId || '',
         };
 
         res.status(HTTP_STATUS_CODES.OK).json(response);
@@ -218,7 +197,6 @@ export class App {
       } catch (error) {
         logger.error('API documentation generation failed', 
           createLogContext()
-            .withRequest(req)
             .withMetadata({ 
               errorMessage: error instanceof Error ? error.message : 'Unknown error'
             })
@@ -228,15 +206,14 @@ export class App {
         const errorResponse: ApiResponse<null> = {
           success: false,
           message: 'Documentation generation failed',
-          timestamp: new Date(),
-          requestId: req.requestId,
+          timestamp: new Date().toISOString(),
+          requestId: (req as any).requestId || '',
         };
 
         res.status(HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR).json(errorResponse);
       }
     });
 
-    // Health check endpoint
     this.app.get('/api/health', (req: Request, res: Response) => {
       const response: ApiResponse<any> = {
         success: true,
@@ -244,35 +221,33 @@ export class App {
         data: {
           status: 'healthy',
           uptime: process.uptime(),
-          timestamp: new Date(),
+          timestamp: new Date().toISOString(),
           version: this.config.version,
           environment: this.config.environment,
           memory: process.memoryUsage(),
           baseUrl: this.config.baseUrl,
         },
-        timestamp: new Date(),
-        requestId: req.requestId,
+        timestamp: new Date().toISOString(),
+        requestId: (req as any).requestId || '',
       };
 
       res.status(HTTP_STATUS_CODES.OK).json(response);
     });
 
-    // 404 handler for undefined routes
     this.app.use('*', (req: Request, res: Response) => {
       const errorResponse: ApiResponse<null> = {
         success: false,
         message: `Route ${req.method} ${req.originalUrl} not found`,
-        timestamp: new Date(),
-        requestId: req.requestId,
+        timestamp: new Date().toISOString(),
+        requestId: (req as any).requestId || '',
       };
 
       logger.warn('Route not found', 
         createLogContext()
-          .withRequest(req)
           .withMetadata({ 
             method: req.method,
             url: req.originalUrl,
-            requestId: req.requestId 
+            requestId: (req as any).requestId 
           })
           .build()
       );
@@ -283,7 +258,6 @@ export class App {
     logger.info('Production routes initialized', logContext);
   }
 
-  // Initialize production error handling
   private initializeErrorHandling(): void {
     const logContext = createLogContext()
       .withMetadata({ phase: 'error_handling_initialization' })
@@ -291,10 +265,8 @@ export class App {
 
     logger.info('Initializing production error handling', logContext);
 
-    // Global error handler
     this.app.use(errorHandler);
 
-    // Unhandled promise rejection handler
     process.on('unhandledRejection', (reason: any, promise: Promise<any>) => {
       logger.error('Unhandled Promise Rejection - Production', 
         createLogContext()
@@ -307,11 +279,9 @@ export class App {
           .build()
       );
 
-      // In production, gracefully shutdown on unhandled rejections
       this.gracefulShutdown('UNHANDLED_REJECTION');
     });
 
-    // Uncaught exception handler
     process.on('uncaughtException', (error: Error) => {
       logger.error('Uncaught Exception - Production', 
         createLogContext()
@@ -324,19 +294,16 @@ export class App {
           .build()
       );
 
-      // Force shutdown on uncaught exceptions in production
       this.gracefulShutdown('UNCAUGHT_EXCEPTION');
     });
 
-    // Production shutdown handlers
     process.on('SIGTERM', () => this.gracefulShutdown('SIGTERM'));
     process.on('SIGINT', () => this.gracefulShutdown('SIGINT'));
-    process.on('SIGUSR2', () => this.gracefulShutdown('SIGUSR2')); // PM2 reload
+    process.on('SIGUSR2', () => this.gracefulShutdown('SIGUSR2'));
 
     logger.info('Production error handling initialized', logContext);
   }
 
-  // Initialize production database connections
   private async initializeDatabase(): Promise<void> {
     const logContext = createLogContext()
       .withMetadata({ phase: 'database_initialization' })
@@ -345,15 +312,12 @@ export class App {
     try {
       logger.info('Initializing production database connections', logContext);
 
-      // Connect to PostgreSQL with production settings
       await connectDatabase();
       logger.info('Production PostgreSQL connection established', logContext);
 
-      // Connect to Redis with production settings
       await connectRedis();
       logger.info('Production Redis connection established', logContext);
 
-      // Test database connections
       await this.testDatabaseConnections();
 
       logger.info('Production database connections initialized successfully', logContext);
@@ -373,16 +337,14 @@ export class App {
     }
   }
 
-  // Test database connections
   private async testDatabaseConnections(): Promise<void> {
     try {
-      // Test Prisma connection
-      const { prisma } = await import('@/config/database');
-      await prisma.$queryRaw`SELECT 1`;
+      const { databaseManager } = await import('@/config/database');
+      const client = databaseManager.getClient();
+      await client.$queryRaw`SELECT 1`;
       
-      // Test Redis connection
-      const { redis } = await import('@/config/redis');
-      await redis.ping();
+      const { redisManager } = await import('@/config/redis');
+      await redisManager.ping();
 
       logger.info('Database connection tests passed');
 
@@ -394,7 +356,6 @@ export class App {
     }
   }
 
-  // Start the production application server
   public async start(): Promise<void> {
     const logContext = createLogContext()
       .withMetadata({ 
@@ -406,29 +367,27 @@ export class App {
       .build();
 
     try {
-      logger.info('Starting TradeConnect production application', logContext);
+      logger.info('Starting BuildHive production application', logContext);
 
-      // Initialize database connections
       await this.initializeDatabase();
 
-      // Create HTTPS server for production
       this.server = createServer(this.app);
 
-      // Configure server settings
       this.server.keepAliveTimeout = 65000;
       this.server.headersTimeout = 66000;
       this.server.maxHeadersCount = 1000;
       this.server.timeout = 120000;
 
-      // Start listening
       this.server.listen(this.config.port, () => {
-        logger.info('TradeConnect production application started successfully', {
+        const startupTime = Date.now();
+        logger.info('BuildHive production application started successfully', {
           ...logContext,
           port: this.config.port,
           environment: this.config.environment,
           processId: process.pid,
           baseUrl: this.config.baseUrl,
-          version: this.config.version
+          version: this.config.version,
+          startupTime
         });
 
         logger.business('PRODUCTION_APPLICATION_STARTED', {
@@ -438,7 +397,6 @@ export class App {
         });
       });
 
-      // Production server error handling
       this.server.on('error', (error: any) => {
         logger.error('Production server error', 
           createLogContext()
@@ -458,7 +416,6 @@ export class App {
         }
       });
 
-      // Server listening event
       this.server.on('listening', () => {
         const address = this.server.address();
         logger.info('Production server is listening', {
@@ -468,9 +425,8 @@ export class App {
         });
       });
 
-      // Server connection handling
       this.server.on('connection', (socket: any) => {
-        socket.setTimeout(120000); // 2 minutes timeout
+        socket.setTimeout(120000);
       });
 
     } catch (error) {
@@ -488,7 +444,6 @@ export class App {
     }
   }
 
-  // Production graceful shutdown
   private gracefulShutdown(signal: string): void {
     const logContext = createLogContext()
       .withMetadata({ 
@@ -501,13 +456,11 @@ export class App {
 
     logger.info(`Production received ${signal}, starting graceful shutdown`, logContext);
 
-    // Set timeout for forceful shutdown (30 seconds in production)
     const shutdownTimeout = setTimeout(() => {
       logger.error('Production graceful shutdown timeout, forcing exit', logContext);
       process.exit(1);
     }, 30000);
 
-    // Close server
     if (this.server) {
       this.server.close(async (error: any) => {
         if (error) {
@@ -520,11 +473,14 @@ export class App {
         }
 
         try {
-          // Close database connections
           await this.closeDatabaseConnections();
           
           clearTimeout(shutdownTimeout);
-          logger.info('Production graceful shutdown completed', logContext);
+          const shutdownDuration = Date.now();
+          logger.info('Production graceful shutdown completed', {
+            ...logContext,
+            shutdownDuration
+          });
           
           logger.business('PRODUCTION_APPLICATION_SHUTDOWN', {
             ...logContext,
@@ -549,7 +505,6 @@ export class App {
     }
   }
 
-  // Close production database connections
   private async closeDatabaseConnections(): Promise<void> {
     const logContext = createLogContext()
       .withMetadata({ 
@@ -561,17 +516,15 @@ export class App {
     try {
       logger.info('Closing production database connections', logContext);
 
-      // Close Redis connection
-      const { redis } = await import('@/config/redis');
-      if (redis) {
-        await redis.quit();
+      const { redisManager } = await import('@/config/redis');
+      if (redisManager) {
+        await redisManager.disconnect();
         logger.info('Production Redis connection closed', logContext);
       }
 
-      // Close Prisma connection
-      const { prisma } = await import('@/config/database');
-      if (prisma) {
-        await prisma.$disconnect();
+      const { databaseManager } = await import('@/config/database');
+      if (databaseManager) {
+        await databaseManager.disconnect();
         logger.info('Production Prisma connection closed', logContext);
       }
 
@@ -586,29 +539,24 @@ export class App {
     }
   }
 
-  // Get Express app instance
   public getApp(): Application {
     return this.app;
   }
 
-  // Get server instance
   public getServer(): any {
     return this.server;
   }
 
-  // Get production configuration
   public getConfig(): Readonly<ReturnType<typeof getApiConfig>> {
     return { ...this.config };
   }
 }
 
-// Create and export production application instance
-const app = new App();
+const app = new BuildHiveApp();
 
 export default app;
-export { App };
+export { BuildHiveApp };
 
-// Export for production deployment
-export const createProductionApp = (): App => {
-  return new App();
+export const createProductionApp = (): BuildHiveApp => {
+  return new BuildHiveApp();
 };
