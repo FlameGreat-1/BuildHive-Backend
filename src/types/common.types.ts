@@ -261,8 +261,8 @@ export interface ValidationError {
   code: string;
   value?: any;
   severity: ErrorSeverity;
-  statusCode?: number;
-  name?: string;
+  statusCode: number;
+  name: string;
 }
 
 export interface DomainEvent {

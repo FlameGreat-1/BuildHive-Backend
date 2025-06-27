@@ -335,7 +335,7 @@ export class AuthController {
     try {
       logger.info('Phone verification request received', logContext);
 
-      const validation = this.validateVerificationRequest(req.body, 'phone');
+      const validation = this.validateVerificationRequest(req.body, 'sms');
       if (!validation.isValid) {
         const errorResponse: ApiResponse<null> = {
           success: false,
@@ -352,7 +352,7 @@ export class AuthController {
       const verificationData: VerificationRequest = {
         userId: req.body.userId,
         code: req.body.code,
-        type: 'phone',
+        type: 'sms',
       };
 
       const result = await authService.verifyPhone(verificationData);
@@ -473,7 +473,14 @@ export class AuthController {
         const errorResponse: ApiResponse<null> = {
           success: false,
           message: 'Refresh token is required',
-          errors: [{ field: 'refreshToken', message: 'Refresh token is required', code: ERROR_CODES.VAL_REQUIRED_FIELD }],
+          errors: [{ 
+            field: 'refreshToken', 
+            message: 'Refresh token is required', 
+            code: ERROR_CODES.VAL_REQUIRED_FIELD,
+            severity: ErrorSeverity.ERROR,
+            statusCode: 400,
+            name: 'ValidationError'
+          }],
           timestamp: new Date().toISOString(),
           requestId: requestContext.requestId,
         };
@@ -588,7 +595,7 @@ export class AuthController {
       next(error);
     }
   };
-  
+
   public getProfile = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const startTime = Date.now();
     const requestContext = this.extractRequestContext(req);
@@ -671,7 +678,14 @@ export class AuthController {
         const errorResponse: ApiResponse<null> = {
           success: false,
           message: 'Token is required',
-          errors: [{ field: 'token', message: 'Token is required', code: ERROR_CODES.VAL_REQUIRED_FIELD }],
+          errors: [{ 
+            field: 'token', 
+            message: 'Token is required', 
+            code: ERROR_CODES.VAL_REQUIRED_FIELD,
+            severity: ErrorSeverity.ERROR,
+            statusCode: 400,
+            name: 'ValidationError'
+          }],
           timestamp: new Date().toISOString(),
           requestId: requestContext.requestId,
         };
@@ -772,41 +786,125 @@ export class AuthController {
     const errors: ValidationError[] = [];
 
     if (!body.email) {
-      errors.push({ field: 'email', message: 'Email is required', code: ERROR_CODES.VAL_REQUIRED_FIELD });
+      errors.push({ 
+        field: 'email', 
+        message: 'Email is required', 
+        code: ERROR_CODES.VAL_REQUIRED_FIELD,
+        severity: ErrorSeverity.ERROR,
+        statusCode: 400,
+        name: 'ValidationError'
+      });
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.email)) {
-      errors.push({ field: 'email', message: 'Invalid email format', code: ERROR_CODES.VAL_INVALID_EMAIL });
+      errors.push({ 
+        field: 'email', 
+        message: 'Invalid email format', 
+        code: ERROR_CODES.VAL_INVALID_EMAIL,
+        severity: ErrorSeverity.ERROR,
+        statusCode: 400,
+        name: 'ValidationError'
+      });
     }
 
     if (!body.password) {
-      errors.push({ field: 'password', message: 'Password is required', code: ERROR_CODES.VAL_REQUIRED_FIELD });
+      errors.push({ 
+        field: 'password', 
+        message: 'Password is required', 
+        code: ERROR_CODES.VAL_REQUIRED_FIELD,
+        severity: ErrorSeverity.ERROR,
+        statusCode: 400,
+        name: 'ValidationError'
+      });
     } else if (body.password.length < 8) {
-      errors.push({ field: 'password', message: 'Password must be at least 8 characters', code: ERROR_CODES.VAL_WEAK_PASSWORD });
+      errors.push({ 
+        field: 'password', 
+        message: 'Password must be at least 8 characters', 
+        code: ERROR_CODES.VAL_WEAK_PASSWORD,
+        severity: ErrorSeverity.ERROR,
+        statusCode: 400,
+        name: 'ValidationError'
+      });
     } else if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/.test(body.password)) {
-      errors.push({ field: 'password', message: 'Password must contain uppercase, lowercase, number and special character', code: ERROR_CODES.VAL_WEAK_PASSWORD });
+      errors.push({ 
+        field: 'password', 
+        message: 'Password must contain uppercase, lowercase, number and special character', 
+        code: ERROR_CODES.VAL_WEAK_PASSWORD,
+        severity: ErrorSeverity.ERROR,
+        statusCode: 400,
+        name: 'ValidationError'
+      });
     }
 
     if (!body.firstName || body.firstName.trim().length < 2) {
-      errors.push({ field: 'firstName', message: 'First name must be at least 2 characters', code: ERROR_CODES.VAL_REQUIRED_FIELD });
+      errors.push({ 
+        field: 'firstName', 
+        message: 'First name must be at least 2 characters', 
+        code: ERROR_CODES.VAL_REQUIRED_FIELD,
+        severity: ErrorSeverity.ERROR,
+        statusCode: 400,
+        name: 'ValidationError'
+      });
     }
 
     if (!body.lastName || body.lastName.trim().length < 2) {
-      errors.push({ field: 'lastName', message: 'Last name must be at least 2 characters', code: ERROR_CODES.VAL_REQUIRED_FIELD });
+      errors.push({ 
+        field: 'lastName', 
+        message: 'Last name must be at least 2 characters', 
+        code: ERROR_CODES.VAL_REQUIRED_FIELD,
+        severity: ErrorSeverity.ERROR,
+        statusCode: 400,
+        name: 'ValidationError'
+      });
     }
 
     if (!body.phone) {
-      errors.push({ field: 'phone', message: 'Phone number is required', code: ERROR_CODES.VAL_REQUIRED_FIELD });
+      errors.push({ 
+        field: 'phone', 
+        message: 'Phone number is required', 
+        code: ERROR_CODES.VAL_REQUIRED_FIELD,
+        severity: ErrorSeverity.ERROR,
+        statusCode: 400,
+        name: 'ValidationError'
+      });
     } else if (!/^\+?[\d\s\-\(\)]{10,}$/.test(body.phone)) {
-      errors.push({ field: 'phone', message: 'Invalid phone number format', code: ERROR_CODES.VAL_INVALID_PHONE });
+      errors.push({ 
+        field: 'phone', 
+        message: 'Invalid phone number format', 
+        code: ERROR_CODES.VAL_INVALID_PHONE,
+        severity: ErrorSeverity.ERROR,
+        statusCode: 400,
+        name: 'ValidationError'
+      });
     }
 
     if (!body.userType) {
-      errors.push({ field: 'userType', message: 'User type is required', code: ERROR_CODES.VAL_REQUIRED_FIELD });
+      errors.push({ 
+        field: 'userType', 
+        message: 'User type is required', 
+        code: ERROR_CODES.VAL_REQUIRED_FIELD,
+        severity: ErrorSeverity.ERROR,
+        statusCode: 400,
+        name: 'ValidationError'
+      });
     } else if (!Object.values(UserType).includes(body.userType)) {
-      errors.push({ field: 'userType', message: 'Invalid user type', code: ERROR_CODES.VAL_INVALID_USER_TYPE });
+      errors.push({ 
+        field: 'userType', 
+        message: 'Invalid user type', 
+        code: ERROR_CODES.VAL_INVALID_USER_TYPE,
+        severity: ErrorSeverity.ERROR,
+        statusCode: 400,
+        name: 'ValidationError'
+      });
     }
 
     if (!body.acceptTerms) {
-      errors.push({ field: 'acceptTerms', message: 'Terms and conditions must be accepted', code: ERROR_CODES.VAL_REQUIRED_FIELD });
+      errors.push({ 
+        field: 'acceptTerms', 
+        message: 'Terms and conditions must be accepted', 
+        code: ERROR_CODES.VAL_REQUIRED_FIELD,
+        severity: ErrorSeverity.ERROR,
+        statusCode: 400,
+        name: 'ValidationError'
+      });
     }
 
     return {
@@ -819,13 +917,34 @@ export class AuthController {
     const errors: ValidationError[] = [];
 
     if (!body.email) {
-      errors.push({ field: 'email', message: 'Email is required', code: ERROR_CODES.VAL_REQUIRED_FIELD });
+      errors.push({ 
+        field: 'email', 
+        message: 'Email is required', 
+        code: ERROR_CODES.VAL_REQUIRED_FIELD,
+        severity: ErrorSeverity.ERROR,
+        statusCode: 400,
+        name: 'ValidationError'
+      });
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.email)) {
-      errors.push({ field: 'email', message: 'Invalid email format', code: ERROR_CODES.VAL_INVALID_EMAIL });
+      errors.push({ 
+        field: 'email', 
+        message: 'Invalid email format', 
+        code: ERROR_CODES.VAL_INVALID_EMAIL,
+        severity: ErrorSeverity.ERROR,
+        statusCode: 400,
+        name: 'ValidationError'
+      });
     }
 
     if (!body.password) {
-      errors.push({ field: 'password', message: 'Password is required', code: ERROR_CODES.VAL_REQUIRED_FIELD });
+      errors.push({ 
+        field: 'password', 
+        message: 'Password is required', 
+        code: ERROR_CODES.VAL_REQUIRED_FIELD,
+        severity: ErrorSeverity.ERROR,
+        statusCode: 400,
+        name: 'ValidationError'
+      });
     }
 
     return {
@@ -834,26 +953,68 @@ export class AuthController {
     };
   }
 
-  private validateVerificationRequest(body: any, type: 'email' | 'phone'): ValidationResult {
+  private validateVerificationRequest(body: any, type: 'email' | 'sms'): ValidationResult {
     const errors: ValidationError[] = [];
 
     if (!body.userId) {
-      errors.push({ field: 'userId', message: 'User ID is required', code: ERROR_CODES.VAL_REQUIRED_FIELD });
+      errors.push({ 
+        field: 'userId', 
+        message: 'User ID is required', 
+        code: ERROR_CODES.VAL_REQUIRED_FIELD,
+        severity: ErrorSeverity.ERROR,
+        statusCode: 400,
+        name: 'ValidationError'
+      });
     } else if (!/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(body.userId)) {
-      errors.push({ field: 'userId', message: 'Invalid user ID format', code: ERROR_CODES.VAL_INVALID_FORMAT });
+      errors.push({ 
+        field: 'userId', 
+        message: 'Invalid user ID format', 
+        code: ERROR_CODES.VAL_INVALID_FORMAT,
+        severity: ErrorSeverity.ERROR,
+        statusCode: 400,
+        name: 'ValidationError'
+      });
     }
 
     if (type === 'email') {
       if (!body.token) {
-        errors.push({ field: 'token', message: 'Verification token is required', code: ERROR_CODES.VAL_REQUIRED_FIELD });
+        errors.push({ 
+          field: 'token', 
+          message: 'Verification token is required', 
+          code: ERROR_CODES.VAL_REQUIRED_FIELD,
+          severity: ErrorSeverity.ERROR,
+          statusCode: 400,
+          name: 'ValidationError'
+        });
       } else if (body.token.length !== 64) {
-        errors.push({ field: 'token', message: 'Invalid token format', code: ERROR_CODES.VAL_INVALID_FORMAT });
+        errors.push({ 
+          field: 'token', 
+          message: 'Invalid token format', 
+          code: ERROR_CODES.VAL_INVALID_FORMAT,
+          severity: ErrorSeverity.ERROR,
+          statusCode: 400,
+          name: 'ValidationError'
+        });
       }
-    } else if (type === 'phone') {
+    } else if (type === 'sms') {
       if (!body.code) {
-        errors.push({ field: 'code', message: 'Verification code is required', code: ERROR_CODES.VAL_REQUIRED_FIELD });
+        errors.push({ 
+          field: 'code', 
+          message: 'Verification code is required', 
+          code: ERROR_CODES.VAL_REQUIRED_FIELD,
+          severity: ErrorSeverity.ERROR,
+          statusCode: 400,
+          name: 'ValidationError'
+        });
       } else if (!/^\d{6}$/.test(body.code)) {
-        errors.push({ field: 'code', message: 'Verification code must be 6 digits', code: ERROR_CODES.VAL_INVALID_FORMAT });
+        errors.push({ 
+          field: 'code', 
+          message: 'Verification code must be 6 digits', 
+          code: ERROR_CODES.VAL_INVALID_FORMAT,
+          severity: ErrorSeverity.ERROR,
+          statusCode: 400,
+          name: 'ValidationError'
+        });
       }
     }
 
@@ -867,9 +1028,23 @@ export class AuthController {
     const errors: ValidationError[] = [];
 
     if (!body.email) {
-      errors.push({ field: 'email', message: 'Email is required', code: ERROR_CODES.VAL_REQUIRED_FIELD });
+      errors.push({ 
+        field: 'email', 
+        message: 'Email is required', 
+        code: ERROR_CODES.VAL_REQUIRED_FIELD,
+        severity: ErrorSeverity.ERROR,
+        statusCode: 400,
+        name: 'ValidationError'
+      });
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.email)) {
-      errors.push({ field: 'email', message: 'Invalid email format', code: ERROR_CODES.VAL_INVALID_EMAIL });
+      errors.push({ 
+        field: 'email', 
+        message: 'Invalid email format', 
+        code: ERROR_CODES.VAL_INVALID_EMAIL,
+        severity: ErrorSeverity.ERROR,
+        statusCode: 400,
+        name: 'ValidationError'
+      });
     }
 
     return {
@@ -1003,4 +1178,3 @@ export const logout = authController.logout;
 export const getProfile = authController.getProfile;
 export const validateToken = authController.validateToken;
 export const healthCheck = authController.healthCheck;
-

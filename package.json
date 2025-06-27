@@ -70,8 +70,6 @@
     "deploy:render": "npm run build && npm run db:migrate",
     "deploy:staging": "npm run build && npm run db:migrate",
     "deploy:production": "npm run build && npm run db:migrate",
-    "migrate": "npx ts-node /app/src/scripts/migrate.ts",
-    "postinstall": "npm run db:generate && npm run migrate",
     "prestart": "npm run build",
     "clean": "rimraf dist coverage .nyc_output",
     "prebuild": "npm run clean && npm run type-check",
@@ -92,7 +90,6 @@
     "express-rate-limit": "^7.1.5",
     "express-validator": "^7.0.1",
     "helmet": "^7.1.0",
-    "ioredis": "^5.3.2",
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
     "multer": "^1.4.5-lts.1",
@@ -183,4 +180,3 @@
     "npm": "10.2.3"
   }
 }
-

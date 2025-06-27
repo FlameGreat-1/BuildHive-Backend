@@ -11,7 +11,6 @@ interface RedisConfig {
   retryDelayOnFailover: number;
   enableOfflineQueue: boolean;
   connectTimeout: number;
-  commandTimeout: number;
   enableReadyCheck: boolean;
   maxRetriesPerRequest: number;
 }
@@ -26,6 +25,7 @@ class RedisManager {
   private isConnected: boolean = false;
   private isSubscriberConnected: boolean = false;
   private isPublisherConnected: boolean = false;
+  private connecting: boolean = false;
 
   private constructor() {
     this.config = this.loadConfiguration();
@@ -47,7 +47,6 @@ class RedisManager {
       retryDelayOnFailover: parseInt(process.env.REDIS_RETRY_DELAY || '100'),
       enableOfflineQueue: process.env.REDIS_OFFLINE_QUEUE !== 'false',
       connectTimeout: parseInt(process.env.REDIS_CONNECT_TIMEOUT || '10000'),
-      commandTimeout: parseInt(process.env.REDIS_COMMAND_TIMEOUT || '5000'),
       enableReadyCheck: process.env.REDIS_READY_CHECK !== 'false',
       maxRetriesPerRequest: parseInt(process.env.REDIS_MAX_RETRIES_PER_REQUEST || '3'),
     };
@@ -58,7 +57,6 @@ class RedisManager {
       url: this.config.url,
       socket: {
         connectTimeout: this.config.connectTimeout,
-        commandTimeout: this.config.commandTimeout,
         reconnectStrategy: (retries: number): number | Error => {
           if (retries > this.config.maxRetries) {
             logger.error('Redis max retries exceeded', 
@@ -128,15 +126,30 @@ class RedisManager {
   }
 
   public async connect(): Promise<void> {
-    const startTime = Date.now();
-    const logContext = createLogContext()
-      .withMetadata({
-        attempt: this.connectionAttempts + 1,
-        maxRetries: this.config.maxRetries,
-      })
-      .build();
+    if (this.isConnected && this.isSubscriberConnected && this.isPublisherConnected) {
+      return;
+    }
+
+    if (this.connecting) {
+      while (this.connecting) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      if (this.isConnected && this.isSubscriberConnected && this.isPublisherConnected) {
+        return;
+      }
+    }
+
+    this.connecting = true;
 
     try {
+      const startTime = Date.now();
+      const logContext = createLogContext()
+        .withMetadata({
+          attempt: this.connectionAttempts + 1,
+          maxRetries: this.config.maxRetries,
+        })
+        .build();
+
       logger.info('Connecting to Redis', logContext);
 
       if (!this.client) {
@@ -157,9 +170,15 @@ class RedisManager {
         this.publisher.connect(),
       ]);
 
-      const failures = connections.filter(result => result.status === 'rejected');
+      const failures = connections
+        .map((result, index) => ({ result, type: ['main', 'subscriber', 'publisher'][index] }))
+        .filter(({ result }) => result.status === 'rejected');
+
       if (failures.length > 0) {
-        throw new Error(`Redis connection failures: ${failures.length}`);
+        const failureDetails = failures.map(({ result, type }) => 
+          `${type}: ${result.status === 'rejected' ? result.reason : 'unknown'}`
+        ).join(', ');
+        throw new Error(`Redis connection failures: ${failureDetails}`);
       }
 
       await Promise.all([
@@ -183,16 +202,20 @@ class RedisManager {
 
     } catch (error) {
       this.connectionAttempts++;
-      const connectionTime = Date.now() - startTime;
-
-      logger.error('Redis connection failed', {
-        ...logContext,
-        errorMessage: error instanceof Error ? error.message : 'Unknown error',
-        connectionTime,
-        errorCode: ERROR_CODES.SYS_REDIS_ERROR,
-      });
+      
+      logger.error('Redis connection failed', 
+        createLogContext()
+          .withMetadata({
+            errorMessage: error instanceof Error ? error.message : 'Unknown error',
+            attempt: this.connectionAttempts,
+            errorCode: ERROR_CODES.SYS_REDIS_ERROR,
+          })
+          .build()
+      );
 
       throw error;
+    } finally {
+      this.connecting = false;
     }
   }
 

@@ -20,6 +20,7 @@ class DatabaseManager {
   private connectionAttempts: number = 0;
   private maxRetries: number = 3;
   private isConnected: boolean = false;
+  private connecting: boolean = false;
 
   private constructor() {
     this.config = this.loadConfiguration();
@@ -49,90 +50,112 @@ class DatabaseManager {
       return this.prisma;
     }
 
-    const startTime = Date.now();
-    const logContext = createLogContext()
-      .withMetadata({ 
-        attempt: this.connectionAttempts + 1,
-        maxRetries: this.maxRetries,
-        config: {
-          maxConnections: this.config.maxConnections,
-          connectionTimeout: this.config.connectionTimeout,
-        }
-      })
-      .build();
+    if (this.connecting) {
+      while (this.connecting) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      if (this.prisma && this.isConnected) {
+        return this.prisma;
+      }
+    }
+
+    this.connecting = true;
 
     try {
+      const startTime = Date.now();
+      const logContext = createLogContext()
+        .withMetadata({ 
+          attempt: this.connectionAttempts + 1,
+          maxRetries: this.maxRetries,
+          config: {
+            maxConnections: this.config.maxConnections,
+            connectionTimeout: this.config.connectionTimeout,
+          }
+        })
+        .build();
+
       logger.info('Attempting database connection', logContext);
 
       this.validateConfiguration();
 
-      this.prisma = new PrismaClient({
-        datasources: {
-          db: {
-            url: this.config.url,
-          },
-        },
-        log: this.config.enableLogging ? [
-          { emit: 'event', level: 'query' },
-          { emit: 'event', level: 'error' },
-          { emit: 'event', level: 'info' },
-          { emit: 'event', level: 'warn' },
-        ] : [],
-        errorFormat: 'pretty',
-      });
+      for (let attempt = 0; attempt < this.maxRetries; attempt++) {
+        try {
+          this.prisma = new PrismaClient({
+            datasources: {
+              db: {
+                url: this.config.url,
+              },
+            },
+            log: this.config.enableLogging ? [
+              { emit: 'event', level: 'query' },
+              { emit: 'event', level: 'error' },
+              { emit: 'event', level: 'info' },
+              { emit: 'event', level: 'warn' },
+            ] : [],
+            errorFormat: 'pretty',
+          });
 
-      if (this.config.enableLogging) {
-        this.setupDatabaseLogging();
+          if (this.config.enableLogging) {
+            this.setupDatabaseLogging();
+          }
+
+          let timeoutId: NodeJS.Timeout;
+          const timeoutPromise = new Promise<never>((_, reject) => {
+            timeoutId = setTimeout(() => reject(new Error('Connection timeout')), this.config.connectionTimeout);
+          });
+
+          try {
+            await Promise.race([this.prisma.$connect(), timeoutPromise]);
+          } finally {
+            clearTimeout(timeoutId!);
+          }
+
+          await this.prisma.$queryRaw`SELECT 1`;
+
+          this.isConnected = true;
+          this.connectionAttempts = 0;
+
+          const connectionTime = Date.now() - startTime;
+          logger.info('Database connection established successfully', {
+            ...logContext,
+            connectionTime,
+          });
+
+          logger.performance('database_connection', connectionTime, logContext);
+
+          return this.prisma;
+
+        } catch (error) {
+          this.connectionAttempts++;
+          const connectionTime = Date.now() - startTime;
+
+          logger.error('Database connection failed', {
+            ...logContext,
+            errorMessage: error instanceof Error ? error.message : 'Unknown error',
+            connectionTime,
+            errorCode: ERROR_CODES.SYS_DATABASE_ERROR,
+            attempt: attempt + 1,
+          });
+
+          if (attempt < this.maxRetries - 1) {
+            const retryDelay = Math.pow(2, attempt + 1) * 1000;
+            logger.info(`Retrying database connection in ${retryDelay}ms`, logContext);
+            await new Promise(resolve => setTimeout(resolve, retryDelay));
+          } else {
+            logger.error('Database connection failed after maximum retries', {
+              ...logContext,
+              errorCode: ERROR_CODES.SYS_DATABASE_ERROR,
+              severity: 'critical',
+            });
+            throw new Error(`Database connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          }
+        }
       }
 
-      await Promise.race([
-        this.prisma.$connect(),
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Connection timeout')), this.config.connectionTimeout)
-        ),
-      ]);
+      throw new Error('Database connection failed after all retry attempts');
 
-      await this.prisma.$queryRaw`SELECT 1`;
-
-      this.isConnected = true;
-      this.connectionAttempts = 0;
-
-      const connectionTime = Date.now() - startTime;
-      logger.info('Database connection established successfully', {
-        ...logContext,
-        connectionTime,
-      });
-
-      logger.performance('database_connection', connectionTime, logContext);
-
-      return this.prisma;
-
-    } catch (error) {
-      this.connectionAttempts++;
-      const connectionTime = Date.now() - startTime;
-
-      logger.error('Database connection failed', {
-        ...logContext,
-        errorMessage: error instanceof Error ? error.message : 'Unknown error',
-        connectionTime,
-        errorCode: ERROR_CODES.SYS_DATABASE_ERROR,
-      });
-
-      if (this.connectionAttempts < this.maxRetries) {
-        const retryDelay = Math.pow(2, this.connectionAttempts) * 1000;
-        logger.info(`Retrying database connection in ${retryDelay}ms`, logContext);
-        
-        await new Promise(resolve => setTimeout(resolve, retryDelay));
-        return this.connect();
-      }
-
-      logger.error('Database connection failed after maximum retries', {
-        ...logContext,
-        errorCode: ERROR_CODES.SYS_DATABASE_ERROR,
-        severity: 'critical',
-      });
-
-      throw new Error(`Database connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      this.connecting = false;
     }
   }
 
@@ -163,7 +186,7 @@ class DatabaseManager {
   private setupDatabaseLogging(): void {
     if (!this.prisma) return;
 
-    this.prisma.$on('query', (event: any) => {
+    this.prisma.$on('query' as any, (event: any) => {
       logger.database(
         'QUERY',
         event.target || 'unknown',
@@ -178,7 +201,7 @@ class DatabaseManager {
       );
     });
 
-    this.prisma.$on('error', (event: any) => {
+    this.prisma.$on('error' as any, (event: any) => {
       logger.error('Database error occurred', 
         createLogContext()
           .withMetadata({
@@ -190,7 +213,7 @@ class DatabaseManager {
       );
     });
 
-    this.prisma.$on('info', (event: any) => {
+    this.prisma.$on('info' as any, (event: any) => {
       logger.info('Database info', 
         createLogContext()
           .withMetadata({
@@ -201,7 +224,7 @@ class DatabaseManager {
       );
     });
 
-    this.prisma.$on('warn', (event: any) => {
+    this.prisma.$on('warn' as any, (event: any) => {
       logger.warn('Database warning', 
         createLogContext()
           .withMetadata({
@@ -370,10 +393,10 @@ export const executeTransaction = async <T>(
   return await databaseManager.transaction(operation, options);
 };
 
-export const prisma = (() => {
+export const prisma: PrismaClient | null = (() => {
   try {
     return databaseManager.getClient();
   } catch {
-    return null as any;
+    return null;
   }
 })();

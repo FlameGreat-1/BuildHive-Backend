@@ -21,6 +21,10 @@
     "noImplicitThis": true,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "exactOptionalPropertyTypes": true,
+    "noUncheckedIndexedAccess": true,
     "moduleResolution": "node",
     "allowJs": true,
     "checkJs": false,
@@ -28,16 +32,7 @@
     "emitDecoratorMetadata": true,
     "baseUrl": "./src",
     "paths": {
-      "@/*": ["*"],
-      "@/config/*": ["config/*"],
-      "@/controllers/*": ["controllers/*"],
-      "@/middleware/*": ["middleware/*"],
-      "@/models/*": ["models/*"],
-      "@/routes/*": ["routes/*"],
-      "@/services/*": ["services/*"],
-      "@/utils/*": ["utils/*"],
-      "@/types/*": ["types/*"],
-      "@/database/*": ["database/*"]
+      "@/*": ["*"]
     },
     "typeRoots": ["./node_modules/@types", "./src/types"]
   },
@@ -50,7 +45,6 @@
     "tests",
     "**/*.test.ts",
     "**/*.spec.ts",
-    "**/*.js",
     "coverage",
     "prisma"
   ],
