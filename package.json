@@ -34,7 +34,7 @@
   },
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "tsc && tsc-alias",
+    "build": "tsc --noEmit false && tsc-alias",
     "start": "node dist/server.js",
     "start:prod": "NODE_ENV=production node dist/server.js",
     "db:generate": "prisma generate",
@@ -72,7 +72,7 @@
     "deploy:production": "npm run build && npm run db:migrate",
     "prestart": "npm run build",
     "clean": "rimraf dist coverage .nyc_output",
-    "prebuild": "npm run clean && npm run type-check",
+    "prebuild": "npm run clean",
     "health": "curl -f http://localhost:3000/api/health || exit 1",
     "security:audit": "npm audit --audit-level=moderate",
     "security:fix": "npm audit fix",

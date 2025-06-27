@@ -38,6 +38,7 @@ export enum ErrorSeverity {
   LOW = 'low',
   MEDIUM = 'medium',
   HIGH = 'high',
+  ERROR = 'error',
   CRITICAL = 'critical'
 }
 

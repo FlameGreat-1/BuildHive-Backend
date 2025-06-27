@@ -1,6 +1,7 @@
 
 import { databaseManager } from '@/config/database';
 import { redisManager } from '@/config/redis';
+import { HealthStatus } from '@/types/common.types';
 
 export async function checkDatabaseHealth() {
   try {
