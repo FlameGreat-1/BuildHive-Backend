@@ -260,7 +260,7 @@ export interface ValidationError {
   message: string;
   code: string;
   value?: any;
-  severity?: ErrorSeverity;
+  severity: ErrorSeverity;
   statusCode?: number;
   name?: string;
 }

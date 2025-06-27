@@ -63,6 +63,7 @@ export interface LoginRequest {
   email: string;
   password: string;
   userType?: UserType;
+  rememberMe?: boolean;
 }
 
 export interface LoginResponse {
@@ -128,7 +129,8 @@ export interface JWTPayload {
   email: string;
   userType: UserType;
   status: UserStatus;
-  permissions?: string[];
+  permissions: string[];
+  sessionId?: string;
   iat: number;
   exp: number;
 }
@@ -149,6 +151,20 @@ export interface VerificationResponse {
   verified: boolean;
   nextStep?: string;
   message: string;
+}
+
+export interface UpdateUserData {
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
+  status?: UserStatus;
+  emailVerified?: boolean;
+  phoneVerified?: boolean;
+  metadata?: Record<string, any>;
+  lastLoginAt?: Date;  
+  loginCount?: number;
+  passwordResetToken?: string; 
+  passwordResetExpires?: Date;  
 }
 
 export interface AuthError {
