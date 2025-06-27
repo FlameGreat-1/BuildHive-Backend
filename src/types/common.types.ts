@@ -1,6 +1,3 @@
-// src/types/common.types.ts
-
-// Enterprise-grade API Response structure
 export interface ApiResponse<T = any> {
   success: boolean;
   message: string;
@@ -11,13 +8,30 @@ export interface ApiResponse<T = any> {
   requestId: string;
 }
 
-// Comprehensive error handling
-export interface ApiError {
-  code: string;
-  message: string;
-  field?: string;
-  severity: ErrorSeverity;
-  details?: Record<string, any>;
+export class ApiError extends Error {
+  public code: string;
+  public field?: string;
+  public severity: ErrorSeverity;
+  public details?: Record<string, any>;
+  public statusCode: number;
+
+  constructor(
+    message: string,
+    statusCode: number = 500,
+    code: string = 'INTERNAL_ERROR',
+    severity: ErrorSeverity = ErrorSeverity.MEDIUM,
+    field?: string,
+    details?: Record<string, any>
+  ) {
+    super(message);
+    this.name = 'ApiError';
+    this.code = code;
+    this.statusCode = statusCode;
+    this.severity = severity;
+    this.field = field;
+    this.details = details;
+    Error.captureStackTrace(this, this.constructor);
+  }
 }
 
 export enum ErrorSeverity {
@@ -27,7 +41,17 @@ export enum ErrorSeverity {
   CRITICAL = 'critical'
 }
 
-// Enterprise pagination and filtering
+export interface LogContext {
+  userId?: string;
+  userType?: string;
+  sessionId?: string;
+  requestId?: string;
+  correlationId?: string;
+  metadata?: Record<string, any>;
+  error?: string;
+  duration?: number;
+}
+
 export interface PaginationParams {
   page: number;
   limit: number;
@@ -59,7 +83,6 @@ export interface ResponseMeta {
   version: string;
 }
 
-// Audit trail for enterprise compliance
 export interface AuditLog {
   id: string;
   userId: string;
@@ -81,7 +104,6 @@ export enum AuditSeverity {
   CRITICAL = 'critical'
 }
 
-// File upload with enterprise security
 export interface FileUpload {
   id: string;
   originalName: string;
@@ -96,7 +118,6 @@ export interface FileUpload {
   metadata?: Record<string, any>;
 }
 
-// Database entity base with audit fields
 export interface BaseEntity {
   id: string;
   createdAt: Date;
@@ -109,7 +130,6 @@ export interface BaseEntity {
   deletedBy?: string;
 }
 
-// Enterprise configuration
 export interface AppConfig {
   app: {
     name: string;
@@ -161,7 +181,6 @@ export enum LogLevel {
   DEBUG = 'debug'
 }
 
-// Enterprise validation
 export interface ValidationRule {
   field: string;
   rules: string[];
@@ -180,7 +199,6 @@ export interface ValidationError {
   value?: any;
 }
 
-// Enterprise event system
 export interface DomainEvent {
   id: string;
   type: string;
@@ -200,7 +218,6 @@ export interface EventMetadata {
   ipAddress?: string;
 }
 
-// Health check for enterprise monitoring
 export interface HealthCheck {
   status: HealthStatus;
   timestamp: Date;
@@ -223,7 +240,6 @@ export interface ServiceHealth {
   lastChecked: Date;
 }
 
-// Enterprise rate limiting
 export interface RateLimitInfo {
   limit: number;
   remaining: number;
@@ -231,7 +247,6 @@ export interface RateLimitInfo {
   retryAfter?: number;
 }
 
-// Enterprise caching
 export interface CacheOptions {
   ttl?: number;
   tags?: string[];

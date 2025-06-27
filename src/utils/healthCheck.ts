@@ -1,21 +1,34 @@
-import { prisma } from '@/config/database';
-import { redis } from '@/config/redis';
+
+import { databaseManager } from '@/config/database';
+import { redisManager } from '@/config/redis';
 
 export async function checkDatabaseHealth() {
   try {
-    await prisma.$queryRaw`SELECT 1`;
+    const client = databaseManager.getClient();
+    await client.$queryRaw`SELECT 1`;
     return { status: 'healthy', service: 'postgresql' };
   } catch (error) {
-    return { status: 'unhealthy', service: 'postgresql', error: error.message };
+    return { 
+      status: 'unhealthy', 
+      service: 'postgresql', 
+      error: error instanceof Error ? error.message : 'Unknown database error' 
+    };
   }
 }
 
 export async function checkRedisHealth() {
   try {
-    await redis.ping();
-    return { status: 'healthy', service: 'redis' };
+    const healthResult = await redisManager.healthCheck();
+    return { 
+      status: healthResult.status === 'HEALTHY' ? 'healthy' : 'unhealthy', 
+      service: 'redis' 
+    };
   } catch (error) {
-    return { status: 'unhealthy', service: 'redis', error: error.message };
+    return { 
+      status: 'unhealthy', 
+      service: 'redis', 
+      error: error instanceof Error ? error.message : 'Unknown redis error' 
+    };
   }
 }
 

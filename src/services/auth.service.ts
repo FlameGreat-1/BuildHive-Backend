@@ -39,7 +39,6 @@ import {
   ValidationError
 } from '@/types/common.types';
 
-// Enterprise authentication service interfaces
 interface AuthServiceConfig {
   enableTwoFactor: boolean;
   enableDeviceTracking: boolean;
@@ -81,7 +80,6 @@ interface SessionInfo {
   isActive: boolean;
 }
 
-// Enterprise authentication service
 export class AuthService {
   private static instance: AuthService;
   private config: AuthServiceConfig;
@@ -90,7 +88,6 @@ export class AuthService {
     this.config = this.loadConfiguration();
   }
 
-  // Singleton pattern for enterprise auth service
   public static getInstance(): AuthService {
     if (!AuthService.instance) {
       AuthService.instance = new AuthService();
@@ -98,19 +95,17 @@ export class AuthService {
     return AuthService.instance;
   }
 
-  // Load authentication service configuration
   private loadConfiguration(): AuthServiceConfig {
     return {
       enableTwoFactor: process.env.ENABLE_TWO_FACTOR === 'true',
       enableDeviceTracking: process.env.ENABLE_DEVICE_TRACKING === 'true',
       enableGeoLocation: process.env.ENABLE_GEO_LOCATION === 'true',
       maxSessionsPerUser: parseInt(process.env.MAX_SESSIONS_PER_USER || '5'),
-      passwordResetExpiry: parseInt(process.env.PASSWORD_RESET_EXPIRY || String(60 * 60 * 1000)), // 1 hour
-      verificationCodeExpiry: parseInt(process.env.VERIFICATION_CODE_EXPIRY || String(10 * 60 * 1000)), // 10 minutes
+      passwordResetExpiry: parseInt(process.env.PASSWORD_RESET_EXPIRY || String(60 * 60 * 1000)),
+      verificationCodeExpiry: parseInt(process.env.VERIFICATION_CODE_EXPIRY || String(10 * 60 * 1000)),
     };
   }
 
-  // Enterprise user registration with role-specific onboarding
   public async register(registerData: RegisterRequest, deviceInfo?: DeviceInfo): Promise<{
     user: any;
     message: string;
@@ -128,7 +123,6 @@ export class AuthService {
     try {
       logger.info('Starting user registration', logContext);
 
-      // Validate registration data
       const validation = await this.validateRegistrationData(registerData);
       if (!validation.isValid) {
         throw new ApiError(
@@ -139,7 +133,6 @@ export class AuthService {
         );
       }
 
-      // Create user with role-specific profile
       const user = await createUser({
         email: registerData.email,
         password: registerData.password,
@@ -155,10 +148,8 @@ export class AuthService {
         },
       });
 
-      // Send verification emails/SMS
       await this.sendVerificationCommunications(user);
 
-      // Publish registration event for downstream services
       await publishEvent('user.registered', {
         userId: user.id,
         userType: user.userType,
@@ -209,7 +200,6 @@ export class AuthService {
     }
   }
 
-  // Enterprise user login with comprehensive security
   public async login(loginData: LoginRequest, deviceInfo?: DeviceInfo): Promise<LoginResponse> {
     const startTime = Date.now();
     const logContext = createLogContext()
@@ -223,7 +213,6 @@ export class AuthService {
     try {
       logger.info('Starting user login', logContext);
 
-      // Check account lockout
       const isLocked = await checkAccountLock(loginData.email);
       if (isLocked) {
         logger.security('LOGIN_ATTEMPT_ON_LOCKED_ACCOUNT', {
@@ -239,10 +228,8 @@ export class AuthService {
         );
       }
 
-      // Get user by email
       const user = await getUserByEmail(loginData.email, true);
       if (!user) {
-        // Track failed attempt
         await trackLogin(loginData.email, false, deviceInfo?.ipAddress);
         
         logger.security('LOGIN_ATTEMPT_INVALID_EMAIL', {
@@ -258,10 +245,8 @@ export class AuthService {
         );
       }
 
-      // Verify password
       const isPasswordValid = await verifyPassword(loginData.password, user.passwordHash);
       if (!isPasswordValid) {
-        // Track failed attempt
         await trackLogin(loginData.email, false, deviceInfo?.ipAddress);
         
         logger.security('LOGIN_ATTEMPT_INVALID_PASSWORD', {
@@ -278,7 +263,6 @@ export class AuthService {
         );
       }
 
-      // Check user status
       if (user.status === UserStatus.SUSPENDED) {
         logger.security('LOGIN_ATTEMPT_SUSPENDED_USER', {
           ...logContext,
@@ -302,7 +286,6 @@ export class AuthService {
         };
       }
 
-      // Generate tokens
       const tokenPair = await generateTokens({
         userId: user.id,
         email: user.email,
@@ -311,19 +294,15 @@ export class AuthService {
         permissions: this.getUserPermissions(user),
       });
 
-      // Create session
       const sessionInfo = await this.createUserSession(user, deviceInfo);
 
-      // Track successful login
       await trackLogin(loginData.email, true, deviceInfo?.ipAddress);
 
-      // Update user login statistics
       await updateUser(user.id, {
         lastLoginAt: new Date(),
         loginCount: user.loginCount + 1,
       });
 
-      // Publish login event
       await publishEvent('user.logged_in', {
         userId: user.id,
         userType: user.userType,
@@ -381,7 +360,6 @@ export class AuthService {
     }
   }
 
-  // Enterprise email verification
   public async verifyEmail(verificationData: VerificationRequest): Promise<{
     success: boolean;
     message: string;
@@ -412,7 +390,6 @@ export class AuthService {
         );
       }
 
-      // Get updated user
       const user = await getUserById(verificationData.userId);
       if (!user) {
         throw new ApiError(
@@ -423,7 +400,6 @@ export class AuthService {
         );
       }
 
-      // Publish verification event
       await publishEvent('user.email_verified', {
         userId: user.id,
         userType: user.userType,
@@ -467,7 +443,6 @@ export class AuthService {
     }
   }
 
-  // Enterprise phone verification
   public async verifyPhone(verificationData: VerificationRequest): Promise<{
     success: boolean;
     message: string;
@@ -498,7 +473,6 @@ export class AuthService {
         );
       }
 
-      // Get updated user
       const user = await getUserById(verificationData.userId);
       if (!user) {
         throw new ApiError(
@@ -509,7 +483,6 @@ export class AuthService {
         );
       }
 
-      // Publish verification event
       await publishEvent('user.phone_verified', {
         userId: user.id,
         userType: user.userType,
@@ -553,7 +526,6 @@ export class AuthService {
     }
   }
 
-  // Enterprise password reset request
   public async requestPasswordReset(email: string, deviceInfo?: DeviceInfo): Promise<{
     success: boolean;
     message: string;
@@ -572,7 +544,6 @@ export class AuthService {
 
       const user = await getUserByEmail(email);
       if (!user) {
-        // Don't reveal if email exists for security
         logger.security('PASSWORD_RESET_INVALID_EMAIL', {
           ...logContext,
           email,
@@ -584,27 +555,22 @@ export class AuthService {
         };
       }
 
-      // Generate reset token
       const resetToken = this.generateSecureToken();
       const resetExpires = new Date(Date.now() + this.config.passwordResetExpiry);
 
-      // Update user with reset token
       await updateUser(user.id, {
         passwordResetToken: resetToken,
         passwordResetExpires: resetExpires,
       });
 
-      // Cache reset token for additional security
       await setCache(
         `${CACHE_CONSTANTS.KEYS.PASSWORD_RESET}${resetToken}`,
         { userId: user.id, email: user.email },
         { ttl: this.config.passwordResetExpiry / 1000 }
       );
 
-      // Send password reset email
       await this.sendPasswordResetEmail(user, resetToken);
 
-      // Publish password reset event
       await publishEvent('user.password_reset_requested', {
         userId: user.id,
         email: user.email,
@@ -648,7 +614,6 @@ export class AuthService {
     }
   }
 
-  // Enterprise token refresh
   public async refreshAccessToken(refreshTokenValue: string, deviceInfo?: DeviceInfo): Promise<{
     tokens: any;
     user: any;
@@ -666,7 +631,6 @@ export class AuthService {
 
       const newTokenPair = await refreshToken(refreshTokenValue);
 
-      // Verify the new token to get user info
       const payload = await verifyToken(newTokenPair.accessToken);
       const user = await getUserById(payload.userId);
 
@@ -709,7 +673,6 @@ export class AuthService {
     }
   }
 
-  // Enterprise user logout
   public async logout(userId: string, sessionId?: string, deviceInfo?: DeviceInfo): Promise<{
     success: boolean;
     message: string;
@@ -726,15 +689,12 @@ export class AuthService {
     try {
       logger.info('User logout initiated', logContext);
 
-      // Invalidate session
       if (sessionId) {
         await this.invalidateSession(sessionId);
       }
 
-      // Invalidate all user sessions if no specific session
       await this.invalidateUserSessions(userId);
 
-      // Publish logout event
       await publishEvent('user.logged_out', {
         userId,
         sessionId,
@@ -773,14 +733,12 @@ export class AuthService {
     }
   }
 
-  // Enterprise token validation
   public async validateToken(token: string): Promise<JWTPayload> {
     const startTime = Date.now();
     
     try {
       const payload = await verifyToken(token);
       
-      // Additional validation - check if user still exists and is active
       const user = await getUserById(payload.userId);
       if (!user || user.status === UserStatus.SUSPENDED) {
         throw new Error('User not found or suspended');
@@ -816,7 +774,6 @@ export class AuthService {
     }
   }
 
-  // Enterprise session management
   private async createUserSession(user: any, deviceInfo?: DeviceInfo): Promise<SessionInfo> {
     const sessionId = this.generateSessionId();
     const sessionInfo: SessionInfo = {
@@ -829,20 +786,16 @@ export class AuthService {
       isActive: true,
     };
 
-    // Store session in cache
     await setCache(
       `${CACHE_CONSTANTS.KEYS.USER_SESSION}${sessionId}`,
       sessionInfo,
       { ttl: SECURITY_CONSTANTS.SESSION.IDLE_TIMEOUT / 1000 }
     );
 
-    // Track user sessions
     const userSessionsKey = `${CACHE_CONSTANTS.KEYS.USER_SESSIONS}${user.id}`;
     const userSessions = await getCache<string[]>(userSessionsKey) || [];
     
-    // Limit concurrent sessions
     if (userSessions.length >= this.config.maxSessionsPerUser) {
-      // Remove oldest session
       const oldestSession = userSessions.shift();
       if (oldestSession) {
         await this.invalidateSession(oldestSession);
@@ -850,7 +803,7 @@ export class AuthService {
     }
 
     userSessions.push(sessionId);
-    await setCache(userSessionsKey, userSessions, { ttl: 86400 }); // 24 hours
+    await setCache(userSessionsKey, userSessions, { ttl: 86400 });
 
     return sessionInfo;
   }
@@ -863,7 +816,6 @@ export class AuthService {
     const userSessionsKey = `${CACHE_CONSTANTS.KEYS.USER_SESSIONS}${userId}`;
     const userSessions = await getCache<string[]>(userSessionsKey) || [];
 
-    // Invalidate all sessions
     const invalidationPromises = userSessions.map(sessionId => 
       this.invalidateSession(sessionId)
     );
@@ -872,11 +824,9 @@ export class AuthService {
     await deleteCache(userSessionsKey);
   }
 
-  // Enterprise validation methods
   private async validateRegistrationData(data: RegisterRequest): Promise<ValidationResult> {
     const errors: ValidationError[] = [];
 
-    // Email validation
     if (!data.email || !this.isValidEmail(data.email)) {
       errors.push({
         field: 'email',
@@ -885,7 +835,6 @@ export class AuthService {
       });
     }
 
-    // Password validation
     if (!data.password || data.password.length < SECURITY_CONSTANTS.PASSWORD.MIN_LENGTH) {
       errors.push({
         field: 'password',
@@ -894,7 +843,6 @@ export class AuthService {
       });
     }
 
-    // Name validation
     if (!data.firstName || data.firstName.trim().length < 2) {
       errors.push({
         field: 'firstName',
@@ -911,7 +859,6 @@ export class AuthService {
       });
     }
 
-    // Phone validation
     if (!data.phone || !this.isValidPhone(data.phone)) {
       errors.push({
         field: 'phone',
@@ -920,7 +867,6 @@ export class AuthService {
       });
     }
 
-    // User type validation
     if (!Object.values(UserType).includes(data.userType)) {
       errors.push({
         field: 'userType',
@@ -929,7 +875,6 @@ export class AuthService {
       });
     }
 
-    // Terms acceptance validation
     if (!data.acceptTerms) {
       errors.push({
         field: 'acceptTerms',
@@ -944,10 +889,8 @@ export class AuthService {
     };
   }
 
-  // Enterprise communication methods
   private async sendVerificationCommunications(user: any): Promise<void> {
     try {
-      // Publish events for email and SMS services
       await publishEvent('notification.send_email_verification', {
         userId: user.id,
         email: user.email,
@@ -1014,7 +957,6 @@ export class AuthService {
     }
   }
 
-  // Enterprise user role and permission management
   private getUserPermissions(user: any): string[] {
     const basePermissions = ['profile:read', 'profile:update'];
     
@@ -1065,7 +1007,6 @@ export class AuthService {
     }
   }
 
-  // Enterprise onboarding flow management
   private getNextOnboardingStep(userType: UserType): string {
     switch (userType) {
       case UserType.CLIENT:
@@ -1104,7 +1045,6 @@ export class AuthService {
     return 'dashboard';
   }
 
-  // Enterprise utility methods
   private sanitizeUserData(user: any): any {
     const { passwordHash, emailVerificationToken, phoneVerificationCode, passwordResetToken, ...sanitizedUser } = user;
     return sanitizedUser;
@@ -1140,16 +1080,13 @@ export class AuthService {
     };
   }
 
-  // Enterprise configuration getter
   public getConfig(): Readonly<AuthServiceConfig> {
     return { ...this.config };
   }
 }
 
-// Export singleton instance and helper functions
 export const authService = AuthService.getInstance();
 
-// Enterprise authentication service helpers
 export const registerUser = async (registerData: RegisterRequest, deviceInfo?: DeviceInfo) => {
   return await authService.register(registerData, deviceInfo);
 };

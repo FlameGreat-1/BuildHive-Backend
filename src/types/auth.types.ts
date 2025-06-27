@@ -1,5 +1,3 @@
-// src/types/auth.types.ts
-
 export enum UserType {
   CLIENT = 'client',
   TRADIE = 'tradie',
@@ -32,7 +30,6 @@ export enum DocumentType {
   DIRECTORS_ID = 'directors_id'
 }
 
-// Base interfaces following Interface Segregation Principle
 export interface BaseUser {
   id: string;
   email: string;
@@ -56,6 +53,9 @@ export interface RegisterRequest {
   lastName: string;
   phone: string;
   userType: UserType;
+  acceptTerms: boolean;
+  marketingConsent?: boolean;
+  source?: string;
 }
 
 export interface LoginRequest {
@@ -64,10 +64,28 @@ export interface LoginRequest {
   userType?: UserType;
 }
 
+export interface LoginResponse {
+  success: boolean;
+  message: string;
+  user?: any;
+  tokens?: any;
+  session?: any;
+  permissions?: string[];
+  profileCompleteness?: number;
+  nextStep?: string;
+}
+
 export interface VerificationRequest {
   userId: string;
-  code: string;
-  type: 'email' | 'sms';
+  code?: string;
+  token?: string;
+  type?: 'email' | 'sms';
+}
+
+export interface PasswordResetRequest {
+  email: string;
+  token?: string;
+  newPassword?: string;
 }
 
 export interface DocumentUpload {
@@ -78,7 +96,6 @@ export interface DocumentUpload {
   uploadedAt: Date;
 }
 
-// Role-specific interfaces
 export interface ClientProfile {
   userId: string;
   location: string;
@@ -105,7 +122,6 @@ export interface EnterpriseProfile {
   verificationStatus: VerificationStatus;
 }
 
-// JWT Token payload
 export interface JWTPayload {
   userId: string;
   email: string;
@@ -116,7 +132,6 @@ export interface JWTPayload {
   exp: number;
 }
 
-// API Response types
 export interface AuthResponse {
   success: boolean;
   message: string;
@@ -135,7 +150,6 @@ export interface VerificationResponse {
   message: string;
 }
 
-// Error types
 export interface AuthError {
   code: string;
   message: string;
