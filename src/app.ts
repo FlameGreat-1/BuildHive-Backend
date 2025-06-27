@@ -553,7 +553,6 @@ export class BuildHiveApp {
 }
 
 export default BuildHiveApp;
-export { BuildHiveApp };
 
 export const createProductionApp = (): BuildHiveApp => {
   return new BuildHiveApp();

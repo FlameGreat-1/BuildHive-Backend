@@ -15,9 +15,7 @@ import {
   createUser, 
   getUserByEmail, 
   getUserById, 
-  updateUser, 
-  verifyUserEmail, 
-  verifyUserPhone 
+  updateUser
 } from '@/models/User';
 import {
   UserType,

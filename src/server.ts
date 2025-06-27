@@ -1,11 +1,8 @@
-// src/server.ts - BuildHive Main Server Entry Point
-
 import 'dotenv/config';
 import { logger, createLogContext } from '@/utils/logger';
 import { ERROR_CODES } from '@/utils/constants';
-import app from './app';
+import { BuildHiveApp } from './app';
 
-// Enterprise server configuration
 interface ServerConfig {
   port: number;
   host: string;
@@ -17,6 +14,7 @@ interface ServerConfig {
 class BuildHiveServer {
   private config: ServerConfig;
   private isShuttingDown: boolean = false;
+  private app: BuildHiveApp;
 
   constructor() {
     this.config = {
@@ -27,17 +25,16 @@ class BuildHiveServer {
       startTime: new Date(),
     };
 
+    this.app = new BuildHiveApp();
     this.setupProcessHandlers();
   }
 
-  // Setup process event handlers
   private setupProcessHandlers(): void {
-    // Handle uncaught exceptions
     process.on('uncaughtException', (error: Error) => {
       logger.error('Uncaught Exception - Server will shutdown', 
         createLogContext()
-          .withError(ERROR_CODES.SYS_UNCAUGHT_EXCEPTION)
           .withMetadata({
+            errorCode: ERROR_CODES.SYS_UNCAUGHT_EXCEPTION,
             errorMessage: error.message,
             stack: error.stack,
             processId: this.config.processId,
@@ -48,12 +45,11 @@ class BuildHiveServer {
       this.gracefulShutdown('UNCAUGHT_EXCEPTION', 1);
     });
 
-    // Handle unhandled promise rejections
     process.on('unhandledRejection', (reason: any, promise: Promise<any>) => {
       logger.error('Unhandled Promise Rejection - Server will shutdown', 
         createLogContext()
-          .withError(ERROR_CODES.SYS_UNHANDLED_REJECTION)
           .withMetadata({
+            errorCode: ERROR_CODES.SYS_UNHANDLED_REJECTION,
             reason: reason?.message || reason,
             stack: reason?.stack,
             processId: this.config.processId,
@@ -64,12 +60,10 @@ class BuildHiveServer {
       this.gracefulShutdown('UNHANDLED_REJECTION', 1);
     });
 
-    // Handle graceful shutdown signals
     process.on('SIGTERM', () => this.gracefulShutdown('SIGTERM', 0));
     process.on('SIGINT', () => this.gracefulShutdown('SIGINT', 0));
-    process.on('SIGUSR2', () => this.gracefulShutdown('SIGUSR2', 0)); // PM2 reload
+    process.on('SIGUSR2', () => this.gracefulShutdown('SIGUSR2', 0));
 
-    // Handle memory warnings
     process.on('warning', (warning) => {
       logger.warn('Process warning', 
         createLogContext()
@@ -84,7 +78,6 @@ class BuildHiveServer {
     });
   }
 
-  // Start the BuildHive server
   public async start(): Promise<void> {
     const startTime = Date.now();
     const logContext = createLogContext()
@@ -102,11 +95,9 @@ class BuildHiveServer {
     try {
       logger.info('Starting BuildHive server...', logContext);
 
-      // Validate environment
       this.validateEnvironment();
 
-      // Start the application
-      await app.start();
+      await this.app.start();
 
       const startupTime = Date.now() - startTime;
       
@@ -117,14 +108,12 @@ class BuildHiveServer {
         memoryUsage: process.memoryUsage(),
       });
 
-      // Log business event
       logger.business('BUILDHIVE_SERVER_STARTED', {
         ...logContext,
         startupTime,
         version: process.env.npm_package_version || '1.0.0',
       });
 
-      // Log server URLs
       this.logServerUrls();
 
     } catch (error) {
@@ -138,12 +127,10 @@ class BuildHiveServer {
         errorCode: ERROR_CODES.SYS_STARTUP_ERROR,
       });
 
-      // Exit with error code
       process.exit(1);
     }
   }
 
-  // Validate required environment variables
   private validateEnvironment(): void {
     const requiredEnvVars = [
       'DATABASE_URL',
@@ -159,8 +146,8 @@ class BuildHiveServer {
       
       logger.error('Environment validation failed', 
         createLogContext()
-          .withError(ERROR_CODES.SYS_CONFIGURATION_ERROR)
           .withMetadata({
+            errorCode: ERROR_CODES.SYS_CONFIGURATION_ERROR,
             missingVariables: missingVars,
             environment: this.config.environment,
           })
@@ -170,7 +157,6 @@ class BuildHiveServer {
       throw new Error(errorMessage);
     }
 
-    // Validate port
     if (this.config.port < 1 || this.config.port > 65535) {
       throw new Error(`Invalid port number: ${this.config.port}`);
     }
@@ -186,20 +172,20 @@ class BuildHiveServer {
     );
   }
 
-  // Log server access URLs
   private logServerUrls(): void {
     const baseUrl = `http://${this.config.host === '0.0.0.0' ? 'localhost' : this.config.host}:${this.config.port}`;
     
-    logger.info('BuildHive server URLs:', {
-      metadata: {
-        baseUrl,
-        healthCheck: `${baseUrl}/api/health`,
-        apiDocs: `${baseUrl}/api/docs`,
-        authEndpoint: `${baseUrl}/api/auth`,
-      }
-    });
+    logger.info('BuildHive server URLs:', 
+      createLogContext()
+        .withMetadata({
+          baseUrl,
+          healthCheck: `${baseUrl}/api/health`,
+          apiDocs: `${baseUrl}/api/docs`,
+          authEndpoint: `${baseUrl}/api/auth`,
+        })
+        .build()
+    );
 
-    // Log in development mode
     if (this.config.environment === 'development') {
       console.log('\n🚀 BuildHive Server Running:');
       console.log(`   ➜ Local:    ${baseUrl}`);
@@ -210,12 +196,13 @@ class BuildHiveServer {
     }
   }
 
-  // Graceful shutdown handler
   private gracefulShutdown(signal: string, exitCode: number): void {
     if (this.isShuttingDown) {
-      logger.warn('Shutdown already in progress, forcing exit', {
-        metadata: { signal, exitCode, processId: this.config.processId }
-      });
+      logger.warn('Shutdown already in progress, forcing exit', 
+        createLogContext()
+          .withMetadata({ signal, exitCode, processId: this.config.processId })
+          .build()
+      );
       process.exit(exitCode);
       return;
     }
@@ -234,7 +221,6 @@ class BuildHiveServer {
 
     logger.info(`BuildHive server received ${signal}, starting graceful shutdown...`, logContext);
 
-    // Set shutdown timeout (30 seconds)
     const shutdownTimeout = setTimeout(() => {
       logger.error('Graceful shutdown timeout, forcing exit', {
         ...logContext,
@@ -243,11 +229,9 @@ class BuildHiveServer {
       process.exit(1);
     }, 30000);
 
-    // Perform graceful shutdown
     Promise.resolve()
       .then(async () => {
-        // Get the server instance and close it
-        const server = app.getServer();
+        const server = this.app.getServer();
         if (server) {
           await new Promise<void>((resolve, reject) => {
             server.close((error: any) => {
@@ -264,9 +248,6 @@ class BuildHiveServer {
             });
           });
         }
-
-        // Close database connections (handled by app.ts)
-        // This is already handled in app.ts graceful shutdown
 
         clearTimeout(shutdownTimeout);
         
@@ -297,21 +278,21 @@ class BuildHiveServer {
       });
   }
 
-  // Get server configuration
   public getConfig(): Readonly<ServerConfig> {
     return { ...this.config };
   }
+
+  public getApp(): BuildHiveApp {
+    return this.app;
+  }
 }
 
-// Create and start the BuildHive server
 const buildHiveServer = new BuildHiveServer();
 
-// Start the server
 buildHiveServer.start().catch((error) => {
   console.error('Failed to start BuildHive server:', error);
   process.exit(1);
 });
 
-// Export for testing
 export default buildHiveServer;
 export { BuildHiveServer };
