@@ -59,15 +59,19 @@ class RedisManager {
       socket: {
         connectTimeout: this.config.connectTimeout,
         commandTimeout: this.config.commandTimeout,
-        reconnectStrategy: (retries) => {
+        reconnectStrategy: (retries: number): number | Error => {
           if (retries > this.config.maxRetries) {
             logger.error('Redis max retries exceeded', 
               createLogContext()
-                .withError(ERROR_CODES.SYS_REDIS_ERROR)
-                .withMetadata({ purpose, retries, maxRetries: this.config.maxRetries })
+                .withMetadata({ 
+                  errorCode: ERROR_CODES.SYS_REDIS_ERROR,
+                  purpose, 
+                  retries, 
+                  maxRetries: this.config.maxRetries 
+                })
                 .build()
             );
-            return false;
+            return new Error('Max retries exceeded');
           }
           const delay = Math.min(retries * this.config.retryDelayOnFailover, 3000);
           logger.warn(`Redis reconnecting in ${delay}ms`, 
@@ -95,11 +99,11 @@ class RedisManager {
       );
     });
 
-    client.on('error', (error) => {
+    client.on('error', (error: Error) => {
       logger.error(`Redis ${purpose} client error`, 
         createLogContext()
-          .withError(ERROR_CODES.SYS_REDIS_ERROR)
           .withMetadata({ 
+            errorCode: ERROR_CODES.SYS_REDIS_ERROR,
             purpose, 
             errorMessage: error.message,
             errorStack: error.stack 
@@ -147,15 +151,22 @@ class RedisManager {
         this.publisher = this.createRedisClient('publisher');
       }
 
-      await Promise.all([
+      const connections = await Promise.allSettled([
         this.client.connect(),
         this.subscriber.connect(),
         this.publisher.connect(),
       ]);
 
-      await this.client.ping();
-      await this.subscriber.ping();
-      await this.publisher.ping();
+      const failures = connections.filter(result => result.status === 'rejected');
+      if (failures.length > 0) {
+        throw new Error(`Redis connection failures: ${failures.length}`);
+      }
+
+      await Promise.all([
+        this.client.ping(),
+        this.subscriber.ping(),
+        this.publisher.ping(),
+      ]);
 
       this.isConnected = true;
       this.isSubscriberConnected = true;
@@ -213,8 +224,8 @@ class RedisManager {
     } catch (error) {
       logger.error('Redis SET failed', 
         createLogContext()
-          .withError(ERROR_CODES.SYS_REDIS_ERROR)
           .withMetadata({ 
+            errorCode: ERROR_CODES.SYS_REDIS_ERROR,
             key: fullKey, 
             errorMessage: error instanceof Error ? error.message : 'Unknown error' 
           })
@@ -251,8 +262,8 @@ class RedisManager {
     } catch (error) {
       logger.error('Redis GET failed', 
         createLogContext()
-          .withError(ERROR_CODES.SYS_REDIS_ERROR)
           .withMetadata({ 
+            errorCode: ERROR_CODES.SYS_REDIS_ERROR,
             key: fullKey, 
             errorMessage: error instanceof Error ? error.message : 'Unknown error' 
           })
@@ -283,8 +294,8 @@ class RedisManager {
     } catch (error) {
       logger.error('Redis DELETE failed', 
         createLogContext()
-          .withError(ERROR_CODES.SYS_REDIS_ERROR)
           .withMetadata({ 
+            errorCode: ERROR_CODES.SYS_REDIS_ERROR,
             key: fullKey, 
             errorMessage: error instanceof Error ? error.message : 'Unknown error' 
           })
@@ -312,8 +323,8 @@ class RedisManager {
     } catch (error) {
       logger.error('Redis PUBLISH failed', 
         createLogContext()
-          .withError(ERROR_CODES.SYS_REDIS_ERROR)
           .withMetadata({ 
+            errorCode: ERROR_CODES.SYS_REDIS_ERROR,
             channel, 
             errorMessage: error instanceof Error ? error.message : 'Unknown error' 
           })
@@ -329,7 +340,7 @@ class RedisManager {
     }
 
     try {
-      await this.subscriber.subscribe(channel, (message) => {
+      await this.subscriber.subscribe(channel, (message: string) => {
         try {
           const parsedMessage = JSON.parse(message);
           callback(parsedMessage);
@@ -343,8 +354,8 @@ class RedisManager {
         } catch (error) {
           logger.error('Redis message parsing failed', 
             createLogContext()
-              .withError(ERROR_CODES.SYS_REDIS_ERROR)
               .withMetadata({ 
+                errorCode: ERROR_CODES.SYS_REDIS_ERROR,
                 channel, 
                 message, 
                 errorMessage: error instanceof Error ? error.message : 'Unknown error' 
@@ -361,8 +372,8 @@ class RedisManager {
     } catch (error) {
       logger.error('Redis SUBSCRIBE failed', 
         createLogContext()
-          .withError(ERROR_CODES.SYS_REDIS_ERROR)
           .withMetadata({ 
+            errorCode: ERROR_CODES.SYS_REDIS_ERROR,
             channel, 
             errorMessage: error instanceof Error ? error.message : 'Unknown error' 
           })

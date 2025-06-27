@@ -1,18 +1,7 @@
-// src/controllers/AuthController.ts
-
 import { Request, Response, NextFunction } from 'express';
 import { logger, createLogContext } from '@/utils/logger';
 import { ERROR_CODES, HTTP_STATUS_CODES, RATE_LIMIT_CONSTANTS } from '@/utils/constants';
-import { 
-  registerUser, 
-  loginUser, 
-  verifyUserEmail, 
-  verifyUserPhone, 
-  requestPasswordReset, 
-  refreshUserToken, 
-  logoutUser, 
-  validateUserToken 
-} from '@/services/AuthService';
+import { AuthService } from '@/services/auth.service';
 import { 
   RegisterRequest, 
   LoginRequest, 
@@ -24,10 +13,12 @@ import {
   ApiError, 
   ErrorSeverity, 
   ApiResponse, 
-  ValidationResult 
+  ValidationResult,
+  ValidationError 
 } from '@/types/common.types';
 
-// Enterprise controller interfaces
+const authService = AuthService.getInstance();
+
 interface AuthControllerConfig {
   enableRateLimiting: boolean;
   enableDeviceFingerprinting: boolean;
@@ -62,7 +53,6 @@ interface DeviceInfo {
   };
 }
 
-// Enterprise authentication controller
 export class AuthController {
   private static instance: AuthController;
   private config: AuthControllerConfig;
@@ -71,7 +61,6 @@ export class AuthController {
     this.config = this.loadConfiguration();
   }
 
-  // Singleton pattern for enterprise auth controller
   public static getInstance(): AuthController {
     if (!AuthController.instance) {
       AuthController.instance = new AuthController();
@@ -79,7 +68,6 @@ export class AuthController {
     return AuthController.instance;
   }
 
-  // Load controller configuration
   private loadConfiguration(): AuthControllerConfig {
     return {
       enableRateLimiting: process.env.ENABLE_RATE_LIMITING !== 'false',
@@ -90,12 +78,11 @@ export class AuthController {
     };
   }
 
-  // Enterprise user registration endpoint
   public register = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const startTime = Date.now();
     const requestContext = this.extractRequestContext(req);
     const logContext = createLogContext()
-      .withRequest(req)
+      .withRequest(requestContext.requestId, req.method, req.originalUrl)
       .withMetadata({ 
         endpoint: 'register',
         userType: req.body.userType,
@@ -106,14 +93,13 @@ export class AuthController {
     try {
       logger.info('Registration request received', logContext);
 
-      // Validate request body
       const validation = this.validateRegistrationRequest(req.body);
       if (!validation.isValid) {
         const errorResponse: ApiResponse<null> = {
           success: false,
           message: 'Validation failed',
           errors: validation.errors,
-          timestamp: new Date(),
+          timestamp: new Date().toISOString(),
           requestId: requestContext.requestId,
         };
 
@@ -121,10 +107,8 @@ export class AuthController {
         return;
       }
 
-      // Extract device information
       const deviceInfo = this.extractDeviceInfo(req, requestContext);
 
-      // Prepare registration data
       const registerData: RegisterRequest = {
         email: req.body.email.toLowerCase().trim(),
         password: req.body.password,
@@ -137,8 +121,7 @@ export class AuthController {
         source: req.body.source || 'web',
       };
 
-      // Register user
-      const result = await registerUser(registerData, deviceInfo);
+      const result = await authService.register(registerData, deviceInfo);
 
       const duration = Date.now() - startTime;
       logger.info('Registration successful', {
@@ -153,7 +136,7 @@ export class AuthController {
         success: true,
         message: result.message,
         data: result,
-        timestamp: new Date(),
+        timestamp: new Date().toISOString(),
         requestId: requestContext.requestId,
       };
 
@@ -172,12 +155,11 @@ export class AuthController {
     }
   };
 
-  // Enterprise user login endpoint
   public login = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const startTime = Date.now();
     const requestContext = this.extractRequestContext(req);
     const logContext = createLogContext()
-      .withRequest(req)
+      .withRequest(requestContext.requestId, req.method, req.originalUrl)
       .withMetadata({ 
         endpoint: 'login',
         email: req.body.email,
@@ -188,14 +170,13 @@ export class AuthController {
     try {
       logger.info('Login request received', logContext);
 
-      // Validate request body
       const validation = this.validateLoginRequest(req.body);
       if (!validation.isValid) {
         const errorResponse: ApiResponse<null> = {
           success: false,
           message: 'Validation failed',
           errors: validation.errors,
-          timestamp: new Date(),
+          timestamp: new Date().toISOString(),
           requestId: requestContext.requestId,
         };
 
@@ -203,18 +184,15 @@ export class AuthController {
         return;
       }
 
-      // Extract device information
       const deviceInfo = this.extractDeviceInfo(req, requestContext);
 
-      // Prepare login data
       const loginData: LoginRequest = {
         email: req.body.email.toLowerCase().trim(),
         password: req.body.password,
         rememberMe: req.body.rememberMe || false,
       };
 
-      // Authenticate user
-      const result = await loginUser(loginData, deviceInfo);
+      const result = await authService.login(loginData, deviceInfo);
 
       const duration = Date.now() - startTime;
       
@@ -228,7 +206,6 @@ export class AuthController {
 
         logger.performance('auth_login', duration, logContext);
 
-        // Set secure HTTP-only cookies for tokens
         if (result.tokens) {
           this.setAuthCookies(res, result.tokens);
         }
@@ -237,13 +214,12 @@ export class AuthController {
           success: true,
           message: result.message,
           data: result,
-          timestamp: new Date(),
+          timestamp: new Date().toISOString(),
           requestId: requestContext.requestId,
         };
 
         res.status(HTTP_STATUS_CODES.OK).json(successResponse);
       } else {
-        // Handle partial success (e.g., pending verification)
         logger.warn('Login partially successful', {
           ...logContext,
           userId: result.user?.id,
@@ -255,7 +231,7 @@ export class AuthController {
           success: false,
           message: result.message,
           data: result,
-          timestamp: new Date(),
+          timestamp: new Date().toISOString(),
           requestId: requestContext.requestId,
         };
 
@@ -275,12 +251,11 @@ export class AuthController {
     }
   };
 
-  // Enterprise email verification endpoint
   public verifyEmail = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const startTime = Date.now();
     const requestContext = this.extractRequestContext(req);
     const logContext = createLogContext()
-      .withRequest(req)
+      .withRequest(requestContext.requestId, req.method, req.originalUrl)
       .withUser(req.body.userId)
       .withMetadata({ 
         endpoint: 'verify-email',
@@ -291,14 +266,13 @@ export class AuthController {
     try {
       logger.info('Email verification request received', logContext);
 
-      // Validate request body
       const validation = this.validateVerificationRequest(req.body, 'email');
       if (!validation.isValid) {
         const errorResponse: ApiResponse<null> = {
           success: false,
           message: 'Validation failed',
           errors: validation.errors,
-          timestamp: new Date(),
+          timestamp: new Date().toISOString(),
           requestId: requestContext.requestId,
         };
 
@@ -306,15 +280,13 @@ export class AuthController {
         return;
       }
 
-      // Prepare verification data
       const verificationData: VerificationRequest = {
         userId: req.body.userId,
         token: req.body.token,
         type: 'email',
       };
 
-      // Verify email
-      const result = await verifyUserEmail(verificationData);
+      const result = await authService.verifyEmail(verificationData);
 
       const duration = Date.now() - startTime;
       logger.info('Email verification successful', {
@@ -329,7 +301,7 @@ export class AuthController {
         success: true,
         message: result.message,
         data: result,
-        timestamp: new Date(),
+        timestamp: new Date().toISOString(),
         requestId: requestContext.requestId,
       };
 
@@ -348,12 +320,11 @@ export class AuthController {
     }
   };
 
-  // Enterprise phone verification endpoint
   public verifyPhone = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const startTime = Date.now();
     const requestContext = this.extractRequestContext(req);
     const logContext = createLogContext()
-      .withRequest(req)
+      .withRequest(requestContext.requestId, req.method, req.originalUrl)
       .withUser(req.body.userId)
       .withMetadata({ 
         endpoint: 'verify-phone',
@@ -364,14 +335,13 @@ export class AuthController {
     try {
       logger.info('Phone verification request received', logContext);
 
-      // Validate request body
       const validation = this.validateVerificationRequest(req.body, 'phone');
       if (!validation.isValid) {
         const errorResponse: ApiResponse<null> = {
           success: false,
           message: 'Validation failed',
           errors: validation.errors,
-          timestamp: new Date(),
+          timestamp: new Date().toISOString(),
           requestId: requestContext.requestId,
         };
 
@@ -379,15 +349,13 @@ export class AuthController {
         return;
       }
 
-      // Prepare verification data
       const verificationData: VerificationRequest = {
         userId: req.body.userId,
         code: req.body.code,
         type: 'phone',
       };
 
-      // Verify phone
-      const result = await verifyUserPhone(verificationData);
+      const result = await authService.verifyPhone(verificationData);
 
       const duration = Date.now() - startTime;
       logger.info('Phone verification successful', {
@@ -402,7 +370,7 @@ export class AuthController {
         success: true,
         message: result.message,
         data: result,
-        timestamp: new Date(),
+        timestamp: new Date().toISOString(),
         requestId: requestContext.requestId,
       };
 
@@ -421,12 +389,11 @@ export class AuthController {
     }
   };
 
-  // Enterprise password reset request endpoint
   public requestPasswordReset = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const startTime = Date.now();
     const requestContext = this.extractRequestContext(req);
     const logContext = createLogContext()
-      .withRequest(req)
+      .withRequest(requestContext.requestId, req.method, req.originalUrl)
       .withMetadata({ 
         endpoint: 'request-password-reset',
         email: req.body.email,
@@ -437,14 +404,13 @@ export class AuthController {
     try {
       logger.info('Password reset request received', logContext);
 
-      // Validate request body
       const validation = this.validatePasswordResetRequest(req.body);
       if (!validation.isValid) {
         const errorResponse: ApiResponse<null> = {
           success: false,
           message: 'Validation failed',
           errors: validation.errors,
-          timestamp: new Date(),
+          timestamp: new Date().toISOString(),
           requestId: requestContext.requestId,
         };
 
@@ -452,11 +418,9 @@ export class AuthController {
         return;
       }
 
-      // Extract device information
       const deviceInfo = this.extractDeviceInfo(req, requestContext);
 
-      // Request password reset
-      const result = await requestPasswordReset(req.body.email.toLowerCase().trim(), deviceInfo);
+      const result = await authService.requestPasswordReset(req.body.email.toLowerCase().trim(), deviceInfo);
 
       const duration = Date.now() - startTime;
       logger.info('Password reset request processed', {
@@ -470,7 +434,7 @@ export class AuthController {
         success: true,
         message: result.message,
         data: result,
-        timestamp: new Date(),
+        timestamp: new Date().toISOString(),
         requestId: requestContext.requestId,
       };
 
@@ -489,12 +453,11 @@ export class AuthController {
     }
   };
 
-  // Enterprise token refresh endpoint
   public refreshToken = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const startTime = Date.now();
     const requestContext = this.extractRequestContext(req);
     const logContext = createLogContext()
-      .withRequest(req)
+      .withRequest(requestContext.requestId, req.method, req.originalUrl)
       .withMetadata({ 
         endpoint: 'refresh-token',
         requestId: requestContext.requestId 
@@ -504,7 +467,6 @@ export class AuthController {
     try {
       logger.debug('Token refresh request received', logContext);
 
-      // Get refresh token from cookie or body
       const refreshTokenValue = req.cookies?.refreshToken || req.body.refreshToken;
       
       if (!refreshTokenValue) {
@@ -512,7 +474,7 @@ export class AuthController {
           success: false,
           message: 'Refresh token is required',
           errors: [{ field: 'refreshToken', message: 'Refresh token is required', code: ERROR_CODES.VAL_REQUIRED_FIELD }],
-          timestamp: new Date(),
+          timestamp: new Date().toISOString(),
           requestId: requestContext.requestId,
         };
 
@@ -520,11 +482,9 @@ export class AuthController {
         return;
       }
 
-      // Extract device information
       const deviceInfo = this.extractDeviceInfo(req, requestContext);
 
-      // Refresh tokens
-      const result = await refreshUserToken(refreshTokenValue, deviceInfo);
+      const result = await authService.refreshAccessToken(refreshTokenValue, deviceInfo);
 
       const duration = Date.now() - startTime;
       logger.debug('Token refresh successful', {
@@ -535,14 +495,13 @@ export class AuthController {
 
       logger.performance('auth_token_refresh', duration, logContext);
 
-      // Set new secure HTTP-only cookies
       this.setAuthCookies(res, result.tokens);
 
       const successResponse: ApiResponse<typeof result> = {
         success: true,
         message: 'Tokens refreshed successfully',
         data: result,
-        timestamp: new Date(),
+        timestamp: new Date().toISOString(),
         requestId: requestContext.requestId,
       };
 
@@ -557,20 +516,18 @@ export class AuthController {
         errorCode: error instanceof ApiError ? error.code : ERROR_CODES.AUTH_TOKEN_INVALID,
       });
 
-      // Clear invalid cookies
       this.clearAuthCookies(res);
 
       next(error);
     }
   };
 
-  // Enterprise user logout endpoint
   public logout = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const startTime = Date.now();
     const requestContext = this.extractRequestContext(req);
     const logContext = createLogContext()
-      .withRequest(req)
-      .withUser(req.user?.userId)
+      .withRequest(requestContext.requestId, req.method, req.originalUrl)
+      .withUser((req as any).user?.userId)
       .withMetadata({ 
         endpoint: 'logout',
         requestId: requestContext.requestId 
@@ -580,14 +537,14 @@ export class AuthController {
     try {
       logger.info('Logout request received', logContext);
 
-      const userId = req.user?.userId;
-      const sessionId = req.user?.sessionId;
+      const userId = (req as any).user?.userId;
+      const sessionId = (req as any).user?.sessionId;
 
       if (!userId) {
         const errorResponse: ApiResponse<null> = {
           success: false,
           message: 'User not authenticated',
-          timestamp: new Date(),
+          timestamp: new Date().toISOString(),
           requestId: requestContext.requestId,
         };
 
@@ -595,11 +552,9 @@ export class AuthController {
         return;
       }
 
-      // Extract device information
       const deviceInfo = this.extractDeviceInfo(req, requestContext);
 
-      // Logout user
-      const result = await logoutUser(userId, sessionId, deviceInfo);
+      const result = await authService.logout(userId, sessionId, deviceInfo);
 
       const duration = Date.now() - startTime;
       logger.info('Logout successful', {
@@ -609,14 +564,13 @@ export class AuthController {
 
       logger.performance('auth_logout', duration, logContext);
 
-      // Clear authentication cookies
       this.clearAuthCookies(res);
 
       const successResponse: ApiResponse<typeof result> = {
         success: true,
         message: result.message,
         data: result,
-        timestamp: new Date(),
+        timestamp: new Date().toISOString(),
         requestId: requestContext.requestId,
       };
 
@@ -634,14 +588,13 @@ export class AuthController {
       next(error);
     }
   };
-
-  // Enterprise user profile endpoint
+  
   public getProfile = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const startTime = Date.now();
     const requestContext = this.extractRequestContext(req);
     const logContext = createLogContext()
-      .withRequest(req)
-      .withUser(req.user?.userId)
+      .withRequest(requestContext.requestId, req.method, req.originalUrl)
+      .withUser((req as any).user?.userId)
       .withMetadata({ 
         endpoint: 'get-profile',
         requestId: requestContext.requestId 
@@ -651,13 +604,13 @@ export class AuthController {
     try {
       logger.debug('Profile request received', logContext);
 
-      const userId = req.user?.userId;
+      const userId = (req as any).user?.userId;
       
       if (!userId) {
         const errorResponse: ApiResponse<null> = {
           success: false,
           message: 'User not authenticated',
-          timestamp: new Date(),
+          timestamp: new Date().toISOString(),
           requestId: requestContext.requestId,
         };
 
@@ -665,8 +618,7 @@ export class AuthController {
         return;
       }
 
-      // Get user profile (this would typically call a UserService)
-      const user = req.user; // Assuming middleware already populated this
+      const user = (req as any).user;
 
       const duration = Date.now() - startTime;
       logger.debug('Profile retrieved successfully', {
@@ -680,7 +632,7 @@ export class AuthController {
         success: true,
         message: 'Profile retrieved successfully',
         data: { user },
-        timestamp: new Date(),
+        timestamp: new Date().toISOString(),
         requestId: requestContext.requestId,
       };
 
@@ -699,12 +651,11 @@ export class AuthController {
     }
   };
 
-  // Enterprise token validation endpoint
   public validateToken = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const startTime = Date.now();
     const requestContext = this.extractRequestContext(req);
     const logContext = createLogContext()
-      .withRequest(req)
+      .withRequest(requestContext.requestId, req.method, req.originalUrl)
       .withMetadata({ 
         endpoint: 'validate-token',
         requestId: requestContext.requestId 
@@ -714,7 +665,6 @@ export class AuthController {
     try {
       logger.debug('Token validation request received', logContext);
 
-      // Get token from header or body
       const token = req.headers.authorization?.replace('Bearer ', '') || req.body.token;
       
       if (!token) {
@@ -722,7 +672,7 @@ export class AuthController {
           success: false,
           message: 'Token is required',
           errors: [{ field: 'token', message: 'Token is required', code: ERROR_CODES.VAL_REQUIRED_FIELD }],
-          timestamp: new Date(),
+          timestamp: new Date().toISOString(),
           requestId: requestContext.requestId,
         };
 
@@ -730,36 +680,48 @@ export class AuthController {
         return;
       }
 
-      // Validate token
-      const payload = await validateUserToken(token);
+      const result = await authService.validateUserToken(token);
 
       const duration = Date.now() - startTime;
-      logger.debug('Token validation successful', {
-        ...logContext,
-        userId: payload.userId,
-        duration,
-      });
+      
+      if (result.isValid) {
+        logger.debug('Token validation successful', {
+          ...logContext,
+          userId: result.payload?.userId,
+          duration,
+        });
 
-      logger.performance('auth_validate_token', duration, logContext);
+        logger.performance('auth_validate_token', duration, logContext);
 
-      const successResponse: ApiResponse<any> = {
-        success: true,
-        message: 'Token is valid',
-        data: { 
-          valid: true,
-          payload: {
-            userId: payload.userId,
-            email: payload.email,
-            userType: payload.userType,
-            status: payload.status,
-            permissions: payload.permissions,
-          }
-        },
-        timestamp: new Date(),
-        requestId: requestContext.requestId,
-      };
+        const successResponse: ApiResponse<any> = {
+          success: true,
+          message: 'Token is valid',
+          data: { 
+            valid: true,
+            payload: result.payload,
+            user: result.user
+          },
+          timestamp: new Date().toISOString(),
+          requestId: requestContext.requestId,
+        };
 
-      res.status(HTTP_STATUS_CODES.OK).json(successResponse);
+        res.status(HTTP_STATUS_CODES.OK).json(successResponse);
+      } else {
+        logger.warn('Token validation failed', {
+          ...logContext,
+          duration,
+        });
+
+        const errorResponse: ApiResponse<any> = {
+          success: false,
+          message: 'Token is invalid or expired',
+          data: { valid: false },
+          timestamp: new Date().toISOString(),
+          requestId: requestContext.requestId,
+        };
+
+        res.status(HTTP_STATUS_CODES.UNAUTHORIZED).json(errorResponse);
+      }
 
     } catch (error) {
       const duration = Date.now() - startTime;
@@ -774,7 +736,7 @@ export class AuthController {
         success: false,
         message: 'Token is invalid or expired',
         data: { valid: false },
-        timestamp: new Date(),
+        timestamp: new Date().toISOString(),
         requestId: requestContext.requestId,
       };
 
@@ -782,7 +744,6 @@ export class AuthController {
     }
   };
 
-  // Enterprise health check endpoint
   public healthCheck = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const requestContext = this.extractRequestContext(req);
     
@@ -793,10 +754,10 @@ export class AuthController {
         data: {
           service: 'auth',
           status: 'healthy',
-          timestamp: new Date(),
+          timestamp: new Date().toISOString(),
           version: process.env.APP_VERSION || '1.0.0',
         },
-        timestamp: new Date(),
+        timestamp: new Date().toISOString(),
         requestId: requestContext.requestId,
       };
 
@@ -807,18 +768,15 @@ export class AuthController {
     }
   };
 
-  // Enterprise request validation methods
   private validateRegistrationRequest(body: any): ValidationResult {
-    const errors: any[] = [];
+    const errors: ValidationError[] = [];
 
-    // Email validation
     if (!body.email) {
       errors.push({ field: 'email', message: 'Email is required', code: ERROR_CODES.VAL_REQUIRED_FIELD });
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.email)) {
       errors.push({ field: 'email', message: 'Invalid email format', code: ERROR_CODES.VAL_INVALID_EMAIL });
     }
 
-    // Password validation
     if (!body.password) {
       errors.push({ field: 'password', message: 'Password is required', code: ERROR_CODES.VAL_REQUIRED_FIELD });
     } else if (body.password.length < 8) {
@@ -827,7 +785,6 @@ export class AuthController {
       errors.push({ field: 'password', message: 'Password must contain uppercase, lowercase, number and special character', code: ERROR_CODES.VAL_WEAK_PASSWORD });
     }
 
-    // Name validation
     if (!body.firstName || body.firstName.trim().length < 2) {
       errors.push({ field: 'firstName', message: 'First name must be at least 2 characters', code: ERROR_CODES.VAL_REQUIRED_FIELD });
     }
@@ -836,21 +793,18 @@ export class AuthController {
       errors.push({ field: 'lastName', message: 'Last name must be at least 2 characters', code: ERROR_CODES.VAL_REQUIRED_FIELD });
     }
 
-    // Phone validation
     if (!body.phone) {
       errors.push({ field: 'phone', message: 'Phone number is required', code: ERROR_CODES.VAL_REQUIRED_FIELD });
     } else if (!/^\+?[\d\s\-\(\)]{10,}$/.test(body.phone)) {
       errors.push({ field: 'phone', message: 'Invalid phone number format', code: ERROR_CODES.VAL_INVALID_PHONE });
     }
 
-    // User type validation
     if (!body.userType) {
       errors.push({ field: 'userType', message: 'User type is required', code: ERROR_CODES.VAL_REQUIRED_FIELD });
     } else if (!Object.values(UserType).includes(body.userType)) {
       errors.push({ field: 'userType', message: 'Invalid user type', code: ERROR_CODES.VAL_INVALID_USER_TYPE });
     }
 
-    // Terms acceptance validation
     if (!body.acceptTerms) {
       errors.push({ field: 'acceptTerms', message: 'Terms and conditions must be accepted', code: ERROR_CODES.VAL_REQUIRED_FIELD });
     }
@@ -862,16 +816,14 @@ export class AuthController {
   }
 
   private validateLoginRequest(body: any): ValidationResult {
-    const errors: any[] = [];
+    const errors: ValidationError[] = [];
 
-    // Email validation
     if (!body.email) {
       errors.push({ field: 'email', message: 'Email is required', code: ERROR_CODES.VAL_REQUIRED_FIELD });
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.email)) {
       errors.push({ field: 'email', message: 'Invalid email format', code: ERROR_CODES.VAL_INVALID_EMAIL });
     }
 
-    // Password validation
     if (!body.password) {
       errors.push({ field: 'password', message: 'Password is required', code: ERROR_CODES.VAL_REQUIRED_FIELD });
     }
@@ -883,16 +835,14 @@ export class AuthController {
   }
 
   private validateVerificationRequest(body: any, type: 'email' | 'phone'): ValidationResult {
-    const errors: any[] = [];
+    const errors: ValidationError[] = [];
 
-    // User ID validation
     if (!body.userId) {
       errors.push({ field: 'userId', message: 'User ID is required', code: ERROR_CODES.VAL_REQUIRED_FIELD });
     } else if (!/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(body.userId)) {
       errors.push({ field: 'userId', message: 'Invalid user ID format', code: ERROR_CODES.VAL_INVALID_FORMAT });
     }
 
-    // Type-specific validation
     if (type === 'email') {
       if (!body.token) {
         errors.push({ field: 'token', message: 'Verification token is required', code: ERROR_CODES.VAL_REQUIRED_FIELD });
@@ -914,9 +864,8 @@ export class AuthController {
   }
 
   private validatePasswordResetRequest(body: any): ValidationResult {
-    const errors: any[] = [];
+    const errors: ValidationError[] = [];
 
-    // Email validation
     if (!body.email) {
       errors.push({ field: 'email', message: 'Email is required', code: ERROR_CODES.VAL_REQUIRED_FIELD });
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.email)) {
@@ -929,7 +878,6 @@ export class AuthController {
     };
   }
 
-  // Enterprise request context extraction
   private extractRequestContext(req: Request): RequestContext {
     const crypto = require('crypto');
     
@@ -966,7 +914,6 @@ export class AuthController {
     };
   }
 
-  // Enterprise device information extraction
   private extractDeviceInfo(req: Request, context: RequestContext): DeviceInfo {
     const userAgent = req.headers['user-agent'] || '';
     
@@ -1014,11 +961,9 @@ export class AuthController {
     return 'unknown';
   }
 
-  // Enterprise cookie management
   private setAuthCookies(res: Response, tokens: any): void {
     const isProduction = process.env.NODE_ENV === 'production';
     
-    // Set access token cookie (shorter expiry)
     res.cookie('accessToken', tokens.accessToken, {
       httpOnly: true,
       secure: isProduction,
@@ -1027,12 +972,11 @@ export class AuthController {
       path: '/',
     });
 
-    // Set refresh token cookie (longer expiry)
     res.cookie('refreshToken', tokens.refreshToken, {
       httpOnly: true,
       secure: isProduction,
       sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      maxAge: 7 * 24 * 60 * 60 * 1000,
       path: '/auth/refresh',
     });
   }
@@ -1042,16 +986,13 @@ export class AuthController {
     res.clearCookie('refreshToken', { path: '/auth/refresh' });
   }
 
-  // Enterprise configuration getter
   public getConfig(): Readonly<AuthControllerConfig> {
     return { ...this.config };
   }
 }
 
-// Export singleton instance and route handlers
 export const authController = AuthController.getInstance();
 
-// Enterprise authentication route handlers
 export const register = authController.register;
 export const login = authController.login;
 export const verifyEmail = authController.verifyEmail;
@@ -1062,3 +1003,4 @@ export const logout = authController.logout;
 export const getProfile = authController.getProfile;
 export const validateToken = authController.validateToken;
 export const healthCheck = authController.healthCheck;
+

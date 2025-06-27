@@ -1,4 +1,4 @@
-// src/services/AuthService.ts
+// src/services/auth.service.ts
 
 import { logger, createLogContext } from '@/utils/logger';
 import { ERROR_CODES, SECURITY_CONSTANTS, CACHE_CONSTANTS } from '@/utils/constants';
@@ -613,6 +613,74 @@ export class AuthService {
       );
     }
   }
+  
+  public async validateUserToken(token: string): Promise<{
+  isValid: boolean;
+  payload?: JWTPayload;
+  user?: any;
+}> {
+  const startTime = Date.now();
+  const logContext = createLogContext()
+    .withMetadata({ 
+      tokenValidation: true,
+      tokenPrefix: token.substring(0, 10) + '...'
+    })
+    .build();
+
+  try {
+    logger.debug('Validating user token', logContext);
+
+    const payload = await verifyToken(token);
+    const user = await getUserById(payload.userId);
+
+    if (!user) {
+      logger.warn('Token valid but user not found', {
+        ...logContext,
+        userId: payload.userId,
+      });
+
+      return {
+        isValid: false,
+      };
+    }
+
+    if (user.status === UserStatus.SUSPENDED) {
+      logger.security('TOKEN_VALIDATION_SUSPENDED_USER', {
+        ...logContext,
+        userId: user.id,
+      });
+
+      return {
+        isValid: false,
+      };
+    }
+
+    const duration = Date.now() - startTime;
+    logger.debug('Token validation successful', {
+      ...logContext,
+      userId: user.id,
+      duration,
+    });
+
+    return {
+      isValid: true,
+      payload,
+      user: this.sanitizeUserData(user),
+    };
+
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    logger.warn('Token validation failed', {
+      ...logContext,
+      duration,
+      errorMessage: error instanceof Error ? error.message : 'Unknown error',
+    });
+
+    return {
+      isValid: false,
+    };
+  }
+}
 
   public async refreshAccessToken(refreshTokenValue: string, deviceInfo?: DeviceInfo): Promise<{
     tokens: any;
@@ -729,47 +797,6 @@ export class AuthService {
         500,
         ERROR_CODES.SYS_INTERNAL_SERVER_ERROR,
         ErrorSeverity.HIGH
-      );
-    }
-  }
-
-  public async validateToken(token: string): Promise<JWTPayload> {
-    const startTime = Date.now();
-    
-    try {
-      const payload = await verifyToken(token);
-      
-      const user = await getUserById(payload.userId);
-      if (!user || user.status === UserStatus.SUSPENDED) {
-        throw new Error('User not found or suspended');
-      }
-
-      const duration = Date.now() - startTime;
-      logger.debug('Token validated successfully', 
-        createLogContext()
-          .withUser(payload.userId, payload.userType)
-          .withMetadata({ duration })
-          .build()
-      );
-
-      return payload;
-
-    } catch (error) {
-      const duration = Date.now() - startTime;
-      logger.warn('Token validation failed', 
-        createLogContext()
-          .withMetadata({ 
-            duration,
-            errorMessage: error instanceof Error ? error.message : 'Unknown error' 
-          })
-          .build()
-      );
-
-      throw new ApiError(
-        'Invalid or expired token',
-        401,
-        ERROR_CODES.AUTH_TOKEN_INVALID,
-        ErrorSeverity.LOW
       );
     }
   }
@@ -948,7 +975,7 @@ export class AuthService {
       logger.error('Failed to send password reset email', 
         createLogContext()
           .withUser(user.id, user.userType)
-          .withError(ERROR_CODES.SYS_NOTIFICATION_ERROR)
+          .withMetadata({ errorCode: ERROR_CODES.SYS_NOTIFICATION_ERROR })
           .withMetadata({ 
             errorMessage: error instanceof Error ? error.message : 'Unknown error' 
           })
@@ -1115,6 +1142,6 @@ export const logoutUser = async (userId: string, sessionId?: string, deviceInfo?
   return await authService.logout(userId, sessionId, deviceInfo);
 };
 
-export const validateUserToken = async (token: string): Promise<JWTPayload> => {
-  return await authService.validateToken(token);
+export const validateUserToken = async (token: string) => {
+  return await authService.validateUserToken(token);
 };

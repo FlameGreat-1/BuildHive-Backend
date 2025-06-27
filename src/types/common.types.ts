@@ -42,26 +42,51 @@ export enum ErrorSeverity {
 }
 
 export interface LogContext {
+  // User and session context
   userId?: string;
   userType?: string;
   sessionId?: string;
   requestId?: string;
   correlationId?: string;
-  metadata?: Record<string, any>;
-  error?: string;
-  duration?: number;
-  errorMessage?: string;
-  port?: number;
+  
+  // Request context
+  ipAddress?: string;
+  userAgent?: string;
+  method?: string;
+  url?: string;
+  
+  // Application context
+  phase?: string;
+  environment?: string;
+  processId?: number;
+  baseUrl?: string;
   version?: string;
+  port?: number;
+  
+  // Error context
+  error?: string;
+  errorMessage?: string;
+  code?: string;
+  severity?: string;
+  stack?: string;
+  reason?: string;
+  
+  // Performance context
+  duration?: number;
+  connectionTime?: number;
+  startupTime?: number;
+  shutdownDuration?: number;
+  uptime?: number;
+  
+  // System context
   address?: string;
   signal?: string;
-  severity?: string;
-  connectionTime?: number;
   cacheHit?: boolean;
+  
+  // Business context
   nextStep?: string;
   rememberMe?: boolean;
   token?: string;
-  code?: string;
   email?: string;
   userRole?: string;
   userPermissions?: string[];
@@ -69,9 +94,25 @@ export interface LogContext {
   currentCompleteness?: number;
   profileCompleteness?: number;
   contentLength?: number;
-  startupTime?: number;
-  shutdownDuration?: number;
-  ipAddress?: string;
+  
+  // CORS and security context
+  rejectedOrigin?: string;
+  allowedOrigins?: string[];
+  ip?: string;
+  
+  // Generic metadata
+  metadata?: Record<string, any>;
+  
+  // Allow any additional properties
+  [key: string]: any;
+}
+
+export interface LoginRequest {
+  email: string;
+  password: string;
+  rememberMe?: boolean;
+  deviceId?: string;
+  userAgent?: string;
 }
 
 export interface PaginationParams {
@@ -219,6 +260,9 @@ export interface ValidationError {
   message: string;
   code: string;
   value?: any;
+  severity?: ErrorSeverity;
+  statusCode?: number;
+  name?: string;
 }
 
 export interface DomainEvent {
@@ -275,3 +319,68 @@ export interface CacheOptions {
   compress?: boolean;
   serialize?: boolean;
 }
+
+// Additional interfaces for auth controller compatibility
+export interface AuthResponse {
+  success: boolean;
+  message: string;
+  data?: {
+    user?: any;
+    tokens?: {
+      accessToken: string;
+      refreshToken: string;
+    };
+    requiresTwoFactor?: boolean;
+    nextStep?: string;
+  };
+  errors?: ApiError[];
+  timestamp: string;
+  requestId: string;
+}
+
+export interface TokenPayload {
+  userId: string;
+  email: string;
+  userType: string;
+  sessionId: string;
+  iat: number;
+  exp: number;
+}
+
+// Database transaction types
+export interface TransactionOptions {
+  isolationLevel?: 'ReadUncommitted' | 'ReadCommitted' | 'RepeatableRead' | 'Serializable';
+  maxWait?: number;
+  timeout?: number;
+}
+
+// Redis connection types
+export interface RedisConfig {
+  url: string;
+  keyPrefix: string;
+  defaultTTL: number;
+  maxRetries: number;
+  retryDelayOnFailover: number;
+  enableReadyCheck: boolean;
+  maxRetriesPerRequest: number;
+}
+
+// Logger types
+export interface LoggerConfig {
+  level: LogLevel;
+  format: 'json' | 'text';
+  enableConsole: boolean;
+  enableFile: boolean;
+  filePath?: string;
+  maxFileSize?: string;
+  maxFiles?: number;
+}
+
+// Export utility types
+export type Nullable<T> = T | null;
+export type Optional<T> = T | undefined;
+export type DeepPartial<T> = {
+  [P in keyof T]?: T[P] extends object ? DeepPartial<T[P]> : T[P];
+};
+export type RequiredFields<T, K extends keyof T> = T & Required<Pick<T, K>>;
+export type PartialFields<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;

@@ -149,13 +149,15 @@ class DatabaseManager {
       throw new Error('Connection timeout must be greater than 0');
     }
 
-    logger.debug('Database configuration validated', {
-      metadata: {
-        maxConnections: this.config.maxConnections,
-        connectionTimeout: this.config.connectionTimeout,
-        enableLogging: this.config.enableLogging,
-      }
-    });
+    logger.debug('Database configuration validated', 
+      createLogContext()
+        .withMetadata({
+          maxConnections: this.config.maxConnections,
+          connectionTimeout: this.config.connectionTimeout,
+          enableLogging: this.config.enableLogging,
+        })
+        .build()
+    );
   }
 
   private setupDatabaseLogging(): void {
@@ -179,8 +181,8 @@ class DatabaseManager {
     this.prisma.$on('error', (event: any) => {
       logger.error('Database error occurred', 
         createLogContext()
-          .withError(ERROR_CODES.SYS_DATABASE_ERROR)
           .withMetadata({
+            errorCode: ERROR_CODES.SYS_DATABASE_ERROR,
             target: event.target,
             message: event.message,
           })
@@ -287,8 +289,8 @@ class DatabaseManager {
   }
 
   public async transaction<T>(
-    operation: (prisma: PrismaClient) => Promise<T>,
-    options?: { timeout?: number; isolationLevel?: string }
+    operation: (prisma: Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>) => Promise<T>,
+    options?: { timeout?: number; isolationLevel?: 'ReadUncommitted' | 'ReadCommitted' | 'RepeatableRead' | 'Serializable' }
   ): Promise<T> {
     if (!this.prisma || !this.isConnected) {
       throw new Error('Database not connected');
@@ -310,7 +312,7 @@ class DatabaseManager {
         operation,
         {
           timeout: options?.timeout || DATABASE_CONSTANTS.CONNECTION.STATEMENT_TIMEOUT,
-          isolationLevel: options?.isolationLevel as any,
+          isolationLevel: options?.isolationLevel,
         }
       );
 
@@ -362,8 +364,8 @@ export const getDatabase = (): PrismaClient => {
 };
 
 export const executeTransaction = async <T>(
-  operation: (prisma: PrismaClient) => Promise<T>,
-  options?: { timeout?: number; isolationLevel?: string }
+  operation: (prisma: Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>) => Promise<T>,
+  options?: { timeout?: number; isolationLevel?: 'ReadUncommitted' | 'ReadCommitted' | 'RepeatableRead' | 'Serializable' }
 ): Promise<T> => {
   return await databaseManager.transaction(operation, options);
 };

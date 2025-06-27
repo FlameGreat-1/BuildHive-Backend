@@ -1,3 +1,4 @@
+## src/scripts/migrate.js
 const { execSync } = require('child_process');
 
 console.log('🔄 Running Prisma migrations...');

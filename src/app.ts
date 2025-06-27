@@ -270,8 +270,8 @@ export class BuildHiveApp {
     process.on('unhandledRejection', (reason: any, promise: Promise<any>) => {
       logger.error('Unhandled Promise Rejection - Production', 
         createLogContext()
-          .withError(ERROR_CODES.SYS_UNHANDLED_REJECTION)
           .withMetadata({ 
+            errorCode: ERROR_CODES.SYS_UNHANDLED_REJECTION,
             reason: reason?.message || reason,
             stack: reason?.stack,
             environment: this.config.environment
@@ -285,8 +285,8 @@ export class BuildHiveApp {
     process.on('uncaughtException', (error: Error) => {
       logger.error('Uncaught Exception - Production', 
         createLogContext()
-          .withError(ERROR_CODES.SYS_UNCAUGHT_EXCEPTION)
           .withMetadata({ 
+            errorCode: ERROR_CODES.SYS_UNCAUGHT_EXCEPTION,
             errorMessage: error.message,
             stack: error.stack,
             environment: this.config.environment
@@ -325,8 +325,8 @@ export class BuildHiveApp {
     } catch (error) {
       logger.error('Production database initialization failed', 
         createLogContext()
-          .withError(ERROR_CODES.SYS_DATABASE_CONNECTION_ERROR)
           .withMetadata({ 
+            errorCode: ERROR_CODES.SYS_DATABASE_CONNECTION_ERROR,
             errorMessage: error instanceof Error ? error.message : 'Unknown error',
             stack: error instanceof Error ? error.stack : undefined,
             environment: this.config.environment
@@ -397,11 +397,11 @@ export class BuildHiveApp {
         });
       });
 
-      this.server.on('error', (error: any) => {
+      this.server.on('error', (error: NodeJS.ErrnoException) => {
         logger.error('Production server error', 
           createLogContext()
-            .withError(ERROR_CODES.SYS_SERVER_ERROR)
             .withMetadata({ 
+              errorCode: ERROR_CODES.SYS_SERVER_ERROR,
               errorMessage: error.message,
               code: error.code,
               port: this.config.port,
@@ -432,8 +432,8 @@ export class BuildHiveApp {
     } catch (error) {
       logger.error('Production application startup failed', 
         createLogContext()
-          .withError(ERROR_CODES.SYS_STARTUP_ERROR)
           .withMetadata({ 
+            errorCode: ERROR_CODES.SYS_STARTUP_ERROR,
             errorMessage: error instanceof Error ? error.message : 'Unknown error',
             stack: error instanceof Error ? error.stack : undefined,
             environment: this.config.environment
@@ -552,9 +552,7 @@ export class BuildHiveApp {
   }
 }
 
-const app = new BuildHiveApp();
-
-export default app;
+export default BuildHiveApp;
 export { BuildHiveApp };
 
 export const createProductionApp = (): BuildHiveApp => {
