@@ -1,5 +1,3 @@
-// src/models/User.ts
-
 import { PrismaClient } from '@prisma/client';
 import { getDatabase, executeTransaction } from '@/config/database';
 import { logger, createLogContext } from '@/utils/logger';
@@ -22,13 +20,20 @@ import {
   BaseEntity, 
   ApiError, 
   ErrorSeverity, 
-  ValidationResult, 
-  ValidationError,
+  ValidationResult,
   AuditLog,
   AuditSeverity
 } from '@/types/common.types';
 
-// Enterprise User entity interface
+interface ValidationError {
+  field: string;
+  message: string;
+  code: string;
+  severity: 'error' | 'warning' | 'info';
+  statusCode: number;
+  name: string;
+}
+
 interface UserEntity extends BaseEntity {
   email: string;
   passwordHash: string;
@@ -49,7 +54,6 @@ interface UserEntity extends BaseEntity {
   metadata?: Record<string, any>;
 }
 
-// Enterprise User profile interfaces
 interface UserWithProfile extends UserEntity {
   clientProfile?: ClientProfile;
   tradieProfile?: TradieProfile;
@@ -57,7 +61,6 @@ interface UserWithProfile extends UserEntity {
   documents?: DocumentUpload[];
 }
 
-// Enterprise User creation data
 interface CreateUserData {
   email: string;
   password: string;
@@ -68,7 +71,6 @@ interface CreateUserData {
   metadata?: Record<string, any>;
 }
 
-// Enterprise User update data
 interface UpdateUserData {
   firstName?: string;
   lastName?: string;
@@ -79,7 +81,6 @@ interface UpdateUserData {
   metadata?: Record<string, any>;
 }
 
-// Enterprise User search filters
 interface UserSearchFilters {
   userType?: UserType;
   status?: UserStatus;
@@ -90,7 +91,6 @@ interface UserSearchFilters {
   search?: string;
 }
 
-// Enterprise User model class
 export class UserModel {
   private prisma: PrismaClient;
   private static instance: UserModel;
@@ -99,7 +99,6 @@ export class UserModel {
     this.prisma = getDatabase();
   }
 
-  // Singleton pattern for enterprise user model
   public static getInstance(): UserModel {
     if (!UserModel.instance) {
       UserModel.instance = new UserModel();
@@ -107,7 +106,6 @@ export class UserModel {
     return UserModel.instance;
   }
 
-  // Enterprise user creation with comprehensive validation
   public async createUser(userData: CreateUserData, createdBy?: string): Promise<UserEntity> {
     const startTime = Date.now();
     const logContext = createLogContext()
@@ -121,25 +119,19 @@ export class UserModel {
     try {
       logger.info('Creating new user', logContext);
 
-      // Validate user data
       const validation = await this.validateUserData(userData);
       if (!validation.isValid) {
         throw new Error(`User validation failed: ${validation.errors.map(e => e.message).join(', ')}`);
       }
 
-      // Check for existing user
       await this.checkUserExists(userData.email, userData.phone);
 
-      // Hash password
       const passwordHash = await hashPassword(userData.password);
 
-      // Generate verification tokens
       const emailVerificationToken = this.generateVerificationToken();
       const phoneVerificationCode = this.generateVerificationCode();
 
-      // Create user in transaction
       const user = await executeTransaction(async (prisma) => {
-        // Create base user
         const newUser = await prisma.user.create({
           data: {
             email: userData.email.toLowerCase(),
@@ -162,10 +154,8 @@ export class UserModel {
           },
         });
 
-        // Create user-specific profile
         await this.createUserProfile(prisma, newUser.id, userData.userType);
 
-        // Create audit log
         await this.createAuditLog(prisma, {
           userId: newUser.id,
           action: AUDIT_CONSTANTS.ACTIONS.CREATE,
@@ -184,8 +174,7 @@ export class UserModel {
         return newUser;
       });
 
-      // Cache user data
-      await this.cacheUser(user);
+      await this.cacheUser(user as UserEntity);
 
       const duration = Date.now() - startTime;
       logger.info('User created successfully', {
@@ -197,7 +186,6 @@ export class UserModel {
 
       logger.performance('user_creation', duration, logContext);
 
-      // Log business event
       logger.business('USER_REGISTERED', {
         ...logContext,
         userId: user.id,
@@ -218,7 +206,6 @@ export class UserModel {
     }
   }
 
-  // Enterprise user retrieval with caching
   public async getUserById(userId: string, includeProfile: boolean = false): Promise<UserWithProfile | null> {
     const startTime = Date.now();
     const logContext = createLogContext()
@@ -227,7 +214,6 @@ export class UserModel {
       .build();
 
     try {
-      // Try cache first
       const cacheKey = `user:${userId}${includeProfile ? ':with_profile' : ''}`;
       const cachedUser = await getCache<UserWithProfile>(cacheKey);
       
@@ -239,7 +225,6 @@ export class UserModel {
         return cachedUser;
       }
 
-      // Query database
       const user = await this.prisma.user.findFirst({
         where: {
           id: userId,
@@ -261,8 +246,7 @@ export class UserModel {
         return null;
       }
 
-      // Cache the result
-      await setCache(cacheKey, user, { ttl: 300 }); // 5 minutes
+      await setCache(cacheKey, user, 300);
 
       const duration = Date.now() - startTime;
       logger.debug('User retrieved from database', {
@@ -285,7 +269,6 @@ export class UserModel {
     }
   }
 
-  // Enterprise user retrieval by email
   public async getUserByEmail(email: string, includeProfile: boolean = false): Promise<UserWithProfile | null> {
     const startTime = Date.now();
     const normalizedEmail = email.toLowerCase();
@@ -294,7 +277,6 @@ export class UserModel {
       .build();
 
     try {
-      // Try cache first
       const cacheKey = `user:email:${normalizedEmail}${includeProfile ? ':with_profile' : ''}`;
       const cachedUser = await getCache<UserWithProfile>(cacheKey);
       
@@ -306,7 +288,6 @@ export class UserModel {
         return cachedUser;
       }
 
-      // Query database
       const user = await this.prisma.user.findFirst({
         where: {
           email: normalizedEmail,
@@ -324,8 +305,7 @@ export class UserModel {
         return null;
       }
 
-      // Cache the result
-      await setCache(cacheKey, user, { ttl: 300 }); // 5 minutes
+      await setCache(cacheKey, user, 300);
 
       const duration = Date.now() - startTime;
       logger.debug('User retrieved from database by email', {
@@ -349,7 +329,6 @@ export class UserModel {
     }
   }
 
-  // Enterprise user update with validation and audit
   public async updateUser(userId: string, updateData: UpdateUserData, updatedBy?: string): Promise<UserEntity> {
     const startTime = Date.now();
     const logContext = createLogContext()
@@ -360,19 +339,16 @@ export class UserModel {
     try {
       logger.info('Updating user', logContext);
 
-      // Get current user for audit trail
       const currentUser = await this.getUserById(userId);
       if (!currentUser) {
         throw new Error('User not found');
       }
 
-      // Validate update data
       const validation = await this.validateUpdateData(updateData);
       if (!validation.isValid) {
         throw new Error(`Update validation failed: ${validation.errors.map(e => e.message).join(', ')}`);
       }
 
-      // Update user in transaction
       const updatedUser = await executeTransaction(async (prisma) => {
         const user = await prisma.user.update({
           where: { id: userId },
@@ -384,7 +360,6 @@ export class UserModel {
           },
         });
 
-        // Create audit log
         await this.createAuditLog(prisma, {
           userId: updatedBy || userId,
           action: AUDIT_CONSTANTS.ACTIONS.UPDATE,
@@ -400,7 +375,6 @@ export class UserModel {
         return user;
       });
 
-      // Invalidate cache
       await this.invalidateUserCache(userId);
 
       const duration = Date.now() - startTime;
@@ -426,7 +400,6 @@ export class UserModel {
     }
   }
 
-  // Enterprise email verification
   public async verifyEmail(userId: string, token: string): Promise<boolean> {
     const startTime = Date.now();
     const logContext = createLogContext()
@@ -450,7 +423,6 @@ export class UserModel {
           return false;
         }
 
-        // Update user verification status
         await prisma.user.update({
           where: { id: userId },
           data: {
@@ -462,7 +434,6 @@ export class UserModel {
           },
         });
 
-        // Create audit log
         await this.createAuditLog(prisma, {
           userId,
           action: AUDIT_CONSTANTS.ACTIONS.UPDATE,
@@ -478,7 +449,6 @@ export class UserModel {
       });
 
       if (result) {
-        // Invalidate cache
         await this.invalidateUserCache(userId);
 
         const duration = Date.now() - startTime;
@@ -504,7 +474,6 @@ export class UserModel {
     }
   }
 
-  // Enterprise phone verification
   public async verifyPhone(userId: string, code: string): Promise<boolean> {
     const startTime = Date.now();
     const logContext = createLogContext()
@@ -528,7 +497,6 @@ export class UserModel {
           return false;
         }
 
-        // Update user verification status
         await prisma.user.update({
           where: { id: userId },
           data: {
@@ -540,7 +508,6 @@ export class UserModel {
           },
         });
 
-        // Create audit log
         await this.createAuditLog(prisma, {
           userId,
           action: AUDIT_CONSTANTS.ACTIONS.UPDATE,
@@ -556,7 +523,6 @@ export class UserModel {
       });
 
       if (result) {
-        // Invalidate cache
         await this.invalidateUserCache(userId);
 
         const duration = Date.now() - startTime;
@@ -582,7 +548,6 @@ export class UserModel {
     }
   }
 
-  // Enterprise user search with comprehensive filters
   public async searchUsers(filters: UserSearchFilters, page: number = 1, limit: number = 20): Promise<{
     users: UserEntity[];
     total: number;
@@ -601,7 +566,6 @@ export class UserModel {
         isDeleted: false,
       };
 
-      // Apply filters
       if (filters.userType) where.userType = filters.userType;
       if (filters.status) where.status = filters.status;
       if (filters.emailVerified !== undefined) where.emailVerified = filters.emailVerified;
@@ -620,10 +584,8 @@ export class UserModel {
         ];
       }
 
-      // Get total count
       const total = await this.prisma.user.count({ where });
 
-      // Get users with pagination
       const users = await this.prisma.user.findMany({
         where,
         skip: (page - 1) * limit,
@@ -658,7 +620,6 @@ export class UserModel {
     }
   }
 
-  // Enterprise soft delete with audit trail
   public async deleteUser(userId: string, deletedBy?: string): Promise<boolean> {
     const startTime = Date.now();
     const logContext = createLogContext()
@@ -689,7 +650,6 @@ export class UserModel {
           },
         });
 
-        // Create audit log
         await this.createAuditLog(prisma, {
           userId: deletedBy || userId,
           action: AUDIT_CONSTANTS.ACTIONS.DELETE,
@@ -706,7 +666,6 @@ export class UserModel {
       });
 
       if (result) {
-        // Invalidate cache
         await this.invalidateUserCache(userId);
 
         const duration = Date.now() - startTime;
@@ -732,16 +691,17 @@ export class UserModel {
     }
   }
 
-  // Enterprise user data validation
   private async validateUserData(userData: CreateUserData): Promise<ValidationResult> {
     const errors: ValidationError[] = [];
 
-    // Email validation
     if (!userData.email || !VALIDATION_CONSTANTS.EMAIL.REGEX.test(userData.email)) {
       errors.push({
         field: 'email',
         message: 'Invalid email format',
         code: ERROR_CODES.VAL_INVALID_EMAIL,
+        severity: 'error',
+        statusCode: 400,
+        name: 'ValidationError',
       });
     }
 
@@ -750,15 +710,20 @@ export class UserModel {
         field: 'email',
         message: `Email must not exceed ${VALIDATION_CONSTANTS.EMAIL.MAX_LENGTH} characters`,
         code: ERROR_CODES.VAL_INVALID_EMAIL,
+        severity: 'error',
+        statusCode: 400,
+        name: 'ValidationError',
       });
     }
 
-    // Name validation
     if (!userData.firstName || userData.firstName.length < VALIDATION_CONSTANTS.NAME.MIN_LENGTH) {
       errors.push({
         field: 'firstName',
         message: `First name must be at least ${VALIDATION_CONSTANTS.NAME.MIN_LENGTH} characters`,
         code: ERROR_CODES.VAL_REQUIRED_FIELD,
+        severity: 'error',
+        statusCode: 400,
+        name: 'ValidationError',
       });
     }
 
@@ -767,24 +732,31 @@ export class UserModel {
         field: 'lastName',
         message: `Last name must be at least ${VALIDATION_CONSTANTS.NAME.MIN_LENGTH} characters`,
         code: ERROR_CODES.VAL_REQUIRED_FIELD,
+        severity: 'error',
+        statusCode: 400,
+        name: 'ValidationError',
       });
     }
 
-    // Phone validation
     if (!userData.phone || !VALIDATION_CONSTANTS.PHONE.REGEX.test(userData.phone)) {
       errors.push({
         field: 'phone',
         message: 'Invalid phone number format',
         code: ERROR_CODES.VAL_INVALID_PHONE,
+        severity: 'error',
+        statusCode: 400,
+        name: 'ValidationError',
       });
     }
 
-    // User type validation
     if (!Object.values(UserType).includes(userData.userType)) {
       errors.push({
         field: 'userType',
         message: 'Invalid user type',
         code: ERROR_CODES.VAL_INVALID_USER_TYPE,
+        severity: 'error',
+        statusCode: 400,
+        name: 'ValidationError',
       });
     }
 
@@ -794,16 +766,17 @@ export class UserModel {
     };
   }
 
-  // Enterprise update data validation
   private async validateUpdateData(updateData: UpdateUserData): Promise<ValidationResult> {
     const errors: ValidationError[] = [];
 
-    // Optional field validations
     if (updateData.firstName && updateData.firstName.length < VALIDATION_CONSTANTS.NAME.MIN_LENGTH) {
       errors.push({
         field: 'firstName',
         message: `First name must be at least ${VALIDATION_CONSTANTS.NAME.MIN_LENGTH} characters`,
         code: ERROR_CODES.VAL_REQUIRED_FIELD,
+        severity: 'error',
+        statusCode: 400,
+        name: 'ValidationError',
       });
     }
 
@@ -812,6 +785,9 @@ export class UserModel {
         field: 'lastName',
         message: `Last name must be at least ${VALIDATION_CONSTANTS.NAME.MIN_LENGTH} characters`,
         code: ERROR_CODES.VAL_REQUIRED_FIELD,
+        severity: 'error',
+        statusCode: 400,
+        name: 'ValidationError',
       });
     }
 
@@ -820,6 +796,9 @@ export class UserModel {
         field: 'phone',
         message: 'Invalid phone number format',
         code: ERROR_CODES.VAL_INVALID_PHONE,
+        severity: 'error',
+        statusCode: 400,
+        name: 'ValidationError',
       });
     }
 
@@ -828,6 +807,9 @@ export class UserModel {
         field: 'status',
         message: 'Invalid user status',
         code: ERROR_CODES.VAL_INVALID_ENUM_VALUE,
+        severity: 'error',
+        statusCode: 400,
+        name: 'ValidationError',
       });
     }
 
@@ -837,7 +819,6 @@ export class UserModel {
     };
   }
 
-  // Enterprise user existence check
   private async checkUserExists(email: string, phone: string): Promise<void> {
     const normalizedEmail = email.toLowerCase();
 
@@ -861,7 +842,6 @@ export class UserModel {
     }
   }
 
-  // Enterprise user profile creation
   private async createUserProfile(prisma: PrismaClient, userId: string, userType: UserType): Promise<void> {
     switch (userType) {
       case UserType.CLIENT:
@@ -909,7 +889,6 @@ export class UserModel {
     }
   }
 
-  // Enterprise audit log creation
   private async createAuditLog(prisma: PrismaClient, auditData: Omit<AuditLog, 'id' | 'createdAt'>): Promise<void> {
     await prisma.auditLog.create({
       data: {
@@ -919,11 +898,10 @@ export class UserModel {
     });
   }
 
-  // Enterprise cache management
   private async cacheUser(user: UserEntity): Promise<void> {
     const cachePromises = [
-      setCache(`user:${user.id}`, user, { ttl: 300 }),
-      setCache(`user:email:${user.email}`, user, { ttl: 300 }),
+      setCache(`user:${user.id}`, user, 300),
+      setCache(`user:email:${user.email}`, user, 300),
     ];
 
     await Promise.all(cachePromises);
@@ -947,9 +925,7 @@ export class UserModel {
     }
   }
 
-  // Enterprise helper methods
   private calculateInitialCompleteness(userType: UserType): number {
-    // Base completeness for having basic info
     return 25;
   }
 
@@ -976,10 +952,8 @@ export class UserModel {
   }
 }
 
-// Export singleton instance and helper functions
 export const userModel = UserModel.getInstance();
 
-// Enterprise user management helpers
 export const createUser = async (userData: CreateUserData, createdBy?: string): Promise<UserEntity> => {
   return await userModel.createUser(userData, createdBy);
 };
@@ -1011,3 +985,5 @@ export const searchUsers = async (filters: UserSearchFilters, page?: number, lim
 export const deleteUser = async (userId: string, deletedBy?: string): Promise<boolean> => {
   return await userModel.deleteUser(userId, deletedBy);
 };
+
+export { UserEntity, UserWithProfile, CreateUserData, UpdateUserData, UserSearchFilters };

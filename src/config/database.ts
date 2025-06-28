@@ -186,7 +186,7 @@ class DatabaseManager {
   private setupDatabaseLogging(): void {
     if (!this.prisma) return;
 
-    this.prisma.$on('query' as any, (event: any) => {
+    this.prisma.$on('query' as never, (event: { target?: string; duration: number; query: string; params: string }) => {
       logger.database(
         'QUERY',
         event.target || 'unknown',
@@ -201,7 +201,7 @@ class DatabaseManager {
       );
     });
 
-    this.prisma.$on('error' as any, (event: any) => {
+    this.prisma.$on('error' as never, (event: { target: string; message: string }) => {
       logger.error('Database error occurred', 
         createLogContext()
           .withMetadata({
@@ -213,7 +213,7 @@ class DatabaseManager {
       );
     });
 
-    this.prisma.$on('info' as any, (event: any) => {
+    this.prisma.$on('info' as never, (event: { target: string; message: string }) => {
       logger.info('Database info', 
         createLogContext()
           .withMetadata({
@@ -224,7 +224,7 @@ class DatabaseManager {
       );
     });
 
-    this.prisma.$on('warn' as any, (event: any) => {
+    this.prisma.$on('warn' as never, (event: { target: string; message: string }) => {
       logger.warn('Database warning', 
         createLogContext()
           .withMetadata({
@@ -312,7 +312,7 @@ class DatabaseManager {
   }
 
   public async transaction<T>(
-    operation: (prisma: Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>) => Promise<T>,
+    operation: (prisma: PrismaClient) => Promise<T>,
     options?: { 
       timeout?: number; 
       isolationLevel?: 'ReadUncommitted' | 'ReadCommitted' | 'RepeatableRead' | 'Serializable' | undefined;
@@ -390,7 +390,7 @@ export const getDatabase = (): PrismaClient => {
 };
 
 export const executeTransaction = async <T>(
-  operation: (prisma: Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>) => Promise<T>,
+  operation: (prisma: PrismaClient) => Promise<T>,
   options?: { 
     timeout?: number; 
     isolationLevel?: 'ReadUncommitted' | 'ReadCommitted' | 'RepeatableRead' | 'Serializable' | undefined;

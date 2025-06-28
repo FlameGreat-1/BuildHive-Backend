@@ -1,34 +1,24 @@
-export enum UserType {
-  CLIENT = 'client',
-  TRADIE = 'tradie',
-  ENTERPRISE = 'enterprise'
-}
 
-export enum UserStatus {
-  PENDING = 'pending',
-  ACTIVE = 'active',
-  INACTIVE = 'inactive',
-  SUSPENDED = 'suspended',
-  REJECTED = 'rejected',
-  PENDING_VERIFICATION = 'pending_verification'
-}
+import { UserType, UserStatus } from '@prisma/client';
+
+export { UserType, UserStatus };
 
 export enum VerificationStatus {
-  PENDING = 'pending',
-  APPROVED = 'approved',
-  REJECTED = 'rejected',
-  RESUBMISSION_REQUIRED = 'resubmission_required'
+  PENDING = 'PENDING',
+  APPROVED = 'APPROVED',
+  REJECTED = 'REJECTED',
+  RESUBMISSION_REQUIRED = 'RESUBMISSION_REQUIRED'
 }
 
 export enum DocumentType {
-  ID_DOCUMENT = 'id_document',
-  SELFIE_PHOTO = 'selfie_photo',
-  ABN_CERTIFICATE = 'abn_certificate',
-  TRADE_QUALIFICATION = 'trade_qualification',
-  INSURANCE_CERTIFICATE = 'insurance_certificate',
-  LICENSE = 'license',
-  COMPANY_REGISTRATION = 'company_registration',
-  DIRECTORS_ID = 'directors_id'
+  ID_DOCUMENT = 'ID_DOCUMENT',
+  SELFIE_PHOTO = 'SELFIE_PHOTO',
+  ABN_CERTIFICATE = 'ABN_CERTIFICATE',
+  TRADE_QUALIFICATION = 'TRADE_QUALIFICATION',
+  INSURANCE_CERTIFICATE = 'INSURANCE_CERTIFICATE',
+  LICENSE = 'LICENSE',
+  COMPANY_REGISTRATION = 'COMPANY_REGISTRATION',
+  DIRECTORS_ID = 'DIRECTORS_ID'
 }
 
 export interface BaseUser {
@@ -161,14 +151,13 @@ export interface UpdateUserData {
   emailVerified?: boolean;
   phoneVerified?: boolean;
   metadata?: Record<string, any>;
-  lastLoginAt?: Date;  
-  loginCount?: number;
-  passwordResetToken?: string; 
-  passwordResetExpires?: Date;  
 }
 
 export interface AuthError {
   code: string;
   message: string;
   field?: string;
+  severity: 'error' | 'warning' | 'info';
+  statusCode: number;
+  name: string;
 }

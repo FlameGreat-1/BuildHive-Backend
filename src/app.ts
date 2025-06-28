@@ -5,6 +5,7 @@ import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import rateLimit from 'express-rate-limit';
 import { createServer } from 'http';
+import { Socket } from 'net';
 import { logger, createLogContext } from '@/utils/logger';
 import { ERROR_CODES, HTTP_STATUS_CODES } from '@/utils/constants';
 import { connectDatabase } from '@/config/database';
@@ -425,7 +426,7 @@ export class BuildHiveApp {
         });
       });
 
-      this.server.on('connection', (socket) => {
+      this.server.on('connection', (socket: Socket) => {
         socket.setTimeout(120000);
       });
 

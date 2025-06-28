@@ -1,1050 +1,1179 @@
-import { Request, Response, NextFunction } from 'express';
 import { logger, createLogContext } from '@/utils/logger';
-import { ERROR_CODES, HTTP_STATUS_CODES, SECURITY_CONSTANTS } from '@/utils/constants';
-import { validateUserToken } from '@/services/auth.service';
-import { getUserById } from '@/models/User';
-import { getCache, setCache } from '@/config/redis';
+import { ERROR_CODES, SECURITY_CONSTANTS, CACHE_CONSTANTS } from '@/utils/constants';
 import { 
-  UserType, 
-  UserStatus, 
-  JWTPayload 
+  generateTokenPair, 
+  verifyToken, 
+  refreshAccessToken, 
+  trackLoginAttempt, 
+  isAccountLocked,
+  verifyPassword 
+} from '@/config/auth';
+import { setCache, getCache, deleteCache, publishEvent } from '@/config/redis';
+import { 
+  createUser, 
+  getUserByEmail, 
+  getUserById, 
+  updateUser,
+  verifyUserEmail,
+  verifyUserPhone
+} from '@/models/User';
+import {
+  UserType,
+  UserStatus,
+  RegisterRequest,
+  LoginRequest,
+  LoginResponse,
+  VerificationRequest,
+  PasswordResetRequest,
+  JWTPayload,
+  ClientProfile,
+  TradieProfile,
+  EnterpriseProfile,
+  UpdateUserData
 } from '@/types/auth.types';
-import { 
-  ApiError, 
-  ErrorSeverity, 
-  ApiResponse 
+import {
+  ApiError,
+  ErrorSeverity,
+  ValidationResult
 } from '@/types/common.types';
 
-interface AuthMiddlewareConfig {
-  enableTokenCaching: boolean;
-  enableRoleBasedAccess: boolean;
-  enablePermissionChecking: boolean;
-  tokenCacheTTL: number;
-  maxFailedAttempts: number;
-  rateLimitWindow: number;
+interface ValidationError {
+  field: string;
+  message: string;
+  code: string;
+  severity: 'error' | 'warning' | 'info';
+  statusCode: number;
+  name: string;
 }
 
-interface AuthenticatedUser {
-  userId: string;
+interface AuthServiceConfig {
+  enableTwoFactor: boolean;
+  enableDeviceTracking: boolean;
+  enableGeoLocation: boolean;
+  maxSessionsPerUser: number;
+  passwordResetExpiry: number;
+  verificationCodeExpiry: number;
+}
+
+interface LoginAttempt {
   email: string;
+  ipAddress: string;
+  userAgent: string;
+  success: boolean;
+  timestamp: Date;
+  failureReason?: string;
+}
+
+interface DeviceInfo {
+  deviceId: string;
+  deviceType: string;
+  browser: string;
+  os: string;
+  ipAddress: string;
+  location?: {
+    country: string;
+    city: string;
+    coordinates?: [number, number];
+  };
+}
+
+interface SessionInfo {
+  sessionId: string;
+  userId: string;
   userType: UserType;
-  status: UserStatus;
-  permissions: string[];
-  sessionId?: string;
-  isVerified: boolean;
-  profileCompleteness: number;
+  deviceInfo: DeviceInfo;
+  createdAt: Date;
+  lastActivity: Date;
+  isActive: boolean;
 }
 
-interface RateLimitInfo {
-  count: number;
-  resetTime: number;
-  blocked: boolean;
-}
-
-declare global {
-  namespace Express {
-    interface Request {
-      user?: AuthenticatedUser;
-      requestId?: string;
-      startTime?: number;
-    }
-  }
-}
-
-export class AuthMiddleware {
-  private static instance: AuthMiddleware;
-  private config: AuthMiddlewareConfig;
+export class AuthService {
+  private static instance: AuthService;
+  private config: AuthServiceConfig;
 
   private constructor() {
     this.config = this.loadConfiguration();
   }
 
-  public static getInstance(): AuthMiddleware {
-    if (!AuthMiddleware.instance) {
-      AuthMiddleware.instance = new AuthMiddleware();
+  public static getInstance(): AuthService {
+    if (!AuthService.instance) {
+      AuthService.instance = new AuthService();
     }
-    return AuthMiddleware.instance;
+    return AuthService.instance;
   }
 
-  private loadConfiguration(): AuthMiddlewareConfig {
+  private loadConfiguration(): AuthServiceConfig {
     return {
-      enableTokenCaching: process.env.ENABLE_TOKEN_CACHING !== 'false',
-      enableRoleBasedAccess: process.env.ENABLE_ROLE_BASED_ACCESS !== 'false',
-      enablePermissionChecking: process.env.ENABLE_PERMISSION_CHECKING !== 'false',
-      tokenCacheTTL: parseInt(process.env.TOKEN_CACHE_TTL || '300'),
-      maxFailedAttempts: parseInt(process.env.MAX_FAILED_ATTEMPTS || '5'),
-      rateLimitWindow: parseInt(process.env.RATE_LIMIT_WINDOW || '900'),
+      enableTwoFactor: process.env.ENABLE_TWO_FACTOR === 'true',
+      enableDeviceTracking: process.env.ENABLE_DEVICE_TRACKING === 'true',
+      enableGeoLocation: process.env.ENABLE_GEO_LOCATION === 'true',
+      maxSessionsPerUser: parseInt(process.env.MAX_SESSIONS_PER_USER || '5'),
+      passwordResetExpiry: parseInt(process.env.PASSWORD_RESET_EXPIRY || String(60 * 60 * 1000)),
+      verificationCodeExpiry: parseInt(process.env.VERIFICATION_CODE_EXPIRY || String(10 * 60 * 1000)),
     };
   }
 
-  public initializeRequest = (req: Request, res: Response, next: NextFunction): void => {
-    const crypto = require('crypto');
-    
-    req.requestId = (req.headers['x-request-id'] as string) || crypto.randomUUID();
-    req.startTime = Date.now();
-
-    res.setHeader('X-Request-ID', req.requestId);
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('X-Frame-Options', 'DENY');
-    res.setHeader('X-XSS-Protection', '1; mode=block');
-
-    const logContext = createLogContext()
-      .withRequest(req)
-      .withMetadata({ requestId: req.requestId })
-      .build();
-
-    logger.debug('Request initialized', logContext);
-
-    next();
-  };
-
-  public authenticate = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  public async register(registerData: RegisterRequest, deviceInfo?: DeviceInfo): Promise<{
+    user: any;
+    message: string;
+    nextStep: string;
+  }> {
     const startTime = Date.now();
     const logContext = createLogContext()
-      .withRequest(req)
-      .withMetadata({ 
-        middleware: 'authenticate',
-        requestId: req.requestId || 'unknown'
+      .withMetadata({
+        userType: registerData.userType,
+        email: registerData.email,
+        deviceInfo: deviceInfo?.deviceType,
       })
       .build();
 
     try {
-      logger.debug('Authentication middleware started', logContext);
+      logger.info('Starting user registration', logContext);
 
-      const token = this.extractToken(req);
-      
-      if (!token) {
-        logger.warn('No authentication token provided', logContext);
-        
-        const errorResponse: ApiResponse<null> = {
-          success: false,
-          message: 'Authentication token is required',
-          timestamp: new Date().toISOString(),
-          requestId: req.requestId || 'unknown',
-        };
-
-        res.status(HTTP_STATUS_CODES.UNAUTHORIZED).json(errorResponse);
-        return;
-      }
-
-      let payload: JWTPayload | null = null;
-      
-      if (this.config.enableTokenCaching) {
-        payload = await this.getTokenFromCache(token);
-      }
-
-      if (!payload) {
-        const validationResult = await validateUserToken(token);
-        if (!validationResult.isValid || !validationResult.payload) {
-          throw new ApiError(
-            'Invalid token',
-            401,
-            ERROR_CODES.AUTH_TOKEN_INVALID,
-            ErrorSeverity.HIGH
-          );
-        }
-        payload = validationResult.payload;
-        
-        if (this.config.enableTokenCaching && payload) {
-          await this.cacheToken(token, payload);
-        }
-      }
-
-      if (!payload) {
+      const validation = await this.validateRegistrationData(registerData);
+      if (!validation.isValid) {
         throw new ApiError(
-          'Token validation failed',
-          401,
-          ERROR_CODES.AUTH_TOKEN_INVALID,
-          ErrorSeverity.HIGH
+          `Registration validation failed: ${validation.errors.map(e => e.message).join(', ')}`,
+          400,
+          ERROR_CODES.VAL_INVALID_INPUT,
+          ErrorSeverity.LOW
         );
       }
 
-      const user = await getUserById(payload.userId, true);
-      
-      if (!user) {
-        logger.warn('User not found for valid token', {
+      const user = await createUser({
+        email: registerData.email,
+        password: registerData.password,
+        firstName: registerData.firstName,
+        lastName: registerData.lastName,
+        phone: registerData.phone,
+        userType: registerData.userType,
+        metadata: {
+          registrationSource: registerData.source || 'web',
+          deviceInfo,
+          termsAccepted: registerData.acceptTerms,
+          marketingConsent: registerData.marketingConsent || false,
+        },
+      });
+
+      await this.sendVerificationCommunications(user);
+
+      await publishEvent('user.registered', {
+        userId: user.id,
+        userType: user.userType,
+        email: user.email,
+        timestamp: new Date(),
+      });
+
+      const duration = Date.now() - startTime;
+      logger.info('User registration completed', {
+        ...logContext,
+        userId: user.id,
+        duration,
+      });
+
+      logger.business('USER_REGISTERED', {
+        ...logContext,
+        userId: user.id,
+        userType: user.userType,
+      });
+
+      logger.performance('user_registration', duration, logContext);
+
+      return {
+        user: this.sanitizeUserData(user),
+        message: 'Registration successful. Please verify your email and phone number.',
+        nextStep: this.getNextOnboardingStep(user.userType),
+      };
+
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.error('User registration failed', {
+        ...logContext,
+        duration,
+        errorMessage: error instanceof Error ? error.message : 'Unknown error',
+        errorCode: error instanceof ApiError ? error.code : ERROR_CODES.SYS_INTERNAL_SERVER_ERROR,
+      });
+
+      if (error instanceof ApiError) {
+        throw error;
+      }
+
+      throw new ApiError(
+        'Registration failed',
+        500,
+        ERROR_CODES.SYS_INTERNAL_SERVER_ERROR,
+        ErrorSeverity.HIGH
+      );
+    }
+  }
+
+  public async login(loginData: LoginRequest, deviceInfo?: DeviceInfo): Promise<LoginResponse> {
+    const startTime = Date.now();
+    const logContext = createLogContext()
+      .withMetadata({
+        email: loginData.email,
+        deviceInfo: deviceInfo?.deviceType,
+        ipAddress: deviceInfo?.ipAddress,
+      })
+      .build();
+
+    try {
+      logger.info('Starting user login', logContext);
+
+      const isLocked = await isAccountLocked(loginData.email);
+      if (isLocked) {
+        logger.security('LOGIN_ATTEMPT_ON_LOCKED_ACCOUNT', 'auth_service', 0, {
           ...logContext,
-          userId: payload.userId,
+          email: loginData.email,
         });
 
         throw new ApiError(
-          'User not found',
-          401,
-          ERROR_CODES.AUTH_USER_NOT_FOUND,
+          'Account is temporarily locked due to multiple failed login attempts',
+          423,
+          ERROR_CODES.AUTH_ACCOUNT_LOCKED,
           ErrorSeverity.MEDIUM
         );
       }
 
+      const user = await getUserByEmail(loginData.email, true);
+      if (!user) {
+        await trackLoginAttempt(loginData.email, false, deviceInfo?.ipAddress);
+        
+        logger.security('LOGIN_ATTEMPT_INVALID_EMAIL', 'auth_service', 0, {
+          ...logContext,
+          email: loginData.email,
+        });
+
+        throw new ApiError(
+          'Invalid email or password',
+          401,
+          ERROR_CODES.AUTH_INVALID_CREDENTIALS,
+          ErrorSeverity.LOW
+        );
+      }
+
+      const isPasswordValid = await verifyPassword(loginData.password, user.passwordHash);
+      if (!isPasswordValid) {
+        await trackLoginAttempt(loginData.email, false, deviceInfo?.ipAddress);
+        
+        logger.security('LOGIN_ATTEMPT_INVALID_PASSWORD', 'auth_service', 0, {
+          ...logContext,
+          userId: user.id,
+          email: loginData.email,
+        });
+
+        throw new ApiError(
+          'Invalid email or password',
+          401,
+          ERROR_CODES.AUTH_INVALID_CREDENTIALS,
+          ErrorSeverity.LOW
+        );
+      }
+
       if (user.status === UserStatus.SUSPENDED) {
-        logger.security('SUSPENDED_USER_ACCESS_ATTEMPT', 'auth_middleware', 0, {
+        logger.security('LOGIN_ATTEMPT_SUSPENDED_USER', 'auth_service', 0, {
           ...logContext,
           userId: user.id,
         });
 
         throw new ApiError(
-          'Account is suspended',
+          'Account is suspended. Please contact support.',
           403,
           ERROR_CODES.AUTH_ACCOUNT_SUSPENDED,
           ErrorSeverity.MEDIUM
         );
       }
 
-      if (user.status === UserStatus.INACTIVE) {
-        logger.warn('Inactive user access attempt', {
-          ...logContext,
-          userId: user.id,
-        });
-
-        throw new ApiError(
-          'Account is inactive',
-          403,
-          ERROR_CODES.AUTH_ACCOUNT_INACTIVE,
-          ErrorSeverity.LOW
-        );
+      if (user.status === UserStatus.PENDING_VERIFICATION) {
+        return {
+          success: false,
+          message: 'Please verify your email and phone number before logging in.',
+          nextStep: 'verification',
+          user: this.sanitizeUserData(user),
+        };
       }
 
-      req.user = {
+      const tokenPair = await generateTokenPair({
         userId: user.id,
         email: user.email,
         userType: user.userType,
         status: user.status,
-        permissions: payload.permissions || [],
-        sessionId: payload.sessionId,
-        isVerified: user.emailVerified && user.phoneVerified,
-        profileCompleteness: user.profileCompleteness,
+        permissions: this.getUserPermissions(user),
+      });
+
+      const sessionInfo = await this.createUserSession(user, deviceInfo);
+
+      await trackLoginAttempt(loginData.email, true, deviceInfo?.ipAddress);
+
+      const updateData: UpdateUserData = {
+        lastLoginAt: new Date(),
       };
 
+      await updateUser(user.id, updateData);
+
+      await publishEvent('user.logged_in', {
+        userId: user.id,
+        userType: user.userType,
+        sessionId: sessionInfo.sessionId,
+        deviceInfo,
+        timestamp: new Date(),
+      });
+
       const duration = Date.now() - startTime;
-      logger.debug('Authentication successful', {
+      logger.info('User login successful', {
+        ...logContext,
+        userId: user.id,
+        sessionId: sessionInfo.sessionId,
+        duration,
+      });
+
+      logger.business('USER_LOGIN', {
         ...logContext,
         userId: user.id,
         userType: user.userType,
-        duration,
       });
 
-      logger.performance('auth_middleware', duration, logContext);
+      logger.performance('user_login', duration, logContext);
 
-      next();
+      return {
+        success: true,
+        message: 'Login successful',
+        user: this.sanitizeUserData(user),
+        tokens: tokenPair,
+        session: sessionInfo,
+        permissions: this.getUserPermissions(user),
+        profileCompleteness: user.profileCompleteness,
+        nextStep: this.getPostLoginStep(user),
+      };
 
     } catch (error) {
       const duration = Date.now() - startTime;
-      logger.error('Authentication failed', {
+      logger.error('User login failed', {
         ...logContext,
         duration,
         errorMessage: error instanceof Error ? error.message : 'Unknown error',
-        errorCode: error instanceof ApiError ? error.code : ERROR_CODES.AUTH_TOKEN_INVALID,
+        errorCode: error instanceof ApiError ? error.code : ERROR_CODES.SYS_INTERNAL_SERVER_ERROR,
       });
 
       if (error instanceof ApiError) {
-        const errorResponse: ApiResponse<null> = {
-          success: false,
-          message: error.message,
-          timestamp: new Date().toISOString(),
-          requestId: req.requestId || 'unknown',
-        };
-
-        res.status(error.statusCode).json(errorResponse);
-        return;
+        throw error;
       }
 
-      const errorResponse: ApiResponse<null> = {
-        success: false,
-        message: 'Authentication failed',
-        timestamp: new Date().toISOString(),
-        requestId: req.requestId || 'unknown',
-      };
-
-      res.status(HTTP_STATUS_CODES.UNAUTHORIZED).json(errorResponse);
-    }
-  };
-
-  public optionalAuthenticate = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    const logContext = createLogContext()
-      .withRequest(req)
-      .withMetadata({ 
-        middleware: 'optionalAuthenticate',
-        requestId: req.requestId || 'unknown'
-      })
-      .build();
-
-    try {
-      const token = this.extractToken(req);
-      
-      if (token) {
-        try {
-          await this.authenticate(req, res, () => {});
-        } catch (error) {
-          logger.debug('Optional authentication failed, continuing without auth', {
-            ...logContext,
-            errorMessage: error instanceof Error ? error.message : 'Unknown error',
-          });
-        }
-      }
-
-      next();
-
-    } catch (error) {
-      logger.debug('Optional authentication error, continuing without auth', {
-        ...logContext,
-        errorMessage: error instanceof Error ? error.message : 'Unknown error',
-      });
-      
-      next();
-    }
-  };
-
-  public requireRole = (allowedRoles: UserType[]) => {
-    return (req: Request, res: Response, next: NextFunction): void => {
-      const logContext = createLogContext()
-        .withRequest(req)
-        .withUser(req.user?.userId, req.user?.userType)
-        .withMetadata({ 
-          middleware: 'requireRole',
-          allowedRoles,
-          requestId: req.requestId || 'unknown'
-        })
-        .build();
-
-      try {
-        logger.debug('Role authorization check started', logContext);
-
-        if (!req.user) {
-          logger.warn('Role check attempted without authentication', logContext);
-          
-          const errorResponse: ApiResponse<null> = {
-            success: false,
-            message: 'Authentication required',
-            timestamp: new Date().toISOString(),
-            requestId: req.requestId || 'unknown',
-          };
-
-          res.status(HTTP_STATUS_CODES.UNAUTHORIZED).json(errorResponse);
-          return;
-        }
-
-        if (!allowedRoles.includes(req.user.userType)) {
-          logger.security('UNAUTHORIZED_ROLE_ACCESS_ATTEMPT', 'auth_middleware', 0, {
-            ...logContext,
-            userRole: req.user.userType,
-            requiredRoles: allowedRoles,
-          });
-
-          const errorResponse: ApiResponse<null> = {
-            success: false,
-            message: 'Insufficient permissions',
-            timestamp: new Date().toISOString(),
-            requestId: req.requestId || 'unknown',
-          };
-
-          res.status(HTTP_STATUS_CODES.FORBIDDEN).json(errorResponse);
-          return;
-        }
-
-        logger.debug('Role authorization successful', {
-          ...logContext,
-          userRole: req.user.userType,
-        });
-
-        next();
-
-      } catch (error) {
-        logger.error('Role authorization failed', {
-          ...logContext,
-          errorMessage: error instanceof Error ? error.message : 'Unknown error',
-        });
-
-        const errorResponse: ApiResponse<null> = {
-          success: false,
-          message: 'Authorization failed',
-          timestamp: new Date().toISOString(),
-          requestId: req.requestId || 'unknown',
-        };
-
-        res.status(HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR).json(errorResponse);
-      }
-    };
-  };
-
-  public requirePermission = (requiredPermissions: string[]) => {
-    return (req: Request, res: Response, next: NextFunction): void => {
-      const logContext = createLogContext()
-        .withRequest(req)
-        .withUser(req.user?.userId, req.user?.userType)
-        .withMetadata({ 
-          middleware: 'requirePermission',
-          requiredPermissions,
-          requestId: req.requestId || 'unknown'
-        })
-        .build();
-
-      try {
-        logger.debug('Permission authorization check started', logContext);
-
-        if (!req.user) {
-          logger.warn('Permission check attempted without authentication', logContext);
-          
-          const errorResponse: ApiResponse<null> = {
-            success: false,
-            message: 'Authentication required',
-            timestamp: new Date().toISOString(),
-            requestId: req.requestId || 'unknown',
-          };
-
-          res.status(HTTP_STATUS_CODES.UNAUTHORIZED).json(errorResponse);
-          return;
-        }
-
-        if (!this.config.enablePermissionChecking) {
-          logger.debug('Permission checking disabled, allowing access', logContext);
-          next();
-          return;
-        }
-
-        const hasAllPermissions = requiredPermissions.every(permission => 
-          req.user!.permissions.includes(permission)
-        );
-
-        if (!hasAllPermissions) {
-          const missingPermissions = requiredPermissions.filter(permission => 
-            !req.user!.permissions.includes(permission)
-          );
-
-          logger.security('INSUFFICIENT_PERMISSIONS_ACCESS_ATTEMPT', 'auth_middleware', 0, {
-            ...logContext,
-            userPermissions: req.user.permissions,
-            requiredPermissions,
-            missingPermissions,
-          });
-
-          const errorResponse: ApiResponse<null> = {
-            success: false,
-            message: 'Insufficient permissions',
-            timestamp: new Date().toISOString(),
-            requestId: req.requestId || 'unknown',
-          };
-
-          res.status(HTTP_STATUS_CODES.FORBIDDEN).json(errorResponse);
-          return;
-        }
-
-        logger.debug('Permission authorization successful', {
-          ...logContext,
-          userPermissions: req.user.permissions,
-        });
-
-        next();
-
-      } catch (error) {
-        logger.error('Permission authorization failed', {
-          ...logContext,
-          errorMessage: error instanceof Error ? error.message : 'Unknown error',
-        });
-
-        const errorResponse: ApiResponse<null> = {
-          success: false,
-          message: 'Authorization failed',
-          timestamp: new Date().toISOString(),
-          requestId: req.requestId || 'unknown',
-        };
-
-        res.status(HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR).json(errorResponse);
-      }
-    };
-  };
-
-  public requireVerification = (req: Request, res: Response, next: NextFunction): void => {
-    const logContext = createLogContext()
-      .withRequest(req)
-      .withUser(req.user?.userId, req.user?.userType)
-      .withMetadata({ 
-        middleware: 'requireVerification',
-        requestId: req.requestId || 'unknown'
-      })
-      .build();
-
-    try {
-      logger.debug('Verification check started', logContext);
-
-      if (!req.user) {
-        logger.warn('Verification check attempted without authentication', logContext);
-        
-        const errorResponse: ApiResponse<null> = {
-          success: false,
-          message: 'Authentication required',
-          timestamp: new Date().toISOString(),
-          requestId: req.requestId || 'unknown',
-        };
-
-        res.status(HTTP_STATUS_CODES.UNAUTHORIZED).json(errorResponse);
-        return;
-      }
-
-      if (!req.user.isVerified) {
-        logger.warn('Unverified user access attempt', {
-          ...logContext,
-          userId: req.user.userId,
-        });
-
-        const errorResponse: ApiResponse<any> = {
-          success: false,
-          message: 'Account verification required',
-          data: {
-            nextStep: 'verification',
-            verificationRequired: true,
-          },
-          timestamp: new Date().toISOString(),
-          requestId: req.requestId || 'unknown',
-        };
-
-        res.status(HTTP_STATUS_CODES.FORBIDDEN).json(errorResponse);
-        return;
-      }
-
-      logger.debug('Verification check successful', logContext);
-      next();
-
-    } catch (error) {
-      logger.error('Verification check failed', {
-        ...logContext,
-        errorMessage: error instanceof Error ? error.message : 'Unknown error',
-      });
-
-      const errorResponse: ApiResponse<null> = {
-        success: false,
-        message: 'Verification check failed',
-        timestamp: new Date().toISOString(),
-        requestId: req.requestId || 'unknown',
-      };
-
-      res.status(HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR).json(errorResponse);
-    }
-  };
-
-  public rateLimit = (maxRequests: number = 100, windowMs: number = 900000) => {
-    return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-      const logContext = createLogContext()
-        .withRequest(req)
-        .withMetadata({ 
-          middleware: 'rateLimit',
-          maxRequests,
-          windowMs,
-          requestId: req.requestId || 'unknown'
-        })
-        .build();
-
-      try {
-        const clientId = req.user?.userId || this.getClientIdentifier(req);
-        const rateLimitKey = `rate_limit:${clientId}`;
-
-        const rateLimitInfo = await getCache<RateLimitInfo>(rateLimitKey);
-        const now = Date.now();
-
-        if (rateLimitInfo) {
-          if (now > rateLimitInfo.resetTime) {
-            const newRateLimitInfo: RateLimitInfo = {
-              count: 1,
-              resetTime: now + windowMs,
-              blocked: false,
-            };
-
-            await setCache(rateLimitKey, newRateLimitInfo, { ttl: windowMs / 1000 });
-          } else {
-            const newCount = rateLimitInfo.count + 1;
-            
-            if (newCount > maxRequests) {
-              logger.security('RATE_LIMIT_EXCEEDED', 'auth_middleware', 0, {
-                ...logContext,
-                clientId,
-                requestCount: newCount,
-                maxRequests,
-              });
-
-              const errorResponse: ApiResponse<null> = {
-                success: false,
-                message: 'Rate limit exceeded',
-                timestamp: new Date().toISOString(),
-                requestId: req.requestId || 'unknown',
-              };
-
-              res.status(HTTP_STATUS_CODES.TOO_MANY_REQUESTS)
-                .setHeader('X-RateLimit-Limit', maxRequests.toString())
-                .setHeader('X-RateLimit-Remaining', '0')
-                .setHeader('X-RateLimit-Reset', rateLimitInfo.resetTime.toString())
-                .json(errorResponse);
-              return;
-            }
-
-            const updatedRateLimitInfo: RateLimitInfo = {
-              ...rateLimitInfo,
-              count: newCount,
-            };
-
-            await setCache(rateLimitKey, updatedRateLimitInfo, { ttl: Math.ceil((rateLimitInfo.resetTime - now) / 1000) });
-
-            res.setHeader('X-RateLimit-Limit', maxRequests.toString());
-            res.setHeader('X-RateLimit-Remaining', (maxRequests - newCount).toString());
-            res.setHeader('X-RateLimit-Reset', rateLimitInfo.resetTime.toString());
-          }
-        } else {
-          const newRateLimitInfo: RateLimitInfo = {
-            count: 1,
-            resetTime: now + windowMs,
-            blocked: false,
-          };
-
-          await setCache(rateLimitKey, newRateLimitInfo, { ttl: windowMs / 1000 });
-
-          res.setHeader('X-RateLimit-Limit', maxRequests.toString());
-          res.setHeader('X-RateLimit-Remaining', (maxRequests - 1).toString());
-          res.setHeader('X-RateLimit-Reset', newRateLimitInfo.resetTime.toString());
-        }
-
-        next();
-
-      } catch (error) {
-        logger.error('Rate limiting failed', {
-          ...logContext,
-          errorMessage: error instanceof Error ? error.message : 'Unknown error',
-        });
-
-        next();
-      }
-    };
-  };
-
-  private extractToken(req: Request): string | null {
-    const authHeader = req.headers.authorization;
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      return authHeader.substring(7);
-    }
-
-    const cookieToken = req.cookies?.accessToken;
-    if (cookieToken) {
-      return cookieToken;
-    }
-
-    const queryToken = req.query.token as string;
-    if (queryToken) {
-      return queryToken;
-    }
-
-    const customHeader = req.headers['x-access-token'] as string;
-    if (customHeader) {
-      return customHeader;
-    }
-
-    return null;
-  }
-
-  private async getTokenFromCache(token: string): Promise<JWTPayload | null> {
-    try {
-      const cacheKey = `token:${this.hashToken(token)}`;
-      const cachedPayload = await getCache<JWTPayload>(cacheKey);
-      
-      if (cachedPayload) {
-        logger.debug('Token retrieved from cache', 
-          createLogContext()
-            .withUser(cachedPayload.userId, cachedPayload.userType)
-            .withMetadata({ cacheHit: true })
-            .build()
-        );
-        return cachedPayload;
-      }
-
-      return null;
-    } catch (error) {
-      logger.warn('Token cache retrieval failed', 
-        createLogContext()
-          .withError(ERROR_CODES.SYS_REDIS_ERROR)
-          .withMetadata({ 
-            errorMessage: error instanceof Error ? error.message : 'Unknown error' 
-          })
-          .build()
-      );
-      return null;
-    }
-  }
-
-  private async cacheToken(token: string, payload: JWTPayload): Promise<void> {
-    try {
-      const cacheKey = `token:${this.hashToken(token)}`;
-      await setCache(cacheKey, payload, { ttl: this.config.tokenCacheTTL });
-      
-      logger.debug('Token cached successfully', 
-        createLogContext()
-          .withUser(payload.userId, payload.userType)
-          .withMetadata({ cacheTTL: this.config.tokenCacheTTL })
-          .build()
-      );
-    } catch (error) {
-      logger.warn('Token caching failed', 
-        createLogContext()
-          .withUser(payload.userId, payload.userType)
-          .withError(ERROR_CODES.SYS_REDIS_ERROR)
-          .withMetadata({ 
-            errorMessage: error instanceof Error ? error.message : 'Unknown error' 
-          })
-          .build()
+      throw new ApiError(
+        'Login failed',
+        500,
+        ERROR_CODES.SYS_INTERNAL_SERVER_ERROR,
+        ErrorSeverity.HIGH
       );
     }
   }
 
-  private hashToken(token: string): string {
-    const crypto = require('crypto');
-    return crypto.createHash('sha256').update(token).digest('hex').substring(0, 16);
-  }
-
-  private getClientIdentifier(req: Request): string {
-    const ipAddress = (req.headers['x-forwarded-for'] as string) || 
-                     (req.headers['x-real-ip'] as string) || 
-                     (req.socket as any)?.remoteAddress || 
-                     '0.0.0.0';
-    
-    const userAgent = req.headers['user-agent'] || 'unknown';
-    const crypto = require('crypto');
-    
-    return crypto.createHash('md5').update(`${ipAddress}-${userAgent}`).digest('hex').substring(0, 12);
-  }
-
-  public getConfig(): Readonly<AuthMiddlewareConfig> {
-    return { ...this.config };
-  }
-  
-  public requireProfileCompleteness = (minimumCompleteness: number = 50) => {
-    return (req: Request, res: Response, next: NextFunction): void => {
-      const logContext = createLogContext()
-        .withRequest(req)
-        .withUser(req.user?.userId, req.user?.userType)
-        .withMetadata({ 
-          middleware: 'requireProfileCompleteness',
-          minimumCompleteness,
-          requestId: req.requestId || 'unknown'
-        })
-        .build();
-
-      try {
-        logger.debug('Profile completeness check started', logContext);
-
-        if (!req.user) {
-          logger.warn('Profile completeness check attempted without authentication', logContext);
-          
-          const errorResponse: ApiResponse<null> = {
-            success: false,
-            message: 'Authentication required',
-            timestamp: new Date().toISOString(),
-            requestId: req.requestId || 'unknown',
-          };
-
-          res.status(HTTP_STATUS_CODES.UNAUTHORIZED).json(errorResponse);
-          return;
-        }
-
-        if (req.user.profileCompleteness < minimumCompleteness) {
-          logger.warn('Incomplete profile access attempt', {
-            ...logContext,
-            currentCompleteness: req.user.profileCompleteness,
-            requiredCompleteness: minimumCompleteness,
-          });
-
-          const errorResponse: ApiResponse<any> = {
-            success: false,
-            message: 'Profile completion required',
-            data: {
-              currentCompleteness: req.user.profileCompleteness,
-              requiredCompleteness: minimumCompleteness,
-              nextStep: 'complete_profile',
-            },
-            timestamp: new Date().toISOString(),
-            requestId: req.requestId || 'unknown',
-          };
-
-          res.status(HTTP_STATUS_CODES.FORBIDDEN).json(errorResponse);
-          return;
-        }
-
-        logger.debug('Profile completeness check successful', {
-          ...logContext,
-          profileCompleteness: req.user.profileCompleteness,
-        });
-
-        next();
-
-      } catch (error) {
-        logger.error('Profile completeness check failed', {
-          ...logContext,
-          errorMessage: error instanceof Error ? error.message : 'Unknown error',
-        });
-
-        const errorResponse: ApiResponse<null> = {
-          success: false,
-          message: 'Profile completeness check failed',
-          timestamp: new Date().toISOString(),
-          requestId: req.requestId || 'unknown',
-        };
-
-        res.status(HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR).json(errorResponse);
-      }
-    };
-  };
-
-  public securityHeaders = (req: Request, res: Response, next: NextFunction): void => {
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('X-Frame-Options', 'DENY');
-    res.setHeader('X-XSS-Protection', '1; mode=block');
-    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-    res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
-    
-    if (req.secure || req.headers['x-forwarded-proto'] === 'https') {
-      res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
-    }
-
-    res.setHeader('Content-Security-Policy', 
-      "default-src 'self'; " +
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
-      "style-src 'self' 'unsafe-inline'; " +
-      "img-src 'self' data: https:; " +
-      "font-src 'self' https:; " +
-      "connect-src 'self' https:; " +
-      "frame-ancestors 'none';"
-    );
-
-    next();
-  };
-
-  public requestLogger = (req: Request, res: Response, next: NextFunction): void => {
+  public async verifyEmail(verificationData: VerificationRequest): Promise<{
+    success: boolean;
+    message: string;
+    nextStep?: string;
+  }> {
     const startTime = Date.now();
     const logContext = createLogContext()
-      .withRequest(req)
-      .withUser(req.user?.userId, req.user?.userType)
-      .withMetadata({ 
-        middleware: 'requestLogger',
-        requestId: req.requestId || 'unknown'
-      })
+      .withUser(verificationData.userId)
+      .withMetadata({ verificationType: 'email' })
       .build();
 
-    logger.info('Request started', {
-      ...logContext,
-      method: req.method,
-      url: req.url,
-      userAgent: req.headers['user-agent'],
-      contentLength: req.headers['content-length'],
-    });
+    try {
+      logger.info('Starting email verification', logContext);
 
-    const originalEnd = res.end;
-    res.end = function(chunk?: any, encoding?: any) {
-      const duration = Date.now() - startTime;
+      const success = await verifyUserEmail(verificationData.userId, verificationData.token || '');
       
-      logger.info('Request completed', {
-        ...logContext,
-        statusCode: res.statusCode,
-        duration,
-        contentLength: res.get('content-length'),
-      });
-
-      logger.performance('request_duration', duration, {
-        ...logContext,
-        statusCode: res.statusCode,
-      });
-
-      originalEnd.call(this, chunk, encoding);
-    };
-
-    next();
-  };
-
-  public errorHandler = (error: any, req: Request, res: Response, next: NextFunction): void => {
-    const logContext = createLogContext()
-      .withRequest(req)
-      .withUser(req.user?.userId, req.user?.userType)
-      .withMetadata({ 
-        middleware: 'errorHandler',
-        requestId: req.requestId || 'unknown'
-      })
-      .build();
-
-    if (error instanceof ApiError) {
-      if (error.severity === ErrorSeverity.HIGH) {
-        logger.error('High severity API error', {
+      if (!success) {
+        logger.security('EMAIL_VERIFICATION_FAILED', 'auth_service', 0, {
           ...logContext,
-          errorMessage: error.message,
-          errorCode: error.code,
-          statusCode: error.statusCode,
-          stack: error.stack,
+          token: verificationData.token?.slice(0, 8) + '...',
         });
-      } else {
-        logger.warn('API error', {
-          ...logContext,
-          errorMessage: error.message,
-          errorCode: error.code,
-          statusCode: error.statusCode,
-        });
+
+        throw new ApiError(
+          'Invalid or expired verification token',
+          400,
+          ERROR_CODES.BIZ_VERIFICATION_CODE_INVALID,
+          ErrorSeverity.LOW
+        );
       }
 
-      const errorResponse: ApiResponse<null> = {
-        success: false,
-        message: error.message,
-        timestamp: new Date().toISOString(),
-        requestId: req.requestId || 'unknown',
-      };
+      const user = await getUserById(verificationData.userId);
+      if (!user) {
+        throw new ApiError(
+          'User not found',
+          404,
+          ERROR_CODES.BIZ_RESOURCE_NOT_FOUND,
+          ErrorSeverity.MEDIUM
+        );
+      }
 
-      res.status(error.statusCode).json(errorResponse);
-      return;
-    }
-
-    logger.error('Unhandled error', {
-      ...logContext,
-      errorMessage: error.message || 'Unknown error',
-      stack: error.stack,
-    });
-
-    const errorResponse: ApiResponse<null> = {
-      success: false,
-      message: process.env.NODE_ENV === 'production' ? 'Internal server error' : error.message,
-      timestamp: new Date().toISOString(),
-      requestId: req.requestId || 'unknown',
-    };
-
-    res.status(HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR).json(errorResponse);
-  };
-
-  public corsHandler = (req: Request, res: Response, next: NextFunction): void => {
-    const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [];
-    const origin = req.headers.origin;
-
-    if (origin && allowedOrigins.includes(origin)) {
-      res.setHeader('Access-Control-Allow-Origin', origin);
-    }
-
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, X-Access-Token, X-Device-Fingerprint');
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.setHeader('Access-Control-Max-Age', '86400');
-
-    if (req.method === 'OPTIONS') {
-      res.status(HTTP_STATUS_CODES.NO_CONTENT).end();
-      return;
-    }
-
-    next();
-  };
-
-  public healthCheckBypass = (req: Request, res: Response, next: NextFunction): void => {
-    if (req.path === '/health' || req.path === '/api/health') {
-      const healthResponse: ApiResponse<any> = {
-        success: true,
-        message: 'Service is healthy',
-        data: {
-          status: 'healthy',
-          timestamp: new Date().toISOString(),
-          uptime: process.uptime(),
-          version: process.env.APP_VERSION || '1.0.0',
-        },
-        timestamp: new Date().toISOString(),
-        requestId: req.requestId || 'unknown',
-      };
-
-      res.status(HTTP_STATUS_CODES.OK).json(healthResponse);
-      return;
-    }
-
-    next();
-  };
-
-  public requestTimeout = (timeoutMs: number = 30000) => {
-    return (req: Request, res: Response, next: NextFunction): void => {
-      const timeout = setTimeout(() => {
-        if (!res.headersSent) {
-          const logContext = createLogContext()
-            .withRequest(req)
-            .withUser(req.user?.userId, req.user?.userType)
-            .withMetadata({ 
-              middleware: 'requestTimeout',
-              timeoutMs,
-              requestId: req.requestId || 'unknown'
-            })
-            .build();
-
-          logger.warn('Request timeout', logContext);
-
-          const errorResponse: ApiResponse<null> = {
-            success: false,
-            message: 'Request timeout',
-            timestamp: new Date().toISOString(),
-            requestId: req.requestId || 'unknown',
-          };
-
-          res.status(HTTP_STATUS_CODES.REQUEST_TIMEOUT).json(errorResponse);
-        }
-      }, timeoutMs);
-
-      res.on('finish', () => {
-        clearTimeout(timeout);
+      await publishEvent('user.email_verified', {
+        userId: user.id,
+        userType: user.userType,
+        email: user.email,
+        timestamp: new Date(),
       });
 
-      next();
+      const duration = Date.now() - startTime;
+      logger.info('Email verification successful', {
+        ...logContext,
+        duration,
+      });
+
+      logger.business('USER_EMAIL_VERIFIED', logContext);
+
+      return {
+        success: true,
+        message: 'Email verified successfully',
+        nextStep: user.phoneVerified ? this.getPostVerificationStep(user.userType) : 'phone_verification',
+      };
+
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.error('Email verification failed', {
+        ...logContext,
+        duration,
+        errorMessage: error instanceof Error ? error.message : 'Unknown error',
+        errorCode: error instanceof ApiError ? error.code : ERROR_CODES.SYS_INTERNAL_SERVER_ERROR,
+      });
+
+      if (error instanceof ApiError) {
+        throw error;
+      }
+
+      throw new ApiError(
+        'Email verification failed',
+        500,
+        ERROR_CODES.SYS_INTERNAL_SERVER_ERROR,
+        ErrorSeverity.HIGH
+      );
+    }
+  }
+
+  public async verifyPhone(verificationData: VerificationRequest): Promise<{
+    success: boolean;
+    message: string;
+    nextStep?: string;
+  }> {
+    const startTime = Date.now();
+    const logContext = createLogContext()
+      .withUser(verificationData.userId)
+      .withMetadata({ verificationType: 'phone' })
+      .build();
+
+    try {
+      logger.info('Starting phone verification', logContext);
+
+      const success = await verifyUserPhone(verificationData.userId, verificationData.code || '');
+      
+      if (!success) {
+        logger.security('PHONE_VERIFICATION_FAILED', 'auth_service', 0, {
+          ...logContext,
+          code: verificationData.code?.slice(0, 2) + '****',
+        });
+
+        throw new ApiError(
+          'Invalid or expired verification code',
+          400,
+          ERROR_CODES.BIZ_VERIFICATION_CODE_INVALID,
+          ErrorSeverity.LOW
+        );
+      }
+
+      const user = await getUserById(verificationData.userId);
+      if (!user) {
+        throw new ApiError(
+          'User not found',
+          404,
+          ERROR_CODES.BIZ_RESOURCE_NOT_FOUND,
+          ErrorSeverity.MEDIUM
+        );
+      }
+
+      await publishEvent('user.phone_verified', {
+        userId: user.id,
+        userType: user.userType,
+        phone: user.phone,
+        timestamp: new Date(),
+      });
+
+      const duration = Date.now() - startTime;
+      logger.info('Phone verification successful', {
+        ...logContext,
+        duration,
+      });
+
+      logger.business('USER_PHONE_VERIFIED', logContext);
+
+      return {
+        success: true,
+        message: 'Phone verified successfully',
+        nextStep: user.emailVerified ? this.getPostVerificationStep(user.userType) : 'email_verification',
+      };
+
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.error('Phone verification failed', {
+        ...logContext,
+        duration,
+        errorMessage: error instanceof Error ? error.message : 'Unknown error',
+        errorCode: error instanceof ApiError ? error.code : ERROR_CODES.SYS_INTERNAL_SERVER_ERROR,
+      });
+
+      if (error instanceof ApiError) {
+        throw error;
+      }
+
+      throw new ApiError(
+        'Phone verification failed',
+        500,
+        ERROR_CODES.SYS_INTERNAL_SERVER_ERROR,
+        ErrorSeverity.HIGH
+      );
+    }
+  }
+
+  public async requestPasswordReset(email: string, deviceInfo?: DeviceInfo): Promise<{
+    success: boolean;
+    message: string;
+  }> {
+    const startTime = Date.now();
+    const logContext = createLogContext()
+      .withMetadata({ 
+        email, 
+        deviceInfo: deviceInfo?.deviceType,
+        ipAddress: deviceInfo?.ipAddress 
+      })
+      .build();
+
+    try {
+      logger.info('Password reset requested', logContext);
+
+      const user = await getUserByEmail(email);
+      if (!user) {
+        logger.security('PASSWORD_RESET_INVALID_EMAIL', 'auth_service', 0, {
+          ...logContext,
+          email,
+        });
+
+        return {
+          success: true,
+          message: 'If the email exists, a password reset link has been sent.',
+        };
+      }
+
+      const resetToken = this.generateSecureToken();
+      const resetExpires = new Date(Date.now() + this.config.passwordResetExpiry);
+
+      const updateData: UpdateUserData = {
+        passwordResetToken: resetToken,
+        passwordResetExpires: resetExpires,
+      };
+
+      await updateUser(user.id, updateData);
+
+      await setCache(
+        `${CACHE_CONSTANTS.KEYS.PASSWORD_RESET}${resetToken}`,
+        { userId: user.id, email: user.email },
+        this.config.passwordResetExpiry / 1000
+      );
+
+      await this.sendPasswordResetEmail(user, resetToken);
+
+      await publishEvent('user.password_reset_requested', {
+        userId: user.id,
+        email: user.email,
+        resetToken: resetToken.slice(0, 8) + '...',
+        deviceInfo,
+        timestamp: new Date(),
+      });
+
+      const duration = Date.now() - startTime;
+      logger.info('Password reset request processed', {
+        ...logContext,
+        userId: user.id,
+        duration,
+      });
+
+      logger.security('PASSWORD_RESET_REQUESTED', 'auth_service', 0, {
+        ...logContext,
+        userId: user.id,
+      });
+
+      return {
+        success: true,
+        message: 'Password reset instructions have been sent to your email.',
+      };
+
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.error('Password reset request failed', {
+        ...logContext,
+        duration,
+        errorMessage: error instanceof Error ? error.message : 'Unknown error',
+        errorCode: ERROR_CODES.SYS_INTERNAL_SERVER_ERROR,
+      });
+
+      throw new ApiError(
+        'Password reset request failed',
+        500,
+        ERROR_CODES.SYS_INTERNAL_SERVER_ERROR,
+        ErrorSeverity.HIGH
+      );
+    }
+  }
+
+  public async validateUserToken(token: string): Promise<{
+    isValid: boolean;
+    payload?: JWTPayload;
+    user?: any;
+  }> {
+    const startTime = Date.now();
+    const logContext = createLogContext()
+      .withMetadata({ 
+        tokenValidation: true,
+        tokenPrefix: token.substring(0, 10) + '...'
+      })
+      .build();
+
+    try {
+      logger.debug('Validating user token', logContext);
+
+      const payload = await verifyToken(token);
+      const user = await getUserById(payload.userId);
+
+      if (!user) {
+        logger.warn('Token valid but user not found', {
+          ...logContext,
+          userId: payload.userId,
+        });
+
+        return {
+          isValid: false,
+        };
+      }
+
+      if (user.status === UserStatus.SUSPENDED) {
+        logger.security('TOKEN_VALIDATION_SUSPENDED_USER', 'auth_service', 0, {
+          ...logContext,
+          userId: user.id,
+        });
+
+        return {
+          isValid: false,
+        };
+      }
+
+      const duration = Date.now() - startTime;
+      logger.debug('Token validation successful', {
+        ...logContext,
+        userId: user.id,
+        duration,
+      });
+
+      return {
+        isValid: true,
+        payload,
+        user: this.sanitizeUserData(user),
+      };
+
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.warn('Token validation failed', {
+        ...logContext,
+        duration,
+        errorMessage: error instanceof Error ? error.message : 'Unknown error',
+      });
+
+      return {
+        isValid: false,
+      };
+    }
+  }
+
+  public async refreshAccessToken(refreshTokenValue: string, deviceInfo?: DeviceInfo): Promise<{
+    tokens: any;
+    user: any;
+  }> {
+    const startTime = Date.now();
+    const logContext = createLogContext()
+      .withMetadata({ 
+        deviceInfo: deviceInfo?.deviceType,
+        tokenRefresh: true 
+      })
+      .build();
+
+    try {
+      logger.debug('Refreshing access token', logContext);
+
+      const newTokenPair = await refreshAccessToken(refreshTokenValue);
+
+      const payload = await verifyToken(newTokenPair.accessToken);
+      const user = await getUserById(payload.userId);
+
+      if (!user) {
+        throw new ApiError(
+          'User not found',
+          404,
+          ERROR_CODES.BIZ_RESOURCE_NOT_FOUND,
+          ErrorSeverity.MEDIUM
+        );
+      }
+
+      const duration = Date.now() - startTime;
+      logger.debug('Token refreshed successfully', {
+        ...logContext,
+        userId: user.id,
+        duration,
+      });
+
+      return {
+        tokens: newTokenPair,
+        user: this.sanitizeUserData(user),
+      };
+
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.error('Token refresh failed', {
+        ...logContext,
+        duration,
+        errorMessage: error instanceof Error ? error.message : 'Unknown error',
+        errorCode: ERROR_CODES.AUTH_TOKEN_INVALID,
+      });
+
+      throw new ApiError(
+        'Token refresh failed',
+        401,
+        ERROR_CODES.AUTH_TOKEN_INVALID,
+        ErrorSeverity.MEDIUM
+      );
+    }
+  }
+
+  public async logout(userId: string, sessionId?: string, deviceInfo?: DeviceInfo): Promise<{
+    success: boolean;
+    message: string;
+  }> {
+    const startTime = Date.now();
+    const logContext = createLogContext()
+      .withUser(userId)
+      .withMetadata({ 
+        sessionId,
+        deviceInfo: deviceInfo?.deviceType 
+      })
+      .build();
+
+    try {
+      logger.info('User logout initiated', logContext);
+
+      if (sessionId) {
+        await this.invalidateSession(sessionId);
+      }
+
+      await this.invalidateUserSessions(userId);
+
+      await publishEvent('user.logged_out', {
+        userId,
+        sessionId,
+        deviceInfo,
+        timestamp: new Date(),
+      });
+
+      const duration = Date.now() - startTime;
+      logger.info('User logout successful', {
+        ...logContext,
+        duration,
+      });
+
+      logger.business('USER_LOGOUT', logContext);
+
+      return {
+        success: true,
+        message: 'Logged out successfully',
+      };
+
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.error('User logout failed', {
+        ...logContext,
+        duration,
+        errorMessage: error instanceof Error ? error.message : 'Unknown error',
+        errorCode: ERROR_CODES.SYS_INTERNAL_SERVER_ERROR,
+      });
+
+      throw new ApiError(
+        'Logout failed',
+        500,
+        ERROR_CODES.SYS_INTERNAL_SERVER_ERROR,
+        ErrorSeverity.HIGH
+      );
+    }
+  }
+  
+  private async createUserSession(user: any, deviceInfo?: DeviceInfo): Promise<SessionInfo> {
+    const sessionId = this.generateSessionId();
+    const sessionInfo: SessionInfo = {
+      sessionId,
+      userId: user.id,
+      userType: user.userType,
+      deviceInfo: deviceInfo || this.getDefaultDeviceInfo(),
+      createdAt: new Date(),
+      lastActivity: new Date(),
+      isActive: true,
     };
-  };
+
+    await setCache(
+      `${CACHE_CONSTANTS.KEYS.USER_SESSION}${sessionId}`,
+      sessionInfo,
+      SECURITY_CONSTANTS.SESSION.IDLE_TIMEOUT / 1000
+    );
+
+    const userSessionsKey = `${CACHE_CONSTANTS.KEYS.USER_SESSIONS}${user.id}`;
+    const userSessions = await getCache<string[]>(userSessionsKey) || [];
+    
+    if (userSessions.length >= this.config.maxSessionsPerUser) {
+      const oldestSession = userSessions.shift();
+      if (oldestSession) {
+        await this.invalidateSession(oldestSession);
+      }
+    }
+
+    userSessions.push(sessionId);
+    await setCache(userSessionsKey, userSessions, 86400);
+
+    return sessionInfo;
+  }
+
+  private async invalidateSession(sessionId: string): Promise<void> {
+    await deleteCache(`${CACHE_CONSTANTS.KEYS.USER_SESSION}${sessionId}`);
+  }
+
+  private async invalidateUserSessions(userId: string): Promise<void> {
+    const userSessionsKey = `${CACHE_CONSTANTS.KEYS.USER_SESSIONS}${userId}`;
+    const userSessions = await getCache<string[]>(userSessionsKey) || [];
+
+    const invalidationPromises = userSessions.map(sessionId => 
+      this.invalidateSession(sessionId)
+    );
+
+    await Promise.all(invalidationPromises);
+    await deleteCache(userSessionsKey);
+  }
+
+  private async validateRegistrationData(data: RegisterRequest): Promise<ValidationResult> {
+    const errors: ValidationError[] = [];
+
+    if (!data.email || !this.isValidEmail(data.email)) {
+      errors.push({
+        field: 'email',
+        message: 'Invalid email format',
+        code: ERROR_CODES.VAL_INVALID_EMAIL,
+        severity: 'error',
+        statusCode: 400,
+        name: 'ValidationError',
+      });
+    }
+
+    if (!data.password || data.password.length < SECURITY_CONSTANTS.PASSWORD.MIN_LENGTH) {
+      errors.push({
+        field: 'password',
+        message: `Password must be at least ${SECURITY_CONSTANTS.PASSWORD.MIN_LENGTH} characters`,
+        code: ERROR_CODES.VAL_WEAK_PASSWORD,
+        severity: 'error',
+        statusCode: 400,
+        name: 'ValidationError',
+      });
+    }
+
+    if (!data.firstName || data.firstName.trim().length < 2) {
+      errors.push({
+        field: 'firstName',
+        message: 'First name must be at least 2 characters',
+        code: ERROR_CODES.VAL_REQUIRED_FIELD,
+        severity: 'error',
+        statusCode: 400,
+        name: 'ValidationError',
+      });
+    }
+
+    if (!data.lastName || data.lastName.trim().length < 2) {
+      errors.push({
+        field: 'lastName',
+        message: 'Last name must be at least 2 characters',
+        code: ERROR_CODES.VAL_REQUIRED_FIELD,
+        severity: 'error',
+        statusCode: 400,
+        name: 'ValidationError',
+      });
+    }
+
+    if (!data.phone || !this.isValidPhone(data.phone)) {
+      errors.push({
+        field: 'phone',
+        message: 'Invalid phone number format',
+        code: ERROR_CODES.VAL_INVALID_PHONE,
+        severity: 'error',
+        statusCode: 400,
+        name: 'ValidationError',
+      });
+    }
+
+    if (!Object.values(UserType).includes(data.userType)) {
+      errors.push({
+        field: 'userType',
+        message: 'Invalid user type',
+        code: ERROR_CODES.VAL_INVALID_USER_TYPE,
+        severity: 'error',
+        statusCode: 400,
+        name: 'ValidationError',
+      });
+    }
+
+    if (!data.acceptTerms) {
+      errors.push({
+        field: 'acceptTerms',
+        message: 'Terms and conditions must be accepted',
+        code: ERROR_CODES.VAL_REQUIRED_FIELD,
+        severity: 'error',
+        statusCode: 400,
+        name: 'ValidationError',
+      });
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors,
+    };
+  }
+
+  private async sendVerificationCommunications(user: any): Promise<void> {
+    try {
+      await publishEvent('notification.send_email_verification', {
+        userId: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        verificationToken: user.emailVerificationToken,
+        userType: user.userType,
+      });
+
+      await publishEvent('notification.send_sms_verification', {
+        userId: user.id,
+        phone: user.phone,
+        firstName: user.firstName,
+        verificationCode: user.phoneVerificationCode,
+        userType: user.userType,
+      });
+
+      logger.info('Verification communications sent', 
+        createLogContext()
+          .withUser(user.id, user.userType)
+          .withMetadata({ email: user.email, phone: user.phone })
+          .build()
+      );
+
+    } catch (error) {
+      logger.error('Failed to send verification communications', 
+        createLogContext()
+          .withUser(user.id, user.userType)
+          .withError(ERROR_CODES.SYS_NOTIFICATION_ERROR)
+          .withMetadata({ 
+            errorMessage: error instanceof Error ? error.message : 'Unknown error' 
+          })
+          .build()
+      );
+    }
+  }
+
+  private async sendPasswordResetEmail(user: any, resetToken: string): Promise<void> {
+    try {
+      await publishEvent('notification.send_password_reset', {
+        userId: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        resetToken,
+        userType: user.userType,
+      });
+
+      logger.info('Password reset email sent', 
+        createLogContext()
+          .withUser(user.id, user.userType)
+          .withMetadata({ email: user.email })
+          .build()
+      );
+
+    } catch (error) {
+      logger.error('Failed to send password reset email', 
+        createLogContext()
+          .withUser(user.id, user.userType)
+          .withMetadata({ errorCode: ERROR_CODES.SYS_NOTIFICATION_ERROR })
+          .withMetadata({ 
+            errorMessage: error instanceof Error ? error.message : 'Unknown error' 
+          })
+          .build()
+      );
+    }
+  }
+
+  private getUserPermissions(user: any): string[] {
+    const basePermissions = ['profile:read', 'profile:update'];
+    
+    switch (user.userType) {
+      case UserType.CLIENT:
+        return [
+          ...basePermissions,
+          'jobs:create',
+          'jobs:read',
+          'jobs:update',
+          'jobs:delete',
+          'applications:read',
+          'payments:create',
+          'reviews:create',
+        ];
+
+      case UserType.TRADIE:
+        return [
+          ...basePermissions,
+          'jobs:read',
+          'applications:create',
+          'applications:read',
+          'applications:update',
+          'quotes:create',
+          'quotes:read',
+          'quotes:update',
+          'reviews:read',
+        ];
+
+      case UserType.ENTERPRISE:
+        return [
+          ...basePermissions,
+          'jobs:create',
+          'jobs:read',
+          'jobs:update',
+          'jobs:delete',
+          'team:create',
+          'team:read',
+          'team:update',
+          'team:delete',
+          'analytics:read',
+          'billing:read',
+          'billing:update',
+        ];
+
+      default:
+        return basePermissions;
+    }
+  }
+
+  private getNextOnboardingStep(userType: UserType): string {
+    switch (userType) {
+      case UserType.CLIENT:
+        return 'verify_identity_and_setup_company';
+      case UserType.TRADIE:
+        return 'verify_identity_and_setup_business';
+      case UserType.ENTERPRISE:
+        return 'verify_identity_and_setup_organization';
+      default:
+        return 'complete_profile';
+    }
+  }
+
+  private getPostVerificationStep(userType: UserType): string {
+    switch (userType) {
+      case UserType.CLIENT:
+        return 'upload_company_documents';
+      case UserType.TRADIE:
+        return 'upload_trade_certifications';
+      case UserType.ENTERPRISE:
+        return 'setup_team_structure';
+      default:
+        return 'complete_profile';
+    }
+  }
+
+  private getPostLoginStep(user: any): string {
+    if (user.profileCompleteness < 50) {
+      return 'complete_profile';
+    }
+
+    if (!user.isVerified) {
+      return 'complete_verification';
+    }
+
+    return 'dashboard';
+  }
+
+  private sanitizeUserData(user: any): any {
+    const { passwordHash, emailVerificationToken, phoneVerificationCode, passwordResetToken, ...sanitizedUser } = user;
+    return sanitizedUser;
+  }
+
+  private isValidEmail(email: string): boolean {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  }
+
+  private isValidPhone(phone: string): boolean {
+    const phoneRegex = /^\+?[\d\s\-\(\)]{10,}$/;
+    return phoneRegex.test(phone);
+  }
+
+  private generateSecureToken(): string {
+    const crypto = require('crypto');
+    return crypto.randomBytes(32).toString('hex');
+  }
+
+  private generateSessionId(): string {
+    const crypto = require('crypto');
+    return crypto.randomBytes(24).toString('hex');
+  }
+
+  private getDefaultDeviceInfo(): DeviceInfo {
+    return {
+      deviceId: 'unknown',
+      deviceType: 'unknown',
+      browser: 'unknown',
+      os: 'unknown',
+      ipAddress: '0.0.0.0',
+    };
+  }
+
+  public getConfig(): Readonly<AuthServiceConfig> {
+    return { ...this.config };
+  }
 }
 
-export const authMiddleware = AuthMiddleware.getInstance();
+export const authService = AuthService.getInstance();
 
-export const initializeRequest = authMiddleware.initializeRequest;
-export const authenticate = authMiddleware.authenticate;
-export const optionalAuthenticate = authMiddleware.optionalAuthenticate;
-export const requireRole = authMiddleware.requireRole;
-export const requirePermission = authMiddleware.requirePermission;
-export const requireVerification = authMiddleware.requireVerification;
-export const requireProfileCompleteness = authMiddleware.requireProfileCompleteness;
-export const rateLimit = authMiddleware.rateLimit;
-export const securityHeaders = authMiddleware.securityHeaders;
-export const requestLogger = authMiddleware.requestLogger;
-export const errorHandler = authMiddleware.errorHandler;
-export const corsHandler = authMiddleware.corsHandler;
-export const healthCheckBypass = authMiddleware.healthCheckBypass;
-export const requestTimeout = authMiddleware.requestTimeout;
+export const registerUser = async (registerData: RegisterRequest, deviceInfo?: DeviceInfo) => {
+  return await authService.register(registerData, deviceInfo);
+};
 
-export const basicAuth = [
-  initializeRequest,
-  securityHeaders,
-  corsHandler,
-  requestLogger,
-  authenticate,
-];
+export const loginUser = async (loginData: LoginRequest, deviceInfo?: DeviceInfo): Promise<LoginResponse> => {
+  return await authService.login(loginData, deviceInfo);
+};
 
-export const clientAuth = [
-  ...basicAuth,
-  requireRole([UserType.CLIENT]),
-  requireVerification,
-];
+export const verifyUserEmailService = async (verificationData: VerificationRequest) => {
+  return await authService.verifyEmail(verificationData);
+};
 
-export const tradieAuth = [
-  ...basicAuth,
-  requireRole([UserType.TRADIE]),
-  requireVerification,
-  requireProfileCompleteness(75),
-];
+export const verifyUserPhoneService = async (verificationData: VerificationRequest) => {
+  return await authService.verifyPhone(verificationData);
+};
 
-export const enterpriseAuth = [
-  ...basicAuth,
-  requireRole([UserType.ENTERPRISE]),
-  requireVerification,
-  requireProfileCompleteness(80),
-];
+export const requestPasswordReset = async (email: string, deviceInfo?: DeviceInfo) => {
+  return await authService.requestPasswordReset(email, deviceInfo);
+};
 
-export const adminAuth = [
-  ...basicAuth,
-  requireRole([UserType.ENTERPRISE]),
-  requirePermission(['admin:read', 'admin:write']),
-  requireVerification,
-];
+export const refreshUserToken = async (refreshToken: string, deviceInfo?: DeviceInfo) => {
+  return await authService.refreshAccessToken(refreshToken, deviceInfo);
+};
 
-export const publicEndpoint = [
-  initializeRequest,
-  securityHeaders,
-  corsHandler,
-  requestLogger,
-  optionalAuthenticate,
-];
+export const logoutUser = async (userId: string, sessionId?: string, deviceInfo?: DeviceInfo) => {
+  return await authService.logout(userId, sessionId, deviceInfo);
+};
 
-export default authMiddleware;
+export const validateUserToken = async (token: string) => {
+  return await authService.validateUserToken(token);
+};
 
