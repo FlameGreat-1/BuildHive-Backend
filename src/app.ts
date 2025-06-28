@@ -1,4 +1,4 @@
-import express, { Application, Request, Response, NextFunction } from 'express';
+import express, { Application, Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
@@ -94,11 +94,11 @@ export class BuildHiveApp {
     }));
 
     this.app.use(compression({
-      filter: (req, res) => {
+      filter: (req, _res) => {
         if (req.headers['x-no-compression']) {
           return false;
         }
-        return compression.filter(req, res);
+        return compression.filter(req, _res);
       },
       level: 6,
       threshold: 1024,
@@ -106,7 +106,7 @@ export class BuildHiveApp {
 
     this.app.use(express.json({ 
       limit: this.config.maxRequestSize,
-      verify: (req: any, res, buf) => {
+      verify: (req: any, _res, buf) => {
         req.rawBody = buf;
       }
     }));
@@ -267,7 +267,7 @@ export class BuildHiveApp {
 
     this.app.use(errorHandler);
 
-    process.on('unhandledRejection', (reason: any, promise: Promise<any>) => {
+    process.on('unhandledRejection', (reason: any, _promise: Promise<any>) => {
       logger.error('Unhandled Promise Rejection - Production', 
         createLogContext()
           .withMetadata({ 
@@ -425,7 +425,7 @@ export class BuildHiveApp {
         });
       });
 
-      this.server.on('connection', (socket: any) => {
+      this.server.on('connection', (socket) => {
         socket.setTimeout(120000);
       });
 

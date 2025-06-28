@@ -1,5 +1,3 @@
-// src/config/auth.ts
-
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { logger, createLogContext } from '@/utils/logger';
@@ -8,7 +6,6 @@ import { JWTPayload, UserType, UserStatus } from '@/types/auth.types';
 import { ApiError, ErrorSeverity } from '@/types/common.types';
 import { setCache, getCache, deleteCache } from './redis';
 
-// Enterprise authentication configuration interface
 interface AuthConfig {
   jwtSecret: string;
   jwtExpiresIn: string;
@@ -22,7 +19,6 @@ interface AuthConfig {
   maxConcurrentSessions: number;
 }
 
-// Enterprise JWT token pair interface
 interface TokenPair {
   accessToken: string;
   refreshToken: string;
@@ -30,7 +26,6 @@ interface TokenPair {
   tokenType: 'Bearer';
 }
 
-// Enterprise password validation result
 interface PasswordValidationResult {
   isValid: boolean;
   errors: string[];
@@ -38,7 +33,6 @@ interface PasswordValidationResult {
   score: number;
 }
 
-// Enterprise authentication manager
 class AuthManager {
   private static instance: AuthManager;
   private config: AuthConfig;
@@ -48,7 +42,6 @@ class AuthManager {
     this.validateConfiguration();
   }
 
-  // Singleton pattern for enterprise auth management
   public static getInstance(): AuthManager {
     if (!AuthManager.instance) {
       AuthManager.instance = new AuthManager();
@@ -56,7 +49,6 @@ class AuthManager {
     return AuthManager.instance;
   }
 
-  // Load authentication configuration with enterprise defaults
   private loadConfiguration(): AuthConfig {
     return {
       jwtSecret: process.env.JWT_SECRET || this.generateSecureSecret(),
@@ -64,15 +56,14 @@ class AuthManager {
       refreshTokenExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || SECURITY_CONSTANTS.JWT.REFRESH_TOKEN_EXPIRES,
       bcryptRounds: parseInt(process.env.BCRYPT_ROUNDS || String(SECURITY_CONSTANTS.PASSWORD.BCRYPT_ROUNDS)),
       maxLoginAttempts: parseInt(process.env.MAX_LOGIN_ATTEMPTS || '5'),
-      lockoutDuration: parseInt(process.env.LOCKOUT_DURATION || String(15 * 60 * 1000)), // 15 minutes
-      passwordResetExpiry: parseInt(process.env.PASSWORD_RESET_EXPIRY || String(60 * 60 * 1000)), // 1 hour
-      verificationCodeExpiry: parseInt(process.env.VERIFICATION_CODE_EXPIRY || String(10 * 60 * 1000)), // 10 minutes
+      lockoutDuration: parseInt(process.env.LOCKOUT_DURATION || String(15 * 60 * 1000)),
+      passwordResetExpiry: parseInt(process.env.PASSWORD_RESET_EXPIRY || String(60 * 60 * 1000)),
+      verificationCodeExpiry: parseInt(process.env.VERIFICATION_CODE_EXPIRY || String(10 * 60 * 1000)),
       sessionTimeout: parseInt(process.env.SESSION_TIMEOUT || String(SECURITY_CONSTANTS.SESSION.IDLE_TIMEOUT)),
       maxConcurrentSessions: parseInt(process.env.MAX_CONCURRENT_SESSIONS || String(SECURITY_CONSTANTS.SESSION.MAX_CONCURRENT_SESSIONS)),
     };
   }
 
-  // Generate secure secret for JWT if not provided
   private generateSecureSecret(): string {
     const crypto = require('crypto');
     const secret = crypto.randomBytes(64).toString('hex');
@@ -89,7 +80,6 @@ class AuthManager {
     return secret;
   }
 
-  // Enterprise configuration validation
   private validateConfiguration(): void {
     const errors: string[] = [];
 
@@ -127,12 +117,10 @@ class AuthManager {
     );
   }
 
-  // Enterprise password hashing with timing attack protection
   public async hashPassword(password: string): Promise<string> {
     const startTime = Date.now();
     
     try {
-      // Validate password before hashing
       const validation = this.validatePassword(password);
       if (!validation.isValid) {
         throw new Error(`Password validation failed: ${validation.errors.join(', ')}`);
@@ -168,7 +156,6 @@ class AuthManager {
     }
   }
 
-  // Enterprise password verification with timing attack protection
   public async verifyPassword(password: string, hashedPassword: string): Promise<boolean> {
     const startTime = Date.now();
     
@@ -203,12 +190,10 @@ class AuthManager {
     }
   }
 
-  // Enterprise password validation with comprehensive rules
   public validatePassword(password: string): PasswordValidationResult {
     const errors: string[] = [];
     let score = 0;
 
-    // Length validation
     if (password.length < SECURITY_CONSTANTS.PASSWORD.MIN_LENGTH) {
       errors.push(`Password must be at least ${SECURITY_CONSTANTS.PASSWORD.MIN_LENGTH} characters long`);
     } else {
@@ -219,7 +204,6 @@ class AuthManager {
       errors.push(`Password must not exceed ${SECURITY_CONSTANTS.PASSWORD.MAX_LENGTH} characters`);
     }
 
-    // Character type validation
     if (SECURITY_CONSTANTS.PASSWORD.REQUIRE_UPPERCASE && !/[A-Z]/.test(password)) {
       errors.push('Password must contain at least one uppercase letter');
     } else if (/[A-Z]/.test(password)) {
@@ -244,7 +228,6 @@ class AuthManager {
       score += 15;
     }
 
-    // Common password patterns
     if (/(.)\1{2,}/.test(password)) {
       errors.push('Password must not contain repeated characters');
       score -= 10;
@@ -255,7 +238,6 @@ class AuthManager {
       score -= 20;
     }
 
-    // Determine strength
     let strength: 'weak' | 'medium' | 'strong';
     if (score < 30) {
       strength = 'weak';
@@ -286,7 +268,6 @@ class AuthManager {
     return result;
   }
 
-  // Enterprise JWT token generation
   public async generateTokenPair(payload: Omit<JWTPayload, 'iat' | 'exp'>): Promise<TokenPair> {
     const startTime = Date.now();
     const logContext = createLogContext()
@@ -297,7 +278,6 @@ class AuthManager {
     try {
       const now = Math.floor(Date.now() / 1000);
       
-      // Generate access token
       const accessTokenPayload: JWTPayload = {
         ...payload,
         iat: now,
@@ -310,7 +290,6 @@ class AuthManager {
         audience: SECURITY_CONSTANTS.JWT.AUDIENCE,
       });
 
-      // Generate refresh token
       const refreshTokenPayload = {
         userId: payload.userId,
         userType: payload.userType,
@@ -325,7 +304,6 @@ class AuthManager {
         audience: SECURITY_CONSTANTS.JWT.AUDIENCE,
       });
 
-      // Store refresh token in cache
       await setCache(
         `${CACHE_CONSTANTS.KEYS.USER_SESSION}${payload.userId}:${refreshToken.slice(-8)}`,
         { userId: payload.userId, userType: payload.userType, createdAt: new Date() },
@@ -359,7 +337,6 @@ class AuthManager {
     }
   }
 
-  // Enterprise JWT token verification
   public async verifyToken(token: string): Promise<JWTPayload> {
     const startTime = Date.now();
     
@@ -420,19 +397,16 @@ class AuthManager {
     }
   }
 
-  // Enterprise refresh token validation
   public async refreshAccessToken(refreshToken: string): Promise<TokenPair> {
     const startTime = Date.now();
     
     try {
-      // Verify refresh token
       const decoded = jwt.verify(refreshToken, this.config.jwtSecret) as any;
       
       if (decoded.tokenType !== 'refresh') {
         throw new Error('Invalid refresh token type');
       }
 
-      // Check if refresh token exists in cache
       const sessionKey = `${CACHE_CONSTANTS.KEYS.USER_SESSION}${decoded.userId}:${refreshToken.slice(-8)}`;
       const sessionData = await getCache(sessionKey);
       
@@ -440,7 +414,6 @@ class AuthManager {
         throw new Error('Refresh token not found or expired');
       }
 
-      // Generate new token pair
       const newTokenPair = await this.generateTokenPair({
         userId: decoded.userId,
         email: decoded.email || '',
@@ -449,7 +422,6 @@ class AuthManager {
         permissions: decoded.permissions || [],
       });
 
-      // Invalidate old refresh token
       await deleteCache(sessionKey);
 
       const duration = Date.now() - startTime;
@@ -477,48 +449,44 @@ class AuthManager {
     }
   }
 
-  // Enterprise login attempt tracking
   public async trackLoginAttempt(identifier: string, success: boolean, ipAddress?: string): Promise<boolean> {
     const cacheKey = `${CACHE_CONSTANTS.KEYS.FAILED_LOGIN_ATTEMPTS}${identifier}`;
     
     try {
       if (success) {
-        // Clear failed attempts on successful login
         await deleteCache(cacheKey);
         
-        logger.audit('LOGIN_SUCCESS', 'USER', 
+        logger.audit('LOGIN_SUCCESS', 'auth_manager', 0,
           createLogContext()
-            .withMetadata({ identifier, ipAddress })
+            .withMetadata({ identifier, ipAddress: ipAddress || 'unknown' })
             .build()
         );
         
         return true;
       }
 
-      // Track failed attempt
       const attempts = await getCache<number>(cacheKey) || 0;
       const newAttempts = attempts + 1;
       
       await setCache(cacheKey, newAttempts, { ttl: this.config.lockoutDuration / 1000 });
 
-      logger.security('LOGIN_FAILED', 
+      logger.security('LOGIN_FAILED', 'auth_manager', 0,
         createLogContext()
           .withMetadata({ 
             identifier, 
-            ipAddress, 
+            ipAddress: ipAddress || 'unknown', 
             attempts: newAttempts,
             maxAttempts: this.config.maxLoginAttempts 
           })
           .build()
       );
 
-      // Check if account should be locked
       if (newAttempts >= this.config.maxLoginAttempts) {
-        logger.security('ACCOUNT_LOCKED', 
+        logger.security('ACCOUNT_LOCKED', 'auth_manager', 0,
           createLogContext()
             .withMetadata({ 
               identifier, 
-              ipAddress, 
+              ipAddress: ipAddress || 'unknown', 
               attempts: newAttempts,
               lockoutDuration: this.config.lockoutDuration 
             })
@@ -539,11 +507,10 @@ class AuthManager {
           })
           .build()
       );
-      return true; // Fail open for availability
+      return true;
     }
   }
 
-  // Enterprise account lockout check
   public async isAccountLocked(identifier: string): Promise<boolean> {
     const cacheKey = `${CACHE_CONSTANTS.KEYS.FAILED_LOGIN_ATTEMPTS}${identifier}`;
     
@@ -560,17 +527,16 @@ class AuthManager {
           })
           .build()
       );
-      return false; // Fail open for availability
+      return false;
     }
   }
 
-  // Enterprise session management
   public async createSession(userId: string, userType: UserType, ipAddress?: string): Promise<string> {
     const sessionId = this.generateSessionId();
     const sessionData = {
       userId,
       userType,
-      ipAddress,
+      ipAddress: ipAddress || 'unknown',
       createdAt: new Date(),
       lastActivity: new Date(),
     };
@@ -581,17 +547,16 @@ class AuthManager {
       { ttl: this.config.sessionTimeout / 1000 }
     );
 
-    logger.audit('SESSION_CREATED', 'USER', 
+    logger.audit('SESSION_CREATED', 'auth_manager', 0,
       createLogContext()
         .withUser(userId, userType)
-        .withMetadata({ sessionId, ipAddress })
+        .withMetadata({ sessionId, ipAddress: ipAddress || 'unknown' })
         .build()
     );
 
     return sessionId;
   }
 
-  // Enterprise session validation
   public async validateSession(sessionId: string): Promise<any> {
     const sessionData = await getCache(`${CACHE_CONSTANTS.KEYS.USER_SESSION}${sessionId}`);
     
@@ -599,7 +564,6 @@ class AuthManager {
       return null;
     }
 
-    // Update last activity
     sessionData.lastActivity = new Date();
     await setCache(
       `${CACHE_CONSTANTS.KEYS.USER_SESSION}${sessionId}`,
@@ -610,18 +574,16 @@ class AuthManager {
     return sessionData;
   }
 
-  // Enterprise session cleanup
   public async destroySession(sessionId: string): Promise<void> {
     await deleteCache(`${CACHE_CONSTANTS.KEYS.USER_SESSION}${sessionId}`);
     
-    logger.audit('SESSION_DESTROYED', 'USER', 
+    logger.audit('SESSION_DESTROYED', 'auth_manager', 0,
       createLogContext()
         .withMetadata({ sessionId })
         .build()
     );
   }
 
-  // Helper methods
   private parseExpirationTime(timeString: string): number {
     const match = timeString.match(/^(\d+)([smhd])$/);
     if (!match) {
@@ -635,7 +597,7 @@ class AuthManager {
       case 's': return value;
       case 'm': return value * 60;
       case 'h': return value * 60 * 60;
-      case 'd': return value * 24 * 60 * 60;
+      case 'd': return value * 60 * 60 * 24;
       default: throw new Error(`Invalid time unit: ${unit}`);
     }
   }
@@ -645,16 +607,13 @@ class AuthManager {
     return crypto.randomBytes(32).toString('hex');
   }
 
-  // Enterprise configuration getter
   public getConfig(): Readonly<AuthConfig> {
     return { ...this.config };
   }
 }
 
-// Export singleton instance and helper functions
 export const authManager = AuthManager.getInstance();
 
-// Enterprise authentication helpers
 export const hashPassword = async (password: string): Promise<string> => {
   return await authManager.hashPassword(password);
 };
@@ -667,7 +626,7 @@ export const validatePassword = (password: string): PasswordValidationResult => 
   return authManager.validatePassword(password);
 };
 
-export const generateTokens = async (payload: Omit<JWTPayload, 'iat' | 'exp'>): Promise<TokenPair> => {
+export const generateTokenPair = async (payload: Omit<JWTPayload, 'iat' | 'exp'>): Promise<TokenPair> => {
   return await authManager.generateTokenPair(payload);
 };
 
@@ -675,14 +634,28 @@ export const verifyToken = async (token: string): Promise<JWTPayload> => {
   return await authManager.verifyToken(token);
 };
 
-export const refreshToken = async (refreshToken: string): Promise<TokenPair> => {
+export const refreshAccessToken = async (refreshToken: string): Promise<TokenPair> => {
   return await authManager.refreshAccessToken(refreshToken);
 };
 
-export const trackLogin = async (identifier: string, success: boolean, ipAddress?: string): Promise<boolean> => {
+export const trackLoginAttempt = async (identifier: string, success: boolean, ipAddress?: string): Promise<boolean> => {
   return await authManager.trackLoginAttempt(identifier, success, ipAddress);
 };
 
-export const checkAccountLock = async (identifier: string): Promise<boolean> => {
+export const isAccountLocked = async (identifier: string): Promise<boolean> => {
   return await authManager.isAccountLocked(identifier);
 };
+
+export const createSession = async (userId: string, userType: UserType, ipAddress?: string): Promise<string> => {
+  return await authManager.createSession(userId, userType, ipAddress);
+};
+
+export const validateSession = async (sessionId: string): Promise<any> => {
+  return await authManager.validateSession(sessionId);
+};
+
+export const destroySession = async (sessionId: string): Promise<void> => {
+  return await authManager.destroySession(sessionId);
+};
+
+export default authManager;

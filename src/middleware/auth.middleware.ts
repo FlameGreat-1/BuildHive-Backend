@@ -1,5 +1,3 @@
-// src/middleware/AuthMiddleware.ts
-
 import { Request, Response, NextFunction } from 'express';
 import { logger, createLogContext } from '@/utils/logger';
 import { ERROR_CODES, HTTP_STATUS_CODES, SECURITY_CONSTANTS } from '@/utils/constants';
@@ -82,7 +80,7 @@ export class AuthMiddleware {
   public initializeRequest = (req: Request, res: Response, next: NextFunction): void => {
     const crypto = require('crypto');
     
-    req.requestId = req.headers['x-request-id'] as string || crypto.randomUUID();
+    req.requestId = (req.headers['x-request-id'] as string) || crypto.randomUUID();
     req.startTime = Date.now();
 
     res.setHeader('X-Request-ID', req.requestId);
@@ -106,7 +104,7 @@ export class AuthMiddleware {
       .withRequest(req)
       .withMetadata({ 
         middleware: 'authenticate',
-        requestId: req.requestId 
+        requestId: req.requestId || 'unknown'
       })
       .build();
 
@@ -122,7 +120,7 @@ export class AuthMiddleware {
           success: false,
           message: 'Authentication token is required',
           timestamp: new Date().toISOString(),
-          requestId: req.requestId,
+          requestId: req.requestId || 'unknown',
         };
 
         res.status(HTTP_STATUS_CODES.UNAUTHORIZED).json(errorResponse);
@@ -136,11 +134,29 @@ export class AuthMiddleware {
       }
 
       if (!payload) {
-        payload = await validateUserToken(token);
+        const validationResult = await validateUserToken(token);
+        if (!validationResult.isValid || !validationResult.payload) {
+          throw new ApiError(
+            'Invalid token',
+            401,
+            ERROR_CODES.AUTH_TOKEN_INVALID,
+            ErrorSeverity.HIGH
+          );
+        }
+        payload = validationResult.payload;
         
-        if (this.config.enableTokenCaching) {
+        if (this.config.enableTokenCaching && payload) {
           await this.cacheToken(token, payload);
         }
+      }
+
+      if (!payload) {
+        throw new ApiError(
+          'Token validation failed',
+          401,
+          ERROR_CODES.AUTH_TOKEN_INVALID,
+          ErrorSeverity.HIGH
+        );
       }
 
       const user = await getUserById(payload.userId, true);
@@ -160,7 +176,7 @@ export class AuthMiddleware {
       }
 
       if (user.status === UserStatus.SUSPENDED) {
-        logger.security('SUSPENDED_USER_ACCESS_ATTEMPT', {
+        logger.security('SUSPENDED_USER_ACCESS_ATTEMPT', 'auth_middleware', 0, {
           ...logContext,
           userId: user.id,
         });
@@ -223,8 +239,8 @@ export class AuthMiddleware {
         const errorResponse: ApiResponse<null> = {
           success: false,
           message: error.message,
-          timestamp: new Date(),
-          requestId: req.requestId,
+          timestamp: new Date().toISOString(),
+          requestId: req.requestId || 'unknown',
         };
 
         res.status(error.statusCode).json(errorResponse);
@@ -234,8 +250,8 @@ export class AuthMiddleware {
       const errorResponse: ApiResponse<null> = {
         success: false,
         message: 'Authentication failed',
-        timestamp: new Date(),
-        requestId: req.requestId,
+        timestamp: new Date().toISOString(),
+        requestId: req.requestId || 'unknown',
       };
 
       res.status(HTTP_STATUS_CODES.UNAUTHORIZED).json(errorResponse);
@@ -247,7 +263,7 @@ export class AuthMiddleware {
       .withRequest(req)
       .withMetadata({ 
         middleware: 'optionalAuthenticate',
-        requestId: req.requestId 
+        requestId: req.requestId || 'unknown'
       })
       .build();
 
@@ -285,7 +301,7 @@ export class AuthMiddleware {
         .withMetadata({ 
           middleware: 'requireRole',
           allowedRoles,
-          requestId: req.requestId 
+          requestId: req.requestId || 'unknown'
         })
         .build();
 
@@ -298,8 +314,8 @@ export class AuthMiddleware {
           const errorResponse: ApiResponse<null> = {
             success: false,
             message: 'Authentication required',
-            timestamp: new Date(),
-            requestId: req.requestId,
+            timestamp: new Date().toISOString(),
+            requestId: req.requestId || 'unknown',
           };
 
           res.status(HTTP_STATUS_CODES.UNAUTHORIZED).json(errorResponse);
@@ -307,7 +323,7 @@ export class AuthMiddleware {
         }
 
         if (!allowedRoles.includes(req.user.userType)) {
-          logger.security('UNAUTHORIZED_ROLE_ACCESS_ATTEMPT', {
+          logger.security('UNAUTHORIZED_ROLE_ACCESS_ATTEMPT', 'auth_middleware', 0, {
             ...logContext,
             userRole: req.user.userType,
             requiredRoles: allowedRoles,
@@ -316,8 +332,8 @@ export class AuthMiddleware {
           const errorResponse: ApiResponse<null> = {
             success: false,
             message: 'Insufficient permissions',
-            timestamp: new Date(),
-            requestId: req.requestId,
+            timestamp: new Date().toISOString(),
+            requestId: req.requestId || 'unknown',
           };
 
           res.status(HTTP_STATUS_CODES.FORBIDDEN).json(errorResponse);
@@ -340,8 +356,8 @@ export class AuthMiddleware {
         const errorResponse: ApiResponse<null> = {
           success: false,
           message: 'Authorization failed',
-          timestamp: new Date(),
-          requestId: req.requestId,
+          timestamp: new Date().toISOString(),
+          requestId: req.requestId || 'unknown',
         };
 
         res.status(HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR).json(errorResponse);
@@ -357,7 +373,7 @@ export class AuthMiddleware {
         .withMetadata({ 
           middleware: 'requirePermission',
           requiredPermissions,
-          requestId: req.requestId 
+          requestId: req.requestId || 'unknown'
         })
         .build();
 
@@ -370,8 +386,8 @@ export class AuthMiddleware {
           const errorResponse: ApiResponse<null> = {
             success: false,
             message: 'Authentication required',
-            timestamp: new Date(),
-            requestId: req.requestId,
+            timestamp: new Date().toISOString(),
+            requestId: req.requestId || 'unknown',
           };
 
           res.status(HTTP_STATUS_CODES.UNAUTHORIZED).json(errorResponse);
@@ -393,7 +409,7 @@ export class AuthMiddleware {
             !req.user!.permissions.includes(permission)
           );
 
-          logger.security('INSUFFICIENT_PERMISSIONS_ACCESS_ATTEMPT', {
+          logger.security('INSUFFICIENT_PERMISSIONS_ACCESS_ATTEMPT', 'auth_middleware', 0, {
             ...logContext,
             userPermissions: req.user.permissions,
             requiredPermissions,
@@ -403,8 +419,8 @@ export class AuthMiddleware {
           const errorResponse: ApiResponse<null> = {
             success: false,
             message: 'Insufficient permissions',
-            timestamp: new Date(),
-            requestId: req.requestId,
+            timestamp: new Date().toISOString(),
+            requestId: req.requestId || 'unknown',
           };
 
           res.status(HTTP_STATUS_CODES.FORBIDDEN).json(errorResponse);
@@ -427,8 +443,8 @@ export class AuthMiddleware {
         const errorResponse: ApiResponse<null> = {
           success: false,
           message: 'Authorization failed',
-          timestamp: new Date(),
-          requestId: req.requestId,
+          timestamp: new Date().toISOString(),
+          requestId: req.requestId || 'unknown',
         };
 
         res.status(HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR).json(errorResponse);
@@ -442,7 +458,7 @@ export class AuthMiddleware {
       .withUser(req.user?.userId, req.user?.userType)
       .withMetadata({ 
         middleware: 'requireVerification',
-        requestId: req.requestId 
+        requestId: req.requestId || 'unknown'
       })
       .build();
 
@@ -455,8 +471,8 @@ export class AuthMiddleware {
         const errorResponse: ApiResponse<null> = {
           success: false,
           message: 'Authentication required',
-          timestamp: new Date(),
-          requestId: req.requestId,
+          timestamp: new Date().toISOString(),
+          requestId: req.requestId || 'unknown',
         };
 
         res.status(HTTP_STATUS_CODES.UNAUTHORIZED).json(errorResponse);
@@ -469,15 +485,15 @@ export class AuthMiddleware {
           userId: req.user.userId,
         });
 
-        const errorResponse: ApiResponse<null> = {
+        const errorResponse: ApiResponse<any> = {
           success: false,
           message: 'Account verification required',
           data: {
             nextStep: 'verification',
             verificationRequired: true,
           },
-          timestamp: new Date(),
-          requestId: req.requestId,
+          timestamp: new Date().toISOString(),
+          requestId: req.requestId || 'unknown',
         };
 
         res.status(HTTP_STATUS_CODES.FORBIDDEN).json(errorResponse);
@@ -496,8 +512,8 @@ export class AuthMiddleware {
       const errorResponse: ApiResponse<null> = {
         success: false,
         message: 'Verification check failed',
-        timestamp: new Date(),
-        requestId: req.requestId,
+        timestamp: new Date().toISOString(),
+        requestId: req.requestId || 'unknown',
       };
 
       res.status(HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR).json(errorResponse);
@@ -512,7 +528,7 @@ export class AuthMiddleware {
           middleware: 'rateLimit',
           maxRequests,
           windowMs,
-          requestId: req.requestId 
+          requestId: req.requestId || 'unknown'
         })
         .build();
 
@@ -536,7 +552,7 @@ export class AuthMiddleware {
             const newCount = rateLimitInfo.count + 1;
             
             if (newCount > maxRequests) {
-              logger.security('RATE_LIMIT_EXCEEDED', {
+              logger.security('RATE_LIMIT_EXCEEDED', 'auth_middleware', 0, {
                 ...logContext,
                 clientId,
                 requestCount: newCount,
@@ -546,8 +562,8 @@ export class AuthMiddleware {
               const errorResponse: ApiResponse<null> = {
                 success: false,
                 message: 'Rate limit exceeded',
-                timestamp: new Date(),
-                requestId: req.requestId,
+                timestamp: new Date().toISOString(),
+                requestId: req.requestId || 'unknown',
               };
 
               res.status(HTTP_STATUS_CODES.TOO_MANY_REQUESTS)
@@ -679,8 +695,8 @@ export class AuthMiddleware {
   }
 
   private getClientIdentifier(req: Request): string {
-    const ipAddress = req.headers['x-forwarded-for'] as string || 
-                     req.headers['x-real-ip'] as string || 
+    const ipAddress = (req.headers['x-forwarded-for'] as string) || 
+                     (req.headers['x-real-ip'] as string) || 
                      (req.socket as any)?.remoteAddress || 
                      '0.0.0.0';
     
@@ -693,7 +709,7 @@ export class AuthMiddleware {
   public getConfig(): Readonly<AuthMiddlewareConfig> {
     return { ...this.config };
   }
-
+  
   public requireProfileCompleteness = (minimumCompleteness: number = 50) => {
     return (req: Request, res: Response, next: NextFunction): void => {
       const logContext = createLogContext()
@@ -702,7 +718,7 @@ export class AuthMiddleware {
         .withMetadata({ 
           middleware: 'requireProfileCompleteness',
           minimumCompleteness,
-          requestId: req.requestId 
+          requestId: req.requestId || 'unknown'
         })
         .build();
 
@@ -715,8 +731,8 @@ export class AuthMiddleware {
           const errorResponse: ApiResponse<null> = {
             success: false,
             message: 'Authentication required',
-            timestamp: new Date(),
-            requestId: req.requestId,
+            timestamp: new Date().toISOString(),
+            requestId: req.requestId || 'unknown',
           };
 
           res.status(HTTP_STATUS_CODES.UNAUTHORIZED).json(errorResponse);
@@ -730,7 +746,7 @@ export class AuthMiddleware {
             requiredCompleteness: minimumCompleteness,
           });
 
-          const errorResponse: ApiResponse<null> = {
+          const errorResponse: ApiResponse<any> = {
             success: false,
             message: 'Profile completion required',
             data: {
@@ -738,8 +754,8 @@ export class AuthMiddleware {
               requiredCompleteness: minimumCompleteness,
               nextStep: 'complete_profile',
             },
-            timestamp: new Date(),
-            requestId: req.requestId,
+            timestamp: new Date().toISOString(),
+            requestId: req.requestId || 'unknown',
           };
 
           res.status(HTTP_STATUS_CODES.FORBIDDEN).json(errorResponse);
@@ -762,8 +778,8 @@ export class AuthMiddleware {
         const errorResponse: ApiResponse<null> = {
           success: false,
           message: 'Profile completeness check failed',
-          timestamp: new Date(),
-          requestId: req.requestId,
+          timestamp: new Date().toISOString(),
+          requestId: req.requestId || 'unknown',
         };
 
         res.status(HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR).json(errorResponse);
@@ -802,7 +818,7 @@ export class AuthMiddleware {
       .withUser(req.user?.userId, req.user?.userType)
       .withMetadata({ 
         middleware: 'requestLogger',
-        requestId: req.requestId 
+        requestId: req.requestId || 'unknown'
       })
       .build();
 
@@ -842,7 +858,7 @@ export class AuthMiddleware {
       .withUser(req.user?.userId, req.user?.userType)
       .withMetadata({ 
         middleware: 'errorHandler',
-        requestId: req.requestId 
+        requestId: req.requestId || 'unknown'
       })
       .build();
 
@@ -867,8 +883,8 @@ export class AuthMiddleware {
       const errorResponse: ApiResponse<null> = {
         success: false,
         message: error.message,
-        timestamp: new Date(),
-        requestId: req.requestId,
+        timestamp: new Date().toISOString(),
+        requestId: req.requestId || 'unknown',
       };
 
       res.status(error.statusCode).json(errorResponse);
@@ -884,8 +900,8 @@ export class AuthMiddleware {
     const errorResponse: ApiResponse<null> = {
       success: false,
       message: process.env.NODE_ENV === 'production' ? 'Internal server error' : error.message,
-      timestamp: new Date(),
-      requestId: req.requestId,
+      timestamp: new Date().toISOString(),
+      requestId: req.requestId || 'unknown',
     };
 
     res.status(HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR).json(errorResponse);
@@ -919,12 +935,12 @@ export class AuthMiddleware {
         message: 'Service is healthy',
         data: {
           status: 'healthy',
-          timestamp: new Date(),
+          timestamp: new Date().toISOString(),
           uptime: process.uptime(),
           version: process.env.APP_VERSION || '1.0.0',
         },
-        timestamp: new Date(),
-        requestId: req.requestId,
+        timestamp: new Date().toISOString(),
+        requestId: req.requestId || 'unknown',
       };
 
       res.status(HTTP_STATUS_CODES.OK).json(healthResponse);
@@ -944,7 +960,7 @@ export class AuthMiddleware {
             .withMetadata({ 
               middleware: 'requestTimeout',
               timeoutMs,
-              requestId: req.requestId 
+              requestId: req.requestId || 'unknown'
             })
             .build();
 
@@ -953,8 +969,8 @@ export class AuthMiddleware {
           const errorResponse: ApiResponse<null> = {
             success: false,
             message: 'Request timeout',
-            timestamp: new Date(),
-            requestId: req.requestId,
+            timestamp: new Date().toISOString(),
+            requestId: req.requestId || 'unknown',
           };
 
           res.status(HTTP_STATUS_CODES.REQUEST_TIMEOUT).json(errorResponse);
@@ -1031,3 +1047,4 @@ export const publicEndpoint = [
 ];
 
 export default authMiddleware;
+

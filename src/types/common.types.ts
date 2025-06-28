@@ -43,20 +43,17 @@ export enum ErrorSeverity {
 }
 
 export interface LogContext {
-  // User and session context
   userId?: string;
   userType?: string;
   sessionId?: string;
   requestId?: string;
   correlationId?: string;
   
-  // Request context
   ipAddress?: string;
   userAgent?: string;
   method?: string;
   url?: string;
   
-  // Application context
   phase?: string;
   environment?: string;
   processId?: number;
@@ -64,7 +61,6 @@ export interface LogContext {
   version?: string;
   port?: number;
   
-  // Error context
   error?: string;
   errorMessage?: string;
   code?: string;
@@ -72,20 +68,17 @@ export interface LogContext {
   stack?: string;
   reason?: string;
   
-  // Performance context
   duration?: number;
   connectionTime?: number;
   startupTime?: number;
   shutdownDuration?: number;
   uptime?: number;
   
-  // System context
   address?: string;
   signal?: string;
   cacheHit?: boolean;
   
-  // Business context
-  nextStep?: string;
+  nextStep?: string | undefined;
   rememberMe?: boolean;
   token?: string;
   email?: string;
@@ -96,15 +89,12 @@ export interface LogContext {
   profileCompleteness?: number;
   contentLength?: number;
   
-  // CORS and security context
   rejectedOrigin?: string;
   allowedOrigins?: string[];
   ip?: string;
   
-  // Generic metadata
   metadata?: Record<string, any>;
   
-  // Allow any additional properties
   [key: string]: any;
 }
 

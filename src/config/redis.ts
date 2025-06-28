@@ -1,6 +1,6 @@
 import { createClient, RedisClientType, RedisClientOptions } from 'redis';
 import { logger, createLogContext } from '@/utils/logger';
-import { CACHE_CONSTANTS, ERROR_CODES, MONITORING_CONSTANTS } from '@/utils/constants';
+import { CACHE_CONSTANTS, ERROR_CODES } from '@/utils/constants';
 import { HealthStatus, ServiceHealth, CacheOptions } from '@/types/common.types';
 
 interface RedisConfig {
@@ -259,42 +259,42 @@ class RedisManager {
   }
 
   public async get<T = any>(key: string, options?: CacheOptions): Promise<T | null> {
-    if (!this.client || !this.isConnected) {
-      throw new Error('Redis not connected');
-    }
-
-    const startTime = Date.now();
-    const fullKey = this.config.keyPrefix + key;
-
-    try {
-      const value = await this.client.get(fullKey);
-      
-      if (value === null) {
-        return null;
-      }
-
-      const duration = Date.now() - startTime;
-      logger.debug('Redis GET operation', 
-        createLogContext()
-          .withMetadata({ key: fullKey, duration, hit: true })
-          .build()
-      );
-
-      return options?.serialize !== false ? JSON.parse(value) : value;
-
-    } catch (error) {
-      logger.error('Redis GET failed', 
-        createLogContext()
-          .withMetadata({ 
-            errorCode: ERROR_CODES.SYS_REDIS_ERROR,
-            key: fullKey, 
-            errorMessage: error instanceof Error ? error.message : 'Unknown error' 
-          })
-          .build()
-      );
-      throw error;
-    }
+  if (!this.client || !this.isConnected) {
+    throw new Error('Redis not connected');
   }
+
+  const startTime = Date.now();
+  const fullKey = this.config.keyPrefix + key;
+
+  try {
+    const value = await this.client.get(fullKey);
+    
+    if (value === null) {
+      return null;
+    }
+
+    const duration = Date.now() - startTime;
+    logger.debug('Redis GET operation', 
+      createLogContext()
+        .withMetadata({ key: fullKey, duration, hit: true })
+        .build()
+    );
+
+    return options?.serialize !== false ? JSON.parse(value) as T : value as T;
+
+  } catch (error) {
+    logger.error('Redis GET failed', 
+      createLogContext()
+        .withMetadata({ 
+          errorCode: ERROR_CODES.SYS_REDIS_ERROR,
+          key: fullKey, 
+          errorMessage: error instanceof Error ? error.message : 'Unknown error' 
+        })
+        .build()
+    );
+    throw error;
+  }
+}
 
   public async delete(key: string): Promise<boolean> {
     if (!this.client || !this.isConnected) {
