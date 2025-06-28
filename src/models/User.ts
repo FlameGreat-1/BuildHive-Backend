@@ -79,6 +79,9 @@ interface UpdateUserData {
   emailVerified?: boolean;
   phoneVerified?: boolean;
   metadata?: Record<string, any>;
+  lastLoginAt?: Date;
+  passwordResetToken?: string;
+  passwordResetExpires?: Date;
 }
 
 interface UserSearchFilters {
@@ -169,6 +172,7 @@ export class UserModel {
           ipAddress: logContext.ipAddress || 'system',
           userAgent: 'system',
           severity: AuditSeverity.INFO,
+          timestamp: new Date(),
         });
 
         return newUser;
@@ -370,6 +374,7 @@ export class UserModel {
           ipAddress: logContext.ipAddress || 'system',
           userAgent: logContext.userAgent || 'system',
           severity: AuditSeverity.INFO,
+          timestamp: new Date(),
         });
 
         return user;
@@ -443,6 +448,7 @@ export class UserModel {
           ipAddress: logContext.ipAddress || 'system',
           userAgent: logContext.userAgent || 'system',
           severity: AuditSeverity.INFO,
+          timestamp: new Date(),
         });
 
         return true;
@@ -517,6 +523,7 @@ export class UserModel {
           ipAddress: logContext.ipAddress || 'system',
           userAgent: logContext.userAgent || 'system',
           severity: AuditSeverity.INFO,
+          timestamp: new Date(),
         });
 
         return true;
@@ -660,6 +667,7 @@ export class UserModel {
           ipAddress: logContext.ipAddress || 'system',
           userAgent: logContext.userAgent || 'system',
           severity: AuditSeverity.MEDIUM,
+          timestamp: new Date(),
         });
 
         return true;
@@ -690,7 +698,7 @@ export class UserModel {
       throw error;
     }
   }
-
+  
   private async validateUserData(userData: CreateUserData): Promise<ValidationResult> {
     const errors: ValidationError[] = [];
 

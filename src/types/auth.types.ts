@@ -151,6 +151,9 @@ export interface UpdateUserData {
   emailVerified?: boolean;
   phoneVerified?: boolean;
   metadata?: Record<string, any>;
+  lastLoginAt?: Date;              
+  passwordResetToken?: string;     
+  passwordResetExpires?: Date;
 }
 
 export interface AuthError {

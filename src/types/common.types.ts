@@ -48,36 +48,30 @@ export interface LogContext {
   sessionId?: string;
   requestId?: string;
   correlationId?: string;
-  
   ipAddress?: string;
   userAgent?: string;
   method?: string;
   url?: string;
-  
   phase?: string;
   environment?: string;
   processId?: number;
   baseUrl?: string;
   version?: string;
   port?: number;
-  
   error?: string;
   errorMessage?: string;
   code?: string;
   severity?: string;
   stack?: string;
   reason?: string;
-  
   duration?: number;
   connectionTime?: number;
   startupTime?: number;
   shutdownDuration?: number;
   uptime?: number;
-  
   address?: string;
   signal?: string;
   cacheHit?: boolean;
-  
   nextStep?: string | undefined;
   rememberMe?: boolean;
   token?: string;
@@ -88,13 +82,10 @@ export interface LogContext {
   currentCompleteness?: number;
   profileCompleteness?: number;
   contentLength?: number;
-  
   rejectedOrigin?: string;
   allowedOrigins?: string[];
   ip?: string;
-  
   metadata?: Record<string, any>;
-  
   [key: string]: any;
 }
 
@@ -149,6 +140,7 @@ export interface AuditLog {
   userAgent: string;
   timestamp: Date;
   severity: AuditSeverity;
+  createdAt: Date;
 }
 
 export enum AuditSeverity {
@@ -311,7 +303,6 @@ export interface CacheOptions {
   serialize?: boolean;
 }
 
-// Additional interfaces for auth controller compatibility
 export interface AuthResponse {
   success: boolean;
   message: string;
@@ -338,14 +329,12 @@ export interface TokenPayload {
   exp: number;
 }
 
-// Database transaction types
 export interface TransactionOptions {
   isolationLevel?: 'ReadUncommitted' | 'ReadCommitted' | 'RepeatableRead' | 'Serializable';
   maxWait?: number;
   timeout?: number;
 }
 
-// Redis connection types
 export interface RedisConfig {
   url: string;
   keyPrefix: string;
@@ -356,7 +345,6 @@ export interface RedisConfig {
   maxRetriesPerRequest: number;
 }
 
-// Logger types
 export interface LoggerConfig {
   level: LogLevel;
   format: 'json' | 'text';
@@ -367,7 +355,6 @@ export interface LoggerConfig {
   maxFiles?: number;
 }
 
-// Export utility types
 export type Nullable<T> = T | null;
 export type Optional<T> = T | undefined;
 export type DeepPartial<T> = {
