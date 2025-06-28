@@ -312,10 +312,10 @@ class DatabaseManager {
   }
 
   public async transaction<T>(
-    operation: (prisma: PrismaClient) => Promise<T>,
+    operation: (prisma: Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>) => Promise<T>,
     options?: { 
       timeout?: number; 
-      isolationLevel?: 'ReadUncommitted' | 'ReadCommitted' | 'RepeatableRead' | 'Serializable' | undefined;
+      isolationLevel?: 'ReadUncommitted' | 'ReadCommitted' | 'RepeatableRead' | 'Serializable';
     }
   ): Promise<T> {
     if (!this.prisma || !this.isConnected) {
@@ -390,10 +390,10 @@ export const getDatabase = (): PrismaClient => {
 };
 
 export const executeTransaction = async <T>(
-  operation: (prisma: PrismaClient) => Promise<T>,
+  operation: (prisma: Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>) => Promise<T>,
   options?: { 
     timeout?: number; 
-    isolationLevel?: 'ReadUncommitted' | 'ReadCommitted' | 'RepeatableRead' | 'Serializable' | undefined;
+    isolationLevel?: 'ReadUncommitted' | 'ReadCommitted' | 'RepeatableRead' | 'Serializable';
   }
 ): Promise<T> => {
   return await databaseManager.transaction(operation, options);

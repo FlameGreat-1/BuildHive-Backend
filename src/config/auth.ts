@@ -307,7 +307,7 @@ class AuthManager {
       await setCache(
         `${CACHE_CONSTANTS.KEYS.USER_SESSION}${payload.userId}:${refreshToken.slice(-8)}`,
         { userId: payload.userId, userType: payload.userType, createdAt: new Date() },
-        this.parseExpirationTime(this.config.refreshTokenExpiresIn)
+        { ttl: this.parseExpirationTime(this.config.refreshTokenExpiresIn) }
       );
 
       const duration = Date.now() - startTime;
@@ -468,7 +468,7 @@ class AuthManager {
       const attempts = await getCache<number>(cacheKey) || 0;
       const newAttempts = attempts + 1;
       
-      await setCache(cacheKey, newAttempts, this.config.lockoutDuration / 1000);
+      await setCache(cacheKey, newAttempts, { ttl: this.config.lockoutDuration / 1000 });
 
       logger.security('LOGIN_FAILED', 'auth_manager', 0,
         createLogContext()
@@ -544,7 +544,7 @@ class AuthManager {
     await setCache(
       `${CACHE_CONSTANTS.KEYS.USER_SESSION}${sessionId}`,
       sessionData,
-      this.config.sessionTimeout / 1000
+      { ttl: this.config.sessionTimeout / 1000 }
     );
 
     logger.audit('SESSION_CREATED', 'auth_manager', 0,
@@ -568,7 +568,7 @@ class AuthManager {
     await setCache(
       `${CACHE_CONSTANTS.KEYS.USER_SESSION}${sessionId}`,
       sessionData,
-      this.config.sessionTimeout / 1000
+      { ttl: this.config.sessionTimeout / 1000 }
     );
 
     return sessionData;
@@ -657,5 +657,3 @@ export const validateSession = async (sessionId: string): Promise<any> => {
 export const destroySession = async (sessionId: string): Promise<void> => {
   return await authManager.destroySession(sessionId);
 };
-
-export { AuthConfig, TokenPair, PasswordValidationResult };

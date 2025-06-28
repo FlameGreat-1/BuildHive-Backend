@@ -21,18 +21,10 @@ import {
   ApiError, 
   ErrorSeverity, 
   ValidationResult,
+  ValidationError,
   AuditLog,
   AuditSeverity
 } from '@/types/common.types';
-
-interface ValidationError {
-  field: string;
-  message: string;
-  code: string;
-  severity: 'error' | 'warning' | 'info';
-  statusCode: number;
-  name: string;
-}
 
 interface UserEntity extends BaseEntity {
   email: string;
@@ -250,7 +242,7 @@ export class UserModel {
         return null;
       }
 
-      await setCache(cacheKey, user, 300);
+      await setCache(cacheKey, user, { ttl: 300 });
 
       const duration = Date.now() - startTime;
       logger.debug('User retrieved from database', {
@@ -309,7 +301,7 @@ export class UserModel {
         return null;
       }
 
-      await setCache(cacheKey, user, 300);
+      await setCache(cacheKey, user, { ttl: 300 });
 
       const duration = Date.now() - startTime;
       logger.debug('User retrieved from database by email', {
@@ -666,7 +658,7 @@ export class UserModel {
           newValues: { isDeleted: true },
           ipAddress: logContext.ipAddress || 'system',
           userAgent: logContext.userAgent || 'system',
-          severity: AuditSeverity.MEDIUM,
+          severity: AuditSeverity.INFO,
           timestamp: new Date(),
         });
 
@@ -707,7 +699,7 @@ export class UserModel {
         field: 'email',
         message: 'Invalid email format',
         code: ERROR_CODES.VAL_INVALID_EMAIL,
-        severity: 'error',
+        severity: ErrorSeverity.ERROR,
         statusCode: 400,
         name: 'ValidationError',
       });
@@ -718,7 +710,7 @@ export class UserModel {
         field: 'email',
         message: `Email must not exceed ${VALIDATION_CONSTANTS.EMAIL.MAX_LENGTH} characters`,
         code: ERROR_CODES.VAL_INVALID_EMAIL,
-        severity: 'error',
+        severity: ErrorSeverity.ERROR,
         statusCode: 400,
         name: 'ValidationError',
       });
@@ -729,7 +721,7 @@ export class UserModel {
         field: 'firstName',
         message: `First name must be at least ${VALIDATION_CONSTANTS.NAME.MIN_LENGTH} characters`,
         code: ERROR_CODES.VAL_REQUIRED_FIELD,
-        severity: 'error',
+        severity: ErrorSeverity.ERROR,
         statusCode: 400,
         name: 'ValidationError',
       });
@@ -740,7 +732,7 @@ export class UserModel {
         field: 'lastName',
         message: `Last name must be at least ${VALIDATION_CONSTANTS.NAME.MIN_LENGTH} characters`,
         code: ERROR_CODES.VAL_REQUIRED_FIELD,
-        severity: 'error',
+        severity: ErrorSeverity.ERROR,
         statusCode: 400,
         name: 'ValidationError',
       });
@@ -751,7 +743,7 @@ export class UserModel {
         field: 'phone',
         message: 'Invalid phone number format',
         code: ERROR_CODES.VAL_INVALID_PHONE,
-        severity: 'error',
+        severity: ErrorSeverity.ERROR,
         statusCode: 400,
         name: 'ValidationError',
       });
@@ -762,7 +754,7 @@ export class UserModel {
         field: 'userType',
         message: 'Invalid user type',
         code: ERROR_CODES.VAL_INVALID_USER_TYPE,
-        severity: 'error',
+        severity: ErrorSeverity.ERROR,
         statusCode: 400,
         name: 'ValidationError',
       });
@@ -782,7 +774,7 @@ export class UserModel {
         field: 'firstName',
         message: `First name must be at least ${VALIDATION_CONSTANTS.NAME.MIN_LENGTH} characters`,
         code: ERROR_CODES.VAL_REQUIRED_FIELD,
-        severity: 'error',
+        severity: ErrorSeverity.ERROR,
         statusCode: 400,
         name: 'ValidationError',
       });
@@ -793,7 +785,7 @@ export class UserModel {
         field: 'lastName',
         message: `Last name must be at least ${VALIDATION_CONSTANTS.NAME.MIN_LENGTH} characters`,
         code: ERROR_CODES.VAL_REQUIRED_FIELD,
-        severity: 'error',
+        severity: ErrorSeverity.ERROR,
         statusCode: 400,
         name: 'ValidationError',
       });
@@ -804,7 +796,7 @@ export class UserModel {
         field: 'phone',
         message: 'Invalid phone number format',
         code: ERROR_CODES.VAL_INVALID_PHONE,
-        severity: 'error',
+        severity: ErrorSeverity.ERROR,
         statusCode: 400,
         name: 'ValidationError',
       });
@@ -815,7 +807,7 @@ export class UserModel {
         field: 'status',
         message: 'Invalid user status',
         code: ERROR_CODES.VAL_INVALID_ENUM_VALUE,
-        severity: 'error',
+        severity: ErrorSeverity.ERROR,
         statusCode: 400,
         name: 'ValidationError',
       });
@@ -857,7 +849,6 @@ export class UserModel {
           data: {
             userId,
             companyName: '',
-            abn: '',
             verificationStatus: VerificationStatus.PENDING,
             isVerified: false,
           },
@@ -869,8 +860,6 @@ export class UserModel {
           data: {
             userId,
             businessName: '',
-            abn: '',
-            trades: [],
             serviceRadius: 0,
             verificationStatus: VerificationStatus.PENDING,
             isVerified: false,
@@ -885,8 +874,6 @@ export class UserModel {
           data: {
             userId,
             companyName: '',
-            abn: '',
-            employeeCount: 0,
             verificationStatus: VerificationStatus.PENDING,
             isVerified: false,
             subscriptionTier: 'BASIC',
@@ -908,8 +895,8 @@ export class UserModel {
 
   private async cacheUser(user: UserEntity): Promise<void> {
     const cachePromises = [
-      setCache(`user:${user.id}`, user, 300),
-      setCache(`user:email:${user.email}`, user, 300),
+      setCache(`user:${user.id}`, user, { ttl: 300 }),
+      setCache(`user:email:${user.email}`, user, { ttl: 300 }),
     ];
 
     await Promise.all(cachePromises);

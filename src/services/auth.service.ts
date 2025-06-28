@@ -34,17 +34,9 @@ import {
 import {
   ApiError,
   ErrorSeverity,
-  ValidationResult
+  ValidationResult,
+  ValidationError
 } from '@/types/common.types';
-
-interface ValidationError {
-  field: string;
-  message: string;
-  code: string;
-  severity: 'error' | 'warning' | 'info';
-  statusCode: number;
-  name: string;
-}
 
 interface AuthServiceConfig {
   enableTwoFactor: boolean;
@@ -576,7 +568,7 @@ export class AuthService {
       await setCache(
         `${CACHE_CONSTANTS.KEYS.PASSWORD_RESET}${resetToken}`,
         { userId: user.id, email: user.email },
-        this.config.passwordResetExpiry / 1000
+        { ttl: this.config.passwordResetExpiry / 1000 }
       );
 
       await this.sendPasswordResetEmail(user, resetToken);
@@ -826,7 +818,7 @@ export class AuthService {
     await setCache(
       `${CACHE_CONSTANTS.KEYS.USER_SESSION}${sessionId}`,
       sessionInfo,
-      SECURITY_CONSTANTS.SESSION.IDLE_TIMEOUT / 1000
+      { ttl: SECURITY_CONSTANTS.SESSION.IDLE_TIMEOUT / 1000 }
     );
 
     const userSessionsKey = `${CACHE_CONSTANTS.KEYS.USER_SESSIONS}${user.id}`;
@@ -840,7 +832,7 @@ export class AuthService {
     }
 
     userSessions.push(sessionId);
-    await setCache(userSessionsKey, userSessions, 86400);
+    await setCache(userSessionsKey, userSessions, { ttl: 86400 });
 
     return sessionInfo;
   }
@@ -869,7 +861,7 @@ export class AuthService {
         field: 'email',
         message: 'Invalid email format',
         code: ERROR_CODES.VAL_INVALID_EMAIL,
-        severity: 'error',
+        severity: ErrorSeverity.ERROR,
         statusCode: 400,
         name: 'ValidationError',
       });
@@ -880,7 +872,7 @@ export class AuthService {
         field: 'password',
         message: `Password must be at least ${SECURITY_CONSTANTS.PASSWORD.MIN_LENGTH} characters`,
         code: ERROR_CODES.VAL_WEAK_PASSWORD,
-        severity: 'error',
+        severity: ErrorSeverity.ERROR,
         statusCode: 400,
         name: 'ValidationError',
       });
@@ -891,7 +883,7 @@ export class AuthService {
         field: 'firstName',
         message: 'First name must be at least 2 characters',
         code: ERROR_CODES.VAL_REQUIRED_FIELD,
-        severity: 'error',
+        severity: ErrorSeverity.ERROR,
         statusCode: 400,
         name: 'ValidationError',
       });
@@ -902,7 +894,7 @@ export class AuthService {
         field: 'lastName',
         message: 'Last name must be at least 2 characters',
         code: ERROR_CODES.VAL_REQUIRED_FIELD,
-        severity: 'error',
+        severity: ErrorSeverity.ERROR,
         statusCode: 400,
         name: 'ValidationError',
       });
@@ -913,7 +905,7 @@ export class AuthService {
         field: 'phone',
         message: 'Invalid phone number format',
         code: ERROR_CODES.VAL_INVALID_PHONE,
-        severity: 'error',
+        severity: ErrorSeverity.ERROR,
         statusCode: 400,
         name: 'ValidationError',
       });
@@ -924,7 +916,7 @@ export class AuthService {
         field: 'userType',
         message: 'Invalid user type',
         code: ERROR_CODES.VAL_INVALID_USER_TYPE,
-        severity: 'error',
+        severity: ErrorSeverity.ERROR,
         statusCode: 400,
         name: 'ValidationError',
       });
@@ -935,7 +927,7 @@ export class AuthService {
         field: 'acceptTerms',
         message: 'Terms and conditions must be accepted',
         code: ERROR_CODES.VAL_REQUIRED_FIELD,
-        severity: 'error',
+        severity: ErrorSeverity.ERROR,
         statusCode: 400,
         name: 'ValidationError',
       });
@@ -1177,4 +1169,4 @@ export const validateUserToken = async (token: string) => {
   return await authService.validateUserToken(token);
 };
 
-export { AuthService, AuthServiceConfig, DeviceInfo, SessionInfo, LoginAttempt };
+export { AuthServiceConfig, DeviceInfo, SessionInfo, LoginAttempt };

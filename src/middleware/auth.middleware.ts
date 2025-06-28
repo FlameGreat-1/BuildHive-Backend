@@ -549,7 +549,7 @@ export class AuthMiddleware {
               blocked: false,
             };
 
-            await setCache(rateLimitKey, newRateLimitInfo, windowMs / 1000);
+            await setCache(rateLimitKey, newRateLimitInfo, { ttl: windowMs / 1000 });
           } else {
             const newCount = rateLimitInfo.count + 1;
             
@@ -581,7 +581,7 @@ export class AuthMiddleware {
               count: newCount,
             };
 
-            await setCache(rateLimitKey, updatedRateLimitInfo, Math.ceil((rateLimitInfo.resetTime - now) / 1000));
+            await setCache(rateLimitKey, updatedRateLimitInfo, { ttl: Math.ceil((rateLimitInfo.resetTime - now) / 1000) });
 
             res.setHeader('X-RateLimit-Limit', maxRequests.toString());
             res.setHeader('X-RateLimit-Remaining', (maxRequests - newCount).toString());
@@ -594,7 +594,7 @@ export class AuthMiddleware {
             blocked: false,
           };
 
-          await setCache(rateLimitKey, newRateLimitInfo, windowMs / 1000);
+          await setCache(rateLimitKey, newRateLimitInfo, { ttl: windowMs / 1000 });
 
           res.setHeader('X-RateLimit-Limit', maxRequests.toString());
           res.setHeader('X-RateLimit-Remaining', (maxRequests - 1).toString());
@@ -670,7 +670,7 @@ export class AuthMiddleware {
   private async cacheToken(token: string, payload: JWTPayload): Promise<void> {
     try {
       const cacheKey = `token:${this.hashToken(token)}`;
-      await setCache(cacheKey, payload, this.config.tokenCacheTTL);
+      await setCache(cacheKey, payload, { ttl: this.config.tokenCacheTTL });
       
       logger.debug('Token cached successfully', 
         createLogContext()
