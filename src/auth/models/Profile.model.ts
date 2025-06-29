@@ -1,9 +1,8 @@
 import { Schema, model } from 'mongoose';
 import { USER_ROLES, VERIFICATION_STATUS } from '../../config';
 import { buildHiveLogger } from '../../shared';
-import type { BaseDocument, UserRole, VerificationStatus, Address, BusinessInfo, ContactInfo } from '../../shared/types';
+import type { BaseDocument, UserRole, VerificationStatus } from '../../shared/types';
 
-// Service categories for Tradies
 export const SERVICE_CATEGORIES = {
   ELECTRICAL: 'electrical',
   PLUMBING: 'plumbing',
@@ -22,7 +21,6 @@ export const SERVICE_CATEGORIES = {
 
 export type ServiceCategory = typeof SERVICE_CATEGORIES[keyof typeof SERVICE_CATEGORIES];
 
-// Availability status for Tradies
 export const AVAILABILITY_STATUS = {
   AVAILABLE: 'available',
   BUSY: 'busy',
@@ -32,26 +30,18 @@ export const AVAILABILITY_STATUS = {
 
 export type AvailabilityStatus = typeof AVAILABILITY_STATUS[keyof typeof AVAILABILITY_STATUS];
 
-// Profile document interface extending BaseDocument
 export interface IProfileDocument extends BaseDocument {
-  // Core Profile Information
-  userId: Schema.Types.ObjectId;
+  userId: string;
   role: UserRole;
-  
-  // Personal Information
   firstName: string;
   lastName: string;
   displayName?: string;
   dateOfBirth?: Date;
   gender?: 'male' | 'female' | 'other' | 'prefer_not_to_say';
-  
-  // Contact Information
   phone?: string;
   alternatePhone?: string;
-  email?: string; // Can be different from user email
+  email?: string;
   preferredContact: 'email' | 'phone' | 'sms' | 'app';
-  
-  // Address Information (Australian Format)
   address?: {
     street: string;
     suburb: string;
@@ -63,8 +53,6 @@ export interface IProfileDocument extends BaseDocument {
       longitude: number;
     };
   };
-  
-  // Profile Media
   avatar?: string;
   coverImage?: string;
   gallery?: Array<{
@@ -73,8 +61,6 @@ export interface IProfileDocument extends BaseDocument {
     type: 'image' | 'video';
     uploadedAt: Date;
   }>;
-  
-  // Verification Status
   verificationStatus: VerificationStatus;
   verificationDocuments?: Array<{
     type: 'id' | 'license' | 'insurance' | 'qualification' | 'abn' | 'other';
@@ -84,12 +70,10 @@ export interface IProfileDocument extends BaseDocument {
     reviewedAt?: Date;
     reviewNotes?: string;
   }>;
-  
-  // Business Information (for Tradies and Enterprise)
   businessInfo?: {
     businessName?: string;
-    abn?: string; // Australian Business Number
-    acn?: string; // Australian Company Number
+    abn?: string;
+    acn?: string;
     tradingName?: string;
     businessType?: 'sole_trader' | 'partnership' | 'company' | 'trust';
     website?: string;
@@ -98,10 +82,7 @@ export interface IProfileDocument extends BaseDocument {
     employeeCount?: number;
     servicesOffered?: string[];
   };
-  
-  // Tradie-Specific Information
   tradieInfo?: {
-    // Service Details
     serviceCategories: ServiceCategory[];
     specializations: string[];
     hourlyRate?: {
@@ -109,8 +90,6 @@ export interface IProfileDocument extends BaseDocument {
       max: number;
       currency: string;
     };
-    
-    // Qualifications & Licenses
     qualifications: Array<{
       name: string;
       issuer: string;
@@ -120,8 +99,6 @@ export interface IProfileDocument extends BaseDocument {
       verified: boolean;
       documentUrl?: string;
     }>;
-    
-    // Insurance
     insurance?: {
       publicLiability: {
         provider: string;
@@ -137,8 +114,6 @@ export interface IProfileDocument extends BaseDocument {
         documentUrl?: string;
       };
     };
-    
-    // Availability
     availability: {
       status: AvailabilityStatus;
       workingHours: {
@@ -150,13 +125,11 @@ export interface IProfileDocument extends BaseDocument {
         saturday: { start: string; end: string; available: boolean };
         sunday: { start: string; end: string; available: boolean };
       };
-      serviceRadius: number; // in kilometers
+      serviceRadius: number;
       travelFee?: number;
       emergencyAvailable: boolean;
       weekendAvailable: boolean;
     };
-    
-    // Portfolio & Experience
     portfolio: Array<{
       title: string;
       description: string;
@@ -165,36 +138,29 @@ export interface IProfileDocument extends BaseDocument {
       clientTestimonial?: string;
       tags: string[];
     }>;
-    
     yearsExperience: number;
     completedJobs: number;
-    
-    // Tools & Equipment
     toolsAndEquipment?: string[];
     vehicleType?: string;
-    
-    // Pricing & Quotes
     quotingPreferences: {
       providesQuotes: boolean;
       quoteValidityDays: number;
       minimumJobValue?: number;
       calloutFee?: number;
-      materialMarkup?: number; // percentage
+      materialMarkup?: number;
     };
   };
-  
-  // Client-Specific Information
   clientInfo?: {
     propertyType?: 'residential' | 'commercial' | 'industrial';
     jobHistory: Array<{
-      jobId: Schema.Types.ObjectId;
+      jobId: string;
       title: string;
       category: ServiceCategory;
       completedDate: Date;
       rating?: number;
       review?: string;
     }>;
-    preferredTradies: Schema.Types.ObjectId[];
+    preferredTradies: string[];
     budgetRange?: {
       min: number;
       max: number;
@@ -207,10 +173,7 @@ export interface IProfileDocument extends BaseDocument {
       preferredTimeToContact: string;
     };
   };
-  
-  // Enterprise-Specific Information
   enterpriseInfo?: {
-    // Company Details
     companySize: 'startup' | 'small' | 'medium' | 'large' | 'enterprise';
     industry: string[];
     headquarters: {
@@ -219,24 +182,18 @@ export interface IProfileDocument extends BaseDocument {
       state: 'NSW' | 'VIC' | 'QLD' | 'WA' | 'SA' | 'TAS' | 'ACT' | 'NT';
       postcode: string;
     };
-    
-    // Team Management
     teamStructure: {
       totalEmployees: number;
       activeFieldWorkers: number;
       adminStaff: number;
       supervisors: number;
     };
-    
-    // Service Areas
     serviceAreas: Array<{
       suburb: string;
       postcode: string;
       state: string;
       priority: 'primary' | 'secondary';
     }>;
-    
-    // Certifications & Compliance
     certifications: Array<{
       name: string;
       issuer: string;
@@ -246,26 +203,20 @@ export interface IProfileDocument extends BaseDocument {
       documentUrl?: string;
       verified: boolean;
     }>;
-    
-    // Financial Information
     financialInfo?: {
-      annualRevenue?: string; // range like "100k-500k"
+      annualRevenue?: string;
       creditRating?: string;
       paymentTerms: string;
       preferredPaymentMethods: string[];
     };
-    
-    // Operational Preferences
     operationalPreferences: {
       minimumJobValue: number;
       maximumConcurrentJobs: number;
-      workingRadius: number; // in kilometers
+      workingRadius: number;
       emergencyServices: boolean;
       weekendOperations: boolean;
       after_hours_available: boolean;
     };
-    
-    // Client Portfolio
     clientPortfolio: Array<{
       clientName: string;
       projectType: string;
@@ -276,8 +227,6 @@ export interface IProfileDocument extends BaseDocument {
       isPublic: boolean;
     }>;
   };
-  
-  // Ratings & Reviews System
   ratings: {
     overall: number;
     totalReviews: number;
@@ -289,7 +238,7 @@ export interface IProfileDocument extends BaseDocument {
       value: number;
     };
     recentReviews: Array<{
-      reviewId: Schema.Types.ObjectId;
+      reviewId: string;
       rating: number;
       comment: string;
       reviewerName: string;
@@ -298,23 +247,18 @@ export interface IProfileDocument extends BaseDocument {
       verified: boolean;
     }>;
   };
-  
-  // Profile Statistics
   statistics: {
     profileViews: number;
     jobsCompleted: number;
     jobsInProgress: number;
-    responseTime: number; // in hours
-    responseRate: number; // percentage
-    repeatClientRate: number; // percentage
-    onTimeCompletionRate: number; // percentage
+    responseTime: number;
+    responseRate: number;
+    repeatClientRate: number;
+    onTimeCompletionRate: number;
     lastActiveDate: Date;
     joinDate: Date;
   };
-  
-  // Preferences & Settings
   preferences: {
-    // Notification Preferences
     notifications: {
       email: {
         newJobs: boolean;
@@ -335,8 +279,6 @@ export interface IProfileDocument extends BaseDocument {
         reviews: boolean;
       };
     };
-    
-    // Privacy Settings
     privacy: {
       showPhone: boolean;
       showEmail: boolean;
@@ -345,8 +287,6 @@ export interface IProfileDocument extends BaseDocument {
       allowDirectContact: boolean;
       profileVisibility: 'public' | 'registered_users' | 'private';
     };
-    
-    // Job Preferences
     jobPreferences: {
       autoAcceptJobs: boolean;
       jobValueRange: {
@@ -354,53 +294,12 @@ export interface IProfileDocument extends BaseDocument {
         max: number;
       };
       preferredJobTypes: ServiceCategory[];
-      blacklistedClients: Schema.Types.ObjectId[];
+      blacklistedClients: string[];
       workingDistance: number;
       requiresDeposit: boolean;
       depositPercentage?: number;
     };
   };
-  
-  // Add these missing methods to profileSchema.methods:
-profileSchema.methods.calculateQualityScore = function(): number {
-  const factors = {
-    profileCompleteness: this.profileCompletion.percentage || 0,
-    verificationStatus: this.verificationStatus === 'verified' ? 100 : 0,
-    reviewRating: (this.ratings.overall || 0) * 20,
-    responseTime: Math.max(0, 100 - (this.statistics.responseTime || 0)),
-    jobCompletionRate: this.statistics.onTimeCompletionRate || 0
-  };
-  
-  const score = Object.values(factors).reduce((sum, val) => sum + val, 0) / 5;
-  this.qualityScore = { score, factors, lastCalculated: new Date() };
-  return score;
-};
-
-profileSchema.methods.updateStatistics = async function(): Promise<void> {
-  this.statistics.lastActiveDate = new Date();
-  await this.save();
-};
-
-profileSchema.methods.addPortfolioItem = async function(item: any): Promise<void> {
-  if (!this.tradieInfo) this.tradieInfo = { portfolio: [] };
-  this.tradieInfo.portfolio.push(item);
-  await this.save();
-};
-
-profileSchema.methods.updateAvailability = async function(status: any): Promise<void> {
-  if (this.tradieInfo) {
-    this.tradieInfo.availability.status = status;
-    await this.save();
-  }
-};
-
-profileSchema.methods.addQualification = async function(qualification: any): Promise<void> {
-  if (!this.tradieInfo) this.tradieInfo = { qualifications: [] };
-  this.tradieInfo.qualifications.push(qualification);
-  await this.save();
-};
-
-  // Social & Professional Links
   socialLinks?: {
     website?: string;
     linkedin?: string;
@@ -409,16 +308,12 @@ profileSchema.methods.addQualification = async function(qualification: any): Pro
     youtube?: string;
     tiktok?: string;
   };
-  
-  // Emergency Contact
   emergencyContact?: {
     name: string;
     relationship: string;
     phone: string;
     email?: string;
   };
-  
-  // Audit & Compliance
   compliance: {
     termsAccepted: boolean;
     termsAcceptedDate: Date;
@@ -428,16 +323,13 @@ profileSchema.methods.addQualification = async function(qualification: any): Pro
     dataRetentionConsent: boolean;
     lastPolicyUpdate?: Date;
   };
-  
-  // Profile Completion & Quality Score
   profileCompletion: {
     percentage: number;
     missingFields: string[];
     lastCalculated: Date;
   };
-  
   qualityScore: {
-    score: number; // 0-100
+    score: number;
     factors: {
       profileCompleteness: number;
       verificationStatus: number;
@@ -447,8 +339,6 @@ profileSchema.methods.addQualification = async function(qualification: any): Pro
     };
     lastCalculated: Date;
   };
-  
-  // Instance Methods
   calculateProfileCompletion(): number;
   calculateQualityScore(): number;
   isProfileComplete(): boolean;
@@ -461,9 +351,7 @@ profileSchema.methods.addQualification = async function(qualification: any): Pro
   isWithinServiceArea(location: { latitude: number; longitude: number }): boolean;
 }
 
-// Profile Schema Definition
 const profileSchema = new Schema<IProfileDocument>({
-  // Core Profile Information
   userId: {
     type: Schema.Types.ObjectId,
     ref: 'User',
@@ -471,7 +359,6 @@ const profileSchema = new Schema<IProfileDocument>({
     unique: true,
     index: true,
   },
-  
   role: {
     type: String,
     enum: {
@@ -481,58 +368,48 @@ const profileSchema = new Schema<IProfileDocument>({
     required: [true, 'User role is required'],
     index: true,
   },
-  
-  // Personal Information
   firstName: {
     type: String,
     required: [true, 'First name is required'],
     trim: true,
     maxlength: [50, 'First name cannot exceed 50 characters'],
   },
-  
   lastName: {
     type: String,
     required: [true, 'Last name is required'],
     trim: true,
     maxlength: [50, 'Last name cannot exceed 50 characters'],
   },
-  
   displayName: {
     type: String,
     trim: true,
     maxlength: [100, 'Display name cannot exceed 100 characters'],
   },
-  
   dateOfBirth: {
     type: Date,
     validate: {
       validator: function(value: Date) {
-        if (!value) return true; // Optional field
+        if (!value) return true;
         const age = (new Date().getTime() - value.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
-        return age >= 16 && age <= 100; // Must be between 16 and 100 years old
+        return age >= 16 && age <= 100;
       },
       message: 'Age must be between 16 and 100 years'
     }
   },
-  
   gender: {
     type: String,
     enum: ['male', 'female', 'other', 'prefer_not_to_say'],
   },
-  
-  // Contact Information
   phone: {
     type: String,
     trim: true,
     match: [/^\+?[1-9]\d{1,14}$/, 'Please provide a valid phone number'],
   },
-  
   alternatePhone: {
     type: String,
     trim: true,
     match: [/^\+?[1-9]\d{1,14}$/, 'Please provide a valid alternate phone number'],
   },
-  
   email: {
     type: String,
     lowercase: true,
@@ -542,14 +419,11 @@ const profileSchema = new Schema<IProfileDocument>({
       'Please provide a valid email address'
     ],
   },
-  
   preferredContact: {
     type: String,
     enum: ['email', 'phone', 'sms', 'app'],
     default: 'app',
   },
-  
-  // Address Information (Australian Format)
   address: {
     street: {
       type: String,
@@ -587,18 +461,14 @@ const profileSchema = new Schema<IProfileDocument>({
       },
     },
   },
-
-  // Profile Media
   avatar: {
     type: String,
     trim: true,
   },
-  
   coverImage: {
     type: String,
     trim: true,
   },
-  
   gallery: [{
     url: {
       type: String,
@@ -620,8 +490,6 @@ const profileSchema = new Schema<IProfileDocument>({
       default: Date.now,
     },
   }],
-  
-  // Verification Status
   verificationStatus: {
     type: String,
     enum: {
@@ -631,7 +499,6 @@ const profileSchema = new Schema<IProfileDocument>({
     default: VERIFICATION_STATUS.PENDING,
     index: true,
   },
-  
   verificationDocuments: [{
     type: {
       type: String,
@@ -658,8 +525,6 @@ const profileSchema = new Schema<IProfileDocument>({
       trim: true,
     },
   }],
-  
-  // Business Information
   businessInfo: {
     businessName: {
       type: String,
@@ -711,8 +576,6 @@ const profileSchema = new Schema<IProfileDocument>({
       trim: true,
     }],
   },
-  
-  // Complex nested schemas for role-specific information
   tradieInfo: {
     serviceCategories: [{
       type: String,
@@ -872,8 +735,166 @@ const profileSchema = new Schema<IProfileDocument>({
       },
     },
   },
-  
-  // Ratings & Statistics
+  clientInfo: {
+    propertyType: {
+      type: String,
+      enum: ['residential', 'commercial', 'industrial'],
+    },
+    jobHistory: [{
+      jobId: {
+        type: Schema.Types.ObjectId,
+        ref: 'Job',
+      },
+      title: String,
+      category: {
+        type: String,
+        enum: Object.values(SERVICE_CATEGORIES),
+      },
+      completedDate: Date,
+      rating: {
+        type: Number,
+        min: 1,
+        max: 5,
+      },
+      review: String,
+    }],
+    preferredTradies: [{
+      type: Schema.Types.ObjectId,
+      ref: 'Profile',
+    }],
+    budgetRange: {
+      min: {
+        type: Number,
+        min: 0,
+      },
+      max: {
+        type: Number,
+        min: 0,
+      },
+      currency: {
+        type: String,
+        default: 'AUD',
+      },
+    },
+    communicationPreferences: {
+      receiveQuotes: {
+        type: Boolean,
+        default: true,
+      },
+      receiveUpdates: {
+        type: Boolean,
+        default: true,
+      },
+      receiveMarketing: {
+        type: Boolean,
+        default: false,
+      },
+      preferredTimeToContact: {
+        type: String,
+        default: 'business_hours',
+      },
+    },
+  },
+  enterpriseInfo: {
+    companySize: {
+      type: String,
+      enum: ['startup', 'small', 'medium', 'large', 'enterprise'],
+    },
+    industry: [String],
+    headquarters: {
+      street: String,
+      suburb: String,
+      state: {
+        type: String,
+        enum: ['NSW', 'VIC', 'QLD', 'WA', 'SA', 'TAS', 'ACT', 'NT'],
+      },
+      postcode: String,
+    },
+    teamStructure: {
+      totalEmployees: {
+        type: Number,
+        min: 0,
+      },
+      activeFieldWorkers: {
+        type: Number,
+        min: 0,
+      },
+      adminStaff: {
+        type: Number,
+        min: 0,
+      },
+      supervisors: {
+        type: Number,
+        min: 0,
+      },
+    },
+    serviceAreas: [{
+      suburb: String,
+      postcode: String,
+      state: String,
+      priority: {
+        type: String,
+        enum: ['primary', 'secondary'],
+      },
+    }],
+    certifications: [{
+      name: String,
+      issuer: String,
+      certificateNumber: String,
+      issueDate: Date,
+      expiryDate: Date,
+      documentUrl: String,
+      verified: {
+        type: Boolean,
+        default: false,
+      },
+    }],
+    financialInfo: {
+      annualRevenue: String,
+      creditRating: String,
+      paymentTerms: String,
+      preferredPaymentMethods: [String],
+    },
+    operationalPreferences: {
+      minimumJobValue: {
+        type: Number,
+        min: 0,
+      },
+      maximumConcurrentJobs: {
+        type: Number,
+        min: 1,
+      },
+      workingRadius: {
+        type: Number,
+        min: 0,
+      },
+      emergencyServices: {
+        type: Boolean,
+        default: false,
+      },
+      weekendOperations: {
+        type: Boolean,
+        default: false,
+      },
+      after_hours_available: {
+        type: Boolean,
+        default: false,
+      },
+    },
+    clientPortfolio: [{
+      clientName: String,
+      projectType: String,
+      projectValue: Number,
+      completionDate: Date,
+      testimonial: String,
+      images: [String],
+      isPublic: {
+        type: Boolean,
+        default: false,
+      },
+    }],
+  },
+
   ratings: {
     overall: {
       type: Number,
@@ -893,26 +914,120 @@ const profileSchema = new Schema<IProfileDocument>({
       professionalism: { type: Number, default: 0, min: 0, max: 5 },
       value: { type: Number, default: 0, min: 0, max: 5 },
     },
+    recentReviews: [{
+      reviewId: {
+        type: Schema.Types.ObjectId,
+        ref: 'Review',
+      },
+      rating: {
+        type: Number,
+        min: 1,
+        max: 5,
+      },
+      comment: String,
+      reviewerName: String,
+      reviewDate: Date,
+      jobCategory: {
+        type: String,
+        enum: Object.values(SERVICE_CATEGORIES),
+      },
+      verified: {
+        type: Boolean,
+        default: false,
+      },
+    }],
   },
-  
   statistics: {
     profileViews: { type: Number, default: 0 },
     jobsCompleted: { type: Number, default: 0 },
     jobsInProgress: { type: Number, default: 0 },
-    responseTime: { type: Number, default: 24 }, // hours
-    responseRate: { type: Number, default: 100 }, // percentage
+    responseTime: { type: Number, default: 24 },
+    responseRate: { type: Number, default: 100 },
     repeatClientRate: { type: Number, default: 0 },
     onTimeCompletionRate: { type: Number, default: 100 },
     lastActiveDate: { type: Date, default: Date.now },
     joinDate: { type: Date, default: Date.now },
   },
-  
+  preferences: {
+    notifications: {
+      email: {
+        newJobs: { type: Boolean, default: true },
+        jobUpdates: { type: Boolean, default: true },
+        messages: { type: Boolean, default: true },
+        reviews: { type: Boolean, default: true },
+        marketing: { type: Boolean, default: false },
+      },
+      sms: {
+        urgentJobs: { type: Boolean, default: true },
+        jobReminders: { type: Boolean, default: true },
+        paymentAlerts: { type: Boolean, default: true },
+      },
+      push: {
+        newJobs: { type: Boolean, default: true },
+        messages: { type: Boolean, default: true },
+        jobUpdates: { type: Boolean, default: true },
+        reviews: { type: Boolean, default: true },
+      },
+    },
+    privacy: {
+      showPhone: { type: Boolean, default: true },
+      showEmail: { type: Boolean, default: false },
+      showAddress: { type: Boolean, default: false },
+      showRates: { type: Boolean, default: true },
+      allowDirectContact: { type: Boolean, default: true },
+      profileVisibility: {
+        type: String,
+        enum: ['public', 'registered_users', 'private'],
+        default: 'public',
+      },
+    },
+    jobPreferences: {
+      autoAcceptJobs: { type: Boolean, default: false },
+      jobValueRange: {
+        min: { type: Number, default: 0 },
+        max: { type: Number, default: 10000 },
+      },
+      preferredJobTypes: [{
+        type: String,
+        enum: Object.values(SERVICE_CATEGORIES),
+      }],
+      blacklistedClients: [{
+        type: Schema.Types.ObjectId,
+        ref: 'Profile',
+      }],
+      workingDistance: { type: Number, default: 50 },
+      requiresDeposit: { type: Boolean, default: false },
+      depositPercentage: { type: Number, min: 0, max: 100 },
+    },
+  },
+  socialLinks: {
+    website: String,
+    linkedin: String,
+    facebook: String,
+    instagram: String,
+    youtube: String,
+    tiktok: String,
+  },
+  emergencyContact: {
+    name: String,
+    relationship: String,
+    phone: String,
+    email: String,
+  },
+  compliance: {
+    termsAccepted: { type: Boolean, default: false },
+    termsAcceptedDate: Date,
+    privacyPolicyAccepted: { type: Boolean, default: false },
+    privacyPolicyAcceptedDate: Date,
+    marketingConsent: { type: Boolean, default: false },
+    dataRetentionConsent: { type: Boolean, default: false },
+    lastPolicyUpdate: Date,
+  },
   profileCompletion: {
     percentage: { type: Number, default: 0, min: 0, max: 100 },
     missingFields: [String],
     lastCalculated: { type: Date, default: Date.now },
   },
-  
   qualityScore: {
     score: { type: Number, default: 0, min: 0, max: 100 },
     factors: {
@@ -938,7 +1053,6 @@ const profileSchema = new Schema<IProfileDocument>({
   },
 });
 
-// Indexes for performance
 profileSchema.index({ userId: 1 });
 profileSchema.index({ role: 1, verificationStatus: 1 });
 profileSchema.index({ 'address.state': 1, 'address.postcode': 1 });
@@ -946,7 +1060,6 @@ profileSchema.index({ 'tradieInfo.serviceCategories': 1 });
 profileSchema.index({ 'ratings.overall': -1 });
 profileSchema.index({ 'businessInfo.abn': 1 }, { sparse: true });
 
-// Instance Methods
 profileSchema.methods.calculateProfileCompletion = function(): number {
   const requiredFields = ['firstName', 'lastName', 'phone'];
   const roleSpecificFields = {
@@ -958,12 +1071,10 @@ profileSchema.methods.calculateProfileCompletion = function(): number {
   let completedFields = 0;
   let totalFields = requiredFields.length;
   
-  // Check required fields
   requiredFields.forEach(field => {
     if (this[field]) completedFields++;
   });
   
-  // Check role-specific fields
   const roleFields = roleSpecificFields[this.role] || [];
   totalFields += roleFields.length;
   
@@ -979,6 +1090,20 @@ profileSchema.methods.calculateProfileCompletion = function(): number {
   return percentage;
 };
 
+profileSchema.methods.calculateQualityScore = function(): number {
+  const factors = {
+    profileCompleteness: this.profileCompletion.percentage || 0,
+    verificationStatus: this.verificationStatus === 'verified' ? 100 : 0,
+    reviewRating: (this.ratings.overall || 0) * 20,
+    responseTime: Math.max(0, 100 - (this.statistics.responseTime || 0)),
+    jobCompletionRate: this.statistics.onTimeCompletionRate || 0
+  };
+  
+  const score = Object.values(factors).reduce((sum, val) => sum + val, 0) / 5;
+  this.qualityScore = { score, factors, lastCalculated: new Date() };
+  return score;
+};
+
 profileSchema.methods.isProfileComplete = function(): boolean {
   return this.calculateProfileCompletion() >= 80;
 };
@@ -989,7 +1114,57 @@ profileSchema.methods.canReceiveJobs = function(): boolean {
          (this.role === USER_ROLES.TRADIE ? this.tradieInfo?.availability?.status === AVAILABILITY_STATUS.AVAILABLE : true);
 };
 
-// Create and export the Profile model
-export const Profile = model<IProfileDocument>('Profile', profileSchema);
+profileSchema.methods.updateStatistics = async function(): Promise<void> {
+  this.statistics.lastActiveDate = new Date();
+  await this.save();
+};
 
+profileSchema.methods.addPortfolioItem = async function(item: any): Promise<void> {
+  if (!this.tradieInfo) this.tradieInfo = { portfolio: [] };
+  this.tradieInfo.portfolio.push(item);
+  await this.save();
+};
+
+profileSchema.methods.updateAvailability = async function(status: AvailabilityStatus): Promise<void> {
+  if (this.tradieInfo) {
+    this.tradieInfo.availability.status = status;
+    await this.save();
+  }
+};
+
+profileSchema.methods.addQualification = async function(qualification: any): Promise<void> {
+  if (!this.tradieInfo) this.tradieInfo = { qualifications: [] };
+  this.tradieInfo.qualifications.push(qualification);
+  await this.save();
+};
+
+profileSchema.methods.getServiceRadius = function(): number {
+  return this.tradieInfo?.availability?.serviceRadius || 50;
+};
+
+profileSchema.methods.isWithinServiceArea = function(location: { latitude: number; longitude: number }): boolean {
+  if (!this.address?.coordinates) return false;
+  
+  const distance = this.calculateDistance(
+    this.address.coordinates.latitude,
+    this.address.coordinates.longitude,
+    location.latitude,
+    location.longitude
+  );
+  
+  return distance <= this.getServiceRadius();
+};
+
+profileSchema.methods.calculateDistance = function(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+};
+
+export const Profile = model<IProfileDocument>('Profile', profileSchema);
 export default Profile;
