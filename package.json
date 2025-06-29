@@ -22,7 +22,6 @@
     "contractors",
     "nodejs",
     "typescript",
-    "prisma",
     "redis",
     "postgresql",
     "express",
@@ -39,14 +38,6 @@
     "build": "tsc --noEmit false && tsc-alias",
     "start": "node dist/server.js",
     "start:prod": "NODE_ENV=production node dist/server.js",
-    "db:generate": "prisma generate",
-    "db:push": "prisma db push",
-    "db:migrate": "prisma migrate deploy",
-    "db:migrate:dev": "prisma migrate dev",
-    "db:seed": "tsx prisma/seed.ts",
-    "db:studio": "prisma studio",
-    "db:reset": "prisma migrate reset",
-    "db:status": "prisma migrate status",
     "lint": "eslint src --ext .ts",
     "lint:fix": "eslint src --ext .ts --fix",
     "format": "prettier --write \"src/**/*.{ts,js,json}\"",
@@ -69,9 +60,9 @@
     "pm2:reload": "pm2 reload ecosystem.config.js",
     "pm2:logs": "pm2 logs",
     "pm2:monit": "pm2 monit",
-    "deploy:render": "npm run build && npm run db:migrate",
-    "deploy:staging": "npm run build && npm run db:migrate",
-    "deploy:production": "npm run build && npm run db:migrate",
+    "deploy:render": "npm run build",
+    "deploy:staging": "npm run build",
+    "deploy:production": "npm run build",
     "prestart": "npm run build",
     "clean": "rimraf dist coverage .nyc_output",
     "prebuild": "npm run clean",
@@ -82,7 +73,6 @@
     "deps:update": "npm update"
   },
   "dependencies": {
-    "@prisma/client": "^5.7.1",
     "bcryptjs": "^2.4.3",
     "compression": "^1.7.4",
     "cookie-parser": "^1.4.6",
@@ -102,7 +92,7 @@
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
     "passport-jwt": "^4.0.1",
-    "prisma": "^5.7.1",
+    "pg": "^8.11.3",
     "redis": "^4.6.0",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.0",
@@ -126,6 +116,7 @@
     "@types/passport": "^1.0.16",
     "@types/passport-google-oauth20": "^2.0.14",
     "@types/passport-jwt": "^4.0.0",
+    "@types/pg": "^8.10.9",
     "@types/redis": "^4.0.0",
     "@types/supertest": "^2.0.16",
     "@types/swagger-jsdoc": "^6.0.4",
@@ -150,9 +141,6 @@
   },
   "peerDependencies": {
     "typescript": "^5.0.0"
-  },
-  "prisma": {
-    "seed": "tsx prisma/seed.ts"
   },
   "eslintConfig": {
     "extends": [
