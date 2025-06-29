@@ -41,6 +41,9 @@ export interface IUserService {
   deactivateUser(userId: string, reason?: string): Promise<UserResponse>;
   reactivateUser(userId: string): Promise<UserResponse>;
   deleteUser(userId: string, hardDelete?: boolean): Promise<boolean>;
+  checkEmailAvailability(email: string): Promise<{ available: boolean; message: string }>;
+  checkPhoneAvailability(phone: string): Promise<{ available: boolean; message: string }>;
+  getVerificationStatus(userId: string): Promise<{ email: boolean; phone: boolean; isFullyVerified: boolean }>;
 }
 
 export interface IEventPublisher {
@@ -721,6 +724,66 @@ export class UserService implements IUserService {
       }
 
       throw AuthErrorFactory.userDeletionFailed('Failed to delete user', error);
+    }
+  }
+
+  async checkEmailAvailability(email: string): Promise<{ available: boolean; message: string }> {
+    try {
+      const existingUser = await this.userRepository.findByEmail(email);
+      
+      if (existingUser) {
+        return {
+          available: false,
+          message: 'Email address is already registered'
+        };
+      }
+
+      return {
+        available: true,
+        message: 'Email address is available'
+      };
+    } catch (error) {
+      this.logger.error('Failed to check email availability', error, { email });
+      throw AuthErrorFactory.validationFailed('Failed to check email availability', error);
+    }
+  }
+
+  async checkPhoneAvailability(phone: string): Promise<{ available: boolean; message: string }> {
+    try {
+      const existingUser = await this.userRepository.findByPhone(phone);
+      
+      if (existingUser) {
+        return {
+          available: false,
+          message: 'Phone number is already registered'
+        };
+      }
+
+      return {
+        available: true,
+        message: 'Phone number is available'
+      };
+    } catch (error) {
+      this.logger.error('Failed to check phone availability', error, { phone });
+      throw AuthErrorFactory.validationFailed('Failed to check phone availability', error);
+    }
+  }
+
+  async getVerificationStatus(userId: string): Promise<{ email: boolean; phone: boolean; isFullyVerified: boolean }> {
+    try {
+      const user = await this.userRepository.findById(userId);
+      if (!user) {
+        throw AuthErrorFactory.userNotFound(userId);
+      }
+
+      return {
+        email: user.isEmailVerified,
+        phone: user.isPhoneVerified,
+        isFullyVerified: user.isEmailVerified && user.isPhoneVerified
+      };
+    } catch (error) {
+      this.logger.error('Failed to get verification status', error, { userId });
+      throw AuthErrorFactory.userNotFound(userId);
     }
   }
 

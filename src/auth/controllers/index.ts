@@ -2,59 +2,33 @@ export type { IAuthController } from './auth.controller';
 export type { IProfileController } from './profile.controller';
 export type { IValidationController } from './validation.controller';
 
-export { AuthController, createAuthController } from './auth.controller';
-export { ProfileController, createProfileController } from './profile.controller';
-export { ValidationController, createValidationController } from './validation.controller';
-
 import { Request, Response, NextFunction } from 'express';
 import rateLimit from 'express-rate-limit';
 import Joi from 'joi';
 import { buildHiveLogger, buildHiveResponse, AuthErrorFactory } from '../../shared';
 import type { ServiceContainer } from '../services';
-import type { IAuthController, IProfileController, IValidationController } from './';
+import type { AuthUser } from '../types/auth.types';
 
-declare global {
-  namespace Express {
-    interface Request {
-      user?: {
-        id: string;
-        email: string;
-        role: string;
-        roles?: string[];
-        isEmailVerified: boolean;
-        isPhoneVerified: boolean;
-      };
-      session?: {
-        id: string;
-        userId: string;
-        deviceInfo: any;
-      };
-    }
-  }
-}
+import { AuthController } from './auth.controller';
+import { ProfileController } from './profile.controller';
+import { ValidationController } from './validation.controller';
 
 export interface AuthenticatedRequest extends Request {
-  user: {
-    id: string;
-    email: string;
-    role: string;
-    roles?: string[];
-    isEmailVerified: boolean;
-    isPhoneVerified: boolean;
-  };
+  user?: AuthUser;
   session?: {
     id: string;
     userId: string;
     deviceInfo: any;
+    expiresAt: Date;
   };
 }
 
 export class ControllerContainer {
   private readonly serviceContainer: ServiceContainer;
   private readonly logger = buildHiveLogger;
-  private authController?: IAuthController;
-  private profileController?: IProfileController;
-  private validationController?: IValidationController;
+  private authController?: AuthController;
+  private profileController?: ProfileController;
+  private validationController?: ValidationController;
 
   constructor(serviceContainer: ServiceContainer) {
     this.serviceContainer = serviceContainer;
@@ -65,25 +39,25 @@ export class ControllerContainer {
     });
   }
 
-  getAuthController(): IAuthController {
+  getAuthController(): AuthController {
     if (!this.authController) {
-      this.authController = createAuthController(this.serviceContainer);
+      this.authController = new AuthController(this.serviceContainer);
       this.logger.debug('AuthController created');
     }
     return this.authController;
   }
 
-  getProfileController(): IProfileController {
+  getProfileController(): ProfileController {
     if (!this.profileController) {
-      this.profileController = createProfileController(this.serviceContainer);
+      this.profileController = new ProfileController(this.serviceContainer);
       this.logger.debug('ProfileController created');
     }
     return this.profileController;
   }
 
-  getValidationController(): IValidationController {
+  getValidationController(): ValidationController {
     if (!this.validationController) {
-      this.validationController = createValidationController(this.serviceContainer);
+      this.validationController = new ValidationController(this.serviceContainer);
       this.logger.debug('ValidationController created');
     }
     return this.validationController;
@@ -128,6 +102,18 @@ export class ControllerContainer {
   }
 }
 
+export function createAuthController(serviceContainer: ServiceContainer): AuthController {
+  return new AuthController(serviceContainer);
+}
+
+export function createProfileController(serviceContainer: ServiceContainer): ProfileController {
+  return new ProfileController(serviceContainer);
+}
+
+export function createValidationController(serviceContainer: ServiceContainer): ValidationController {
+  return new ValidationController(serviceContainer);
+}
+
 export function validateRequest(schema: Joi.ObjectSchema) {
   return (req: Request, res: Response, next: NextFunction) => {
     const logger = buildHiveLogger;
@@ -156,6 +142,7 @@ export function validateRequest(schema: Joi.ObjectSchema) {
         return res.status(400).json(buildHiveResponse.error(
           'Validation failed',
           'VALIDATION_ERROR',
+          undefined,
           validationErrors
         ));
       }
@@ -215,21 +202,8 @@ export function createRateLimit(options: {
 
       res.status(429).json(buildHiveResponse.error(
         options.message,
-        'RATE_LIMIT_EXCEEDED',
-        {
-          retryAfter: Math.ceil(options.windowMs / 1000),
-          limit: options.max,
-          windowMs: options.windowMs
-        }
+        'RATE_LIMIT_EXCEEDED'
       ));
-    },
-    onLimitReached: (req: Request) => {
-      logger.warn('Rate limit reached', {
-        ip: req.ip,
-        path: req.path,
-        method: req.method,
-        userId: (req as any).user?.id
-      });
     }
   });
 }
@@ -270,7 +244,7 @@ export function requireRole(roles: string | string[]) {
       ));
     }
 
-    const userRoles = user.roles || [user.role];
+    const userRoles = [user.role];
     const requiredRoles = Array.isArray(roles) ? roles : [roles];
     
     const hasRequiredRole = requiredRoles.some(role => userRoles.includes(role));
@@ -278,8 +252,7 @@ export function requireRole(roles: string | string[]) {
     if (!hasRequiredRole) {
       return res.status(403).json(buildHiveResponse.error(
         'Insufficient permissions',
-        'FORBIDDEN',
-        { requiredRoles, userRoles }
+        'FORBIDDEN'
       ));
     }
 
@@ -333,6 +306,8 @@ export const rateLimiters = {
 export function createControllerContainer(serviceContainer: ServiceContainer): ControllerContainer {
   return new ControllerContainer(serviceContainer);
 }
+
+export { AuthController, ProfileController, ValidationController };
 
 export default {
   AuthController,

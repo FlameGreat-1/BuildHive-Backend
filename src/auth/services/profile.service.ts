@@ -37,6 +37,11 @@ export interface IProfileService {
   calculateQualityScore(profileId: string): Promise<QualityScore>;
   verifyProfile(profileId: string, verifiedBy: string): Promise<ProfileResponse>;
   deactivateProfile(profileId: string, reason?: string): Promise<ProfileResponse>;
+  getProfileById(profileId: string): Promise<ProfileResponse>;
+  deleteProfile(profileId: string, deletedBy: string): Promise<ProfileResponse>;
+  getProfilesByRole(role: string, params?: ProfileQueryParams): Promise<ProfileListResponse>;
+  uploadProfileImage(profileId: string, file: Buffer, type: 'avatar' | 'cover' | 'gallery'): Promise<string>;
+  updateTradieServices(profileId: string, services: ServiceCategory[]): Promise<ProfileResponse>;
 }
 
 export interface IEventPublisher {
@@ -915,6 +920,103 @@ export class ProfileService implements IProfileService {
       throw AuthErrorFactory.invalidInput('At least one image is required for portfolio item');
     }
   }
+
+  async getProfileById(profileId: string): Promise<ProfileResponse> {
+    return this.getProfile(profileId);
+  }
+
+  async deleteProfile(profileId: string, deletedBy: string): Promise<ProfileResponse> {
+    try {
+      this.logger.info('Deleting profile', { profileId, deletedBy });
+
+      const profile = await this.profileRepository.findById(profileId);
+      if (!profile) {
+        throw AuthErrorFactory.profileNotFound(profileId);
+      }
+
+      const updateData = {
+        status: 'deleted' as const,
+        deletedAt: new Date(),
+        deletedBy,
+        updatedAt: new Date()
+      };
+
+      const updatedProfile = await this.profileRepository.update(profileId, updateData);
+      const user = await this.userRepository.findById(profile.userId.toString());
+
+      const profileResponse = await this.mapToProfileResponse(updatedProfile!, user!);
+
+      await this.publishProfileEvent('profile.deleted', updatedProfile!, { deletedBy });
+
+      return buildHiveResponse.success(profileResponse, 'Profile deleted successfully');
+    } catch (error) {
+      this.logger.error('Failed to delete profile', error, { profileId });
+      throw AuthErrorFactory.profileUpdateFailed('Failed to delete profile', error);
+    }
+  }
+
+  async getProfilesByRole(role: string, params?: ProfileQueryParams): Promise<ProfileListResponse> {
+    const searchParams = { ...params, role };
+    return this.searchProfiles(searchParams);
+  }
+
+  async uploadProfileImage(profileId: string, file: Buffer, type: 'avatar' | 'cover' | 'gallery'): Promise<string> {
+    try {
+      const profile = await this.profileRepository.findById(profileId);
+      if (!profile) {
+        throw AuthErrorFactory.profileNotFound(profileId);
+      }
+
+      const imageUrl = await this.fileUploadService.uploadProfileImage(file, profile.userId.toString(), type);
+
+      const updateData: any = { updatedAt: new Date() };
+      if (type === 'avatar') {
+        updateData['media.avatar'] = imageUrl;
+      } else if (type === 'cover') {
+        updateData['media.coverImage'] = imageUrl;
+      } else {
+        const gallery = profile.media?.gallery || [];
+        gallery.push(imageUrl);
+        updateData['media.gallery'] = gallery;
+      }
+
+      await this.profileRepository.update(profileId, updateData);
+
+      return imageUrl;
+    } catch (error) {
+      this.logger.error('Failed to upload profile image', error, { profileId });
+      throw AuthErrorFactory.profileUpdateFailed('Failed to upload image', error);
+    }
+  }
+
+  async updateTradieServices(profileId: string, services: ServiceCategory[]): Promise<ProfileResponse> {
+    try {
+      const profile = await this.profileRepository.findById(profileId);
+      if (!profile) {
+        throw AuthErrorFactory.profileNotFound(profileId);
+      }
+
+      if (profile.role !== USER_ROLES.TRADIE) {
+        throw AuthErrorFactory.invalidOperation('Only tradie profiles can update services');
+      }
+
+      const updateData = {
+        'tradieInfo.serviceCategories': services,
+        updatedAt: new Date()
+      };
+
+      const updatedProfile = await this.profileRepository.update(profileId, updateData);
+      const user = await this.userRepository.findById(profile.userId.toString());
+
+      const profileResponse = await this.mapToProfileResponse(updatedProfile!, user!);
+
+      return buildHiveResponse.success(profileResponse, 'Services updated successfully');
+    } catch (error) {
+      this.logger.error('Failed to update tradie services', error, { profileId });
+      throw AuthErrorFactory.profileUpdateFailed('Failed to update services', error);
+    }
+  }
+}
 
   private async publishProfileEvent(eventType: string, profile: IProfileDocument | null, metadata: any): Promise<void> {
     try {

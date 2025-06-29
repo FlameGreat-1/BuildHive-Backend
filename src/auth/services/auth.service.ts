@@ -40,6 +40,11 @@ export interface IAuthService {
   changePassword(userId: string, request: ChangePasswordRequest): Promise<VerificationResponse>;
   validateToken(token: string): Promise<AuthValidationResult>;
   revokeAllSessions(userId: string, exceptSessionId?: string): Promise<number>;
+  forgotPassword(request: PasswordResetRequest): Promise<PasswordResetResponse>;
+  sendEmailVerification(userId: string, email: string): Promise<VerificationResponse>;
+  sendPhoneVerification(userId: string, phone: string): Promise<VerificationResponse>;
+  resendVerification(request: ResendVerificationRequest): Promise<VerificationResponse>;
+  validateSession(sessionId: string, userId: string): Promise<boolean>;
 }
 
 export interface IEventPublisher {
@@ -779,5 +784,78 @@ export class AuthService implements IAuthService {
 
   private maskPhone(phone: string): string {
     return phone.substring(0, 4) + '***' + phone.substring(phone.length - 2);
+  }
+}
+
+async forgotPassword(request: PasswordResetRequest): Promise<PasswordResetResponse> {
+  return this.requestPasswordReset(request);
+}
+
+async sendEmailVerification(userId: string, email: string): Promise<VerificationResponse> {
+  try {
+    const user = await this.userRepository.findById(userId);
+    if (!user) {
+      throw AuthErrorFactory.userNotFound();
+    }
+
+    const verificationToken = await this.tokenService.generateEmailVerificationToken(userId, email);
+    await this.emailService.sendVerificationEmail(email, verificationToken, user.username);
+
+    return buildHiveResponse.success({
+      verified: false,
+      type: 'email' as const,
+      user: {
+        id: userId,
+        verificationStatus: user.verificationStatus,
+        isEmailVerified: user.isEmailVerified,
+        isPhoneVerified: user.isPhoneVerified
+      },
+      isFullyVerified: false
+    }, 'Verification email sent');
+  } catch (error) {
+    throw AuthErrorFactory.verificationFailed('Failed to send email verification', error);
+  }
+}
+
+async sendPhoneVerification(userId: string, phone: string): Promise<VerificationResponse> {
+  try {
+    const user = await this.userRepository.findById(userId);
+    if (!user) {
+      throw AuthErrorFactory.userNotFound();
+    }
+
+    const verificationCode = await this.tokenService.generatePhoneVerificationCode(userId, phone);
+    await this.smsService.sendVerificationCode(phone, verificationCode);
+
+    return buildHiveResponse.success({
+      verified: false,
+      type: 'phone' as const,
+      user: {
+        id: userId,
+        verificationStatus: user.verificationStatus,
+        isEmailVerified: user.isEmailVerified,
+        isPhoneVerified: user.isPhoneVerified
+      },
+      isFullyVerified: false
+    }, 'Verification code sent');
+  } catch (error) {
+    throw AuthErrorFactory.verificationFailed('Failed to send phone verification', error);
+  }
+}
+
+async resendVerification(request: ResendVerificationRequest): Promise<VerificationResponse> {
+  if (request.type === 'email') {
+    return this.sendEmailVerification(request.userId!, request.identifier);
+  } else {
+    return this.sendPhoneVerification(request.userId!, request.identifier);
+  }
+}
+
+async validateSession(sessionId: string, userId: string): Promise<boolean> {
+  try {
+    const session = await this.sessionRepository.findById(sessionId);
+    return session ? session.userId.toString() === userId && session.isValid() : false;
+  } catch (error) {
+    return false;
   }
 }
