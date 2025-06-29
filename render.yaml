@@ -7,7 +7,6 @@ services:
     buildCommand: |
       npm ci
       npm run build
-      npx prisma generate
     startCommand: npm start
     healthCheckPath: /health
     autoDeploy: true
@@ -91,6 +90,12 @@ services:
         sync: false
       - key: ABN_LOOKUP_API_KEY
         sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REDIRECT_URI
+        value: https://buildhive-api.onrender.com/api/v1/auth/google/callback
 
     disk:
       name: buildhive-storage
