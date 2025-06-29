@@ -8,8 +8,8 @@ export { LoggingMiddleware, createLoggingMiddleware, createLoggingMiddlewareFunc
 export { ValidationMiddleware, createValidationMiddleware, createValidationMiddlewareFunctions } from './validation.middleware';
 
 import { Request, Response, NextFunction } from 'express';
+import rateLimit from 'express-rate-limit';
 import type { ServiceContainer } from '../services';
-import { buildHiveLogger } from '../../shared';
 import { AuthMiddleware } from './auth.middleware';
 import { SecurityMiddleware } from './security.middleware';
 import { LoggingMiddleware } from './logging.middleware';
@@ -25,8 +25,6 @@ export function initializeMiddleware(serviceContainer: ServiceContainer): void {
   globalSecurityMiddleware = new SecurityMiddleware();
   globalLoggingMiddleware = new LoggingMiddleware();
   globalValidationMiddleware = new ValidationMiddleware();
-  
-  buildHiveLogger.info('Global middleware instances initialized');
 }
 
 export const authMiddleware = (req: Request, res: Response, next: NextFunction) => {
@@ -107,22 +105,67 @@ export const requirePhoneVerification = (req: Request, res: Response, next: Next
   return globalAuthMiddleware.requirePhoneVerification(req, res, next);
 };
 
+export const authRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: { error: 'Too many authentication attempts' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+export const profileRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: { error: 'Too many profile requests' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+export const generalRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  message: { error: 'Too many requests' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+export const strictRateLimit = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 3,
+  message: { error: 'Rate limit exceeded' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+export const dynamicRateLimit = (windowMs: number, max: number) => rateLimit({
+  windowMs,
+  max,
+  message: { error: 'Rate limit exceeded' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+export const customRateLimit = (options: any) => rateLimit(options);
+
+export const skipRateLimitIf = (condition: (req: Request) => boolean) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (condition(req)) {
+      return next();
+    }
+    return generalRateLimit(req, res, next);
+  };
+};
+
+export const rateLimitHealthCheck = (req: Request, res: Response, next: NextFunction) => {
+  next();
+};
+
 export const rateLimiters = {
-  auth: (req: Request, res: Response, next: NextFunction) => {
-    next();
-  },
-  register: (req: Request, res: Response, next: NextFunction) => {
-    next();
-  },
-  passwordReset: (req: Request, res: Response, next: NextFunction) => {
-    next();
-  },
-  verification: (req: Request, res: Response, next: NextFunction) => {
-    next();
-  },
-  general: (req: Request, res: Response, next: NextFunction) => {
-    next();
-  }
+  auth: authRateLimit,
+  register: strictRateLimit,
+  passwordReset: strictRateLimit,
+  verification: strictRateLimit,
+  general: generalRateLimit,
 };
 
 export function asyncHandler(fn: (req: Request, res: Response, next: NextFunction) => Promise<void>) {
@@ -140,9 +183,40 @@ export function validateRequest(schema: any) {
   };
 }
 
+export function errorHandler(error: any, req: Request, res: Response, next: NextFunction) {
+  const statusCode = error.statusCode || 500;
+  const message = error.message || 'Internal Server Error';
+  
+  res.status(statusCode).json({
+    success: false,
+    message,
+    error: error.code || 'INTERNAL_ERROR',
+    ...(process.env.NODE_ENV === 'development' && { stack: error.stack })
+  });
+}
+
+export function notFoundHandler(req: Request, res: Response) {
+  res.status(404).json({
+    success: false,
+    message: 'Resource not found',
+    error: 'NOT_FOUND'
+  });
+}
+
+export function validationErrorHandler(error: any, req: Request, res: Response, next: NextFunction) {
+  if (error.name === 'ValidationError') {
+    return res.status(400).json({
+      success: false,
+      message: 'Validation failed',
+      error: 'VALIDATION_ERROR',
+      details: error.details
+    });
+  }
+  next(error);
+}
+
 export class MiddlewareContainer {
   private readonly serviceContainer: ServiceContainer;
-  private readonly logger = buildHiveLogger;
   private authMiddleware?: AuthMiddleware;
   private securityMiddleware?: SecurityMiddleware;
   private loggingMiddleware?: LoggingMiddleware;
@@ -150,17 +224,11 @@ export class MiddlewareContainer {
 
   constructor(serviceContainer: ServiceContainer) {
     this.serviceContainer = serviceContainer;
-    
-    this.logger.info('MiddlewareContainer initialized', {
-      container: 'MiddlewareContainer',
-      timestamp: new Date().toISOString()
-    });
   }
 
   getAuthMiddleware(): AuthMiddleware {
     if (!this.authMiddleware) {
       this.authMiddleware = new AuthMiddleware(this.serviceContainer);
-      this.logger.debug('AuthMiddleware created');
     }
     return this.authMiddleware;
   }
@@ -168,7 +236,6 @@ export class MiddlewareContainer {
   getSecurityMiddleware(): SecurityMiddleware {
     if (!this.securityMiddleware) {
       this.securityMiddleware = new SecurityMiddleware();
-      this.logger.debug('SecurityMiddleware created');
     }
     return this.securityMiddleware;
   }
@@ -176,7 +243,6 @@ export class MiddlewareContainer {
   getLoggingMiddleware(): LoggingMiddleware {
     if (!this.loggingMiddleware) {
       this.loggingMiddleware = new LoggingMiddleware();
-      this.logger.debug('LoggingMiddleware created');
     }
     return this.loggingMiddleware;
   }
@@ -184,7 +250,6 @@ export class MiddlewareContainer {
   getValidationMiddleware(): ValidationMiddleware {
     if (!this.validationMiddleware) {
       this.validationMiddleware = new ValidationMiddleware();
-      this.logger.debug('ValidationMiddleware created');
     }
     return this.validationMiddleware;
   }
@@ -247,7 +312,6 @@ export class MiddlewareContainer {
       this.getAuthMiddleware();
       results.auth = true;
     } catch (error) {
-      this.logger.error('AuthMiddleware health check failed', error as Error);
       results.auth = false;
     }
 
@@ -255,7 +319,6 @@ export class MiddlewareContainer {
       this.getSecurityMiddleware();
       results.security = true;
     } catch (error) {
-      this.logger.error('SecurityMiddleware health check failed', error as Error);
       results.security = false;
     }
 
@@ -263,7 +326,6 @@ export class MiddlewareContainer {
       this.getLoggingMiddleware();
       results.logging = true;
     } catch (error) {
-      this.logger.error('LoggingMiddleware health check failed', error as Error);
       results.logging = false;
     }
 
@@ -271,7 +333,6 @@ export class MiddlewareContainer {
       this.getValidationMiddleware();
       results.validation = true;
     } catch (error) {
-      this.logger.error('ValidationMiddleware health check failed', error as Error);
       results.validation = false;
     }
 
@@ -298,12 +359,43 @@ export function createAllMiddleware(serviceContainer: ServiceContainer) {
   };
 }
 
+export class ErrorMiddleware {
+  static handle = errorHandler;
+  static notFound = notFoundHandler;
+  static validation = validationErrorHandler;
+}
+
+export class RateLimitMiddleware {
+  static auth = authRateLimit;
+  static profile = profileRateLimit;
+  static general = generalRateLimit;
+  static strict = strictRateLimit;
+  static dynamic = dynamicRateLimit;
+  static custom = customRateLimit;
+  static skip = skipRateLimitIf;
+  static healthCheck = rateLimitHealthCheck;
+}
+
+export const middleware = {
+  auth: authMiddleware,
+  session: sessionMiddleware,
+  cors: corsMiddleware,
+  security: securityMiddleware,
+  logging: loggingMiddleware,
+  validation: validateRequest,
+  error: errorHandler,
+  notFound: notFoundHandler,
+  rateLimit: rateLimiters,
+};
+
 export default {
   AuthMiddleware,
   SecurityMiddleware,
   LoggingMiddleware,
   ValidationMiddleware,
   MiddlewareContainer,
+  ErrorMiddleware,
+  RateLimitMiddleware,
   createMiddlewareContainer,
   createAllMiddleware,
   initializeMiddleware,
@@ -320,5 +412,17 @@ export default {
   requirePhoneVerification,
   rateLimiters,
   asyncHandler,
-  validateRequest
+  validateRequest,
+  errorHandler,
+  notFoundHandler,
+  validationErrorHandler,
+  authRateLimit,
+  profileRateLimit,
+  generalRateLimit,
+  strictRateLimit,
+  dynamicRateLimit,
+  customRateLimit,
+  skipRateLimitIf,
+  rateLimitHealthCheck,
+  middleware,
 };

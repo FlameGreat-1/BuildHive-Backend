@@ -1,7 +1,4 @@
-// Shared Module Export
-// Main entry point for all shared functionality across BuildHive
-
-// Utilities
+// ===== UTILS EXPORTS =====
 export {
   buildHiveLogger,
   winstonLogger,
@@ -11,9 +8,10 @@ export {
   AuthErrorHandler,
   AUTH_ERROR_CODES,
   utils,
+  gracefulShutdown,
 } from './utils';
 
-// Middleware
+// ===== MIDDLEWARE EXPORTS =====
 export {
   errorHandler,
   asyncHandler,
@@ -30,9 +28,30 @@ export {
   rateLimitHealthCheck,
   RateLimitMiddleware,
   middleware,
+  AuthMiddleware,
+  SecurityMiddleware,
+  LoggingMiddleware,
+  ValidationMiddleware,
+  MiddlewareContainer,
+  createMiddlewareContainer,
+  createAllMiddleware,
+  initializeMiddleware,
+  authMiddleware,
+  sessionMiddleware,
+  profileOwnershipMiddleware,
+  corsMiddleware,
+  securityMiddleware,
+  loggingMiddleware,
+  imageUploadMiddleware,
+  requireAuth,
+  requireRole,
+  requireEmailVerification,
+  requirePhoneVerification,
+  rateLimiters,
+  validateRequest,
 } from './middleware';
 
-// Types
+// ===== TYPE EXPORTS =====
 export type {
   BaseApiResponse,
   ApiSuccessResponse,
@@ -101,10 +120,146 @@ export type {
   DocumentArray,
   Mixed,
   Decimal128,
-  sharedTypes,
+  VerifyEmailRequest,
+  VerifyPhoneRequest,
+  ProfileSearchRequest,
+  ValidationResponse,
+  SortOptions,
+  ForgotPasswordRequest,
+  ResetPasswordRequest,
+  AuthResponse,
+  User,
+  PlatformType,
+  AuthProvider,
+  TokenType,
+  DeviceInfo,
+  LocationInfo,
+  RegisterRequest,
+  LoginRequest,
+  RefreshTokenRequest,
+  LogoutRequest,
+  EmailVerificationRequest,
+  PhoneVerificationRequest,
+  ResendVerificationRequest,
+  PasswordResetRequest,
+  PasswordResetConfirmRequest,
+  ChangePasswordRequest,
+  TokenPayload,
+  RefreshTokenPayload,
+  TokenPair,
+  AuthUser,
+  RegisterResponse,
+  LoginResponse,
+  RefreshTokenResponse,
+  LogoutResponse,
+  VerificationResponse,
+  PasswordResetResponse,
+  SessionData,
+  ActiveSession,
+  SessionListResponse,
+  SecurityContext,
+  AuthValidationResult,
+  ClientAuthData,
+  TradieAuthData,
+  EnterpriseAuthData,
+  AuthEvent,
+  RateLimitContext,
+  RateLimitResult,
+  AuthAuditLog,
+  MFASetupRequest,
+  MFAVerifyRequest,
+  MFAResponse,
+  AuthRequestType,
+  AuthResponseType,
+  VerificationRequestType,
+  CreateUserRequest,
+  UpdateUserRequest,
+  UpdateUserPasswordRequest,
+  UpdateUserStatusRequest,
+  UserProfile,
+  DetailedUserProfile,
+  UserListItem,
+  UserQueryParams,
+  UserFilterOptions,
+  UserStatistics,
+  UserActivitySummary,
+  UpdateSubscriptionRequest,
+  CreditTransactionRequest,
+  CreditBalance,
+  TeamMember,
+  EnterpriseTeam,
+  TeamInvitationRequest,
+  TeamMemberUpdateRequest,
+  UserDevice,
+  DeviceManagementRequest,
+  UserPreferences,
+  UpdatePreferencesRequest,
+  BulkUserOperation,
+  BulkOperationResult,
+  UserImportData,
+  UserExportOptions,
+  UserResponse,
+  DetailedUserResponse,
+  UserListResponse,
+  UserStatisticsResponse,
+  CreditBalanceResponse,
+  EnterpriseTeamResponse,
+  UserDevicesResponse,
+  UserPreferencesResponse,
+  BulkOperationResponse,
+  UserRequestType,
+  UserResponseType,
+  TeamManagementType,
+  UserManagementType,
+  ServiceCategory,
+  AvailabilityStatus,
+  AustralianState,
+  BusinessType,
+  PropertyType,
+  CompanySize,
+  ProfileAddress,
+  ProfileBusinessInfo,
+  ProfileMedia,
+  VerificationDocument,
+  ProfileRatings,
+  ProfileStatistics,
+  ProfileCompletion,
+  QualityScore,
+  TradieQualification,
+  TradieInsurance,
+  TradieAvailability,
+  QuotingPreferences,
+  PortfolioItem,
+  ClientCommunicationPreferences,
+  ClientJobHistory,
+  EnterpriseTeamStructure,
+  EnterpriseServiceArea,
+  EnterpriseCertification,
+  EnterpriseOperationalPreferences,
+  EnterpriseClientPortfolio,
+  CreateProfileRequest,
+  CreateTradieProfileRequest,
+  CreateClientProfileRequest,
+  CreateEnterpriseProfileRequest,
+  UpdateProfileRequest,
+  ProfileQueryParams,
+  ProfileData,
+  TradieProfile,
+  ClientProfile,
+  EnterpriseProfile,
+  ProfileResponse,
+  ProfileListResponse,
+  ProfileType,
+  CreateProfileRequestType,
+  ProfileRequestType,
+  ProfileResponseType,
+  AuthenticatedUser,
+  AuthenticatedRequest,
+  ValidationOptions,
+  LoggingOptions,
 } from './types';
 
-// Database
+// ===== DATABASE EXPORTS =====
 export {
   databaseConnection,
   connectDatabase,
@@ -119,16 +274,16 @@ export {
   database,
 } from './database';
 
-// Default exports for convenience
+// ===== DEFAULT EXPORTS =====
 export { default as logger } from './utils/logger.util';
 export { default as response } from './utils/response.util';
 export { default as errorFactory } from './utils/error.util';
-export { default as ErrorMiddleware } from './middleware/error.middleware';
-export { default as RateLimitMiddleware } from './middleware/rate-limit.middleware';
+export { default as ErrorMiddleware } from './middleware';
+export { default as RateLimitMiddleware } from './middleware';
 export { default as types } from './types';
 export { default as db } from './database';
 
-// Combined shared object for easy access
+// ===== SHARED OBJECT =====
 export const shared = {
   utils: {
     logger: buildHiveLogger,
@@ -139,6 +294,12 @@ export const shared = {
   middleware: {
     error: ErrorMiddleware,
     rateLimit: RateLimitMiddleware,
+    auth: authMiddleware,
+    session: sessionMiddleware,
+    cors: corsMiddleware,
+    security: securityMiddleware,
+    logging: loggingMiddleware,
+    validation: validateRequest,
   },
   database: {
     connection: databaseConnection,
@@ -154,7 +315,10 @@ export const shared = {
       abort: abortTransaction,
     },
   },
-  types: sharedTypes,
+  types: {
+    AUTH_TYPES: AUTH_TYPES,
+    PROFILE_TYPES: PROFILE_TYPES,
+  },
 };
 
 export default shared;

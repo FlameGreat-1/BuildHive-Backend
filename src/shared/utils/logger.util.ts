@@ -1,4 +1,6 @@
 import winston from 'winston';
+import path from 'path';
+import fs from 'fs';
 import { env, isProduction, isDevelopment } from '../../config/auth';
 
 const LOG_LEVELS = {
@@ -7,6 +9,15 @@ const LOG_LEVELS = {
   info: 2,
   debug: 3,
 } as const;
+
+const ensureLogDirectory = (): void => {
+  const logDir = path.join(process.cwd(), 'logs');
+  if (!fs.existsSync(logDir)) {
+    fs.mkdirSync(logDir, { recursive: true });
+  }
+};
+
+ensureLogDirectory();
 
 const buildHiveFormat = winston.format.combine(
   winston.format.timestamp({
@@ -49,27 +60,27 @@ const logger = winston.createLogger({
   },
   transports: [
     new winston.transports.File({
-      filename: 'logs/error.log',
+      filename: path.join('logs', 'error.log'),
       level: 'error',
       maxsize: 5242880,
       maxFiles: 5,
     }),
     new winston.transports.File({
-      filename: 'logs/combined.log',
+      filename: path.join('logs', 'combined.log'),
       maxsize: 5242880,
       maxFiles: 10,
     }),
   ],
   exceptionHandlers: [
     new winston.transports.File({
-      filename: 'logs/exceptions.log',
+      filename: path.join('logs', 'exceptions.log'),
       maxsize: 5242880,
       maxFiles: 3,
     }),
   ],
   rejectionHandlers: [
     new winston.transports.File({
-      filename: 'logs/rejections.log',
+      filename: path.join('logs', 'rejections.log'),
       maxsize: 5242880,
       maxFiles: 3,
     }),
@@ -101,7 +112,7 @@ class BuildHiveLogger {
   }
 
   auth = {
-    login: (userId: string, ip: string, success: boolean, context?: LogContext) => {
+    login: (userId: string, ip: string, success: boolean, context?: LogContext): void => {
       const level = success ? 'info' : 'warn';
       const message = success ? 'User login successful' : 'User login failed';
       
@@ -114,7 +125,7 @@ class BuildHiveLogger {
       });
     },
 
-    register: (email: string, role: string, ip: string, context?: LogContext) => {
+    register: (email: string, role: string, ip: string, context?: LogContext): void => {
       this.logger.info('User registration initiated', {
         action: 'AUTH_REGISTER',
         email,
@@ -124,7 +135,7 @@ class BuildHiveLogger {
       });
     },
 
-    logout: (userId: string, ip: string, context?: LogContext) => {
+    logout: (userId: string, ip: string, context?: LogContext): void => {
       this.logger.info('User logout', {
         action: 'AUTH_LOGOUT',
         userId,
@@ -133,7 +144,7 @@ class BuildHiveLogger {
       });
     },
 
-    passwordReset: (email: string, ip: string, context?: LogContext) => {
+    passwordReset: (email: string, ip: string, context?: LogContext): void => {
       this.logger.info('Password reset requested', {
         action: 'AUTH_PASSWORD_RESET',
         email,
@@ -142,7 +153,7 @@ class BuildHiveLogger {
       });
     },
 
-    emailVerification: (userId: string, email: string, success: boolean, context?: LogContext) => {
+    emailVerification: (userId: string, email: string, success: boolean, context?: LogContext): void => {
       const level = success ? 'info' : 'warn';
       const message = success ? 'Email verification successful' : 'Email verification failed';
       
@@ -157,7 +168,7 @@ class BuildHiveLogger {
   };
 
   profile = {
-    update: (userId: string, fields: string[], context?: LogContext) => {
+    update: (userId: string, fields: string[], context?: LogContext): void => {
       this.logger.info('Profile updated', {
         action: 'PROFILE_UPDATE',
         userId,
@@ -166,7 +177,7 @@ class BuildHiveLogger {
       });
     },
 
-    imageUpload: (userId: string, fileName: string, fileSize: number, context?: LogContext) => {
+    imageUpload: (userId: string, fileName: string, fileSize: number, context?: LogContext): void => {
       this.logger.info('Profile image uploaded', {
         action: 'PROFILE_IMAGE_UPLOAD',
         userId,
@@ -176,7 +187,7 @@ class BuildHiveLogger {
       });
     },
 
-    verification: (userId: string, verificationType: string, status: string, context?: LogContext) => {
+    verification: (userId: string, verificationType: string, status: string, context?: LogContext): void => {
       this.logger.info('Profile verification status changed', {
         action: 'PROFILE_VERIFICATION',
         userId,
@@ -188,7 +199,7 @@ class BuildHiveLogger {
   };
 
   security = {
-    suspiciousActivity: (userId: string, activity: string, ip: string, context?: LogContext) => {
+    suspiciousActivity: (userId: string, activity: string, ip: string, context?: LogContext): void => {
       this.logger.warn('Suspicious activity detected', {
         action: 'SECURITY_SUSPICIOUS',
         userId,
@@ -198,7 +209,7 @@ class BuildHiveLogger {
       });
     },
 
-    rateLimitExceeded: (ip: string, endpoint: string, context?: LogContext) => {
+    rateLimitExceeded: (ip: string, endpoint: string, context?: LogContext): void => {
       this.logger.warn('Rate limit exceeded', {
         action: 'SECURITY_RATE_LIMIT',
         ip,
@@ -207,7 +218,7 @@ class BuildHiveLogger {
       });
     },
 
-    invalidToken: (token: string, ip: string, context?: LogContext) => {
+    invalidToken: (token: string, ip: string, context?: LogContext): void => {
       this.logger.warn('Invalid token used', {
         action: 'SECURITY_INVALID_TOKEN',
         token: token.substring(0, 10) + '...',
@@ -216,7 +227,7 @@ class BuildHiveLogger {
       });
     },
 
-    accountLocked: (username: string, context?: LogContext) => {
+    accountLocked: (username: string, context?: LogContext): void => {
       this.logger.warn('Account locked due to failed login attempts', {
         action: 'SECURITY_ACCOUNT_LOCKED',
         username,
@@ -224,7 +235,7 @@ class BuildHiveLogger {
       });
     },
 
-    loginAttempt: (identifier: string, success: boolean, reason?: string, context?: LogContext) => {
+    loginAttempt: (identifier: string, success: boolean, reason?: string, context?: LogContext): void => {
       const level = success ? 'info' : 'warn';
       const message = success ? 'Login attempt successful' : 'Login attempt failed';
       
@@ -237,7 +248,7 @@ class BuildHiveLogger {
       });
     },
 
-    passwordChanged: (username: string, context?: LogContext) => {
+    passwordChanged: (username: string, context?: LogContext): void => {
       this.logger.info('User password changed', {
         action: 'SECURITY_PASSWORD_CHANGED',
         username,
@@ -247,7 +258,7 @@ class BuildHiveLogger {
   };
 
   api = {
-    request: (method: string, url: string, statusCode: number, duration: number, context?: LogContext) => {
+    request: (method: string, url: string, statusCode: number, duration: number, context?: LogContext): void => {
       const level = statusCode >= 400 ? 'warn' : 'info';
       
       this.logger.log(level, 'API request', {
@@ -260,7 +271,7 @@ class BuildHiveLogger {
       });
     },
 
-    error: (error: Error, context?: LogContext) => {
+    error: (error: Error, context?: LogContext): void => {
       this.logger.error('API error', {
         action: 'API_ERROR',
         error: error.message,
@@ -271,7 +282,7 @@ class BuildHiveLogger {
   };
 
   database = {
-    connection: (database: string, status: 'connected' | 'disconnected' | 'error', context?: LogContext) => {
+    connection: (database: string, status: 'connected' | 'disconnected' | 'error', context?: LogContext): void => {
       const level = status === 'error' ? 'error' : 'info';
       
       this.logger.log(level, `Database ${status}`, {
@@ -282,7 +293,7 @@ class BuildHiveLogger {
       });
     },
 
-    query: (collection: string, operation: string, duration: number, context?: LogContext) => {
+    query: (collection: string, operation: string, duration: number, context?: LogContext): void => {
       this.logger.debug('Database query', {
         action: 'DATABASE_QUERY',
         collection,

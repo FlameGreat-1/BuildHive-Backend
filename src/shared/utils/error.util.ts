@@ -192,6 +192,76 @@ class AuthErrorFactory {
     );
   }
 
+static unauthorized(message: string = 'Unauthorized', context?: Record<string, any>): BuildHiveAuthError {
+  return new BuildHiveAuthError(
+    message,
+    AUTH_ERROR_CODES.INSUFFICIENT_PERMISSIONS,
+    401,
+    true,
+    context
+  );
+}
+
+static forbidden(message: string = 'Forbidden', context?: Record<string, any>): BuildHiveAuthError {
+  return new BuildHiveAuthError(
+    message,
+    AUTH_ERROR_CODES.ACCESS_DENIED,
+    403,
+    true,
+    context
+  );
+}
+
+static validationError(message: string = 'Validation Error', context?: Record<string, any>): BuildHiveAuthError {
+  return new BuildHiveAuthError(
+    message,
+    AUTH_ERROR_CODES.VALIDATION_FAILED,
+    400,
+    true,
+    context
+  );
+}
+
+static notFound(message: string = 'Not Found', context?: Record<string, any>): BuildHiveAuthError {
+  return new BuildHiveAuthError(
+    message,
+    AUTH_ERROR_CODES.USER_NOT_FOUND,
+    404,
+    true,
+    context
+  );
+}
+
+static sessionNotFound(message: string = 'Session not found', context?: Record<string, any>): BuildHiveAuthError {
+  return new BuildHiveAuthError(
+    message,
+    AUTH_ERROR_CODES.INVALID_TOKEN,
+    404,
+    true,
+    context
+  );
+}
+
+static missingRequiredFields(fields: string[], context?: Record<string, any>): BuildHiveAuthError {
+  return new BuildHiveAuthError(
+    `Missing required fields: ${fields.join(', ')}`,
+    AUTH_ERROR_CODES.VALIDATION_FAILED,
+    400,
+    true,
+    { missingFields: fields, ...context }
+  );
+}
+
+static invalidPhoneNumber(message: string = 'Invalid phone number', context?: Record<string, any>): BuildHiveAuthError {
+  return new BuildHiveAuthError(
+    message,
+    AUTH_ERROR_CODES.INVALID_PHONE,
+    400,
+    true,
+    context
+  );
+}
+
   static tooManyAttempts(action: string, context?: Record<string, any>): BuildHiveAuthError {
     return new BuildHiveAuthError(
       'Too many attempts. Please try again later',
