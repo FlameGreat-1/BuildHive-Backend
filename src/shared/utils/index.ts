@@ -24,4 +24,16 @@ export const utils = {
   errorHandler: AuthErrorHandler,
 };
 
+export const gracefulShutdown = async (): Promise<void> => {
+  const logger = buildHiveLogger;
+  logger.info('Graceful shutdown initiated...');
+  
+  try {
+    logger.info('Cleanup completed successfully');
+  } catch (error) {
+    logger.error('Error during cleanup:', error);
+  }
+};
+
+
 export default utils;

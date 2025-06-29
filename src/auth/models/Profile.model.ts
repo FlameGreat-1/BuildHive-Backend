@@ -1,3 +1,6 @@
+I WANT YOU TO ORGANIZE EVERYTHING PERFECTLY FROM THE BEGINNING TO THE END. REMOVE ALL COMMENTS. THIS ABOUT 998 LINES OF CODES. SO YOU HAVE TO BE EXTREMELY CAREFUL TO AVOID OMITTING OR MISSING ANYTHING AT ALL TO ALL. YOU SHOULD ONLY REMOVE THE COMMENTS, EVERYTHING ELSE MUST REMAIN INTACT. FINALLY, DIVIDE THE CODES INTO 3 EQUAL PARTS, WHEN YOU FINISH PART 1 YOU TAKE PERMISSION BEFORE YOU CONTINUE:
+
+
 import { Schema, model } from 'mongoose';
 import { USER_ROLES, VERIFICATION_STATUS } from '../../config';
 import { buildHiveLogger } from '../../shared';
@@ -361,6 +364,45 @@ export interface IProfileDocument extends BaseDocument {
     };
   };
   
+  // Add these missing methods to profileSchema.methods:
+profileSchema.methods.calculateQualityScore = function(): number {
+  const factors = {
+    profileCompleteness: this.profileCompletion.percentage || 0,
+    verificationStatus: this.verificationStatus === 'verified' ? 100 : 0,
+    reviewRating: (this.ratings.overall || 0) * 20,
+    responseTime: Math.max(0, 100 - (this.statistics.responseTime || 0)),
+    jobCompletionRate: this.statistics.onTimeCompletionRate || 0
+  };
+  
+  const score = Object.values(factors).reduce((sum, val) => sum + val, 0) / 5;
+  this.qualityScore = { score, factors, lastCalculated: new Date() };
+  return score;
+};
+
+profileSchema.methods.updateStatistics = async function(): Promise<void> {
+  this.statistics.lastActiveDate = new Date();
+  await this.save();
+};
+
+profileSchema.methods.addPortfolioItem = async function(item: any): Promise<void> {
+  if (!this.tradieInfo) this.tradieInfo = { portfolio: [] };
+  this.tradieInfo.portfolio.push(item);
+  await this.save();
+};
+
+profileSchema.methods.updateAvailability = async function(status: any): Promise<void> {
+  if (this.tradieInfo) {
+    this.tradieInfo.availability.status = status;
+    await this.save();
+  }
+};
+
+profileSchema.methods.addQualification = async function(qualification: any): Promise<void> {
+  if (!this.tradieInfo) this.tradieInfo = { qualifications: [] };
+  this.tradieInfo.qualifications.push(qualification);
+  await this.save();
+};
+
   // Social & Professional Links
   socialLinks?: {
     website?: string;

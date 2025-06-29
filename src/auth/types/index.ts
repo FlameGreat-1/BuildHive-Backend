@@ -131,6 +131,53 @@ export type {
   ProfileResponseType,
 } from './profile.types';
 
+// ADD THESE MISSING ALIASES THAT THE CONTROLLER EXPECTS:
+export type ForgotPasswordRequest = PasswordResetRequest;
+export type ResetPasswordRequest = PasswordResetConfirmRequest;
+export type AuthResponse = LoginResponse | RegisterResponse | RefreshTokenResponse;
+export type User = AuthUser;
+
+// ADD MISSING VALIDATION TYPES
+export interface VerifyEmailRequest {
+  token: string;
+  email: string;
+}
+
+export interface VerifyPhoneRequest {
+  code: string;
+  phone: string;
+  userId: string;
+}
+
+export interface ProfileSearchRequest {
+  query?: string;
+  category?: ServiceCategory;
+  location?: string;
+  radius?: number;
+  minRating?: number;
+  availability?: AvailabilityStatus;
+  priceRange?: {
+    min: number;
+    max: number;
+  };
+  sortBy?: 'rating' | 'distance' | 'price' | 'reviews';
+  sortOrder?: 'asc' | 'desc';
+  page?: number;
+  limit?: number;
+}
+
+export interface ValidationResponse {
+  success: boolean;
+  message: string;
+  data?: any;
+  errors?: ValidationError[];
+}
+
+export interface SortOptions {
+  field: string;
+  direction: 'asc' | 'desc';
+}
+
 export const AUTH_TYPES = {
   PLATFORM: {
     WEB: 'web' as const,

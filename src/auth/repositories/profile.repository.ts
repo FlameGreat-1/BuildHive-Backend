@@ -280,6 +280,38 @@ export class ProfileRepository implements IProfileRepository {
     }
   }
 
+// Add these missing private methods to ProfileRepository class:
+private validateProfileData(profileData: any): void {
+  if (!profileData.role) throw AuthErrorFactory.invalidInput('Role is required');
+  if (!profileData.firstName) throw AuthErrorFactory.invalidInput('First name is required');
+  if (!profileData.lastName) throw AuthErrorFactory.invalidInput('Last name is required');
+}
+
+private sanitizeUpdateData(updateData: any): any {
+  const { _id, userId, createdAt, ...sanitized } = updateData;
+  return sanitized;
+}
+
+private async emitProfileEvent(eventName: string, profile: any, metadata?: any): Promise<void> {
+  this.logger.info(`Profile event: ${eventName}`, { profileId: profile._id, ...metadata });
+}
+
+private isValidABN(abn: string): boolean {
+  return /^\d{11}$/.test(abn.replace(/\s/g, ''));
+}
+
+private maskIdentifier(identifier: string): string {
+  return identifier.replace(/(.{2}).*(.{2})/, '$1***$2');
+}
+
+private maskEmail(email: string): string {
+  return email.replace(/(.{2}).*(@.*)/, '$1***$2');
+}
+
+private maskPhone(phone: string): string {
+  return phone.replace(/(.{2}).*(.{2})/, '$1***$2');
+}
+
   /**
    * Soft delete profile (following GDPR compliance)
    */
@@ -1277,6 +1309,258 @@ export class ProfileRepository implements IProfileRepository {
       throw AuthErrorFactory.databaseError('Failed to remove qualification', error);
     }
   }
+
+  /**
+ * Search profiles with advanced filtering and facets
+ * Core functionality for BuildHive marketplace search
+ */
+async searchProfiles(query: {
+  searchTerm?: string;
+  serviceCategories?: string[];
+  location?: string;
+  minRating?: number;
+  maxHourlyRate?: number;
+  availability?: string;
+  verified?: boolean;
+}, options?: PaginationOptions): Promise<{
+  profiles: IProfileDocument[];
+  total: number;
+  facets: {
+    serviceCategories: { category: string; count: number }[];
+    locations: { location: string; count: number }[];
+    ratingRanges: { range: string; count: number }[];
+  };
+}> {
+  try {
+    const page = options?.page || 1;
+    const limit = options?.limit || 20;
+    const skip = (page - 1) * limit;
+
+    // Build base query
+    const baseQuery: FilterQuery<IProfileDocument> = {
+      deletedAt: { $exists: false },
+    };
+
+    // Search term filter (name, business name, specializations)
+    if (query.searchTerm) {
+      const searchRegex = new RegExp(query.searchTerm, 'i');
+      baseQuery.$or = [
+        { firstName: searchRegex },
+        { lastName: searchRegex },
+        { displayName: searchRegex },
+        { 'businessInfo.businessName': searchRegex },
+        { 'businessInfo.tradingName': searchRegex },
+        { 'tradieInfo.specializations': { $in: [searchRegex] } },
+      ];
+    }
+
+    // Service categories filter
+    if (query.serviceCategories && query.serviceCategories.length > 0) {
+      baseQuery['tradieInfo.serviceCategories'] = { $in: query.serviceCategories };
+    }
+
+    // Location filter
+    if (query.location) {
+      const locationRegex = new RegExp(query.location, 'i');
+      baseQuery.$or = baseQuery.$or || [];
+      baseQuery.$or.push(
+        { 'address.state': locationRegex },
+        { 'address.suburb': locationRegex },
+        { 'address.postcode': locationRegex }
+      );
+    }
+
+    // Rating filter
+    if (query.minRating) {
+      baseQuery['ratings.overall'] = { $gte: query.minRating };
+    }
+
+    // Hourly rate filter
+    if (query.maxHourlyRate) {
+      baseQuery['tradieInfo.hourlyRate.max'] = { $lte: query.maxHourlyRate };
+    }
+
+    // Availability filter
+    if (query.availability) {
+      baseQuery['tradieInfo.availability.status'] = query.availability;
+    }
+
+    // Verification filter
+    if (query.verified === true) {
+      baseQuery.verificationStatus = VERIFICATION_STATUS.VERIFIED;
+    }
+
+    // Execute search with pagination
+    const [profiles, total, facets] = await Promise.all([
+      this.model
+        .find(baseQuery)
+        .populate('userId', 'username email status lastLogin')
+        .sort({ 
+          'ratings.overall': -1, 
+          'tradieInfo.hourlyRate.min': 1,
+          updatedAt: -1 
+        })
+        .skip(skip)
+        .limit(limit)
+        .lean()
+        .exec(),
+      this.model.countDocuments(baseQuery),
+      this.generateSearchFacets(baseQuery)
+    ]);
+
+    this.logger.info('Profile search completed', {
+      query,
+      resultsCount: profiles.length,
+      totalResults: total,
+      page,
+      limit,
+    });
+
+    return {
+      profiles: profiles as IProfileDocument[],
+      total,
+      facets,
+    };
+  } catch (error) {
+    this.logger.error('Profile search failed', error, { query, options });
+    throw AuthErrorFactory.databaseError('Profile search failed', error);
+  }
+}
+
+/**
+ * Get comprehensive profile statistics
+ * For admin dashboard and analytics
+ */
+async getProfileStatistics(): Promise<{
+  totalProfiles: number;
+  profilesByRole: Record<UserRole, number>;
+  verificationStats: Record<string, number>;
+  averageRatings: Record<string, number>;
+  serviceDistribution: { category: string; count: number }[];
+  locationDistribution: { state: string; count: number }[];
+}> {
+  try {
+    const [
+      totalProfiles,
+      profilesByRole,
+      verificationStats,
+      averageRatings,
+      serviceDistribution,
+      locationDistribution
+    ] = await Promise.all([
+      // Total profiles count
+      this.model.countDocuments({ deletedAt: { $exists: false } }),
+
+      // Profiles by role
+      this.model.aggregate([
+        { $match: { deletedAt: { $exists: false } } },
+        { $group: { _id: '$role', count: { $sum: 1 } } }
+      ]),
+
+      // Verification statistics
+      this.model.aggregate([
+        { $match: { deletedAt: { $exists: false } } },
+        { $group: { _id: '$verificationStatus', count: { $sum: 1 } } }
+      ]),
+
+      // Average ratings by role
+      this.model.aggregate([
+        { 
+          $match: { 
+            deletedAt: { $exists: false },
+            'ratings.overall': { $exists: true, $gt: 0 }
+          }
+        },
+        {
+          $group: {
+            _id: '$role',
+            averageRating: { $avg: '$ratings.overall' },
+            totalRated: { $sum: 1 }
+          }
+        }
+      ]),
+
+      // Service category distribution
+      this.model.aggregate([
+        { 
+          $match: { 
+            deletedAt: { $exists: false },
+            role: USER_ROLES.TRADIE,
+            'tradieInfo.serviceCategories': { $exists: true }
+          }
+        },
+        { $unwind: '$tradieInfo.serviceCategories' },
+        { $group: { _id: '$tradieInfo.serviceCategories', count: { $sum: 1 } } },
+        { $sort: { count: -1 } }
+      ]),
+
+      // Location distribution
+      this.model.aggregate([
+        { 
+          $match: { 
+            deletedAt: { $exists: false },
+            'address.state': { $exists: true }
+          }
+        },
+        { $group: { _id: '$address.state', count: { $sum: 1 } } },
+        { $sort: { count: -1 } }
+      ])
+    ]);
+
+    // Transform aggregation results to expected format
+    const profilesByRoleMap: Record<UserRole, number> = {
+      [USER_ROLES.CLIENT]: 0,
+      [USER_ROLES.TRADIE]: 0,
+      [USER_ROLES.ENTERPRISE]: 0,
+    };
+
+    profilesByRole.forEach(item => {
+      if (item._id in profilesByRoleMap) {
+        profilesByRoleMap[item._id as UserRole] = item.count;
+      }
+    });
+
+    const verificationStatsMap: Record<string, number> = {};
+    verificationStats.forEach(item => {
+      verificationStatsMap[item._id] = item.count;
+    });
+
+    const averageRatingsMap: Record<string, number> = {};
+    averageRatings.forEach(item => {
+      averageRatingsMap[item._id] = Math.round(item.averageRating * 100) / 100;
+    });
+
+    const serviceDistributionArray = serviceDistribution.map(item => ({
+      category: item._id,
+      count: item.count
+    }));
+
+    const locationDistributionArray = locationDistribution.map(item => ({
+      state: item._id,
+      count: item.count
+    }));
+
+    const statistics = {
+      totalProfiles,
+      profilesByRole: profilesByRoleMap,
+      verificationStats: verificationStatsMap,
+      averageRatings: averageRatingsMap,
+      serviceDistribution: serviceDistributionArray,
+      locationDistribution: locationDistributionArray,
+    };
+
+    this.logger.info('Profile statistics generated', {
+      totalProfiles,
+      profilesByRole: profilesByRoleMap,
+      verificationStats: verificationStatsMap,
+    });
+
+    return statistics;
+  } catch (error) {
+    this.logger.error('Failed to generate profile statistics', error);
+    throw AuthErrorFactory.databaseError('Failed to generate profile statistics', error);
+  }
+}
 
   // Advanced Search with Facets
 

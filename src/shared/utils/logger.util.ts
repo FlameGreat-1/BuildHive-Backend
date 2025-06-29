@@ -1,7 +1,6 @@
 import winston from 'winston';
 import { env, isProduction, isDevelopment } from '../../config/auth';
 
-// Log levels configuration
 const LOG_LEVELS = {
   error: 0,
   warn: 1,
@@ -9,7 +8,6 @@ const LOG_LEVELS = {
   debug: 3,
 } as const;
 
-// Custom log format for BuildHive
 const buildHiveFormat = winston.format.combine(
   winston.format.timestamp({
     format: 'YYYY-MM-DD HH:mm:ss',
@@ -31,7 +29,6 @@ const buildHiveFormat = winston.format.combine(
   })
 );
 
-// Console format for development
 const consoleFormat = winston.format.combine(
   winston.format.colorize(),
   winston.format.timestamp({
@@ -42,7 +39,6 @@ const consoleFormat = winston.format.combine(
   })
 );
 
-// Create Winston logger instance
 const logger = winston.createLogger({
   levels: LOG_LEVELS,
   level: env.LOG_LEVEL,
@@ -52,49 +48,40 @@ const logger = winston.createLogger({
     environment: env.NODE_ENV,
   },
   transports: [
-    // Error logs - separate file
     new winston.transports.File({
       filename: 'logs/error.log',
       level: 'error',
-      maxsize: 5242880, // 5MB
+      maxsize: 5242880,
       maxFiles: 5,
     }),
-    
-    // Combined logs
     new winston.transports.File({
       filename: 'logs/combined.log',
-      maxsize: 5242880, // 5MB
+      maxsize: 5242880,
       maxFiles: 10,
     }),
   ],
-  
-  // Handle uncaught exceptions
   exceptionHandlers: [
     new winston.transports.File({
       filename: 'logs/exceptions.log',
-      maxsize: 5242880, // 5MB
+      maxsize: 5242880,
       maxFiles: 3,
     }),
   ],
-  
-  // Handle unhandled promise rejections
   rejectionHandlers: [
     new winston.transports.File({
       filename: 'logs/rejections.log',
-      maxsize: 5242880, // 5MB
+      maxsize: 5242880,
       maxFiles: 3,
     }),
   ],
 });
 
-// Add console transport for development
 if (isDevelopment()) {
   logger.add(new winston.transports.Console({
     format: consoleFormat,
   }));
 }
 
-// Logger interface for type safety
 interface LogContext {
   userId?: string;
   action?: string;
@@ -106,7 +93,6 @@ interface LogContext {
   [key: string]: any;
 }
 
-// Enhanced logger class with BuildHive-specific methods
 class BuildHiveLogger {
   private logger: winston.Logger;
 
@@ -114,7 +100,6 @@ class BuildHiveLogger {
     this.logger = logger;
   }
 
-  // Authentication specific logging
   auth = {
     login: (userId: string, ip: string, success: boolean, context?: LogContext) => {
       const level = success ? 'info' : 'warn';
@@ -171,7 +156,6 @@ class BuildHiveLogger {
     },
   };
 
-  // Profile specific logging
   profile = {
     update: (userId: string, fields: string[], context?: LogContext) => {
       this.logger.info('Profile updated', {
@@ -203,7 +187,6 @@ class BuildHiveLogger {
     },
   };
 
-  // Security logging
   security = {
     suspiciousActivity: (userId: string, activity: string, ip: string, context?: LogContext) => {
       this.logger.warn('Suspicious activity detected', {
@@ -232,9 +215,37 @@ class BuildHiveLogger {
         ...context,
       });
     },
+
+    accountLocked: (username: string, context?: LogContext) => {
+      this.logger.warn('Account locked due to failed login attempts', {
+        action: 'SECURITY_ACCOUNT_LOCKED',
+        username,
+        ...context,
+      });
+    },
+
+    loginAttempt: (identifier: string, success: boolean, reason?: string, context?: LogContext) => {
+      const level = success ? 'info' : 'warn';
+      const message = success ? 'Login attempt successful' : 'Login attempt failed';
+      
+      this.logger.log(level, message, {
+        action: 'SECURITY_LOGIN_ATTEMPT',
+        identifier,
+        success,
+        reason,
+        ...context,
+      });
+    },
+
+    passwordChanged: (username: string, context?: LogContext) => {
+      this.logger.info('User password changed', {
+        action: 'SECURITY_PASSWORD_CHANGED',
+        username,
+        ...context,
+      });
+    },
   };
 
-  // API request logging
   api = {
     request: (method: string, url: string, statusCode: number, duration: number, context?: LogContext) => {
       const level = statusCode >= 400 ? 'warn' : 'info';
@@ -259,7 +270,6 @@ class BuildHiveLogger {
     },
   };
 
-  // Database logging
   database = {
     connection: (database: string, status: 'connected' | 'disconnected' | 'error', context?: LogContext) => {
       const level = status === 'error' ? 'error' : 'info';
@@ -283,7 +293,6 @@ class BuildHiveLogger {
     },
   };
 
-  // Standard logging methods
   info(message: string, context?: LogContext): void {
     this.logger.info(message, context);
   }
@@ -304,10 +313,6 @@ class BuildHiveLogger {
   }
 }
 
-// Create and export BuildHive logger instance
 export const buildHiveLogger = new BuildHiveLogger(logger);
-
-// Export for direct winston access if needed
 export { logger as winstonLogger };
-
 export default buildHiveLogger;
