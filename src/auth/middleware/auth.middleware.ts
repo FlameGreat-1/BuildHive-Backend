@@ -2,23 +2,15 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { buildHiveLogger, buildHiveResponse, AuthErrorFactory } from '../../shared';
 import type { ServiceContainer } from '../services';
-
-export interface AuthenticatedUser {
-  id: string;
-  email: string;
-  role: string;
-  roles?: string[];
-  isEmailVerified: boolean;
-  isPhoneVerified: boolean;
-  sessionId?: string;
-}
+import type { AuthUser } from '../types/auth.types';
 
 export interface AuthenticatedRequest extends Request {
-  user?: AuthenticatedUser;
+  user?: AuthUser;
   session?: {
     id: string;
     userId: string;
     deviceInfo: any;
+    expiresAt: Date;
   };
 }
 
@@ -27,6 +19,7 @@ interface JWTPayload {
   sessionId?: string;
   email: string;
   role: string;
+  username?: string;
   iat?: number;
   exp?: number;
 }
@@ -34,11 +27,12 @@ interface JWTPayload {
 declare global {
   namespace Express {
     interface Request {
-      user?: AuthenticatedUser;
+      user?: AuthUser;
       session?: {
         id: string;
         userId: string;
         deviceInfo: any;
+        expiresAt: Date;
       };
     }
   }
@@ -78,12 +72,25 @@ export class AuthMiddleware {
       req.user = {
         id: user.id,
         email: user.email,
+        username: user.username || user.email.split('@')[0],
         role: user.role,
-        roles: user.roles || [user.role],
+        status: user.status,
+        platform: user.platform || 'web',
+        authProvider: user.authProvider || 'local',
         isEmailVerified: user.isEmailVerified,
         isPhoneVerified: user.isPhoneVerified,
-        sessionId: decoded.sessionId
-      };
+        verificationStatus: user.verificationStatus || 'pending',
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+        lastLogin: user.lastLogin,
+        profileId: user.profileId,
+        phone: user.phone,
+        subscription: user.subscription,
+        credits: user.credits || 0,
+        canApplyToJobs: user.canApplyToJobs,
+        canPostJobs: user.canPostJobs,
+        canManageTeam: user.canManageTeam
+      } as AuthUser;
 
       this.logger.debug('User authenticated successfully', {
         userId: user.id,
@@ -143,12 +150,12 @@ export class AuthMiddleware {
 
   validateSession = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
-      if (!req.user?.sessionId) {
+      if (!req.user?.id) {
         throw AuthErrorFactory.unauthorized('Session required');
       }
 
       const authService = this.serviceContainer.getAuthService();
-      const sessionValid = await authService.validateSession(req.user.sessionId, req.user.id);
+      const sessionValid = await authService.validateSession(req.user.id, req.user.id);
 
       if (!sessionValid) {
         throw AuthErrorFactory.unauthorized('Invalid or expired session');
@@ -156,7 +163,6 @@ export class AuthMiddleware {
 
       this.logger.debug('Session validated', {
         userId: req.user.id,
-        sessionId: req.user.sessionId,
         ip: req.ip
       });
 
@@ -165,7 +171,6 @@ export class AuthMiddleware {
     } catch (error) {
       this.logger.warn('Session validation failed', error as Error, {
         userId: req.user?.id,
-        sessionId: req.user?.sessionId,
         ip: req.ip
       });
 
@@ -180,7 +185,7 @@ export class AuthMiddleware {
           throw AuthErrorFactory.unauthorized('Authentication required');
         }
 
-        const userRoles = req.user.roles || [req.user.role];
+        const userRoles = [req.user.role];
         const requiredRoles = Array.isArray(roles) ? roles : [roles];
         
         const hasRequiredRole = requiredRoles.some(role => userRoles.includes(role));
@@ -270,12 +275,12 @@ export class AuthMiddleware {
         throw AuthErrorFactory.validationError('Profile ID required');
       }
 
-      if (req.user.roles?.includes('admin')) {
+      if (req.user.role === 'admin') {
         return next();
       }
 
       const profileService = this.serviceContainer.getProfileService();
-      const profileResult = await profileService.getProfileById(profileId);
+      const profileResult = await profileService.getProfile(profileId);
 
       if (!profileResult.success) {
         throw AuthErrorFactory.notFound('Profile not found');
