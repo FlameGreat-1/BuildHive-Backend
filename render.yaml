@@ -9,7 +9,7 @@ services:
       npm run build
       npx prisma generate
     startCommand: npm start
-    healthCheckPath: /api/health
+    healthCheckPath: /health
     autoDeploy: true
     branch: main
     

@@ -1,25 +1,14 @@
-// jest.config.js - BuildHive Testing Configuration
-
 module.exports = {
-  // Test environment
   preset: 'ts-jest',
   testEnvironment: 'node',
-  
-  // Root directories
   roots: ['<rootDir>/src', '<rootDir>/tests'],
-  
-  // Test file patterns
   testMatch: [
     '**/__tests__/**/*.ts',
     '**/?(*.)+(spec|test).ts'
   ],
-  
-  // Transform files
   transform: {
     '^.+\\.ts$': 'ts-jest'
   },
-  
-  // Module name mapping (for path aliases)
   moduleNameMapping: {
     '^@/(.*)$': '<rootDir>/src/$1',
     '^@/config/(.*)$': '<rootDir>/src/config/$1',
@@ -31,11 +20,7 @@ module.exports = {
     '^@/utils/(.*)$': '<rootDir>/src/utils/$1',
     '^@/types/(.*)$': '<rootDir>/src/types/$1'
   },
-  
-  // Setup files
   setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
-  
-  // Coverage configuration
   collectCoverage: true,
   collectCoverageFrom: [
     'src/**/*.ts',
@@ -43,11 +28,9 @@ module.exports = {
     '!src/types/**/*',
     '!src/**/*.test.ts',
     '!src/**/*.spec.ts',
-    '!src/server.ts', // Exclude server entry point
-    '!src/app.ts'     // Exclude app setup
+    '!src/server.ts',
+    '!src/app.ts'
   ],
-  
-  // Coverage thresholds
   coverageThreshold: {
     global: {
       branches: 70,
@@ -56,8 +39,6 @@ module.exports = {
       statements: 70
     }
   },
-  
-  // Coverage output
   coverageDirectory: 'coverage',
   coverageReporters: [
     'text',
@@ -66,45 +47,25 @@ module.exports = {
     'html',
     'json'
   ],
-  
-  // Test timeout
   testTimeout: 30000,
-  
-  // Clear mocks
   clearMocks: true,
   restoreMocks: true,
-  
-  // Verbose output
   verbose: true,
-  
-  // Global setup/teardown
   globalSetup: '<rootDir>/tests/globalSetup.ts',
   globalTeardown: '<rootDir>/tests/globalTeardown.ts',
-  
-  // Test environment options
   testEnvironmentOptions: {
     NODE_ENV: 'test'
   },
-  
-  // Module file extensions
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json'],
-  
-  // Ignore patterns
   testPathIgnorePatterns: [
     '/node_modules/',
     '/dist/',
     '/coverage/'
   ],
-  
-  // Transform ignore patterns
   transformIgnorePatterns: [
     '/node_modules/(?!(some-esm-package)/)'
   ],
-  
-  // Error handling
   errorOnDeprecated: true,
-  
-  // Watch plugins
   watchPlugins: [
     'jest-watch-typeahead/filename',
     'jest-watch-typeahead/testname'

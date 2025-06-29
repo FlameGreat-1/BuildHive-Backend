@@ -92,7 +92,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
         const options = { \
             hostname: 'localhost', \
             port: 3000, \
-            path: '/api/health', \
+            path: '/health', \
             method: 'GET', \
             timeout: 5000 \
         }; \
