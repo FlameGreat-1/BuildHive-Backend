@@ -14,8 +14,20 @@ import type {
   ProfileResponse,
   ProfileListResponse,
   ProfileCompletion,
-  QualityScore
+  QualityScore,
+  AuthUser
 } from '../types';
+
+declare global {
+  namespace Express {
+    interface Request {
+      user?: AuthUser & {
+        id: string;
+        roles?: string[];
+      };
+    }
+  }
+}
 
 export interface IProfileController {
   createProfile(req: Request, res: Response, next: NextFunction): Promise<void>;
@@ -34,6 +46,7 @@ export interface IProfileController {
   getQualityScore(req: Request, res: Response, next: NextFunction): Promise<void>;
   verifyProfile(req: Request, res: Response, next: NextFunction): Promise<void>;
   deactivateProfile(req: Request, res: Response, next: NextFunction): Promise<void>;
+  healthCheck(req: Request, res: Response, next: NextFunction): Promise<void>;
 }
 
 export class ProfileController implements IProfileController {
@@ -99,7 +112,7 @@ export class ProfileController implements IProfileController {
       res.status(201).json(result);
 
     } catch (error) {
-      this.logger.error('Profile creation failed', error, {
+      this.logger.error('Profile creation failed', error as Error, {
         userId: req.user?.id,
         role: req.body.role,
         ip: req.ip
@@ -122,11 +135,9 @@ export class ProfileController implements IProfileController {
 
       const result = await this.profileService.getProfileById(profileId);
 
-      // Check if requester has permission to view full profile
-      const canViewFullProfile = this.canViewFullProfile(requesterId, result.data);
+      const canViewFullProfile = this.canViewFullProfile(requesterId, result.data, req);
       
       if (!canViewFullProfile) {
-        // Return limited public profile data
         const publicProfile = this.filterPublicProfileData(result.data);
         const publicResult = buildHiveResponse.success(publicProfile, 'Public profile retrieved');
         
@@ -148,7 +159,7 @@ export class ProfileController implements IProfileController {
       res.status(200).json(result);
 
     } catch (error) {
-      this.logger.error('Profile retrieval failed', error, {
+      this.logger.error('Profile retrieval failed', error as Error, {
         profileId: req.params.id,
         requesterId: req.user?.id,
         ip: req.ip
@@ -174,8 +185,7 @@ export class ProfileController implements IProfileController {
         throw AuthErrorFactory.unauthorized('User not authenticated');
       }
 
-      // Check if user owns the profile or has admin privileges
-      await this.validateProfileOwnership(profileId, userId);
+      await this.validateProfileOwnership(profileId, userId, req);
 
       const updateData: UpdateProfileRequest = {
         ...req.body,
@@ -199,7 +209,7 @@ export class ProfileController implements IProfileController {
       res.status(200).json(result);
 
     } catch (error) {
-      this.logger.error('Profile update failed', error, {
+      this.logger.error('Profile update failed', error as Error, {
         profileId: req.params.id,
         userId: req.user?.id,
         fieldsToUpdate: Object.keys(req.body),
@@ -227,8 +237,7 @@ export class ProfileController implements IProfileController {
         throw AuthErrorFactory.unauthorized('User not authenticated');
       }
 
-      // Check if user owns the profile or has admin privileges
-      await this.validateProfileOwnership(profileId, userId);
+      await this.validateProfileOwnership(profileId, userId, req);
 
       const result = await this.profileService.deleteProfile(profileId, reason);
 
@@ -241,7 +250,7 @@ export class ProfileController implements IProfileController {
       res.status(200).json(result);
 
     } catch (error) {
-      this.logger.error('Profile deletion failed', error, {
+      this.logger.error('Profile deletion failed', error as Error, {
         profileId: req.params.id,
         userId: req.user?.id,
         ip: req.ip
@@ -265,11 +274,17 @@ export class ProfileController implements IProfileController {
         ip: req.ip
       });
 
+      const serviceCategories = Array.isArray(req.query.serviceCategories) 
+        ? req.query.serviceCategories as string[]
+        : req.query.serviceCategories 
+          ? [req.query.serviceCategories as string]
+          : undefined;
+
       const searchParams: ProfileSearchRequest = {
         query: req.query.q as string,
         role: req.query.role as string,
         location: req.query.location as string,
-        serviceCategories: req.query.serviceCategories as string[],
+        serviceCategories,
         availability: req.query.availability as string,
         rating: req.query.rating ? parseFloat(req.query.rating as string) : undefined,
         verified: req.query.verified === 'true',
@@ -281,7 +296,7 @@ export class ProfileController implements IProfileController {
         sortBy: req.query.sortBy as string || 'relevance',
         sortOrder: req.query.sortOrder as 'asc' | 'desc' || 'desc',
         page: parseInt(req.query.page as string) || 1,
-        limit: Math.min(parseInt(req.query.limit as string) || 20, 100) // Max 100 results per page
+        limit: Math.min(parseInt(req.query.limit as string) || 20, 100)
       };
 
       const result = await this.profileService.searchProfiles(searchParams);
@@ -296,7 +311,7 @@ export class ProfileController implements IProfileController {
       res.status(200).json(result);
 
     } catch (error) {
-      this.logger.error('Profile search failed', error, {
+      this.logger.error('Profile search failed', error as Error, {
         requesterId: req.user?.id,
         query: req.query.q,
         ip: req.ip
@@ -334,7 +349,7 @@ export class ProfileController implements IProfileController {
       res.status(200).json(result);
 
     } catch (error) {
-      this.logger.error('Get profiles by role failed', error, {
+      this.logger.error('Get profiles by role failed', error as Error, {
         role: req.params.role,
         requesterId: req.user?.id,
         ip: req.ip
@@ -348,7 +363,7 @@ export class ProfileController implements IProfileController {
     try {
       const profileId = req.params.id;
       const userId = req.user?.id;
-      const imageType = req.body.type || 'avatar'; // avatar, cover, gallery
+      const imageType = req.body.type || 'avatar';
 
       this.logger.info('Profile image upload attempt', {
         profileId,
@@ -363,10 +378,11 @@ export class ProfileController implements IProfileController {
       }
 
       if (!req.file) {
-        throw AuthErrorFactory.invalidInput('No image file provided');
+        throw AuthErrorFactory.validationError('No image file provided');
       }
 
-      await this.validateProfileOwnership(profileId, userId);
+      this.validateImageFile(req.file);
+      await this.validateProfileOwnership(profileId, userId, req);
 
       const result = await this.profileService.uploadProfileImage(
         profileId,
@@ -384,7 +400,7 @@ export class ProfileController implements IProfileController {
       res.status(200).json(result);
 
     } catch (error) {
-      this.logger.error('Profile image upload failed', error, {
+      this.logger.error('Profile image upload failed', error as Error, {
         profileId: req.params.id,
         userId: req.user?.id,
         imageType: req.body.type,
@@ -412,7 +428,7 @@ export class ProfileController implements IProfileController {
         throw AuthErrorFactory.unauthorized('User not authenticated');
       }
 
-      await this.validateProfileOwnership(profileId, userId);
+      await this.validateProfileOwnership(profileId, userId, req);
 
       const serviceData = {
         serviceCategories: req.body.serviceCategories,
@@ -434,7 +450,7 @@ export class ProfileController implements IProfileController {
       res.status(200).json(result);
 
     } catch (error) {
-      this.logger.error('Tradie services update failed', error, {
+      this.logger.error('Tradie services update failed', error as Error, {
         profileId: req.params.id,
         userId: req.user?.id,
         ip: req.ip
@@ -460,7 +476,7 @@ export class ProfileController implements IProfileController {
         throw AuthErrorFactory.unauthorized('User not authenticated');
       }
 
-      await this.validateProfileOwnership(profileId, userId);
+      await this.validateProfileOwnership(profileId, userId, req);
 
       const availabilityData = {
         status: req.body.status,
@@ -482,7 +498,7 @@ export class ProfileController implements IProfileController {
       res.status(200).json(result);
 
     } catch (error) {
-      this.logger.error('Tradie availability update failed', error, {
+      this.logger.error('Tradie availability update failed', error as Error, {
         profileId: req.params.id,
         userId: req.user?.id,
         ip: req.ip
@@ -508,7 +524,7 @@ export class ProfileController implements IProfileController {
         throw AuthErrorFactory.unauthorized('User not authenticated');
       }
 
-      await this.validateProfileOwnership(profileId, userId);
+      await this.validateProfileOwnership(profileId, userId, req);
 
       const qualificationData = {
         name: req.body.name,
@@ -531,7 +547,7 @@ export class ProfileController implements IProfileController {
       res.status(201).json(result);
 
     } catch (error) {
-      this.logger.error('Tradie qualification addition failed', error, {
+      this.logger.error('Tradie qualification addition failed', error as Error, {
         profileId: req.params.id,
         userId: req.user?.id,
         qualificationName: req.body.name,
@@ -558,7 +574,7 @@ export class ProfileController implements IProfileController {
         throw AuthErrorFactory.unauthorized('User not authenticated');
       }
 
-      await this.validateProfileOwnership(profileId, userId);
+      await this.validateProfileOwnership(profileId, userId, req);
 
       const insuranceData = {
         provider: req.body.provider,
@@ -580,7 +596,7 @@ export class ProfileController implements IProfileController {
       res.status(200).json(result);
 
     } catch (error) {
-      this.logger.error('Tradie insurance update failed', error, {
+      this.logger.error('Tradie insurance update failed', error as Error, {
         profileId: req.params.id,
         userId: req.user?.id,
         ip: req.ip
@@ -606,7 +622,7 @@ export class ProfileController implements IProfileController {
         throw AuthErrorFactory.unauthorized('User not authenticated');
       }
 
-      await this.validateProfileOwnership(profileId, userId);
+      await this.validateProfileOwnership(profileId, userId, req);
 
       const portfolioItem = {
         title: req.body.title,
@@ -631,7 +647,7 @@ export class ProfileController implements IProfileController {
       res.status(201).json(result);
 
     } catch (error) {
-      this.logger.error('Portfolio item addition failed', error, {
+      this.logger.error('Portfolio item addition failed', error as Error, {
         profileId: req.params.id,
         userId: req.user?.id,
         title: req.body.title,
@@ -657,7 +673,7 @@ export class ProfileController implements IProfileController {
         throw AuthErrorFactory.unauthorized('User not authenticated');
       }
 
-      await this.validateProfileOwnership(profileId, userId);
+      await this.validateProfileOwnership(profileId, userId, req);
 
       const result = await this.profileService.calculateProfileCompletion(profileId);
 
@@ -670,7 +686,7 @@ export class ProfileController implements IProfileController {
       res.status(200).json(buildHiveResponse.success(result, 'Profile completion calculated'));
 
     } catch (error) {
-      this.logger.error('Profile completion calculation failed', error, {
+      this.logger.error('Profile completion calculation failed', error as Error, {
         profileId: req.params.id,
         userId: req.user?.id,
         ip: req.ip
@@ -695,7 +711,7 @@ export class ProfileController implements IProfileController {
         throw AuthErrorFactory.unauthorized('User not authenticated');
       }
 
-      await this.validateProfileOwnership(profileId, userId);
+      await this.validateProfileOwnership(profileId, userId, req);
 
       const result = await this.profileService.calculateQualityScore(profileId);
 
@@ -708,7 +724,7 @@ export class ProfileController implements IProfileController {
       res.status(200).json(buildHiveResponse.success(result, 'Quality score calculated'));
 
     } catch (error) {
-      this.logger.error('Quality score calculation failed', error, {
+      this.logger.error('Quality score calculation failed', error as Error, {
         profileId: req.params.id,
         userId: req.user?.id,
         ip: req.ip
@@ -733,7 +749,6 @@ export class ProfileController implements IProfileController {
         throw AuthErrorFactory.unauthorized('User not authenticated');
       }
 
-      // Only admin users can verify profiles
       if (!req.user?.roles?.includes('admin')) {
         throw AuthErrorFactory.forbidden('Insufficient permissions to verify profiles');
       }
@@ -748,7 +763,7 @@ export class ProfileController implements IProfileController {
       res.status(200).json(result);
 
     } catch (error) {
-      this.logger.error('Profile verification failed', error, {
+      this.logger.error('Profile verification failed', error as Error, {
         profileId: req.params.id,
         verifierId: req.user?.id,
         ip: req.ip
@@ -775,7 +790,7 @@ export class ProfileController implements IProfileController {
         throw AuthErrorFactory.unauthorized('User not authenticated');
       }
 
-      await this.validateProfileOwnership(profileId, userId);
+      await this.validateProfileOwnership(profileId, userId, req);
 
       const result = await this.profileService.deactivateProfile(profileId, reason);
 
@@ -788,7 +803,7 @@ export class ProfileController implements IProfileController {
       res.status(200).json(result);
 
     } catch (error) {
-      this.logger.error('Profile deactivation failed', error, {
+      this.logger.error('Profile deactivation failed', error as Error, {
         profileId: req.params.id,
         userId: req.user?.id,
         ip: req.ip
@@ -798,23 +813,39 @@ export class ProfileController implements IProfileController {
     }
   }
 
-  // Utility Methods
-  private async validateProfileOwnership(profileId: string, userId: string): Promise<void> {
+  async healthCheck(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const health = {
+        status: 'healthy',
+        timestamp: new Date().toISOString(),
+        service: 'profile-controller',
+        version: process.env.APP_VERSION || '1.0.0',
+        dependencies: {
+          profileService: 'connected'
+        }
+      };
+
+      res.status(200).json(buildHiveResponse.success(health, 'Profile controller is healthy'));
+
+    } catch (error) {
+      this.logger.error('Profile controller health check failed', error as Error);
+      next(error);
+    }
+  }
+
+  private async validateProfileOwnership(profileId: string, userId: string, req: Request): Promise<void> {
     const profile = await this.profileService.getProfileById(profileId);
     
-    if (profile.data.userId !== userId && !this.isAdminUser()) {
+    if (profile.data.userId !== userId && !this.isAdminUser(req)) {
       throw AuthErrorFactory.forbidden('You do not have permission to modify this profile');
     }
   }
 
-  private canViewFullProfile(requesterId: string | undefined, profile: any): boolean {
-    // Profile owner can always view full profile
+  private canViewFullProfile(requesterId: string | undefined, profile: any, req: Request): boolean {
     if (requesterId === profile.userId) return true;
     
-    // Admin users can view all profiles
-    if (this.isAdminUser()) return true;
+    if (this.isAdminUser(req)) return true;
     
-    // Public profiles can be viewed by authenticated users
     if (profile.visibility === 'public' && requesterId) return true;
     
     return false;
@@ -838,7 +869,7 @@ export class ProfileController implements IProfileController {
         availability: {
           status: profile.tradieInfo?.availability?.status
         },
-        portfolio: profile.tradieInfo?.portfolio?.slice(0, 3) // Show only first 3 items
+        portfolio: profile.tradieInfo?.portfolio?.slice(0, 3)
       } : undefined,
       statistics: {
         jobsCompleted: profile.statistics?.jobsCompleted,
@@ -849,22 +880,20 @@ export class ProfileController implements IProfileController {
     };
   }
 
-  private isAdminUser(): boolean {
-    // This would typically check req.user but we need access to request context
-    // In a real implementation, you'd pass this through or use a different pattern
-    return false; // Placeholder - implement based on your auth system
+  private isAdminUser(req: Request): boolean {
+    return req.user?.roles?.includes('admin') || false;
   }
 
   private validateImageFile(file: Express.Multer.File): void {
     const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
-    const maxSize = 5 * 1024 * 1024; // 5MB
+    const maxSize = 5 * 1024 * 1024;
 
     if (!allowedTypes.includes(file.mimetype)) {
-      throw AuthErrorFactory.invalidInput('Invalid image format. Only JPEG, PNG, and WebP are allowed');
+      throw AuthErrorFactory.validationError('Invalid image format. Only JPEG, PNG, and WebP are allowed');
     }
 
     if (file.size > maxSize) {
-      throw AuthErrorFactory.invalidInput('Image file too large. Maximum size is 5MB');
+      throw AuthErrorFactory.validationError('Image file too large. Maximum size is 5MB');
     }
   }
 
@@ -876,30 +905,8 @@ export class ProfileController implements IProfileController {
       radius: params.radius ? Math.min(200, Math.max(1, parseInt(params.radius))) : undefined
     };
   }
-
-  // Health check for profile controller
-  async healthCheck(req: Request, res: Response, next: NextFunction): Promise<void> {
-    try {
-      const health = {
-        status: 'healthy',
-        timestamp: new Date().toISOString(),
-        service: 'profile-controller',
-        version: process.env.APP_VERSION || '1.0.0',
-        dependencies: {
-          profileService: 'connected'
-        }
-      };
-
-      res.status(200).json(buildHiveResponse.success(health, 'Profile controller is healthy'));
-
-    } catch (error) {
-      this.logger.error('Profile controller health check failed', error);
-      next(error);
-    }
-  }
 }
 
-// Export factory function for dependency injection
 export function createProfileController(serviceContainer: ServiceContainer): IProfileController {
   return new ProfileController(serviceContainer);
 }

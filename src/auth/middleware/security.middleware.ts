@@ -3,10 +3,21 @@ import helmet from 'helmet';
 import cors from 'cors';
 import { buildHiveLogger, buildHiveResponse } from '../../shared';
 
+interface ExtendedRequest extends Request {
+  requestId?: string;
+}
+
+declare global {
+  namespace Express {
+    interface Request {
+      requestId?: string;
+    }
+  }
+}
+
 export class SecurityMiddleware {
   private readonly logger = buildHiveLogger;
 
-  // CORS configuration
   corsMiddleware = cors({
     origin: (origin, callback) => {
       const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [
@@ -17,7 +28,6 @@ export class SecurityMiddleware {
         'https://admin.buildhive.com.au'
       ];
 
-      // Allow requests with no origin (mobile apps, Postman, etc.)
       if (!origin) return callback(null, true);
 
       if (allowedOrigins.includes(origin)) {
@@ -49,10 +59,9 @@ export class SecurityMiddleware {
       'X-RateLimit-Reset',
       'X-Request-ID'
     ],
-    maxAge: 86400 // 24 hours
+    maxAge: 86400
   });
 
-  // Helmet security headers
   helmetMiddleware = helmet({
     contentSecurityPolicy: {
       directives: {
@@ -72,7 +81,7 @@ export class SecurityMiddleware {
     crossOriginEmbedderPolicy: false,
     crossOriginResourcePolicy: { policy: "cross-origin" },
     hsts: {
-      maxAge: 31536000, // 1 year
+      maxAge: 31536000,
       includeSubDomains: true,
       preload: true
     },
@@ -82,20 +91,16 @@ export class SecurityMiddleware {
     referrerPolicy: { policy: "strict-origin-when-cross-origin" }
   });
 
-  // Request sanitization
   sanitizeRequest = (req: Request, res: Response, next: NextFunction): void => {
     try {
-      // Sanitize request body
       if (req.body && typeof req.body === 'object') {
         req.body = this.sanitizeObject(req.body);
       }
 
-      // Sanitize query parameters
       if (req.query && typeof req.query === 'object') {
         req.query = this.sanitizeObject(req.query);
       }
 
-      // Sanitize URL parameters
       if (req.params && typeof req.params === 'object') {
         req.params = this.sanitizeObject(req.params);
       }
@@ -103,7 +108,7 @@ export class SecurityMiddleware {
       next();
 
     } catch (error) {
-      this.logger.error('Request sanitization failed', error, {
+      this.logger.error('Request sanitization failed', error as Error, {
         path: req.path,
         method: req.method,
         ip: req.ip
@@ -116,11 +121,9 @@ export class SecurityMiddleware {
     }
   };
 
-  // IP whitelist/blacklist middleware
   ipFilter = (req: Request, res: Response, next: NextFunction): void => {
     const clientIP = this.getClientIP(req);
     
-    // Check blacklist
     const blacklistedIPs = process.env.BLACKLISTED_IPS?.split(',') || [];
     if (blacklistedIPs.includes(clientIP)) {
       this.logger.warn('Blocked blacklisted IP', {
@@ -136,7 +139,6 @@ export class SecurityMiddleware {
       ));
     }
 
-    // Check whitelist (if configured)
     const whitelistedIPs = process.env.WHITELISTED_IPS?.split(',') || [];
     if (whitelistedIPs.length > 0 && !whitelistedIPs.includes(clientIP)) {
       this.logger.warn('Blocked non-whitelisted IP', {
@@ -155,7 +157,6 @@ export class SecurityMiddleware {
     next();
   };
 
-  // Request size limiter
   requestSizeLimiter = (maxSize: string = '10mb') => {
     return (req: Request, res: Response, next: NextFunction): void => {
       const contentLength = req.get('Content-Length');
@@ -185,7 +186,6 @@ export class SecurityMiddleware {
     };
   };
 
-  // API key validation (for external integrations)
   validateApiKey = (req: Request, res: Response, next: NextFunction): void => {
     const apiKey = req.get('X-API-Key');
     
@@ -221,25 +221,18 @@ export class SecurityMiddleware {
     next();
   };
 
-  // Request ID generator
-  generateRequestId = (req: Request, res: Response, next: NextFunction): void => {
+  generateRequestId = (req: ExtendedRequest, res: Response, next: NextFunction): void => {
     const requestId = req.get('X-Request-ID') || this.generateUUID();
     
-    // Add to request for logging
-    (req as any).requestId = requestId;
-    
-    // Add to response headers
+    req.requestId = requestId;
     res.set('X-Request-ID', requestId);
     
     next();
   };
 
-  // Security headers middleware
   securityHeaders = (req: Request, res: Response, next: NextFunction): void => {
-    // Remove server information
     res.removeHeader('X-Powered-By');
     
-    // Add custom security headers
     res.set({
       'X-Content-Type-Options': 'nosniff',
       'X-Frame-Options': 'DENY',
@@ -253,7 +246,6 @@ export class SecurityMiddleware {
     next();
   };
 
-  // Utility methods
   private sanitizeObject(obj: any): any {
     if (typeof obj !== 'object' || obj === null) {
       return this.sanitizeValue(obj);
@@ -277,22 +269,21 @@ export class SecurityMiddleware {
       return value;
     }
 
-    // Remove potentially dangerous characters
     return value
-      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '') // Remove script tags
-      .replace(/javascript:/gi, '') // Remove javascript: protocol
-      .replace(/on\w+\s*=/gi, '') // Remove event handlers
-      .replace(/[<>]/g, '') // Remove angle brackets
+      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+      .replace(/javascript:/gi, '')
+      .replace(/on\w+\s*=/gi, '')
+      .replace(/[<>]/g, '')
       .trim();
   }
 
   private getClientIP(req: Request): string {
     return (
-      req.get('CF-Connecting-IP') || // Cloudflare
-      req.get('X-Forwarded-For')?.split(',')[0] || // Load balancer
-      req.get('X-Real-IP') || // Nginx
-      req.connection.remoteAddress ||
-      req.socket.remoteAddress ||
+      req.get('CF-Connecting-IP') ||
+      req.get('X-Forwarded-For')?.split(',')[0] ||
+      req.get('X-Real-IP') ||
+      (req.connection as any)?.remoteAddress ||
+      (req.socket as any)?.remoteAddress ||
       req.ip ||
       'unknown'
     );
@@ -333,12 +324,10 @@ export class SecurityMiddleware {
   }
 }
 
-// Factory function
 export function createSecurityMiddleware(): SecurityMiddleware {
   return new SecurityMiddleware();
 }
 
-// Export individual middleware functions
 export function createSecurityMiddlewareFunctions() {
   const securityMiddleware = new SecurityMiddleware();
   

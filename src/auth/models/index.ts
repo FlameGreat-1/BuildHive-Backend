@@ -1,57 +1,68 @@
-// Auth Models Module Export
-// Main entry point for all authentication-related models, types, and constants
+export { User } from './User.model';
+export { Profile } from './Profile.model';
+export { Session } from './Session.model';
 
-// Model Exports
-export { User, IUserDocument } from './User.model';
-export { Profile, IProfileDocument } from './Profile.model';
-export { Session, ISessionDocument } from './Session.model';
+export type { IUserDocument } from './User.model';
+export type { IProfileDocument } from './Profile.model';
+export type { ISessionDocument } from './Session.model';
 
-// Type Exports from User Model
-export type {
-  PlatformType,
-  AuthProvider,
-} from './User.model';
+export type PlatformType = 'web' | 'mobile';
+export type AuthProvider = 'local' | 'google';
+export type ServiceCategory = 'electrical' | 'plumbing' | 'carpentry' | 'painting' | 'roofing' | 'landscaping' | 'cleaning' | 'handyman' | 'tiling' | 'flooring' | 'hvac' | 'security' | 'other';
+export type AvailabilityStatus = 'available' | 'busy' | 'unavailable' | 'vacation';
+export type SessionPlatform = 'web' | 'mobile' | 'desktop';
+export type SessionStatus = 'active' | 'expired' | 'revoked' | 'invalid';
 
-// Type Exports from Profile Model
-export type {
-  ServiceCategory,
-  AvailabilityStatus,
-} from './Profile.model';
+export interface DeviceInfo {
+  userAgent: string;
+  ipAddress: string;
+  deviceType: 'mobile' | 'desktop' | 'tablet';
+  location?: LocationInfo;
+}
 
-// Constants from Profile Model
-export {
-  SERVICE_CATEGORIES,
-  AVAILABILITY_STATUS,
-} from './Profile.model';
+export interface LocationInfo {
+  country?: string;
+  region?: string;
+  city?: string;
+  latitude?: number;
+  longitude?: number;
+}
 
-// Type Exports from Session Model
-export type {
-  SessionPlatform,
-  SessionStatus,
-  DeviceInfo,
-  LocationInfo,
-} from './Session.model';
+export const SERVICE_CATEGORIES = {
+  ELECTRICAL: 'electrical' as const,
+  PLUMBING: 'plumbing' as const,
+  CARPENTRY: 'carpentry' as const,
+  PAINTING: 'painting' as const,
+  ROOFING: 'roofing' as const,
+  LANDSCAPING: 'landscaping' as const,
+  CLEANING: 'cleaning' as const,
+  HANDYMAN: 'handyman' as const,
+  TILING: 'tiling' as const,
+  FLOORING: 'flooring' as const,
+  HVAC: 'hvac' as const,
+  SECURITY: 'security' as const,
+  OTHER: 'other' as const,
+};
 
-// Default model exports for convenience
-export { default as UserModel } from './User.model';
-export { default as ProfileModel } from './Profile.model';
-export { default as SessionModel } from './Session.model';
+export const AVAILABILITY_STATUS = {
+  AVAILABLE: 'available' as const,
+  BUSY: 'busy' as const,
+  UNAVAILABLE: 'unavailable' as const,
+  VACATION: 'vacation' as const,
+};
 
-// Combined models object for easy access
 export const authModels = {
   User,
   Profile,
   Session,
 };
 
-// Model interfaces for dependency injection and testing
 export interface IAuthModels {
   User: typeof User;
   Profile: typeof Profile;
   Session: typeof Session;
 }
 
-// Service categories helper functions
 export const getServiceCategoryLabel = (category: ServiceCategory): string => {
   const labels: Record<ServiceCategory, string> = {
     [SERVICE_CATEGORIES.ELECTRICAL]: 'Electrical Services',
@@ -72,7 +83,6 @@ export const getServiceCategoryLabel = (category: ServiceCategory): string => {
   return labels[category] || category;
 };
 
-// Availability status helper functions
 export const getAvailabilityStatusLabel = (status: AvailabilityStatus): string => {
   const labels: Record<AvailabilityStatus, string> = {
     [AVAILABILITY_STATUS.AVAILABLE]: 'Available for Work',
@@ -84,7 +94,6 @@ export const getAvailabilityStatusLabel = (status: AvailabilityStatus): string =
   return labels[status] || status;
 };
 
-// Platform type helper functions
 export const getPlatformLabel = (platform: PlatformType): string => {
   const labels: Record<PlatformType, string> = {
     web: 'Web Application',
@@ -94,7 +103,6 @@ export const getPlatformLabel = (platform: PlatformType): string => {
   return labels[platform] || platform;
 };
 
-// Auth provider helper functions
 export const getAuthProviderLabel = (provider: AuthProvider): string => {
   const labels: Record<AuthProvider, string> = {
     local: 'Email/Phone & Password',
@@ -104,7 +112,6 @@ export const getAuthProviderLabel = (provider: AuthProvider): string => {
   return labels[provider] || provider;
 };
 
-// Session status helper functions
 export const getSessionStatusLabel = (status: SessionStatus): string => {
   const labels: Record<SessionStatus, string> = {
     active: 'Active Session',
@@ -116,7 +123,6 @@ export const getSessionStatusLabel = (status: SessionStatus): string => {
   return labels[status] || status;
 };
 
-// Model validation helpers
 export const isValidServiceCategory = (category: string): category is ServiceCategory => {
   return Object.values(SERVICE_CATEGORIES).includes(category as ServiceCategory);
 };
@@ -137,12 +143,10 @@ export const isValidSessionStatus = (status: string): status is SessionStatus =>
   return ['active', 'expired', 'revoked', 'invalid'].includes(status);
 };
 
-// Model factory functions for testing and dependency injection
 export const createUserModel = () => User;
 export const createProfileModel = () => Profile;
 export const createSessionModel = () => Session;
 
-// Model connection helpers
 export const getModelNames = (): string[] => {
   return ['User', 'Profile', 'Session'];
 };
@@ -151,11 +155,9 @@ export const getModelCollections = (): string[] => {
   return ['users', 'profiles', 'sessions'];
 };
 
-// Export all service categories as array for validation
 export const SERVICE_CATEGORIES_ARRAY = Object.values(SERVICE_CATEGORIES);
 export const AVAILABILITY_STATUS_ARRAY = Object.values(AVAILABILITY_STATUS);
 
-// Australian-specific helpers for Profile model
 export const AUSTRALIAN_STATES = ['NSW', 'VIC', 'QLD', 'WA', 'SA', 'TAS', 'ACT', 'NT'] as const;
 export type AustralianState = typeof AUSTRALIAN_STATES[number];
 
@@ -178,7 +180,6 @@ export const isValidAustralianState = (state: string): state is AustralianState 
   return AUSTRALIAN_STATES.includes(state as AustralianState);
 };
 
-// Business type helpers
 export const BUSINESS_TYPES = ['sole_trader', 'partnership', 'company', 'trust'] as const;
 export type BusinessType = typeof BUSINESS_TYPES[number];
 
@@ -193,7 +194,6 @@ export const getBusinessTypeLabel = (type: BusinessType): string => {
   return labels[type] || type;
 };
 
-// Enterprise access level helpers
 export const ENTERPRISE_ACCESS_LEVELS = ['owner', 'admin', 'member', 'viewer'] as const;
 export type EnterpriseAccessLevel = typeof ENTERPRISE_ACCESS_LEVELS[number];
 
@@ -208,7 +208,6 @@ export const getAccessLevelLabel = (level: EnterpriseAccessLevel): string => {
   return labels[level] || level;
 };
 
-// Enterprise permissions
 export const ENTERPRISE_PERMISSIONS = [
   'manage_team',
   'assign_jobs',
@@ -237,7 +236,6 @@ export const getPermissionLabel = (permission: EnterprisePermission): string => 
   return labels[permission] || permission;
 };
 
-// Model health check function
 export const checkModelsHealth = async (): Promise<{
   status: 'healthy' | 'unhealthy';
   models: Record<string, boolean>;
@@ -249,7 +247,6 @@ export const checkModelsHealth = async (): Promise<{
   };
   
   try {
-    // Check if models are properly initialized
     modelChecks.User = !!User.collection;
     modelChecks.Profile = !!Profile.collection;
     modelChecks.Session = !!Session.collection;
@@ -268,22 +265,16 @@ export const checkModelsHealth = async (): Promise<{
   }
 };
 
-// Default export for the entire models module
 export default {
-  // Models
   User,
   Profile,
   Session,
-  
-  // Constants
   SERVICE_CATEGORIES,
   AVAILABILITY_STATUS,
   AUSTRALIAN_STATES,
   BUSINESS_TYPES,
   ENTERPRISE_ACCESS_LEVELS,
   ENTERPRISE_PERMISSIONS,
-  
-  // Helper functions
   getServiceCategoryLabel,
   getAvailabilityStatusLabel,
   getPlatformLabel,
@@ -293,16 +284,12 @@ export default {
   getBusinessTypeLabel,
   getAccessLevelLabel,
   getPermissionLabel,
-  
-  // Validation functions
   isValidServiceCategory,
   isValidAvailabilityStatus,
   isValidPlatformType,
   isValidAuthProvider,
   isValidSessionStatus,
   isValidAustralianState,
-  
-  // Utility functions
   checkModelsHealth,
   getModelNames,
   getModelCollections,

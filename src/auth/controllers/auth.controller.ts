@@ -14,8 +14,25 @@ import type {
   ChangePasswordRequest,
   LogoutRequest,
   AuthResponse,
-  UserResponse
+  UserResponse,
+  AuthUser,
+  User,
+  TokenPair,
+  DeviceInfo
 } from '../types';
+
+declare global {
+  namespace Express {
+    interface Request {
+      user?: AuthUser;
+      session?: {
+        id: string;
+        userId: string;
+        expiresAt: Date;
+      };
+    }
+  }
+}
 
 export interface IAuthController {
   register(req: Request, res: Response, next: NextFunction): Promise<void>;
@@ -27,6 +44,8 @@ export interface IAuthController {
   changePassword(req: Request, res: Response, next: NextFunction): Promise<void>;
   getCurrentUser(req: Request, res: Response, next: NextFunction): Promise<void>;
   updateProfile(req: Request, res: Response, next: NextFunction): Promise<void>;
+  healthCheck(req: Request, res: Response, next: NextFunction): Promise<void>;
+  getRateLimitInfo(req: Request, res: Response, next: NextFunction): Promise<void>;
 }
 
 export class AuthController implements IAuthController {
@@ -61,7 +80,6 @@ export class AuthController implements IAuthController {
         lastName: req.body.lastName,
         phone: req.body.phone,
         role: req.body.role,
-        dateOfBirth: req.body.dateOfBirth,
         gender: req.body.gender,
         address: req.body.address,
         platform: req.body.platform || 'web',
@@ -89,7 +107,7 @@ export class AuthController implements IAuthController {
       res.status(201).json(result);
 
     } catch (error) {
-      this.logger.error('Registration failed', error, {
+      this.logger.error('Registration failed', error as Error, {
         email: req.body.email ? this.maskEmail(req.body.email) : 'not_provided',
         role: req.body.role,
         ip: req.ip
@@ -109,6 +127,8 @@ export class AuthController implements IAuthController {
         ip: req.ip
       });
 
+      const deviceType = this.detectDeviceType(req.get('User-Agent') || '') as "mobile" | "desktop" | "tablet";
+
       const loginData: LoginRequest = {
         email: req.body.email,
         password: req.body.password,
@@ -117,14 +137,13 @@ export class AuthController implements IAuthController {
         deviceInfo: {
           userAgent: req.get('User-Agent') || '',
           ipAddress: req.ip || '',
-          deviceType: this.detectDeviceType(req.get('User-Agent') || ''),
+          deviceType: deviceType,
           location: req.body.location
         }
       };
 
       const result = await this.authService.login(loginData);
 
-      // Set secure HTTP-only cookies for tokens
       this.setAuthCookies(res, result.data.tokens);
 
       this.logger.info('Login successful', {
@@ -138,7 +157,7 @@ export class AuthController implements IAuthController {
       res.status(200).json(result);
 
     } catch (error) {
-      this.logger.error('Login failed', error, {
+      this.logger.error('Login failed', error as Error, {
         email: req.body.email ? this.maskEmail(req.body.email) : 'not_provided',
         ip: req.ip,
         userAgent: req.get('User-Agent')
@@ -160,27 +179,24 @@ export class AuthController implements IAuthController {
       });
 
       const logoutData: LogoutRequest = {
-        userId: userId!,
         sessionId: sessionId,
-        allDevices: req.body.allDevices || false,
         reason: req.body.reason || 'user_initiated'
       };
 
       const result = await this.authService.logout(logoutData);
 
-      // Clear auth cookies
       this.clearAuthCookies(res);
 
       this.logger.info('Logout successful', {
         userId,
         sessionId,
-        allDevices: logoutData.allDevices
+        allDevices: req.body.allDevices
       });
 
       res.status(200).json(result);
 
     } catch (error) {
-      this.logger.error('Logout failed', error, {
+      this.logger.error('Logout failed', error as Error, {
         userId: req.user?.id,
         sessionId: req.session?.id
       });
@@ -200,21 +216,22 @@ export class AuthController implements IAuthController {
       });
 
       if (!refreshToken) {
-        throw AuthErrorFactory.missingRefreshToken();
+        throw AuthErrorFactory.invalidToken('Missing refresh token');
       }
+
+      const deviceType = this.detectDeviceType(req.get('User-Agent') || '') as "mobile" | "desktop" | "tablet";
 
       const refreshData: RefreshTokenRequest = {
         refreshToken,
         deviceInfo: {
           userAgent: req.get('User-Agent') || '',
           ipAddress: req.ip || '',
-          deviceType: this.detectDeviceType(req.get('User-Agent') || '')
+          deviceType: deviceType
         }
       };
 
       const result = await this.authService.refreshToken(refreshData);
 
-      // Update auth cookies with new tokens
       this.setAuthCookies(res, result.data.tokens);
 
       this.logger.info('Token refresh successful', {
@@ -225,12 +242,11 @@ export class AuthController implements IAuthController {
       res.status(200).json(result);
 
     } catch (error) {
-      this.logger.error('Token refresh failed', error, {
+      this.logger.error('Token refresh failed', error as Error, {
         userId: req.user?.id,
         ip: req.ip
       });
 
-      // Clear invalid cookies
       this.clearAuthCookies(res);
       next(error);
     }
@@ -263,7 +279,7 @@ export class AuthController implements IAuthController {
       res.status(200).json(result);
 
     } catch (error) {
-      this.logger.error('Password reset request failed', error, {
+      this.logger.error('Password reset request failed', error as Error, {
         email: req.body.email ? this.maskEmail(req.body.email) : 'not_provided',
         ip: req.ip
       });
@@ -296,13 +312,13 @@ export class AuthController implements IAuthController {
 
       this.logger.info('Password reset successful', {
         email: this.maskEmail(req.body.email),
-        userId: result.data?.userId
+        userId: result.data?.user?.id
       });
 
       res.status(200).json(result);
 
     } catch (error) {
-      this.logger.error('Password reset failed', error, {
+      this.logger.error('Password reset failed', error as Error, {
         email: req.body.email ? this.maskEmail(req.body.email) : 'not_provided',
         hasToken: !!req.body.token,
         ip: req.ip
@@ -326,11 +342,9 @@ export class AuthController implements IAuthController {
       }
 
       const changePasswordData: ChangePasswordRequest = {
-        userId,
         currentPassword: req.body.currentPassword,
         newPassword: req.body.newPassword,
         confirmPassword: req.body.confirmPassword,
-        logoutAllDevices: req.body.logoutAllDevices || false,
         metadata: {
           userAgent: req.get('User-Agent'),
           ipAddress: req.ip,
@@ -338,21 +352,21 @@ export class AuthController implements IAuthController {
         }
       };
 
-      const result = await this.authService.changePassword(changePasswordData);
+      const result = await this.authService.changePassword(userId, changePasswordData);
 
-      if (changePasswordData.logoutAllDevices) {
+      if (req.body.logoutAllDevices) {
         this.clearAuthCookies(res);
       }
 
       this.logger.info('Password change successful', {
         userId,
-        logoutAllDevices: changePasswordData.logoutAllDevices
+        logoutAllDevices: req.body.logoutAllDevices
       });
 
       res.status(200).json(result);
 
     } catch (error) {
-      this.logger.error('Password change failed', error, {
+      this.logger.error('Password change failed', error as Error, {
         userId: req.user?.id,
         ip: req.ip
       });
@@ -386,7 +400,7 @@ export class AuthController implements IAuthController {
       res.status(200).json(result);
 
     } catch (error) {
-      this.logger.error('Get current user failed', error, {
+      this.logger.error('Get current user failed', error as Error, {
         userId: req.user?.id,
         ip: req.ip
       });
@@ -410,7 +424,6 @@ export class AuthController implements IAuthController {
       }
 
       const updateData = {
-        userId,
         ...req.body,
         updatedBy: userId,
         metadata: {
@@ -430,7 +443,7 @@ export class AuthController implements IAuthController {
       res.status(200).json(result);
 
     } catch (error) {
-      this.logger.error('Profile update failed', error, {
+      this.logger.error('Profile update failed', error as Error, {
         userId: req.user?.id,
         fieldsToUpdate: Object.keys(req.body),
         ip: req.ip
@@ -440,8 +453,47 @@ export class AuthController implements IAuthController {
     }
   }
 
-  // Utility Methods
-  private setAuthCookies(res: Response, tokens: any): void {
+  async healthCheck(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const health = {
+        status: 'healthy',
+        timestamp: new Date().toISOString(),
+        service: 'auth-controller',
+        version: process.env.APP_VERSION || '1.0.0',
+        uptime: process.uptime(),
+        memory: process.memoryUsage(),
+        dependencies: {
+          authService: 'connected',
+          userService: 'connected'
+        }
+      };
+
+      res.status(200).json(buildHiveResponse.success(health, 'Auth controller is healthy'));
+
+    } catch (error) {
+      this.logger.error('Health check failed', error as Error);
+      next(error);
+    }
+  }
+
+  async getRateLimitInfo(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const rateLimitInfo = {
+        remaining: parseInt(res.get('X-RateLimit-Remaining') || '0'),
+        limit: parseInt(res.get('X-RateLimit-Limit') || '0'),
+        reset: parseInt(res.get('X-RateLimit-Reset') || '0'),
+        retryAfter: res.get('Retry-After')
+      };
+
+      res.status(200).json(buildHiveResponse.success(rateLimitInfo, 'Rate limit information'));
+
+    } catch (error) {
+      this.logger.error('Rate limit info failed', error as Error);
+      next(error);
+    }
+  }
+
+  private setAuthCookies(res: Response, tokens: TokenPair): void {
     const isProduction = process.env.NODE_ENV === 'production';
     
     const cookieOptions = {
@@ -452,16 +504,14 @@ export class AuthController implements IAuthController {
       path: '/'
     };
 
-    // Set access token cookie (shorter expiry)
     res.cookie('accessToken', tokens.accessToken.token, {
       ...cookieOptions,
-      maxAge: 15 * 60 * 1000 // 15 minutes
+      maxAge: 15 * 60 * 1000
     });
 
-    // Set refresh token cookie (longer expiry)
     res.cookie('refreshToken', tokens.refreshToken.token, {
       ...cookieOptions,
-      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+      maxAge: 7 * 24 * 60 * 60 * 1000
     });
 
     this.logger.debug('Auth cookies set', {
@@ -516,60 +566,16 @@ export class AuthController implements IAuthController {
     const missingFields = requiredFields.filter(field => !data[field]);
     
     if (missingFields.length > 0) {
-      throw AuthErrorFactory.missingRequiredFields(missingFields);
+      throw AuthErrorFactory.validationError(`Missing required fields: ${missingFields.join(', ')}`);
     }
   }
 
   private sanitizeUserData(userData: any): any {
-    // Remove sensitive fields from response
     const { password, resetToken, verificationToken, ...sanitized } = userData;
     return sanitized;
   }
-
-  // Health check endpoint
-  async healthCheck(req: Request, res: Response, next: NextFunction): Promise<void> {
-    try {
-      const health = {
-        status: 'healthy',
-        timestamp: new Date().toISOString(),
-        service: 'auth-controller',
-        version: process.env.APP_VERSION || '1.0.0',
-        uptime: process.uptime(),
-        memory: process.memoryUsage(),
-        dependencies: {
-          authService: 'connected',
-          userService: 'connected'
-        }
-      };
-
-      res.status(200).json(buildHiveResponse.success(health, 'Auth controller is healthy'));
-
-    } catch (error) {
-      this.logger.error('Health check failed', error);
-      next(error);
-    }
-  }
-
-  // Rate limiting info endpoint
-  async getRateLimitInfo(req: Request, res: Response, next: NextFunction): Promise<void> {
-    try {
-      const rateLimitInfo = {
-        remaining: parseInt(res.get('X-RateLimit-Remaining') || '0'),
-        limit: parseInt(res.get('X-RateLimit-Limit') || '0'),
-        reset: parseInt(res.get('X-RateLimit-Reset') || '0'),
-        retryAfter: res.get('Retry-After')
-      };
-
-      res.status(200).json(buildHiveResponse.success(rateLimitInfo, 'Rate limit information'));
-
-    } catch (error) {
-      this.logger.error('Rate limit info failed', error);
-      next(error);
-    }
-  }
 }
 
-// Export factory function for dependency injection
 export function createAuthController(serviceContainer: ServiceContainer): IAuthController {
   return new AuthController(serviceContainer);
 }

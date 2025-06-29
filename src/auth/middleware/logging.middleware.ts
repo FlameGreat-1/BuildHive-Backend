@@ -14,6 +14,28 @@ export interface LoggingOptions {
   sensitiveFields?: string[];
 }
 
+interface ExtendedRequest extends Request {
+  requestId?: string;
+  user?: {
+    id: string;
+    email?: string;
+    role?: string;
+  };
+}
+
+declare global {
+  namespace Express {
+    interface Request {
+      requestId?: string;
+      user?: {
+        id: string;
+        email?: string;
+        role?: string;
+      };
+    }
+  }
+}
+
 export class LoggingMiddleware {
   private readonly logger = buildHiveLogger;
   private readonly defaultOptions: LoggingOptions = {
@@ -24,36 +46,31 @@ export class LoggingMiddleware {
     logResponse: false,
     excludePaths: ['/health', '/favicon.ico'],
     excludeHeaders: ['authorization', 'cookie', 'x-api-key'],
-    maxBodySize: 1024, // 1KB
+    maxBodySize: 1024,
     sensitiveFields: ['password', 'token', 'secret', 'key', 'authorization']
   };
 
-  // Main request logging middleware
   requestLogger = (options: LoggingOptions = {}) => {
     const config = { ...this.defaultOptions, ...options };
 
-    return (req: Request, res: Response, next: NextFunction): void => {
+    return (req: ExtendedRequest, res: Response, next: NextFunction): void => {
       const startTime = performance.now();
-      const requestId = (req as any).requestId || this.generateRequestId();
+      const requestId = req.requestId || this.generateRequestId();
 
-      // Skip logging for excluded paths
       if (config.excludePaths?.some(path => req.path.includes(path))) {
         return next();
       }
 
-      // Log incoming request
       this.logIncomingRequest(req, requestId, config);
 
-      // Capture original res.json to log responses
-      const originalJson = res.json;
+      const originalJson = res.json.bind(res);
       let responseBody: any = null;
 
       res.json = function(body: any) {
         responseBody = body;
-        return originalJson.call(this, body);
+        return originalJson(body);
       };
 
-      // Log response when request finishes
       res.on('finish', () => {
         const endTime = performance.now();
         const duration = Math.round(endTime - startTime);
@@ -65,32 +82,29 @@ export class LoggingMiddleware {
     };
   };
 
-  // Error logging middleware
-  errorLogger = (error: any, req: Request, res: Response, next: NextFunction): void => {
-    const requestId = (req as any).requestId || this.generateRequestId();
+  errorLogger = (error: any, req: ExtendedRequest, res: Response, next: NextFunction): void => {
+    const requestId = req.requestId || this.generateRequestId();
 
-    this.logger.error('Request error occurred', error, {
+    this.logger.error('Request error occurred', error as Error, {
       requestId,
       method: req.method,
       path: req.path,
       ip: this.getClientIP(req),
       userAgent: req.get('User-Agent'),
-      userId: (req as any).user?.id,
+      userId: req.user?.id,
       statusCode: res.statusCode,
-      stack: error.stack,
+      stack: error?.stack,
       timestamp: new Date().toISOString()
     });
 
     next(error);
   };
 
-  // Audit logging for sensitive operations
   auditLogger = (operation: string, details?: any) => {
-    return (req: Request, res: Response, next: NextFunction): void => {
-      const requestId = (req as any).requestId || this.generateRequestId();
-      const userId = (req as any).user?.id;
+    return (req: ExtendedRequest, res: Response, next: NextFunction): void => {
+      const requestId = req.requestId || this.generateRequestId();
+      const userId = req.user?.id;
 
-      // Log before operation
       this.logger.info('Audit log - Operation started', {
         requestId,
         operation,
@@ -103,10 +117,8 @@ export class LoggingMiddleware {
         timestamp: new Date().toISOString()
       });
 
-      // Capture response to log operation result
-      const originalJson = res.json;
+      const originalJson = res.json.bind(res);
       res.json = function(body: any) {
-        // Log after operation
         buildHiveLogger.info('Audit log - Operation completed', {
           requestId,
           operation,
@@ -117,23 +129,21 @@ export class LoggingMiddleware {
           timestamp: new Date().toISOString()
         });
 
-        return originalJson.call(this, body);
+        return originalJson(body);
       };
 
       next();
     };
   };
 
-  // Performance monitoring middleware
-  performanceLogger = (req: Request, res: Response, next: NextFunction): void => {
+  performanceLogger = (req: ExtendedRequest, res: Response, next: NextFunction): void => {
     const startTime = performance.now();
-    const requestId = (req as any).requestId || this.generateRequestId();
+    const requestId = req.requestId || this.generateRequestId();
 
     res.on('finish', () => {
       const endTime = performance.now();
       const duration = Math.round(endTime - startTime);
 
-      // Log slow requests (over 1 second)
       if (duration > 1000) {
         this.logger.warn('Slow request detected', {
           requestId,
@@ -141,13 +151,12 @@ export class LoggingMiddleware {
           path: req.path,
           duration: `${duration}ms`,
           ip: this.getClientIP(req),
-          userId: (req as any).user?.id,
+          userId: req.user?.id,
           statusCode: res.statusCode,
           timestamp: new Date().toISOString()
         });
       }
 
-      // Log performance metrics
       this.logger.debug('Request performance', {
         requestId,
         method: req.method,
@@ -162,10 +171,9 @@ export class LoggingMiddleware {
     next();
   };
 
-  // Security event logger
   securityLogger = (event: string, severity: 'low' | 'medium' | 'high' | 'critical' = 'medium') => {
-    return (req: Request, res: Response, next: NextFunction): void => {
-      const requestId = (req as any).requestId || this.generateRequestId();
+    return (req: ExtendedRequest, res: Response, next: NextFunction): void => {
+      const requestId = req.requestId || this.generateRequestId();
 
       this.logger.warn('Security event detected', {
         requestId,
@@ -175,7 +183,7 @@ export class LoggingMiddleware {
         path: req.path,
         ip: this.getClientIP(req),
         userAgent: req.get('User-Agent'),
-        userId: (req as any).user?.id,
+        userId: req.user?.id,
         headers: this.sanitizeHeaders(req.headers),
         timestamp: new Date().toISOString()
       });
@@ -184,11 +192,10 @@ export class LoggingMiddleware {
     };
   };
 
-  // Database operation logger
   dbOperationLogger = (operation: string, table: string) => {
-    return (req: Request, res: Response, next: NextFunction): void => {
-      const requestId = (req as any).requestId || this.generateRequestId();
-      const userId = (req as any).user?.id;
+    return (req: ExtendedRequest, res: Response, next: NextFunction): void => {
+      const requestId = req.requestId || this.generateRequestId();
+      const userId = req.user?.id;
 
       this.logger.debug('Database operation', {
         requestId,
@@ -204,15 +211,14 @@ export class LoggingMiddleware {
     };
   };
 
-  // Private helper methods
-  private logIncomingRequest(req: Request, requestId: string, config: LoggingOptions): void {
+  private logIncomingRequest(req: ExtendedRequest, requestId: string, config: LoggingOptions): void {
     const logData: any = {
       requestId,
       method: req.method,
       path: req.path,
       ip: this.getClientIP(req),
       userAgent: req.get('User-Agent'),
-      userId: (req as any).user?.id,
+      userId: req.user?.id,
       timestamp: new Date().toISOString()
     };
 
@@ -238,7 +244,7 @@ export class LoggingMiddleware {
   }
 
   private logOutgoingResponse(
-    req: Request, 
+    req: ExtendedRequest, 
     res: Response, 
     responseBody: any, 
     duration: number, 
@@ -252,7 +258,7 @@ export class LoggingMiddleware {
       statusCode: res.statusCode,
       duration: `${duration}ms`,
       contentLength: res.get('Content-Length'),
-      userId: (req as any).user?.id,
+      userId: req.user?.id,
       timestamp: new Date().toISOString()
     };
 
@@ -266,7 +272,6 @@ export class LoggingMiddleware {
       }
     }
 
-    // Use appropriate log level based on status code
     if (res.statusCode >= 500) {
       this.logger.error('Outgoing response - Server Error', logData);
     } else if (res.statusCode >= 400) {
@@ -318,8 +323,8 @@ export class LoggingMiddleware {
       req.get('CF-Connecting-IP') ||
       req.get('X-Forwarded-For')?.split(',')[0] ||
       req.get('X-Real-IP') ||
-      req.connection.remoteAddress ||
-      req.socket.remoteAddress ||
+      (req.connection as any)?.remoteAddress ||
+      (req.socket as any)?.remoteAddress ||
       req.ip ||
       'unknown'
     );
@@ -330,12 +335,10 @@ export class LoggingMiddleware {
   }
 }
 
-// Factory function
 export function createLoggingMiddleware(): LoggingMiddleware {
   return new LoggingMiddleware();
 }
 
-// Export individual middleware functions
 export function createLoggingMiddlewareFunctions() {
   const loggingMiddleware = new LoggingMiddleware();
   

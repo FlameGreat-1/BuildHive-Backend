@@ -11,8 +11,20 @@ import type {
   ResendVerificationRequest,
   VerifyEmailRequest,
   VerifyPhoneRequest,
-  ValidationResponse
+  ValidationResponse,
+  AuthUser
 } from '../types';
+
+declare global {
+  namespace Express {
+    interface Request {
+      user?: AuthUser & {
+        id: string;
+        roles?: string[];
+      };
+    }
+  }
+}
 
 export interface IValidationController {
   sendEmailVerification(req: Request, res: Response, next: NextFunction): Promise<void>;
@@ -27,6 +39,7 @@ export interface IValidationController {
   checkPhoneAvailability(req: Request, res: Response, next: NextFunction): Promise<void>;
   validatePostcode(req: Request, res: Response, next: NextFunction): Promise<void>;
   getVerificationStatus(req: Request, res: Response, next: NextFunction): Promise<void>;
+  healthCheck(req: Request, res: Response, next: NextFunction): Promise<void>;
 }
 
 export class ValidationController implements IValidationController {
@@ -56,7 +69,7 @@ export class ValidationController implements IValidationController {
       });
 
       if (!email) {
-        throw AuthErrorFactory.missingRequiredFields(['email']);
+        throw AuthErrorFactory.validationError('Email is required');
       }
 
       const verificationData: EmailVerificationRequest = {
@@ -81,7 +94,7 @@ export class ValidationController implements IValidationController {
       res.status(200).json(result);
 
     } catch (error) {
-      this.logger.error('Email verification send failed', error, {
+      this.logger.error('Email verification send failed', error as Error, {
         email: req.body.email ? this.maskEmail(req.body.email) : 'not_provided',
         userId: req.user?.id,
         ip: req.ip
@@ -102,7 +115,7 @@ export class ValidationController implements IValidationController {
       });
 
       if (!email || !token) {
-        throw AuthErrorFactory.missingRequiredFields(['email', 'token']);
+        throw AuthErrorFactory.validationError('Email and token are required');
       }
 
       const verifyData: VerifyEmailRequest = {
@@ -119,13 +132,13 @@ export class ValidationController implements IValidationController {
 
       this.logger.info('Email verification successful', {
         email: this.maskEmail(email),
-        userId: result.data?.userId
+        userId: result.data?.user?.id
       });
 
       res.status(200).json(result);
 
     } catch (error) {
-      this.logger.error('Email verification failed', error, {
+      this.logger.error('Email verification failed', error as Error, {
         email: req.body.email ? this.maskEmail(req.body.email) : 'not_provided',
         hasToken: !!req.body.token,
         ip: req.ip
@@ -147,10 +160,9 @@ export class ValidationController implements IValidationController {
       });
 
       if (!phone) {
-        throw AuthErrorFactory.missingRequiredFields(['phone']);
+        throw AuthErrorFactory.validationError('Phone number is required');
       }
 
-      // Validate Australian phone number format
       this.validateAustralianPhone(phone);
 
       const verificationData: PhoneVerificationRequest = {
@@ -175,7 +187,7 @@ export class ValidationController implements IValidationController {
       res.status(200).json(result);
 
     } catch (error) {
-      this.logger.error('Phone verification send failed', error, {
+      this.logger.error('Phone verification send failed', error as Error, {
         phone: req.body.phone ? this.maskPhone(req.body.phone) : 'not_provided',
         userId: req.user?.id,
         ip: req.ip
@@ -196,7 +208,7 @@ export class ValidationController implements IValidationController {
       });
 
       if (!phone || !code) {
-        throw AuthErrorFactory.missingRequiredFields(['phone', 'code']);
+        throw AuthErrorFactory.validationError('Phone number and verification code are required');
       }
 
       const verifyData: VerifyPhoneRequest = {
@@ -213,13 +225,13 @@ export class ValidationController implements IValidationController {
 
       this.logger.info('Phone verification successful', {
         phone: this.maskPhone(phone),
-        userId: result.data?.userId
+        userId: result.data?.user?.id
       });
 
       res.status(200).json(result);
 
     } catch (error) {
-      this.logger.error('Phone verification failed', error, {
+      this.logger.error('Phone verification failed', error as Error, {
         phone: req.body.phone ? this.maskPhone(req.body.phone) : 'not_provided',
         hasCode: !!req.body.code,
         ip: req.ip
@@ -241,11 +253,10 @@ export class ValidationController implements IValidationController {
       });
 
       if (!email) {
-        throw AuthErrorFactory.missingRequiredFields(['email']);
+        throw AuthErrorFactory.validationError('Email is required');
       }
 
-      // Check rate limiting for resend attempts
-      await this.checkResendRateLimit(email, 'email', req.ip);
+      await this.checkResendRateLimit(email, 'email', req.ip || '');
 
       const resendData: ResendVerificationRequest = {
         email,
@@ -269,7 +280,7 @@ export class ValidationController implements IValidationController {
       res.status(200).json(result);
 
     } catch (error) {
-      this.logger.error('Email verification resend failed', error, {
+      this.logger.error('Email verification resend failed', error as Error, {
         email: req.body.email ? this.maskEmail(req.body.email) : 'not_provided',
         userId: req.user?.id,
         ip: req.ip
@@ -291,11 +302,10 @@ export class ValidationController implements IValidationController {
       });
 
       if (!phone) {
-        throw AuthErrorFactory.missingRequiredFields(['phone']);
+        throw AuthErrorFactory.validationError('Phone number is required');
       }
 
-      // Check rate limiting for resend attempts
-      await this.checkResendRateLimit(phone, 'phone', req.ip);
+      await this.checkResendRateLimit(phone, 'phone', req.ip || '');
 
       const resendData: ResendVerificationRequest = {
         phone,
@@ -319,7 +329,7 @@ export class ValidationController implements IValidationController {
       res.status(200).json(result);
 
     } catch (error) {
-      this.logger.error('Phone verification resend failed', error, {
+      this.logger.error('Phone verification resend failed', error as Error, {
         phone: req.body.phone ? this.maskPhone(req.body.phone) : 'not_provided',
         userId: req.user?.id,
         ip: req.ip
@@ -340,7 +350,7 @@ export class ValidationController implements IValidationController {
       });
 
       if (!abn && !acn) {
-        throw AuthErrorFactory.missingRequiredFields(['abn or acn']);
+        throw AuthErrorFactory.validationError('ABN or ACN is required');
       }
 
       const validationResult = {
@@ -357,7 +367,7 @@ export class ValidationController implements IValidationController {
       res.status(200).json(buildHiveResponse.success(validationResult, 'Business number validation completed'));
 
     } catch (error) {
-      this.logger.error('Business number validation failed', error, {
+      this.logger.error('Business number validation failed', error as Error, {
         hasABN: !!req.body.abn,
         hasACN: !!req.body.acn,
         ip: req.ip
@@ -379,7 +389,7 @@ export class ValidationController implements IValidationController {
       });
 
       if (!licenseNumber || !state || !tradeType) {
-        throw AuthErrorFactory.missingRequiredFields(['licenseNumber', 'state', 'tradeType']);
+        throw AuthErrorFactory.validationError('License number, state, and trade type are required');
       }
 
       const validationResult = await this.validateTradeLicenseNumber(licenseNumber, state, tradeType);
@@ -394,7 +404,7 @@ export class ValidationController implements IValidationController {
       res.status(200).json(buildHiveResponse.success(validationResult, 'Trade license validation completed'));
 
     } catch (error) {
-      this.logger.error('Trade license validation failed', error, {
+      this.logger.error('Trade license validation failed', error as Error, {
         licenseNumber: req.body.licenseNumber ? this.maskLicenseNumber(req.body.licenseNumber) : 'not_provided',
         state: req.body.state,
         ip: req.ip
@@ -414,7 +424,7 @@ export class ValidationController implements IValidationController {
       });
 
       if (!email) {
-        throw AuthErrorFactory.missingRequiredFields(['email']);
+        throw AuthErrorFactory.validationError('Email is required');
       }
 
       const isAvailable = await this.userService.checkEmailAvailability(email);
@@ -431,7 +441,7 @@ export class ValidationController implements IValidationController {
       }, 'Email availability checked'));
 
     } catch (error) {
-      this.logger.error('Email availability check failed', error, {
+      this.logger.error('Email availability check failed', error as Error, {
         email: req.query.email ? this.maskEmail(req.query.email as string) : 'not_provided',
         ip: req.ip
       });
@@ -450,7 +460,7 @@ export class ValidationController implements IValidationController {
       });
 
       if (!phone) {
-        throw AuthErrorFactory.missingRequiredFields(['phone']);
+        throw AuthErrorFactory.validationError('Phone number is required');
       }
 
       const isAvailable = await this.userService.checkPhoneAvailability(phone);
@@ -467,7 +477,7 @@ export class ValidationController implements IValidationController {
       }, 'Phone availability checked'));
 
     } catch (error) {
-      this.logger.error('Phone availability check failed', error, {
+      this.logger.error('Phone availability check failed', error as Error, {
         phone: req.query.phone ? this.maskPhone(req.query.phone as string) : 'not_provided',
         ip: req.ip
       });
@@ -486,7 +496,7 @@ export class ValidationController implements IValidationController {
       });
 
       if (!postcode) {
-        throw AuthErrorFactory.missingRequiredFields(['postcode']);
+        throw AuthErrorFactory.validationError('Postcode is required');
       }
 
       const validationResult = await this.validateAustralianPostcode(postcode);
@@ -500,7 +510,7 @@ export class ValidationController implements IValidationController {
       res.status(200).json(buildHiveResponse.success(validationResult, 'Postcode validation completed'));
 
     } catch (error) {
-      this.logger.error('Postcode validation failed', error, {
+      this.logger.error('Postcode validation failed', error as Error, {
         postcode: req.query.postcode,
         ip: req.ip
       });
@@ -534,7 +544,7 @@ export class ValidationController implements IValidationController {
       res.status(200).json(buildHiveResponse.success(status, 'Verification status retrieved'));
 
     } catch (error) {
-      this.logger.error('Verification status retrieval failed', error, {
+      this.logger.error('Verification status retrieval failed', error as Error, {
         userId: req.user?.id,
         ip: req.ip
       });
@@ -543,7 +553,27 @@ export class ValidationController implements IValidationController {
     }
   }
 
-  // Utility Methods
+  async healthCheck(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const health = {
+        status: 'healthy',
+        timestamp: new Date().toISOString(),
+        service: 'validation-controller',
+        version: process.env.APP_VERSION || '1.0.0',
+        dependencies: {
+          authService: 'connected',
+          userService: 'connected'
+        }
+      };
+
+      res.status(200).json(buildHiveResponse.success(health, 'Validation controller is healthy'));
+
+    } catch (error) {
+      this.logger.error('Validation controller health check failed', error as Error);
+      next(error);
+    }
+  }
+
   private maskEmail(email: string): string {
     if (!email || !email.includes('@')) return email;
     const [username, domain] = email.split('@');
@@ -569,15 +599,13 @@ export class ValidationController implements IValidationController {
   private validateAustralianPhone(phone: string): void {
     const australianPhoneRegex = /^(\+61|0)[2-9]\d{8}$/;
     if (!australianPhoneRegex.test(phone.replace(/\s/g, ''))) {
-      throw AuthErrorFactory.invalidPhoneNumber('Invalid Australian phone number format');
+      throw AuthErrorFactory.validationError('Invalid Australian phone number format');
     }
   }
 
   private async checkResendRateLimit(identifier: string, type: 'email' | 'phone', ip: string): Promise<void> {
-    // Implement rate limiting logic here
-    // For production, use Redis or similar cache
     const key = `resend_limit:${type}:${identifier}`;
-    const limit = 3; // 3 attempts per hour
+    const limit = 3;
     
     this.logger.debug('Rate limit check passed', {
       identifier: type === 'email' ? this.maskEmail(identifier) : this.maskPhone(identifier),
@@ -588,7 +616,6 @@ export class ValidationController implements IValidationController {
   }
 
   private async validateABN(abn: string): Promise<{ isValid: boolean; businessName?: string; status?: string }> {
-    // ABN validation logic - integrate with ASIC API
     const cleanABN = abn.replace(/\s/g, '');
     const abnRegex = /^\d{11}$/;
     
@@ -596,10 +623,9 @@ export class ValidationController implements IValidationController {
       return { isValid: false };
     }
 
-    // Implement ABN checksum validation
     const weights = [10, 1, 3, 5, 7, 9, 11, 13, 15, 17, 19];
     const digits = cleanABN.split('').map(Number);
-    digits[0] -= 1; // Subtract 1 from first digit
+    digits[0] -= 1;
     
     const sum = digits.reduce((acc, digit, index) => acc + (digit * weights[index]), 0);
     const isValid = sum % 89 === 0;
@@ -608,7 +634,6 @@ export class ValidationController implements IValidationController {
   }
 
   private async validateACN(acn: string): Promise<{ isValid: boolean; companyName?: string; status?: string }> {
-    // ACN validation logic
     const cleanACN = acn.replace(/\s/g, '');
     const acnRegex = /^\d{9}$/;
     
@@ -616,7 +641,6 @@ export class ValidationController implements IValidationController {
       return { isValid: false };
     }
 
-    // Implement ACN checksum validation
     const weights = [8, 7, 6, 5, 4, 3, 2, 1];
     const digits = cleanACN.substring(0, 8).split('').map(Number);
     
@@ -629,8 +653,6 @@ export class ValidationController implements IValidationController {
   }
 
   private async validateTradeLicenseNumber(license: string, state: string, tradeType: string): Promise<{ isValid: boolean; licenseHolder?: string; expiryDate?: string }> {
-    // Trade license validation logic - integrate with state licensing authorities
-    // This is a placeholder implementation
     return {
       isValid: true,
       licenseHolder: 'Sample Tradie',
@@ -639,14 +661,12 @@ export class ValidationController implements IValidationController {
   }
 
   private async validateAustralianPostcode(postcode: string): Promise<{ isValid: boolean; suburb?: string; state?: string }> {
-    // Australian postcode validation
     const postcodeRegex = /^\d{4}$/;
     
     if (!postcodeRegex.test(postcode)) {
       return { isValid: false };
     }
 
-    // Validate postcode range (1000-9999 for Australia)
     const code = parseInt(postcode);
     const isValid = code >= 1000 && code <= 9999;
 
@@ -656,26 +676,8 @@ export class ValidationController implements IValidationController {
       state: isValid ? 'NSW' : undefined
     };
   }
-
-  // Health check
-  async healthCheck(req: Request, res: Response, next: NextFunction): Promise<void> {
-    try {
-      const health = {
-        status: 'healthy',
-        timestamp: new Date().toISOString(),
-        service: 'validation-controller',
-        version: process.env.APP_VERSION || '1.0.0'
-      };
-
-      res.status(200).json(buildHiveResponse.success(health, 'Validation controller is healthy'));
-    } catch (error) {
-      this.logger.error('Validation controller health check failed', error);
-      next(error);
-    }
-  }
 }
 
-// Export factory function
 export function createValidationController(serviceContainer: ServiceContainer): IValidationController {
   return new ValidationController(serviceContainer);
 }

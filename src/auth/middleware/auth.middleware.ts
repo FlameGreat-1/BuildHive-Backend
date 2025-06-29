@@ -22,6 +22,28 @@ export interface AuthenticatedRequest extends Request {
   };
 }
 
+interface JWTPayload {
+  userId: string;
+  sessionId?: string;
+  email: string;
+  role: string;
+  iat?: number;
+  exp?: number;
+}
+
+declare global {
+  namespace Express {
+    interface Request {
+      user?: AuthenticatedUser;
+      session?: {
+        id: string;
+        userId: string;
+        deviceInfo: any;
+      };
+    }
+  }
+}
+
 export class AuthMiddleware {
   private readonly serviceContainer: ServiceContainer;
   private readonly logger = buildHiveLogger;
@@ -30,7 +52,6 @@ export class AuthMiddleware {
     this.serviceContainer = serviceContainer;
   }
 
-  // Main authentication middleware
   authenticate = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
       const token = this.extractToken(req);
@@ -39,10 +60,8 @@ export class AuthMiddleware {
         throw AuthErrorFactory.unauthorized('Authentication token required');
       }
 
-      // Verify JWT token
-      const decoded = this.verifyToken(token);
+      const decoded = this.verifyToken(token) as JWTPayload;
       
-      // Get user from database
       const userService = this.serviceContainer.getUserService();
       const userResult = await userService.getUserById(decoded.userId);
       
@@ -52,12 +71,10 @@ export class AuthMiddleware {
 
       const user = userResult.data;
 
-      // Check if user is active
       if (user.status !== 'active') {
         throw AuthErrorFactory.forbidden('Account is not active');
       }
 
-      // Attach user to request
       req.user = {
         id: user.id,
         email: user.email,
@@ -79,20 +96,21 @@ export class AuthMiddleware {
       next();
 
     } catch (error) {
-      this.logger.warn('Authentication failed', error, {
+      this.logger.warn('Authentication failed', error as Error, {
         ip: req.ip,
         userAgent: req.get('User-Agent'),
         path: req.path
       });
 
-      if (error.name === 'TokenExpiredError') {
+      const err = error as any;
+      if (err.name === 'TokenExpiredError') {
         return res.status(401).json(buildHiveResponse.error(
           'Token expired',
           'TOKEN_EXPIRED'
         ));
       }
 
-      if (error.name === 'JsonWebTokenError') {
+      if (err.name === 'JsonWebTokenError') {
         return res.status(401).json(buildHiveResponse.error(
           'Invalid token',
           'INVALID_TOKEN'
@@ -103,31 +121,26 @@ export class AuthMiddleware {
     }
   };
 
-  // Optional authentication (doesn't fail if no token)
   optionalAuthenticate = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
       const token = this.extractToken(req);
 
       if (!token) {
-        return next(); // Continue without authentication
+        return next();
       }
 
-      // Try to authenticate, but don't fail if it doesn't work
-      await this.authenticate(req, res, (error) => {
+      await this.authenticate(req, res, (error?: any) => {
         if (error) {
-          // Log the error but continue without authentication
-          this.logger.debug('Optional authentication failed', error);
+          this.logger.debug('Optional authentication failed', error as Error);
         }
         next();
       });
 
     } catch (error) {
-      // Continue without authentication
       next();
     }
   };
 
-  // Session validation middleware
   validateSession = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
       if (!req.user?.sessionId) {
@@ -150,7 +163,7 @@ export class AuthMiddleware {
       next();
 
     } catch (error) {
-      this.logger.warn('Session validation failed', error, {
+      this.logger.warn('Session validation failed', error as Error, {
         userId: req.user?.id,
         sessionId: req.user?.sessionId,
         ip: req.ip
@@ -160,7 +173,6 @@ export class AuthMiddleware {
     }
   };
 
-  // Role-based authorization
   requireRole = (roles: string | string[]) => {
     return (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
       try {
@@ -200,7 +212,6 @@ export class AuthMiddleware {
     };
   };
 
-  // Email verification requirement
   requireEmailVerification = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
     try {
       if (!req.user) {
@@ -225,7 +236,6 @@ export class AuthMiddleware {
     }
   };
 
-  // Phone verification requirement
   requirePhoneVerification = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
     try {
       if (!req.user) {
@@ -249,7 +259,6 @@ export class AuthMiddleware {
     }
   };
 
-  // Profile ownership validation
   validateProfileOwnership = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
       if (!req.user) {
@@ -258,10 +267,9 @@ export class AuthMiddleware {
 
       const profileId = req.params.id;
       if (!profileId) {
-        throw AuthErrorFactory.invalidInput('Profile ID required');
+        throw AuthErrorFactory.validationError('Profile ID required');
       }
 
-      // Admin users can access any profile
       if (req.user.roles?.includes('admin')) {
         return next();
       }
@@ -298,15 +306,12 @@ export class AuthMiddleware {
     }
   };
 
-  // Utility methods
   private extractToken(req: Request): string | null {
-    // Check Authorization header
     const authHeader = req.get('Authorization');
     if (authHeader && authHeader.startsWith('Bearer ')) {
       return authHeader.substring(7);
     }
 
-    // Check cookies
     const cookieToken = req.cookies?.accessToken;
     if (cookieToken) {
       return cookieToken;
@@ -315,13 +320,18 @@ export class AuthMiddleware {
     return null;
   }
 
-  private verifyToken(token: string): any {
+  private verifyToken(token: string): JWTPayload {
     const secret = process.env.JWT_SECRET;
     if (!secret) {
       throw new Error('JWT_SECRET not configured');
     }
 
-    return jwt.verify(token, secret);
+    try {
+      const decoded = jwt.verify(token, secret) as JWTPayload;
+      return decoded;
+    } catch (error) {
+      throw error;
+    }
   }
 
   private maskEmail(email: string): string {
@@ -334,12 +344,10 @@ export class AuthMiddleware {
   }
 }
 
-// Factory function
 export function createAuthMiddleware(serviceContainer: ServiceContainer): AuthMiddleware {
   return new AuthMiddleware(serviceContainer);
 }
 
-// Export individual middleware functions for convenience
 export function createAuthMiddlewareFunctions(serviceContainer: ServiceContainer) {
   const authMiddleware = new AuthMiddleware(serviceContainer);
   

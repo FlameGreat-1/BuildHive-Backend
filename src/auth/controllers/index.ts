@@ -1,23 +1,40 @@
-// Controller Interfaces
 export type { IAuthController } from './auth.controller';
 export type { IProfileController } from './profile.controller';
 export type { IValidationController } from './validation.controller';
 
-// Controller Implementations
 export { AuthController, createAuthController } from './auth.controller';
 export { ProfileController, createProfileController } from './profile.controller';
 export { ValidationController, createValidationController } from './validation.controller';
 
-// Import required dependencies
 import { Request, Response, NextFunction } from 'express';
 import rateLimit from 'express-rate-limit';
 import Joi from 'joi';
 import { buildHiveLogger, buildHiveResponse, AuthErrorFactory } from '../../shared';
 import type { ServiceContainer } from '../services';
+import type { IAuthController, IProfileController, IValidationController } from './';
 
-// Extended Request interface
+declare global {
+  namespace Express {
+    interface Request {
+      user?: {
+        id: string;
+        email: string;
+        role: string;
+        roles?: string[];
+        isEmailVerified: boolean;
+        isPhoneVerified: boolean;
+      };
+      session?: {
+        id: string;
+        userId: string;
+        deviceInfo: any;
+      };
+    }
+  }
+}
+
 export interface AuthenticatedRequest extends Request {
-  user?: {
+  user: {
     id: string;
     email: string;
     role: string;
@@ -32,7 +49,6 @@ export interface AuthenticatedRequest extends Request {
   };
 }
 
-// Controller Factory Class
 export class ControllerContainer {
   private readonly serviceContainer: ServiceContainer;
   private readonly logger = buildHiveLogger;
@@ -88,7 +104,7 @@ export class ControllerContainer {
       this.getAuthController();
       results.auth = true;
     } catch (error) {
-      this.logger.error('AuthController health check failed', error);
+      this.logger.error('AuthController health check failed', error as Error);
       results.auth = false;
     }
 
@@ -96,7 +112,7 @@ export class ControllerContainer {
       this.getProfileController();
       results.profile = true;
     } catch (error) {
-      this.logger.error('ProfileController health check failed', error);
+      this.logger.error('ProfileController health check failed', error as Error);
       results.profile = false;
     }
 
@@ -104,7 +120,7 @@ export class ControllerContainer {
       this.getValidationController();
       results.validation = true;
     } catch (error) {
-      this.logger.error('ValidationController health check failed', error);
+      this.logger.error('ValidationController health check failed', error as Error);
       results.validation = false;
     }
 
@@ -112,7 +128,6 @@ export class ControllerContainer {
   }
 }
 
-// COMPLETE Request validation middleware
 export function validateRequest(schema: Joi.ObjectSchema) {
   return (req: Request, res: Response, next: NextFunction) => {
     const logger = buildHiveLogger;
@@ -145,12 +160,11 @@ export function validateRequest(schema: Joi.ObjectSchema) {
         ));
       }
 
-      // Replace req.body with validated and sanitized data
       req.body = value;
       next();
 
     } catch (validationError) {
-      logger.error('Request validation middleware error', validationError, {
+      logger.error('Request validation middleware error', validationError as Error, {
         path: req.path,
         method: req.method,
         ip: req.ip
@@ -164,7 +178,6 @@ export function validateRequest(schema: Joi.ObjectSchema) {
   };
 }
 
-// COMPLETE Rate limiting middleware factory
 export function createRateLimit(options: {
   windowMs: number;
   max: number;
@@ -187,8 +200,7 @@ export function createRateLimit(options: {
     standardHeaders: true,
     legacyHeaders: false,
     keyGenerator: options.keyGenerator || ((req: Request) => {
-      // Use user ID if authenticated, otherwise IP
-      return req.user?.id || req.ip;
+      return (req as any).user?.id || req.ip || 'unknown';
     }),
     skipSuccessfulRequests: options.skipSuccessfulRequests || false,
     skipFailedRequests: options.skipFailedRequests || false,
@@ -197,7 +209,7 @@ export function createRateLimit(options: {
         ip: req.ip,
         path: req.path,
         method: req.method,
-        userId: req.user?.id,
+        userId: (req as any).user?.id,
         userAgent: req.get('User-Agent')
       });
 
@@ -216,22 +228,21 @@ export function createRateLimit(options: {
         ip: req.ip,
         path: req.path,
         method: req.method,
-        userId: req.user?.id
+        userId: (req as any).user?.id
       });
     }
   });
 }
 
-// COMPLETE Async handler wrapper
 export function asyncHandler(fn: (req: Request, res: Response, next: NextFunction) => Promise<void>) {
   return (req: Request, res: Response, next: NextFunction) => {
     const logger = buildHiveLogger;
     
     Promise.resolve(fn(req, res, next)).catch((error) => {
-      logger.error('Async handler caught error', error, {
+      logger.error('Async handler caught error', error as Error, {
         path: req.path,
         method: req.method,
-        userId: req.user?.id,
+        userId: (req as any).user?.id,
         ip: req.ip
       });
       next(error);
@@ -239,9 +250,8 @@ export function asyncHandler(fn: (req: Request, res: Response, next: NextFunctio
   };
 }
 
-// COMPLETE Authentication middleware
 export function requireAuth(req: Request, res: Response, next: NextFunction) {
-  if (!req.user) {
+  if (!(req as any).user) {
     return res.status(401).json(buildHiveResponse.error(
       'Authentication required',
       'UNAUTHORIZED'
@@ -250,17 +260,17 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
   next();
 }
 
-// COMPLETE Role-based authorization middleware
 export function requireRole(roles: string | string[]) {
   return (req: Request, res: Response, next: NextFunction) => {
-    if (!req.user) {
+    const user = (req as any).user;
+    if (!user) {
       return res.status(401).json(buildHiveResponse.error(
         'Authentication required',
         'UNAUTHORIZED'
       ));
     }
 
-    const userRoles = req.user.roles || [req.user.role];
+    const userRoles = user.roles || [user.role];
     const requiredRoles = Array.isArray(roles) ? roles : [roles];
     
     const hasRequiredRole = requiredRoles.some(role => userRoles.includes(role));
@@ -277,9 +287,9 @@ export function requireRole(roles: string | string[]) {
   };
 }
 
-// COMPLETE Email verification middleware
 export function requireEmailVerification(req: Request, res: Response, next: NextFunction) {
-  if (!req.user?.isEmailVerified) {
+  const user = (req as any).user;
+  if (!user?.isEmailVerified) {
     return res.status(403).json(buildHiveResponse.error(
       'Email verification required',
       'EMAIL_NOT_VERIFIED'
@@ -288,50 +298,42 @@ export function requireEmailVerification(req: Request, res: Response, next: Next
   next();
 }
 
-// Pre-configured rate limiters
 export const rateLimiters = {
-  // Authentication endpoints
   auth: createRateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 5, // 5 attempts per window
+    windowMs: 15 * 60 * 1000,
+    max: 5,
     message: 'Too many authentication attempts. Please try again in 15 minutes.'
   }),
 
-  // Registration endpoint
   register: createRateLimit({
-    windowMs: 60 * 60 * 1000, // 1 hour
-    max: 3, // 3 registrations per hour per IP
+    windowMs: 60 * 60 * 1000,
+    max: 3,
     message: 'Too many registration attempts. Please try again in 1 hour.'
   }),
 
-  // Password reset
   passwordReset: createRateLimit({
-    windowMs: 60 * 60 * 1000, // 1 hour
-    max: 3, // 3 password reset attempts per hour
+    windowMs: 60 * 60 * 1000,
+    max: 3,
     message: 'Too many password reset attempts. Please try again in 1 hour.'
   }),
 
-  // Verification codes
   verification: createRateLimit({
-    windowMs: 60 * 60 * 1000, // 1 hour
-    max: 5, // 5 verification attempts per hour
+    windowMs: 60 * 60 * 1000,
+    max: 5,
     message: 'Too many verification attempts. Please try again in 1 hour.'
   }),
 
-  // General API
   general: createRateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // 100 requests per window
+    windowMs: 15 * 60 * 1000,
+    max: 100,
     message: 'Too many requests. Please try again later.'
   })
 };
 
-// Factory function
 export function createControllerContainer(serviceContainer: ServiceContainer): ControllerContainer {
   return new ControllerContainer(serviceContainer);
 }
 
-// Default export
 export default {
   AuthController,
   ProfileController,

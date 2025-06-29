@@ -9,6 +9,26 @@ export interface ValidationOptions {
   skipOnError?: boolean;
 }
 
+interface ExtendedRequest extends Request {
+  user?: {
+    id: string;
+    email?: string;
+    role?: string;
+  };
+}
+
+declare global {
+  namespace Express {
+    interface Request {
+      user?: {
+        id: string;
+        email?: string;
+        role?: string;
+      };
+    }
+  }
+}
+
 export class ValidationMiddleware {
   private readonly logger = buildHiveLogger;
   private readonly defaultOptions: ValidationOptions = {
@@ -18,7 +38,6 @@ export class ValidationMiddleware {
     skipOnError: false
   };
 
-  // Request body validation
   validateBody = (schema: Joi.ObjectSchema, options: ValidationOptions = {}) => {
     return (req: Request, res: Response, next: NextFunction): void => {
       const config = { ...this.defaultOptions, ...options };
@@ -39,7 +58,7 @@ export class ValidationMiddleware {
             method: req.method,
             errors: validationErrors,
             ip: req.ip,
-            userId: (req as any).user?.id
+            userId: (req as ExtendedRequest).user?.id
           });
 
           return res.status(400).json(buildHiveResponse.error(
@@ -53,7 +72,7 @@ export class ValidationMiddleware {
         next();
 
       } catch (validationError) {
-        this.logger.error('Body validation middleware error', validationError, {
+        this.logger.error('Body validation middleware error', validationError as Error, {
           path: req.path,
           method: req.method,
           ip: req.ip
@@ -67,7 +86,6 @@ export class ValidationMiddleware {
     };
   };
 
-  // Query parameters validation
   validateQuery = (schema: Joi.ObjectSchema, options: ValidationOptions = {}) => {
     return (req: Request, res: Response, next: NextFunction): void => {
       const config = { ...this.defaultOptions, ...options };
@@ -88,7 +106,7 @@ export class ValidationMiddleware {
             method: req.method,
             errors: validationErrors,
             ip: req.ip,
-            userId: (req as any).user?.id
+            userId: (req as ExtendedRequest).user?.id
           });
 
           return res.status(400).json(buildHiveResponse.error(
@@ -102,7 +120,7 @@ export class ValidationMiddleware {
         next();
 
       } catch (validationError) {
-        this.logger.error('Query validation middleware error', validationError, {
+        this.logger.error('Query validation middleware error', validationError as Error, {
           path: req.path,
           method: req.method,
           ip: req.ip
@@ -116,7 +134,6 @@ export class ValidationMiddleware {
     };
   };
 
-  // URL parameters validation
   validateParams = (schema: Joi.ObjectSchema, options: ValidationOptions = {}) => {
     return (req: Request, res: Response, next: NextFunction): void => {
       const config = { ...this.defaultOptions, ...options };
@@ -137,7 +154,7 @@ export class ValidationMiddleware {
             method: req.method,
             errors: validationErrors,
             ip: req.ip,
-            userId: (req as any).user?.id
+            userId: (req as ExtendedRequest).user?.id
           });
 
           return res.status(400).json(buildHiveResponse.error(
@@ -151,7 +168,7 @@ export class ValidationMiddleware {
         next();
 
       } catch (validationError) {
-        this.logger.error('Params validation middleware error', validationError, {
+        this.logger.error('Params validation middleware error', validationError as Error, {
           path: req.path,
           method: req.method,
           ip: req.ip
@@ -165,7 +182,6 @@ export class ValidationMiddleware {
     };
   };
 
-  // Headers validation
   validateHeaders = (schema: Joi.ObjectSchema, options: ValidationOptions = {}) => {
     return (req: Request, res: Response, next: NextFunction): void => {
       const config = { ...this.defaultOptions, ...options };
@@ -186,7 +202,7 @@ export class ValidationMiddleware {
             method: req.method,
             errors: validationErrors,
             ip: req.ip,
-            userId: (req as any).user?.id
+            userId: (req as ExtendedRequest).user?.id
           });
 
           return res.status(400).json(buildHiveResponse.error(
@@ -199,7 +215,7 @@ export class ValidationMiddleware {
         next();
 
       } catch (validationError) {
-        this.logger.error('Headers validation middleware error', validationError, {
+        this.logger.error('Headers validation middleware error', validationError as Error, {
           path: req.path,
           method: req.method,
           ip: req.ip
@@ -213,7 +229,6 @@ export class ValidationMiddleware {
     };
   };
 
-  // File upload validation
   validateFileUpload = (options: {
     maxSize?: number;
     allowedTypes?: string[];
@@ -222,7 +237,7 @@ export class ValidationMiddleware {
   } = {}) => {
     return (req: Request, res: Response, next: NextFunction): void => {
       const {
-        maxSize = 5 * 1024 * 1024, // 5MB default
+        maxSize = 5 * 1024 * 1024,
         allowedTypes = ['image/jpeg', 'image/png', 'image/webp'],
         required = false,
         maxFiles = 1
@@ -272,14 +287,14 @@ export class ValidationMiddleware {
           path: req.path,
           method: req.method,
           fileCount: singleFile ? 1 : files.length,
-          userId: (req as any).user?.id,
+          userId: (req as ExtendedRequest).user?.id,
           ip: req.ip
         });
 
         next();
 
       } catch (error) {
-        this.logger.error('File validation middleware error', error, {
+        this.logger.error('File validation middleware error', error as Error, {
           path: req.path,
           method: req.method,
           ip: req.ip
@@ -293,7 +308,6 @@ export class ValidationMiddleware {
     };
   };
 
-  // Australian-specific validations
   validateAustralianPhone = (req: Request, res: Response, next: NextFunction): void => {
     const phone = req.body.phone || req.query.phone;
 
@@ -306,7 +320,7 @@ export class ValidationMiddleware {
           phone: this.maskPhone(phone),
           path: req.path,
           ip: req.ip,
-          userId: (req as any).user?.id
+          userId: (req as ExtendedRequest).user?.id
         });
 
         return res.status(400).json(buildHiveResponse.error(
@@ -315,7 +329,6 @@ export class ValidationMiddleware {
         ));
       }
 
-      // Normalize phone number
       if (req.body.phone) req.body.phone = cleanPhone;
       if (req.query.phone) req.query.phone = cleanPhone;
     }
@@ -335,7 +348,7 @@ export class ValidationMiddleware {
           postcode,
           path: req.path,
           ip: req.ip,
-          userId: (req as any).user?.id
+          userId: (req as ExtendedRequest).user?.id
         });
 
         return res.status(400).json(buildHiveResponse.error(
@@ -362,10 +375,9 @@ export class ValidationMiddleware {
         ));
       }
 
-      // ABN checksum validation
       const weights = [10, 1, 3, 5, 7, 9, 11, 13, 15, 17, 19];
       const digits = cleanABN.split('').map(Number);
-      digits[0] -= 1; // Subtract 1 from first digit
+      digits[0] -= 1;
 
       const sum = digits.reduce((acc, digit, index) => acc + (digit * weights[index]), 0);
       const isValid = sum % 89 === 0;
@@ -375,7 +387,7 @@ export class ValidationMiddleware {
           abn: this.maskABN(abn),
           path: req.path,
           ip: req.ip,
-          userId: (req as any).user?.id
+          userId: (req as ExtendedRequest).user?.id
         });
 
         return res.status(400).json(buildHiveResponse.error(
@@ -384,7 +396,6 @@ export class ValidationMiddleware {
         ));
       }
 
-      // Normalize ABN
       if (req.body.abn) req.body.abn = cleanABN;
       if (req.query.abn) req.query.abn = cleanABN;
     }
@@ -406,7 +417,6 @@ export class ValidationMiddleware {
         ));
       }
 
-      // ACN checksum validation
       const weights = [8, 7, 6, 5, 4, 3, 2, 1];
       const digits = cleanACN.substring(0, 8).split('').map(Number);
       
@@ -420,7 +430,7 @@ export class ValidationMiddleware {
           acn: this.maskACN(acn),
           path: req.path,
           ip: req.ip,
-          userId: (req as any).user?.id
+          userId: (req as ExtendedRequest).user?.id
         });
 
         return res.status(400).json(buildHiveResponse.error(
@@ -429,7 +439,6 @@ export class ValidationMiddleware {
         ));
       }
 
-      // Normalize ACN
       if (req.body.acn) req.body.acn = cleanACN;
       if (req.query.acn) req.query.acn = cleanACN;
     }
@@ -437,7 +446,6 @@ export class ValidationMiddleware {
     next();
   };
 
-  // Email format validation
   validateEmailFormat = (req: Request, res: Response, next: NextFunction): void => {
     const email = req.body.email || req.query.email;
 
@@ -449,7 +457,7 @@ export class ValidationMiddleware {
           email: this.maskEmail(email),
           path: req.path,
           ip: req.ip,
-          userId: (req as any).user?.id
+          userId: (req as ExtendedRequest).user?.id
         });
 
         return res.status(400).json(buildHiveResponse.error(
@@ -458,7 +466,6 @@ export class ValidationMiddleware {
         ));
       }
 
-      // Normalize email (lowercase)
       const normalizedEmail = email.toLowerCase().trim();
       if (req.body.email) req.body.email = normalizedEmail;
       if (req.query.email) req.query.email = normalizedEmail;
@@ -467,7 +474,6 @@ export class ValidationMiddleware {
     next();
   };
 
-  // Password strength validation
   validatePasswordStrength = (req: Request, res: Response, next: NextFunction): void => {
     const password = req.body.password || req.body.newPassword;
 
@@ -500,7 +506,7 @@ export class ValidationMiddleware {
         this.logger.warn('Password strength validation failed', {
           path: req.path,
           ip: req.ip,
-          userId: (req as any).user?.id,
+          userId: (req as ExtendedRequest).user?.id,
           errors
         });
 
@@ -515,13 +521,11 @@ export class ValidationMiddleware {
     next();
   };
 
-  // Utility methods
   private validateSingleFile(
     file: Express.Multer.File,
     maxSize: number,
     allowedTypes: string[]
   ): { isValid: boolean; error?: string } {
-    // Check file size
     if (file.size > maxSize) {
       return {
         isValid: false,
@@ -529,7 +533,6 @@ export class ValidationMiddleware {
       };
     }
 
-    // Check file type
     if (!allowedTypes.includes(file.mimetype)) {
       return {
         isValid: false,
@@ -537,7 +540,6 @@ export class ValidationMiddleware {
       };
     }
 
-    // Check for malicious file names
     if (this.hasMaliciousFileName(file.originalname)) {
       return {
         isValid: false,
@@ -550,10 +552,10 @@ export class ValidationMiddleware {
 
   private hasMaliciousFileName(filename: string): boolean {
     const maliciousPatterns = [
-      /\.\./,           // Directory traversal
-      /[<>:"|?*]/,      // Invalid filename characters
-      /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/i, // Windows reserved names
-      /\.(exe|bat|cmd|scr|pif|com)$/i // Executable extensions
+      /\.\./,
+      /[<>:"|?*]/,
+      /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/i,
+      /\.(exe|bat|cmd|scr|pif|com)$/i
     ];
 
     return maliciousPatterns.some(pattern => pattern.test(filename));
@@ -592,12 +594,10 @@ export class ValidationMiddleware {
   }
 }
 
-// Factory function
 export function createValidationMiddleware(): ValidationMiddleware {
   return new ValidationMiddleware();
 }
 
-// Export individual middleware functions
 export function createValidationMiddlewareFunctions() {
   const validationMiddleware = new ValidationMiddleware();
   
