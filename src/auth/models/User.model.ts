@@ -1,6 +1,6 @@
 import { Schema, model } from 'mongoose';
 import bcrypt from 'bcryptjs';
-import { USER_ROLES, USER_STATUS, VERIFICATION_STATUS, PASSWORD_CONFIG } from '../../config';
+import { USER_ROLES, USER_STATUS, VERIFICATION_STATUS, PASSWORD_CONFIG } from '../../config/auth';
 import { buildHiveLogger } from '../../shared';
 import type { BaseDocument, UserRole, UserStatus, VerificationStatus } from '../../shared/types';
 

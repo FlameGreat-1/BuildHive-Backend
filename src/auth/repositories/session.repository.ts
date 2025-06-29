@@ -1,8 +1,8 @@
 import { FilterQuery, UpdateQuery, Types } from 'mongoose';
 import { Session, ISessionDocument } from '../models';
 import { buildHiveLogger, AuthErrorFactory } from '../../shared';
-import { SESSION_STATUS, USER_ROLES } from '../../config';
-import type { UserRole, PaginationOptions } from '../../shared/types';
+import { SESSION_STATUS, USER_ROLES } from '../../config/auth';
+import type { UserRole, PaginationOptions } from '../../auth/types';
 
 // Repository interface following Interface Segregation Principle
 export interface ISessionRepository {

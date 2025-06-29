@@ -1,5 +1,5 @@
 import { Schema, model } from 'mongoose';
-import { USER_ROLES } from '../../config';
+import { USER_ROLES } from '../../config/auth';
 import { buildHiveLogger } from '../../shared';
 import type { BaseDocument, UserRole } from '../../shared/types';
 

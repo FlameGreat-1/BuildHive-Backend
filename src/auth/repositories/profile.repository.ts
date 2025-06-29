@@ -1,8 +1,8 @@
 import { FilterQuery, UpdateQuery, QueryOptions, Types } from 'mongoose';
 import { Profile, IProfileDocument } from '../models';
 import { buildHiveLogger, buildHiveResponse, AuthErrorFactory } from '../../shared';
-import { USER_ROLES, VERIFICATION_STATUS, SERVICE_CATEGORIES, AVAILABILITY_STATUS } from '../../config';
-import type { UserRole, PaginationOptions, SortOptions } from '../../shared/types';
+import { USER_ROLES, VERIFICATION_STATUS, SERVICE_CATEGORIES, AVAILABILITY_STATUS } from '../../config/auth';
+import type { UserRole, PaginationOptions, SortOptions } from '../../auth/types';
 
 // Repository interface following Interface Segregation Principle
 export interface IProfileRepository {

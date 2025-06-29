@@ -1,5 +1,5 @@
 import { Schema, model } from 'mongoose';
-import { USER_ROLES, VERIFICATION_STATUS } from '../../config';
+import { USER_ROLES, VERIFICATION_STATUS } from '../../config/auth';
 import { buildHiveLogger } from '../../shared';
 import type { BaseDocument, UserRole, VerificationStatus } from '../../shared/types';
 
