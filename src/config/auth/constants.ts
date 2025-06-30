@@ -1,27 +1,22 @@
-// Authentication & Profile Constants
-
-// User Role Constants
 export const USER_ROLES = {
   CLIENT: 'client',
   TRADIE: 'tradie', 
   ENTERPRISE: 'enterprise',
+  ADMIN: 'admin',
 } as const;
 
 export type UserRole = typeof USER_ROLES[keyof typeof USER_ROLES];
 
-// User Status Constants
 export const USER_STATUS = {
   ACTIVE: 'active',
   INACTIVE: 'inactive',
   SUSPENDED: 'suspended',
-  PENDING_VERIFICATION: 'pending_verification',
+  PENDING: 'pending',
 } as const;
 
 export type UserStatus = typeof USER_STATUS[keyof typeof USER_STATUS];
 
-// Profile Verification Status
 export const VERIFICATION_STATUS = {
-  UNVERIFIED: 'unverified',
   PENDING: 'pending',
   VERIFIED: 'verified',
   REJECTED: 'rejected',
@@ -29,7 +24,6 @@ export const VERIFICATION_STATUS = {
 
 export type VerificationStatus = typeof VERIFICATION_STATUS[keyof typeof VERIFICATION_STATUS];
 
-// Authentication Token Types
 export const TOKEN_TYPES = {
   ACCESS: 'access',
   REFRESH: 'refresh',
@@ -39,14 +33,12 @@ export const TOKEN_TYPES = {
 
 export type TokenType = typeof TOKEN_TYPES[keyof typeof TOKEN_TYPES];
 
-// Session Constants
 export const SESSION_CONFIG = {
   MAX_ACTIVE_SESSIONS: 5,
   SESSION_TIMEOUT_HOURS: 24,
   REMEMBER_ME_DAYS: 30,
 } as const;
 
-// Password Requirements
 export const PASSWORD_CONFIG = {
   MIN_LENGTH: 8,
   MAX_LENGTH: 128,
@@ -57,21 +49,19 @@ export const PASSWORD_CONFIG = {
   SPECIAL_CHARS: '!@#$%^&*()_+-=[]{}|;:,.<>?',
 } as const;
 
-// File Upload Constants (Profile Images)
 export const UPLOAD_CONFIG = {
   PROFILE_IMAGE: {
-    MAX_SIZE: 5 * 1024 * 1024, // 5MB
+    MAX_SIZE: 5 * 1024 * 1024,
     ALLOWED_TYPES: ['image/jpeg', 'image/png', 'image/webp'],
     MAX_WIDTH: 1024,
     MAX_HEIGHT: 1024,
   },
   DOCUMENT: {
-    MAX_SIZE: 10 * 1024 * 1024, // 10MB
+    MAX_SIZE: 10 * 1024 * 1024,
     ALLOWED_TYPES: ['application/pdf', 'image/jpeg', 'image/png'],
   },
 } as const;
 
-// Australian Business Constants
 export const BUSINESS_CONFIG = {
   ABN_LENGTH: 11,
   ACN_LENGTH: 9,
@@ -79,7 +69,6 @@ export const BUSINESS_CONFIG = {
   POSTCODE_REGEX: /^\d{4}$/,
 } as const;
 
-// Tradie Service Categories
 export const SERVICE_CATEGORIES = {
   ELECTRICAL: 'electrical',
   PLUMBING: 'plumbing',
@@ -96,21 +85,19 @@ export const SERVICE_CATEGORIES = {
 
 export type ServiceCategory = typeof SERVICE_CATEGORIES[keyof typeof SERVICE_CATEGORIES];
 
-// Rate Limiting Constants
 export const RATE_LIMITS = {
   AUTH: {
-    LOGIN: { windowMs: 15 * 60 * 1000, max: 5 }, // 5 attempts per 15 minutes
-    REGISTER: { windowMs: 60 * 60 * 1000, max: 3 }, // 3 attempts per hour
-    PASSWORD_RESET: { windowMs: 60 * 60 * 1000, max: 3 }, // 3 attempts per hour
-    EMAIL_VERIFICATION: { windowMs: 60 * 60 * 1000, max: 5 }, // 5 attempts per hour
+    LOGIN: { windowMs: 15 * 60 * 1000, max: 5 },
+    REGISTER: { windowMs: 60 * 60 * 1000, max: 3 },
+    PASSWORD_RESET: { windowMs: 60 * 60 * 1000, max: 3 },
+    EMAIL_VERIFICATION: { windowMs: 60 * 60 * 1000, max: 5 },
   },
   PROFILE: {
-    UPDATE: { windowMs: 15 * 60 * 1000, max: 10 }, // 10 updates per 15 minutes
-    IMAGE_UPLOAD: { windowMs: 60 * 60 * 1000, max: 5 }, // 5 uploads per hour
+    UPDATE: { windowMs: 15 * 60 * 1000, max: 10 },
+    IMAGE_UPLOAD: { windowMs: 60 * 60 * 1000, max: 5 },
   },
 } as const;
 
-// Validation Messages
 export const VALIDATION_MESSAGES = {
   REQUIRED: 'This field is required',
   INVALID_EMAIL: 'Please enter a valid email address',
@@ -125,7 +112,6 @@ export const VALIDATION_MESSAGES = {
   INVALID_FILE_TYPE: 'File type not supported',
 } as const;
 
-// API Response Messages
 export const RESPONSE_MESSAGES = {
   SUCCESS: {
     USER_REGISTERED: 'User registered successfully',
@@ -152,7 +138,6 @@ export const RESPONSE_MESSAGES = {
   },
 } as const;
 
-// HTTP Status Codes
 export const HTTP_STATUS = {
   OK: 200,
   CREATED: 201,
@@ -167,7 +152,6 @@ export const HTTP_STATUS = {
   INTERNAL_SERVER_ERROR: 500,
 } as const;
 
-// Database Collection Names
 export const COLLECTIONS = {
   USERS: 'users',
   PROFILES: 'profiles',
@@ -175,7 +159,6 @@ export const COLLECTIONS = {
   TOKENS: 'tokens',
 } as const;
 
-// Cache Keys
 export const CACHE_KEYS = {
   USER_SESSION: (userId: string) => `session:${userId}`,
   USER_PROFILE: (userId: string) => `profile:${userId}`,
@@ -184,7 +167,6 @@ export const CACHE_KEYS = {
   RATE_LIMIT: (ip: string, action: string) => `rate_limit:${ip}:${action}`,
 } as const;
 
-// Event Names for Redis Pub/Sub
 export const EVENTS = {
   USER_REGISTERED: 'user.registered',
   USER_VERIFIED: 'user.verified',

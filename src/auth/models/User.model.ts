@@ -1,62 +1,40 @@
 import { Schema, model } from 'mongoose';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import { USER_ROLES, USER_STATUS, VERIFICATION_STATUS, PASSWORD_CONFIG } from '../../config/auth';
 import { buildHiveLogger } from '../../shared';
 import type { BaseDocument, UserRole, UserStatus, VerificationStatus } from '../../shared/types';
+import type { PlatformType, AuthProvider } from '../types/auth.types';
 
-// Platform types for registration source
-export type PlatformType = 'web' | 'mobile';
-export type AuthProvider = 'local' | 'google';
-
-// User document interface extending BaseDocument
 export interface IUserDocument extends BaseDocument {
-  // Core Authentication Fields
   username: string;
-  email?: string; // Optional for mobile phone registration
-  phone?: string; // Required for mobile, optional for web
-  password?: string; // Optional when using OAuth only
-  
-  // User Classification
+  email?: string;
+  phone?: string;
+  password?: string;
   role: UserRole;
   status: UserStatus;
   platform: PlatformType;
   authProvider: AuthProvider;
-  
-  // Google OAuth Integration
   googleId?: string;
   googleEmail?: string;
   googleAvatar?: string;
-  
-  // Email Verification
   isEmailVerified: boolean;
   emailVerificationToken?: string;
   emailVerificationExpires?: Date;
-  
-  // Phone Verification
   isPhoneVerified: boolean;
   phoneVerificationCode?: string;
   phoneVerificationExpires?: Date;
   phoneVerificationAttempts: number;
-  
-  // Overall Verification Status
   verificationStatus: VerificationStatus;
-  
-  // Password Reset
   passwordResetToken?: string;
   passwordResetExpires?: Date;
   passwordChangedAt?: Date;
-  
-  // Security & Login Management
   loginAttempts: number;
   lockUntil?: Date;
   lastLogin?: Date;
   lastLoginIP?: string;
   lastLoginPlatform?: PlatformType;
-  
-  // Profile Reference
   profileId?: Schema.Types.ObjectId;
-  
-  // Subscription & Credits System (BuildHive Monetization)
   subscription?: {
     plan: 'free' | 'pro' | 'enterprise';
     status: 'active' | 'cancelled' | 'expired';
@@ -72,8 +50,6 @@ export interface IUserDocument extends BaseDocument {
     description: string;
     timestamp: Date;
   }>;
-  
-  // Enterprise Team Management
   enterpriseTeam?: {
     isOwner: boolean;
     ownerId?: Schema.Types.ObjectId;
@@ -81,22 +57,16 @@ export interface IUserDocument extends BaseDocument {
     permissions?: Array<'manage_team' | 'assign_jobs' | 'view_analytics' | 'manage_billing' | 'manage_settings'>;
     invitationCode?: string;
   };
-  
-  // Device & Session Management
   devices?: Array<{
     deviceId: string;
     platform: PlatformType;
     deviceInfo: string;
     lastActive: Date;
-    pushToken?: string; // For mobile notifications
+    pushToken?: string;
   }>;
-  
-  // Audit Trail
   createdBy?: Schema.Types.ObjectId;
   updatedBy?: Schema.Types.ObjectId;
   registrationIP?: string;
-  
-  // Instance Methods
   comparePassword(candidatePassword: string): Promise<boolean>;
   isLocked(): boolean;
   incLoginAttempts(): Promise<void>;
@@ -116,9 +86,7 @@ export interface IUserDocument extends BaseDocument {
   removeDevice(deviceId: string): Promise<void>;
 }
 
-// User Schema Definition
 const userSchema = new Schema<IUserDocument>({
-  // Core Authentication Fields
   username: {
     type: String,
     required: [true, 'Username is required'],
@@ -133,10 +101,9 @@ const userSchema = new Schema<IUserDocument>({
     ],
     index: true,
   },
-  
   email: {
     type: String,
-    sparse: true, // Allows multiple null values
+    sparse: true,
     lowercase: true,
     trim: true,
     match: [
@@ -145,10 +112,9 @@ const userSchema = new Schema<IUserDocument>({
     ],
     index: true,
   },
-  
   phone: {
     type: String,
-    sparse: true, // Allows multiple null values
+    sparse: true,
     trim: true,
     match: [
       /^\+?[1-9]\d{1,14}$/,
@@ -156,15 +122,12 @@ const userSchema = new Schema<IUserDocument>({
     ],
     index: true,
   },
-  
   password: {
     type: String,
     minlength: [PASSWORD_CONFIG.MIN_LENGTH, `Password must be at least ${PASSWORD_CONFIG.MIN_LENGTH} characters`],
     maxlength: [PASSWORD_CONFIG.MAX_LENGTH, `Password must not exceed ${PASSWORD_CONFIG.MAX_LENGTH} characters`],
-    select: false, // Don't include password in queries by default
+    select: false,
   },
-  
-  // User Classification
   role: {
     type: String,
     enum: {
@@ -174,7 +137,6 @@ const userSchema = new Schema<IUserDocument>({
     required: [true, 'User role is required'],
     index: true,
   },
-  
   status: {
     type: String,
     enum: {
@@ -184,7 +146,6 @@ const userSchema = new Schema<IUserDocument>({
     default: USER_STATUS.ACTIVE,
     index: true,
   },
-  
   platform: {
     type: String,
     enum: {
@@ -194,7 +155,6 @@ const userSchema = new Schema<IUserDocument>({
     required: [true, 'Registration platform is required'],
     index: true,
   },
-  
   authProvider: {
     type: String,
     enum: {
@@ -204,66 +164,51 @@ const userSchema = new Schema<IUserDocument>({
     default: 'local',
     index: true,
   },
-  
-  // Google OAuth Integration
   googleId: {
     type: String,
     sparse: true,
     index: true,
   },
-  
   googleEmail: {
     type: String,
     lowercase: true,
     trim: true,
   },
-  
   googleAvatar: {
     type: String,
     trim: true,
   },
-  
-  // Email Verification
   isEmailVerified: {
     type: Boolean,
     default: false,
     index: true,
   },
-  
   emailVerificationToken: {
     type: String,
     select: false,
   },
-  
   emailVerificationExpires: {
     type: Date,
     select: false,
   },
-  
-  // Phone Verification
   isPhoneVerified: {
     type: Boolean,
     default: false,
     index: true,
   },
-  
   phoneVerificationCode: {
     type: String,
     select: false,
   },
-  
   phoneVerificationExpires: {
     type: Date,
     select: false,
   },
-  
   phoneVerificationAttempts: {
     type: Number,
     default: 0,
     select: false,
   },
-  
-  // Overall Verification Status
   verificationStatus: {
     type: String,
     enum: {
@@ -273,58 +218,45 @@ const userSchema = new Schema<IUserDocument>({
     default: VERIFICATION_STATUS.PENDING,
     index: true,
   },
-  
-  // Password Reset
   passwordResetToken: {
     type: String,
     select: false,
   },
-  
   passwordResetExpires: {
     type: Date,
     select: false,
   },
-  
   passwordChangedAt: {
     type: Date,
     select: false,
   },
-  
-  // Security & Login Management
   loginAttempts: {
     type: Number,
     default: 0,
     select: false,
   },
-  
   lockUntil: {
     type: Date,
     select: false,
   },
-  
   lastLogin: {
     type: Date,
     index: true,
   },
-  
   lastLoginIP: {
     type: String,
     trim: true,
   },
-  
   lastLoginPlatform: {
     type: String,
     enum: ['web', 'mobile'],
   },
-  
-  // Profile Reference
   profileId: {
     type: Schema.Types.ObjectId,
     ref: 'Profile',
     index: true,
   },
 
-  // Subscription & Credits System (BuildHive Monetization)
   subscription: {
     plan: {
       type: String,
@@ -348,14 +280,12 @@ const userSchema = new Schema<IUserDocument>({
       default: 'monthly',
     },
   },
-  
   credits: {
     type: Number,
     default: 0,
     min: [0, 'Credits cannot be negative'],
     index: true,
   },
-  
   creditHistory: [{
     amount: {
       type: Number,
@@ -376,8 +306,6 @@ const userSchema = new Schema<IUserDocument>({
       default: Date.now,
     },
   }],
-  
-  // Enterprise Team Management
   enterpriseTeam: {
     isOwner: {
       type: Boolean,
@@ -401,8 +329,6 @@ const userSchema = new Schema<IUserDocument>({
       sparse: true,
     },
   },
-  
-  // Device & Session Management
   devices: [{
     deviceId: {
       type: String,
@@ -421,20 +347,16 @@ const userSchema = new Schema<IUserDocument>({
       type: Date,
       default: Date.now,
     },
-    pushToken: String, // For mobile push notifications
+    pushToken: String,
   }],
-  
-  // Audit Trail
   createdBy: {
     type: Schema.Types.ObjectId,
     ref: 'User',
   },
-  
   updatedBy: {
     type: Schema.Types.ObjectId,
     ref: 'User',
   },
-  
   registrationIP: {
     type: String,
     trim: true,
@@ -470,7 +392,6 @@ const userSchema = new Schema<IUserDocument>({
   },
 });
 
-// Compound Indexes for performance optimization
 userSchema.index({ username: 1, status: 1 });
 userSchema.index({ email: 1, status: 1 }, { sparse: true });
 userSchema.index({ phone: 1, status: 1 }, { sparse: true });
@@ -484,31 +405,22 @@ userSchema.index({ createdAt: -1 });
 userSchema.index({ lastLogin: -1 });
 userSchema.index({ 'enterpriseTeam.ownerId': 1 }, { sparse: true });
 
-// Virtual for account lock status
 userSchema.virtual('isLocked').get(function() {
   return !!(this.lockUntil && this.lockUntil > new Date());
 });
 
-// Pre-save middleware for password hashing
 userSchema.pre('save', async function(next) {
-  // Only hash password if it's modified and exists
   if (!this.isModified('password') || !this.password) return next();
-  
   try {
-    // Hash password with cost of 12
     this.password = await bcrypt.hash(this.password, 12);
-    
-    // Set password changed timestamp
     if (!this.isNew) {
       this.passwordChangedAt = new Date(Date.now() - 1000);
     }
-    
     buildHiveLogger.info('Password hashed successfully', {
       userId: this._id,
       username: this.username,
       platform: this.platform,
     });
-    
     next();
   } catch (error) {
     buildHiveLogger.error('Password hashing failed', error, {
@@ -519,42 +431,29 @@ userSchema.pre('save', async function(next) {
   }
 });
 
-// Pre-save middleware for validation
 userSchema.pre('save', function(next) {
-  // Ensure either email or phone is provided
   if (!this.email && !this.phone) {
     return next(new Error('Either email or phone number is required'));
   }
-  
-  // Password is required for local auth provider
   if (this.authProvider === 'local' && !this.password) {
     return next(new Error('Password is required for local authentication'));
   }
-  
-  // Google ID is required for Google auth provider
   if (this.authProvider === 'google' && !this.googleId) {
     return next(new Error('Google ID is required for Google authentication'));
   }
-  
-  // Set up enterprise team structure for enterprise users
   if (this.role === USER_ROLES.ENTERPRISE && !this.enterpriseTeam) {
     this.enterpriseTeam = {
       isOwner: true,
       teamMembers: [],
       permissions: ['manage_team', 'assign_jobs', 'view_analytics', 'manage_billing', 'manage_settings'],
-      invitationCode: require('crypto').randomBytes(8).toString('hex').toUpperCase(),
+      invitationCode: crypto.randomBytes(8).toString('hex').toUpperCase(),
     };
   }
-  
   next();
 });
 
-// Instance Methods
-
-// Compare password method
 userSchema.methods.comparePassword = async function(candidatePassword: string): Promise<boolean> {
   if (!this.password) return false;
-  
   try {
     return await bcrypt.compare(candidatePassword, this.password);
   } catch (error) {
@@ -566,30 +465,22 @@ userSchema.methods.comparePassword = async function(candidatePassword: string): 
   }
 };
 
-// Check if account is locked
 userSchema.methods.isLocked = function(): boolean {
   return !!(this.lockUntil && this.lockUntil > new Date());
 };
 
-// Increment login attempts
 userSchema.methods.incLoginAttempts = async function(): Promise<void> {
   const maxAttempts = 5;
-  const lockTime = 2 * 60 * 60 * 1000; // 2 hours
-  
-  // If we have a previous lock that has expired, restart at 1
+  const lockTime = 2 * 60 * 60 * 1000;
   if (this.lockUntil && this.lockUntil < new Date()) {
     return this.updateOne({
       $unset: { lockUntil: 1 },
       $set: { loginAttempts: 1 },
     });
   }
-  
   const updates: any = { $inc: { loginAttempts: 1 } };
-  
-  // If we've reached max attempts and it's not locked yet, lock the account
   if (this.loginAttempts + 1 >= maxAttempts && !this.isLocked()) {
     updates.$set = { lockUntil: new Date(Date.now() + lockTime) };
-    
     buildHiveLogger.security.accountLocked(this.username, {
       userId: this._id,
       attempts: this.loginAttempts + 1,
@@ -597,115 +488,71 @@ userSchema.methods.incLoginAttempts = async function(): Promise<void> {
       platform: this.platform,
     });
   }
-  
   return this.updateOne(updates);
 };
 
-// Reset login attempts
 userSchema.methods.resetLoginAttempts = async function(): Promise<void> {
   return this.updateOne({
     $unset: { loginAttempts: 1, lockUntil: 1 },
   });
 };
 
-// Create password reset token
 userSchema.methods.createPasswordResetToken = function(): string {
-  const resetToken = require('crypto').randomBytes(32).toString('hex');
-  
-  this.passwordResetToken = require('crypto')
-    .createHash('sha256')
-    .update(resetToken)
-    .digest('hex');
-  
-  this.passwordResetExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
-  
+  const resetToken = crypto.randomBytes(32).toString('hex');
+  this.passwordResetToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+  this.passwordResetExpires = new Date(Date.now() + 10 * 60 * 1000);
   return resetToken;
 };
 
-// Create email verification token
 userSchema.methods.createEmailVerificationToken = function(): string {
-  const verificationToken = require('crypto').randomBytes(32).toString('hex');
-  
-  this.emailVerificationToken = require('crypto')
-    .createHash('sha256')
-    .update(verificationToken)
-    .digest('hex');
-  
-  this.emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
-  
+  const verificationToken = crypto.randomBytes(32).toString('hex');
+  this.emailVerificationToken = crypto.createHash('sha256').update(verificationToken).digest('hex');
+  this.emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
   return verificationToken;
 };
 
-// Create phone verification code
 userSchema.methods.createPhoneVerificationCode = function(): string {
-  const verificationCode = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit code
-  
-  this.phoneVerificationCode = require('crypto')
-    .createHash('sha256')
-    .update(verificationCode)
-    .digest('hex');
-  
-  this.phoneVerificationExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+  const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+  this.phoneVerificationCode = crypto.createHash('sha256').update(verificationCode).digest('hex');
+  this.phoneVerificationExpires = new Date(Date.now() + 10 * 60 * 1000);
   this.phoneVerificationAttempts = 0;
-  
   return verificationCode;
 };
 
-// Check if password changed after JWT was issued
 userSchema.methods.changedPasswordAfter = function(JWTTimestamp: number): boolean {
   if (this.passwordChangedAt) {
-    const changedTimestamp = parseInt(
-      (this.passwordChangedAt.getTime() / 1000).toString(),
-      10
-    );
+    const changedTimestamp = parseInt((this.passwordChangedAt.getTime() / 1000).toString(), 10);
     return JWTTimestamp < changedTimestamp;
   }
   return false;
 };
 
-// Check if user is fully verified
 userSchema.methods.isFullyVerified = function(): boolean {
   const emailVerified = !this.email || this.isEmailVerified;
   const phoneVerified = !this.phone || this.isPhoneVerified;
   return emailVerified && phoneVerified;
 };
 
-// Business logic methods for BuildHive features
-
-// Check if user can apply to jobs (Tradies only)
 userSchema.methods.canApplyToJobs = function(): boolean {
-  return this.role === USER_ROLES.TRADIE && 
-         this.status === USER_STATUS.ACTIVE && 
-         this.isFullyVerified();
+  return this.role === USER_ROLES.TRADIE && this.status === USER_STATUS.ACTIVE && this.isFullyVerified();
 };
 
-// Check if user can post jobs (Clients and Enterprise)
 userSchema.methods.canPostJobs = function(): boolean {
-  return (this.role === USER_ROLES.CLIENT || this.role === USER_ROLES.ENTERPRISE) &&
-         this.status === USER_STATUS.ACTIVE &&
-         this.isFullyVerified();
+  return (this.role === USER_ROLES.CLIENT || this.role === USER_ROLES.ENTERPRISE) && this.status === USER_STATUS.ACTIVE && this.isFullyVerified();
 };
 
-// Check if user can manage team (Enterprise only)
 userSchema.methods.canManageTeam = function(): boolean {
-  return this.role === USER_ROLES.ENTERPRISE &&
-         this.status === USER_STATUS.ACTIVE &&
-         this.enterpriseTeam?.isOwner === true;
+  return this.role === USER_ROLES.ENTERPRISE && this.status === USER_STATUS.ACTIVE && this.enterpriseTeam?.isOwner === true;
 };
 
-// Check if user has active subscription
 userSchema.methods.hasActiveSubscription = function(): boolean {
-  return this.subscription?.status === 'active' &&
-         this.subscription?.endDate &&
-         this.subscription.endDate > new Date();
+  return this.subscription?.status === 'active' && this.subscription?.endDate && this.subscription.endDate > new Date();
 };
 
-// Deduct credits with history tracking
 userSchema.methods.deductCredits = async function(amount: number, description: string): Promise<boolean> {
   if (this.credits < amount) {
     return false;
   }
-  
   this.credits -= amount;
   this.creditHistory?.push({
     amount: -amount,
@@ -713,9 +560,7 @@ userSchema.methods.deductCredits = async function(amount: number, description: s
     description,
     timestamp: new Date(),
   });
-  
   await this.save();
-  
   buildHiveLogger.info('Credits deducted', {
     userId: this._id,
     username: this.username,
@@ -723,11 +568,9 @@ userSchema.methods.deductCredits = async function(amount: number, description: s
     remainingCredits: this.credits,
     description,
   });
-  
   return true;
 };
 
-// Add credits with history tracking
 userSchema.methods.addCredits = async function(amount: number, type: string, description: string): Promise<void> {
   this.credits += amount;
   this.creditHistory?.push({
@@ -736,9 +579,7 @@ userSchema.methods.addCredits = async function(amount: number, type: string, des
     description,
     timestamp: new Date(),
   });
-  
   await this.save();
-  
   buildHiveLogger.info('Credits added', {
     userId: this._id,
     username: this.username,
@@ -749,10 +590,8 @@ userSchema.methods.addCredits = async function(amount: number, type: string, des
   });
 };
 
-// Add device to user's device list
 userSchema.methods.addDevice = async function(deviceInfo: any): Promise<void> {
   const existingDevice = this.devices?.find(d => d.deviceId === deviceInfo.deviceId);
-  
   if (existingDevice) {
     existingDevice.lastActive = new Date();
     existingDevice.pushToken = deviceInfo.pushToken;
@@ -765,11 +604,9 @@ userSchema.methods.addDevice = async function(deviceInfo: any): Promise<void> {
       pushToken: deviceInfo.pushToken,
     });
   }
-  
   await this.save();
 };
 
-// Remove device from user's device list
 userSchema.methods.removeDevice = async function(deviceId: string): Promise<void> {
   if (this.devices) {
     this.devices = this.devices.filter(d => d.deviceId !== deviceId);
@@ -777,7 +614,6 @@ userSchema.methods.removeDevice = async function(deviceId: string): Promise<void
   }
 };
 
-// Create and export the User model
 export const User = model<IUserDocument>('User', userSchema);
 
 export default User;

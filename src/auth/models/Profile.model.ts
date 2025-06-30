@@ -1,34 +1,8 @@
 import { Schema, model } from 'mongoose';
-import { USER_ROLES, VERIFICATION_STATUS } from '../../config/auth';
+import { USER_ROLES, VERIFICATION_STATUS, SERVICE_CATEGORIES, AVAILABILITY_STATUS } from '../../config/auth';
 import { buildHiveLogger } from '../../shared';
 import type { BaseDocument, UserRole, VerificationStatus } from '../../shared/types';
-
-export const SERVICE_CATEGORIES = {
-  ELECTRICAL: 'electrical',
-  PLUMBING: 'plumbing',
-  CARPENTRY: 'carpentry',
-  PAINTING: 'painting',
-  ROOFING: 'roofing',
-  LANDSCAPING: 'landscaping',
-  CLEANING: 'cleaning',
-  HANDYMAN: 'handyman',
-  TILING: 'tiling',
-  FLOORING: 'flooring',
-  HVAC: 'hvac',
-  SECURITY: 'security',
-  OTHER: 'other',
-} as const;
-
-export type ServiceCategory = typeof SERVICE_CATEGORIES[keyof typeof SERVICE_CATEGORIES];
-
-export const AVAILABILITY_STATUS = {
-  AVAILABLE: 'available',
-  BUSY: 'busy',
-  UNAVAILABLE: 'unavailable',
-  VACATION: 'vacation',
-} as const;
-
-export type AvailabilityStatus = typeof AVAILABILITY_STATUS[keyof typeof AVAILABILITY_STATUS];
+import type { ServiceCategory, AvailabilityStatus } from '../types/profile.types';
 
 export interface IProfileDocument extends BaseDocument {
   userId: string;
@@ -349,6 +323,7 @@ export interface IProfileDocument extends BaseDocument {
   addQualification(qualification: any): Promise<void>;
   getServiceRadius(): number;
   isWithinServiceArea(location: { latitude: number; longitude: number }): boolean;
+  calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number;
 }
 
 const profileSchema = new Schema<IProfileDocument>({
@@ -424,6 +399,7 @@ const profileSchema = new Schema<IProfileDocument>({
     enum: ['email', 'phone', 'sms', 'app'],
     default: 'app',
   },
+
   address: {
     street: {
       type: String,
@@ -811,22 +787,10 @@ const profileSchema = new Schema<IProfileDocument>({
       postcode: String,
     },
     teamStructure: {
-      totalEmployees: {
-        type: Number,
-        min: 0,
-      },
-      activeFieldWorkers: {
-        type: Number,
-        min: 0,
-      },
-      adminStaff: {
-        type: Number,
-        min: 0,
-      },
-      supervisors: {
-        type: Number,
-        min: 0,
-      },
+      totalEmployees: Number,
+      activeFieldWorkers: Number,
+      adminStaff: Number,
+      supervisors: Number,
     },
     serviceAreas: [{
       suburb: String,
@@ -856,30 +820,12 @@ const profileSchema = new Schema<IProfileDocument>({
       preferredPaymentMethods: [String],
     },
     operationalPreferences: {
-      minimumJobValue: {
-        type: Number,
-        min: 0,
-      },
-      maximumConcurrentJobs: {
-        type: Number,
-        min: 1,
-      },
-      workingRadius: {
-        type: Number,
-        min: 0,
-      },
-      emergencyServices: {
-        type: Boolean,
-        default: false,
-      },
-      weekendOperations: {
-        type: Boolean,
-        default: false,
-      },
-      after_hours_available: {
-        type: Boolean,
-        default: false,
-      },
+      minimumJobValue: Number,
+      maximumConcurrentJobs: Number,
+      workingRadius: Number,
+      emergencyServices: Boolean,
+      weekendOperations: Boolean,
+      after_hours_available: Boolean,
     },
     clientPortfolio: [{
       clientName: String,
@@ -899,13 +845,12 @@ const profileSchema = new Schema<IProfileDocument>({
     overall: {
       type: Number,
       default: 0,
-      min: [0, 'Rating cannot be negative'],
-      max: [5, 'Rating cannot exceed 5'],
+      min: 0,
+      max: 5,
     },
     totalReviews: {
       type: Number,
       default: 0,
-      min: [0, 'Total reviews cannot be negative'],
     },
     breakdown: {
       quality: { type: Number, default: 0, min: 0, max: 5 },
@@ -915,15 +860,8 @@ const profileSchema = new Schema<IProfileDocument>({
       value: { type: Number, default: 0, min: 0, max: 5 },
     },
     recentReviews: [{
-      reviewId: {
-        type: Schema.Types.ObjectId,
-        ref: 'Review',
-      },
-      rating: {
-        type: Number,
-        min: 1,
-        max: 5,
-      },
+      reviewId: String,
+      rating: { type: Number, min: 1, max: 5 },
       comment: String,
       reviewerName: String,
       reviewDate: Date,
@@ -931,20 +869,17 @@ const profileSchema = new Schema<IProfileDocument>({
         type: String,
         enum: Object.values(SERVICE_CATEGORIES),
       },
-      verified: {
-        type: Boolean,
-        default: false,
-      },
+      verified: { type: Boolean, default: false },
     }],
   },
   statistics: {
     profileViews: { type: Number, default: 0 },
     jobsCompleted: { type: Number, default: 0 },
     jobsInProgress: { type: Number, default: 0 },
-    responseTime: { type: Number, default: 24 },
-    responseRate: { type: Number, default: 100 },
+    responseTime: { type: Number, default: 0 },
+    responseRate: { type: Number, default: 0 },
     repeatClientRate: { type: Number, default: 0 },
-    onTimeCompletionRate: { type: Number, default: 100 },
+    onTimeCompletionRate: { type: Number, default: 0 },
     lastActiveDate: { type: Date, default: Date.now },
     joinDate: { type: Date, default: Date.now },
   },
@@ -991,10 +926,7 @@ const profileSchema = new Schema<IProfileDocument>({
         type: String,
         enum: Object.values(SERVICE_CATEGORIES),
       }],
-      blacklistedClients: [{
-        type: Schema.Types.ObjectId,
-        ref: 'Profile',
-      }],
+      blacklistedClients: [String],
       workingDistance: { type: Number, default: 50 },
       requiresDeposit: { type: Boolean, default: false },
       depositPercentage: { type: Number, min: 0, max: 100 },
@@ -1015,12 +947,12 @@ const profileSchema = new Schema<IProfileDocument>({
     email: String,
   },
   compliance: {
-    termsAccepted: { type: Boolean, default: false },
-    termsAcceptedDate: Date,
-    privacyPolicyAccepted: { type: Boolean, default: false },
-    privacyPolicyAcceptedDate: Date,
+    termsAccepted: { type: Boolean, required: true },
+    termsAcceptedDate: { type: Date, required: true },
+    privacyPolicyAccepted: { type: Boolean, required: true },
+    privacyPolicyAcceptedDate: { type: Date, required: true },
     marketingConsent: { type: Boolean, default: false },
-    dataRetentionConsent: { type: Boolean, default: false },
+    dataRetentionConsent: { type: Boolean, default: true },
     lastPolicyUpdate: Date,
   },
   profileCompletion: {
@@ -1051,37 +983,48 @@ const profileSchema = new Schema<IProfileDocument>({
       return ret;
     },
   },
+  toObject: {
+    transform: function(doc, ret) {
+      ret.id = ret._id;
+      delete ret._id;
+      delete ret.__v;
+      return ret;
+    },
+  },
 });
 
 profileSchema.index({ userId: 1 });
-profileSchema.index({ role: 1, verificationStatus: 1 });
-profileSchema.index({ 'address.state': 1, 'address.postcode': 1 });
+profileSchema.index({ role: 1 });
+profileSchema.index({ verificationStatus: 1 });
 profileSchema.index({ 'tradieInfo.serviceCategories': 1 });
+profileSchema.index({ 'tradieInfo.availability.status': 1 });
+profileSchema.index({ 'address.state': 1, 'address.postcode': 1 });
 profileSchema.index({ 'ratings.overall': -1 });
-profileSchema.index({ 'businessInfo.abn': 1 }, { sparse: true });
+profileSchema.index({ 'statistics.jobsCompleted': -1 });
+profileSchema.index({ 'qualityScore.score': -1 });
+profileSchema.index({ 'address.coordinates': '2dsphere' });
 
 profileSchema.methods.calculateProfileCompletion = function(): number {
-  const requiredFields = ['firstName', 'lastName', 'phone'];
+  const requiredFields = ['firstName', 'lastName', 'phone', 'address'];
   const roleSpecificFields = {
-    [USER_ROLES.TRADIE]: ['tradieInfo.serviceCategories', 'tradieInfo.hourlyRate', 'businessInfo.abn'],
-    [USER_ROLES.CLIENT]: ['address'],
-    [USER_ROLES.ENTERPRISE]: ['businessInfo.businessName', 'businessInfo.abn'],
+    tradie: ['tradieInfo.serviceCategories', 'tradieInfo.hourlyRate', 'tradieInfo.availability'],
+    client: ['clientInfo.propertyType', 'clientInfo.communicationPreferences'],
+    enterprise: ['enterpriseInfo.companySize', 'enterpriseInfo.teamStructure']
   };
   
   let completedFields = 0;
   let totalFields = requiredFields.length;
   
   requiredFields.forEach(field => {
-    if (this[field]) completedFields++;
+    if (this.get(field)) completedFields++;
   });
   
-  const roleFields = roleSpecificFields[this.role] || [];
-  totalFields += roleFields.length;
-  
-  roleFields.forEach(field => {
-    const value = field.split('.').reduce((obj, key) => obj?.[key], this);
-    if (value) completedFields++;
-  });
+  if (roleSpecificFields[this.role]) {
+    totalFields += roleSpecificFields[this.role].length;
+    roleSpecificFields[this.role].forEach(field => {
+      if (this.get(field)) completedFields++;
+    });
+  }
   
   const percentage = Math.round((completedFields / totalFields) * 100);
   this.profileCompletion.percentage = percentage;
@@ -1092,16 +1035,20 @@ profileSchema.methods.calculateProfileCompletion = function(): number {
 
 profileSchema.methods.calculateQualityScore = function(): number {
   const factors = {
-    profileCompleteness: this.profileCompletion.percentage || 0,
-    verificationStatus: this.verificationStatus === 'verified' ? 100 : 0,
-    reviewRating: (this.ratings.overall || 0) * 20,
-    responseTime: Math.max(0, 100 - (this.statistics.responseTime || 0)),
-    jobCompletionRate: this.statistics.onTimeCompletionRate || 0
+    profileCompleteness: this.profileCompletion.percentage * 0.3,
+    verificationStatus: this.verificationStatus === 'verified' ? 25 : 0,
+    reviewRating: this.ratings.overall * 5,
+    responseTime: Math.max(0, 20 - (this.statistics.responseTime / 60)),
+    jobCompletionRate: this.statistics.onTimeCompletionRate * 0.2
   };
   
-  const score = Object.values(factors).reduce((sum, val) => sum + val, 0) / 5;
-  this.qualityScore = { score, factors, lastCalculated: new Date() };
-  return score;
+  const score = Math.min(100, Object.values(factors).reduce((sum, val) => sum + val, 0));
+  
+  this.qualityScore.score = Math.round(score);
+  this.qualityScore.factors = factors;
+  this.qualityScore.lastCalculated = new Date();
+  
+  return this.qualityScore.score;
 };
 
 profileSchema.methods.isProfileComplete = function(): boolean {
@@ -1109,37 +1056,74 @@ profileSchema.methods.isProfileComplete = function(): boolean {
 };
 
 profileSchema.methods.canReceiveJobs = function(): boolean {
-  return this.verificationStatus === VERIFICATION_STATUS.VERIFIED &&
-         this.isProfileComplete() &&
-         (this.role === USER_ROLES.TRADIE ? this.tradieInfo?.availability?.status === AVAILABILITY_STATUS.AVAILABLE : true);
+  return this.verificationStatus === 'verified' && 
+         this.isProfileComplete() && 
+         (this.role === 'tradie' ? this.tradieInfo?.availability.status === 'available' : true);
 };
 
 profileSchema.methods.updateStatistics = async function(): Promise<void> {
   this.statistics.lastActiveDate = new Date();
   await this.save();
+  
+  buildHiveLogger.profile.update(this.userId, ['statistics'], {
+    profileId: this._id,
+    lastActive: this.statistics.lastActiveDate,
+  });
 };
 
 profileSchema.methods.addPortfolioItem = async function(item: any): Promise<void> {
-  if (!this.tradieInfo) this.tradieInfo = { portfolio: [] };
-  this.tradieInfo.portfolio.push(item);
-  await this.save();
+  if (this.role === 'tradie' && this.tradieInfo) {
+    this.tradieInfo.portfolio.push(item);
+    await this.save();
+    
+    buildHiveLogger.profile.update(this.userId, ['portfolio'], {
+      profileId: this._id,
+      portfolioCount: this.tradieInfo.portfolio.length,
+    });
+  }
 };
 
 profileSchema.methods.updateAvailability = async function(status: AvailabilityStatus): Promise<void> {
-  if (this.tradieInfo) {
+  if (this.role === 'tradie' && this.tradieInfo) {
     this.tradieInfo.availability.status = status;
     await this.save();
+    
+    buildHiveLogger.profile.update(this.userId, ['availability'], {
+      profileId: this._id,
+      newStatus: status,
+    });
   }
 };
 
 profileSchema.methods.addQualification = async function(qualification: any): Promise<void> {
-  if (!this.tradieInfo) this.tradieInfo = { qualifications: [] };
-  this.tradieInfo.qualifications.push(qualification);
-  await this.save();
+  if (this.role === 'tradie' && this.tradieInfo) {
+    this.tradieInfo.qualifications.push(qualification);
+    await this.save();
+    
+    buildHiveLogger.profile.update(this.userId, ['qualifications'], {
+      profileId: this._id,
+      qualificationName: qualification.name,
+    });
+  }
 };
 
 profileSchema.methods.getServiceRadius = function(): number {
-  return this.tradieInfo?.availability?.serviceRadius || 50;
+  if (this.role === 'tradie' && this.tradieInfo) {
+    return this.tradieInfo.availability.serviceRadius;
+  }
+  if (this.role === 'enterprise' && this.enterpriseInfo) {
+    return this.enterpriseInfo.operationalPreferences.workingRadius;
+  }
+  return 0;
+};
+
+profileSchema.methods.calculateDistance = function(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
 };
 
 profileSchema.methods.isWithinServiceArea = function(location: { latitude: number; longitude: number }): boolean {
@@ -1155,16 +1139,19 @@ profileSchema.methods.isWithinServiceArea = function(location: { latitude: numbe
   return distance <= this.getServiceRadius();
 };
 
-profileSchema.methods.calculateDistance = function(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 6371;
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLon/2) * Math.sin(dLon/2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  return R * c;
-};
+profileSchema.pre('save', function(next) {
+  if (this.isModified('firstName') || this.isModified('lastName')) {
+    this.displayName = `${this.firstName} ${this.lastName}`;
+  }
+  
+  if (this.isModified()) {
+    this.calculateProfileCompletion();
+    this.calculateQualityScore();
+  }
+  
+  next();
+});
 
 export const Profile = model<IProfileDocument>('Profile', profileSchema);
+
 export default Profile;
