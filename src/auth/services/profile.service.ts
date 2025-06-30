@@ -1016,7 +1016,6 @@ export class ProfileService implements IProfileService {
       throw AuthErrorFactory.profileUpdateFailed('Failed to update services', error);
     }
   }
-}
 
   private async publishProfileEvent(eventType: string, profile: IProfileDocument | null, metadata: any): Promise<void> {
     try {
@@ -1034,3 +1033,5 @@ export class ProfileService implements IProfileService {
     }
   }
 }
+
+ 
