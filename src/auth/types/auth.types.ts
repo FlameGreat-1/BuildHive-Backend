@@ -22,6 +22,7 @@ export interface DeviceInfo {
   deviceId: string;
   platform: PlatformType;
   userAgent: string;
+  ipAddress?: string;
   browser?: string;
   browserVersion?: string;
   os?: string;
@@ -55,6 +56,7 @@ export interface RegisterRequest {
   authProvider: AuthProvider;
   firstName: string;
   lastName: string;
+  gender?: string; 
   acceptTerms: boolean;
   marketingConsent?: boolean;
   deviceInfo: DeviceInfo;
@@ -89,6 +91,7 @@ export interface RefreshTokenRequest {
 
 export interface LogoutRequest {
   refreshToken?: string;
+  sessionId?: string;  
   logoutAll?: boolean;
   deviceId?: string;
 }
@@ -109,6 +112,8 @@ export interface ResendVerificationRequest {
   type: 'email' | 'phone';
   identifier: string;
   userId?: string;
+  email?: string;  
+  phone?: string;  
 }
 
 export interface PasswordResetRequest {
@@ -126,6 +131,11 @@ export interface ChangePasswordRequest {
   currentPassword: string;
   newPassword: string;
   confirmPassword: string;
+  metadata?: {  
+    userAgent?: string;
+    ipAddress?: string;
+    timestamp?: Date;
+  };
 }
 
 // Token Interfaces

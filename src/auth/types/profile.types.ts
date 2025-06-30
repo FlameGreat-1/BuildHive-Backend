@@ -107,14 +107,23 @@ export interface QualityScore {
 export interface TradieQualification {
   name: string;
   issuer: string;
+  issuingBody: string;
   licenseNumber?: string;
   issueDate: Date;
   expiryDate?: Date;
   verified: boolean;
+  verificationStatus: 'pending' | 'verified' | 'rejected';
   documentUrl?: string;
+  documents: string[];
 }
 
 export interface TradieInsurance {
+  provider: string;
+  policyNumber: string;
+  coverageType: string;
+  coverageAmount: number;
+  expiryDate: Date;
+  documents: string[];
   publicLiability: {
     provider: string;
     policyNumber: string;
@@ -158,9 +167,13 @@ export interface QuotingPreferences {
 export interface PortfolioItem {
   title: string;
   description: string;
+  category: ServiceCategory;
   images: string[];
   completedDate: Date;
+  completionDate: Date;
+  location: string;
   clientTestimonial?: string;
+  projectValue?: number;
   tags: string[];
 }
 
@@ -240,6 +253,12 @@ export interface CreateProfileRequest {
   tradieInfo?: CreateTradieProfileRequest;
   clientInfo?: CreateClientProfileRequest;
   enterpriseInfo?: CreateEnterpriseProfileRequest;
+  metadata?: {
+    createdBy?: string;
+    userAgent?: string;
+    ipAddress?: string;
+    timestamp?: Date;
+  };
 }
 
 export interface CreateTradieProfileRequest {
@@ -292,6 +311,12 @@ export interface UpdateProfileRequest {
   address?: Partial<ProfileAddress>;
   businessInfo?: Partial<ProfileBusinessInfo>;
   updatedBy?: string;
+  metadata?: {
+    updatedBy?: string;
+    userAgent?: string;
+    ipAddress?: string;
+    timestamp?: Date;
+  };
 }
 
 export interface ProfileQueryParams extends BaseQueryParams {
@@ -307,6 +332,33 @@ export interface ProfileQueryParams extends BaseQueryParams {
   hasInsurance?: boolean;
   yearsExperience?: number;
   serviceRadius?: number;
+  query?: string;
+  location?: string;
+  radius?: number;
+  priceRange?: {
+    min?: number;
+    max?: number;
+  };
+  sortBy?: 'rating' | 'reviews' | 'distance' | 'price';
+  sortOrder?: 'asc' | 'desc';
+}
+
+export interface ProfileSearchRequest extends ProfileQueryParams {
+  query?: string;
+  location?: string;
+  serviceCategories?: ServiceCategory[];
+  availability?: string;
+  rating?: number;
+  verified?: boolean;
+  radius?: number;
+  priceRange?: {
+    min?: number;
+    max?: number;
+  };
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+  page?: number;
+  limit?: number;
 }
 
 export interface ProfileData extends BaseProfile {
@@ -394,3 +446,45 @@ export type ProfileType = TradieProfile | ClientProfile | EnterpriseProfile;
 export type CreateProfileRequestType = CreateTradieProfileRequest | CreateClientProfileRequest | CreateEnterpriseProfileRequest;
 export type ProfileRequestType = CreateProfileRequest | UpdateProfileRequest;
 export type ProfileResponseType = ProfileResponse | ProfileListResponse;
+
+export type {
+  ServiceCategory,
+  AvailabilityStatus,
+  AustralianState,
+  BusinessType,
+  PropertyType,
+  CompanySize,
+  ProfileAddress,
+  ProfileBusinessInfo,
+  ProfileMedia,
+  VerificationDocument,
+  ProfileRatings,
+  ProfileStatistics,
+  ProfileCompletion,
+  QualityScore,
+  TradieQualification,
+  TradieInsurance,
+  TradieAvailability,
+  QuotingPreferences,
+  PortfolioItem,
+  ClientCommunicationPreferences,
+  ClientJobHistory,
+  EnterpriseTeamStructure,
+  EnterpriseServiceArea,
+  EnterpriseCertification,
+  EnterpriseOperationalPreferences,
+  EnterpriseClientPortfolio,
+  CreateProfileRequest,
+  CreateTradieProfileRequest,
+  CreateClientProfileRequest,
+  CreateEnterpriseProfileRequest,
+  UpdateProfileRequest,
+  ProfileQueryParams,
+  ProfileSearchRequest,
+  ProfileData,
+  TradieProfile,
+  ClientProfile,
+  EnterpriseProfile,
+  ProfileResponse,
+  ProfileListResponse
+};

@@ -1,4 +1,3 @@
-// ===== EXISTING TYPE EXPORTS =====
 export type {
   PlatformType,
   AuthProvider,
@@ -50,6 +49,12 @@ export type {
   UpdateUserRequest,
   UpdateUserPasswordRequest,
   UpdateUserStatusRequest,
+  VerifyEmailRequest,
+  VerifyPhoneRequest,
+  ForgotPasswordRequest,
+  ResetPasswordRequest,
+  UserAvailabilityCheck,
+  UserVerificationStatus,
   UserProfile,
   DetailedUserProfile,
   UserListItem,
@@ -72,6 +77,8 @@ export type {
   BulkOperationResult,
   UserImportData,
   UserExportOptions,
+  ValidationResponse,
+  AuthResponse,
   UserResponse,
   DetailedUserResponse,
   UserListResponse,
@@ -85,6 +92,8 @@ export type {
   UserResponseType,
   TeamManagementType,
   UserManagementType,
+  VerificationRequestType as UserVerificationRequestType,
+  PasswordRequestType,
 } from './user.types';
 
 export type {
@@ -120,6 +129,7 @@ export type {
   CreateEnterpriseProfileRequest,
   UpdateProfileRequest,
   ProfileQueryParams,
+  ProfileSearchRequest,
   ProfileData,
   TradieProfile,
   ClientProfile,
@@ -132,13 +142,8 @@ export type {
   ProfileResponseType,
 } from './profile.types';
 
-// ===== MISSING ALIASES FOR CONTROLLERS =====
-export type ForgotPasswordRequest = PasswordResetRequest;
-export type ResetPasswordRequest = PasswordResetConfirmRequest;
-export type AuthResponse = LoginResponse | RegisterResponse | RefreshTokenResponse;
 export type User = AuthUser;
 
-// ===== BASE API RESPONSE TYPES =====
 export interface BaseApiResponse {
   success: boolean;
   message: string;
@@ -181,7 +186,6 @@ export interface PaginatedApiResponse<T = any> extends ApiSuccessResponse<T[]> {
   pagination: PaginationMeta;
 }
 
-// ===== QUERY AND FILTER TYPES =====
 export interface BaseQueryParams {
   page?: number;
   limit?: number;
@@ -198,7 +202,6 @@ export interface FilterParams {
 
 export type QueryParams = BaseQueryParams & FilterParams;
 
-// ===== RESPONSE TYPES =====
 export interface FileUploadResponse {
   filename: string;
   originalName: string;
@@ -220,12 +223,10 @@ export interface HealthCheckResponse {
   services: Record<string, boolean>;
 }
 
-// ===== USER ROLE AND STATUS TYPES =====
 export type UserRole = 'client' | 'tradie' | 'enterprise' | 'admin';
 export type UserStatus = 'active' | 'inactive' | 'suspended' | 'pending';
 export type VerificationStatus = 'pending' | 'verified' | 'rejected';
 
-// ===== BASE ENTITY TYPES =====
 export interface BaseUser {
   id: string;
   email: string;
@@ -279,7 +280,6 @@ export interface AuditInfo {
   updatedAt: Date;
 }
 
-// ===== SEARCH AND ACTIVITY TYPES =====
 export interface SearchResult<T = any> {
   items: T[];
   total: number;
@@ -309,7 +309,6 @@ export interface RateLimitInfo {
   retryAfter?: number;
 }
 
-// ===== VALIDATION AND ERROR TYPES =====
 export interface ValidationError {
   field: string;
   message: string;
@@ -338,7 +337,6 @@ export interface SessionInfo {
   isActive: boolean;
 }
 
-// ===== UTILITY TYPES =====
 export type Optional<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
 export type RequiredFields<T, K extends keyof T> = T & Required<Pick<T, K>>;
 export type PartialExcept<T, K extends keyof T> = Partial<T> & Pick<T, K>;
@@ -360,7 +358,6 @@ export interface BaseEntity extends Timestamps {
 
 export interface BaseEntityWithSoftDelete extends BaseEntity, SoftDelete {}
 
-// ===== DATABASE TYPES =====
 export type ObjectId = string;
 
 export interface BaseDocument extends BaseEntity {
@@ -451,7 +448,6 @@ export interface DatabaseOperationResult<T = any> {
   errorType?: DatabaseErrorType;
 }
 
-// ===== CACHE AND REDIS TYPES =====
 export interface CacheConfig {
   ttl: number;
   maxSize?: number;
@@ -480,7 +476,6 @@ export interface DatabaseHealthMetrics {
   errorRate: number;
 }
 
-// ===== DOCUMENT TYPES =====
 export interface AuditTrailDocument extends BaseDocument {
   userId: string;
   action: string;
@@ -518,7 +513,6 @@ export interface NotificationDocument extends BaseDocument {
   readAt?: Date;
 }
 
-// ===== REPOSITORY AND SERVICE TYPES =====
 export interface Repository<T> {
   create(data: Partial<T>): Promise<T>;
   findById(id: string): Promise<T | null>;
@@ -545,48 +539,11 @@ export type DocumentArray<T> = T[] & {
 export type Mixed = any;
 export type Decimal128 = number;
 
-// ===== ADDITIONAL VALIDATION TYPES =====
-export interface VerifyEmailRequest {
-  token: string;
-  email: string;
-}
-
-export interface VerifyPhoneRequest {
-  code: string;
-  phone: string;
-  userId: string;
-}
-
-export interface ProfileSearchRequest {
-  query?: string;
-  category?: ServiceCategory;
-  location?: string;
-  radius?: number;
-  minRating?: number;
-  availability?: AvailabilityStatus;
-  priceRange?: {
-    min: number;
-    max: number;
-  };
-  sortBy?: 'rating' | 'distance' | 'price' | 'reviews';
-  sortOrder?: 'asc' | 'desc';
-  page?: number;
-  limit?: number;
-}
-
-export interface ValidationResponse {
-  success: boolean;
-  message: string;
-  data?: any;
-  errors?: ValidationError[];
-}
-
 export interface SortOptions {
   field: string;
   direction: 'asc' | 'desc';
 }
 
-// ===== CONSTANTS =====
 export const AUTH_TYPES = {
   PLATFORM: {
     WEB: 'web' as const,
@@ -657,10 +614,8 @@ export const PROFILE_TYPES = {
   },
 } as const;
 
-// ===== EXPORT CONSTANTS =====
 export { AUTH_TYPES, PROFILE_TYPES };
 
-// ===== SHARED TYPES OBJECT =====
 export const sharedTypes = {
   AUTH_TYPES,
   PROFILE_TYPES,

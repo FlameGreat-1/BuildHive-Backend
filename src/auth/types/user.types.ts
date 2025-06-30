@@ -11,21 +11,43 @@ export interface CreateUserRequest {
   authProvider: AuthProvider;
   firstName: string;
   lastName: string;
+  gender?: 'male' | 'female' | 'other' | 'prefer_not_to_say';
+  address?: string;
   acceptTerms: boolean;
   marketingConsent?: boolean;
   registrationIP?: string;
   googleId?: string;
   googleEmail?: string;
   googleAvatar?: string;
+  deviceInfo?: DeviceInfo;
+  locationInfo?: LocationInfo;
+  businessInfo?: {
+    businessName?: string;
+    abn?: string;
+    tradingName?: string;
+  };
+  metadata?: {
+    userAgent?: string;
+    ipAddress?: string;
+    timestamp?: Date;
+  };
 }
 
 export interface UpdateUserRequest {
   username?: string;
   email?: string;
   phone?: string;
+  firstName?: string;
+  lastName?: string;
   status?: UserStatus;
   marketingConsent?: boolean;
   updatedBy?: string;
+  metadata?: {
+    updatedBy?: string;
+    userAgent?: string;
+    ipAddress?: string;
+    timestamp?: Date;
+  };
 }
 
 export interface UpdateUserPasswordRequest {
@@ -33,6 +55,11 @@ export interface UpdateUserPasswordRequest {
   newPassword: string;
   confirmPassword: string;
   logoutOtherSessions?: boolean;
+  metadata?: {
+    userAgent?: string;
+    ipAddress?: string;
+    timestamp?: Date;
+  };
 }
 
 export interface UpdateUserStatusRequest {
@@ -40,6 +67,62 @@ export interface UpdateUserStatusRequest {
   reason?: string;
   updatedBy: string;
   notifyUser?: boolean;
+}
+
+export interface VerifyEmailRequest {
+  email: string;
+  token: string;
+  metadata?: {
+    userAgent?: string;
+    ipAddress?: string;
+    timestamp?: Date;
+  };
+}
+
+export interface VerifyPhoneRequest {
+  phone: string;
+  code: string;
+  metadata?: {
+    userAgent?: string;
+    ipAddress?: string;
+    timestamp?: Date;
+  };
+}
+
+export interface ForgotPasswordRequest {
+  email: string;
+  platform: PlatformType;
+  metadata?: {
+    userAgent?: string;
+    ipAddress?: string;
+    timestamp?: Date;
+  };
+}
+
+export interface ResetPasswordRequest {
+  email: string;
+  token: string;
+  newPassword: string;
+  confirmPassword: string;
+  metadata?: {
+    userAgent?: string;
+    ipAddress?: string;
+    timestamp?: Date;
+  };
+}
+
+export interface UserAvailabilityCheck {
+  email?: string;
+  phone?: string;
+  username?: string;
+}
+
+export interface UserVerificationStatus {
+  email: boolean;
+  phone: boolean;
+  emailVerified: boolean;
+  phoneVerified: boolean;
+  isFullyVerified: boolean;
 }
 
 export interface UserProfile extends BaseUser {
@@ -412,6 +495,26 @@ export interface UserExportOptions {
   };
 }
 
+export interface ValidationResponse extends BaseApiResponse {
+  success: true;
+  data: {
+    verified: boolean;
+    type: 'email' | 'phone';
+    user: Pick<UserProfile, 'id' | 'verificationStatus' | 'isEmailVerified' | 'isPhoneVerified'>;
+    isFullyVerified: boolean;
+    expiresAt?: Date;
+  };
+}
+
+export interface AuthResponse extends BaseApiResponse {
+  success: true;
+  data: {
+    user: UserProfile;
+    tokens?: any;
+    session?: any;
+  };
+}
+
 export interface UserResponse extends BaseApiResponse {
   success: true;
   data: UserProfile;
@@ -468,3 +571,51 @@ export type UserRequestType = CreateUserRequest | UpdateUserRequest | UpdateUser
 export type UserResponseType = UserResponse | DetailedUserResponse | UserListResponse | UserStatisticsResponse;
 export type TeamManagementType = TeamInvitationRequest | TeamMemberUpdateRequest | EnterpriseTeamResponse;
 export type UserManagementType = BulkUserOperation | UserImportData | UserExportOptions;
+export type VerificationRequestType = VerifyEmailRequest | VerifyPhoneRequest;
+export type PasswordRequestType = ForgotPasswordRequest | ResetPasswordRequest;
+
+export type {
+  CreateUserRequest,
+  UpdateUserRequest,
+  UpdateUserPasswordRequest,
+  UpdateUserStatusRequest,
+  VerifyEmailRequest,
+  VerifyPhoneRequest,
+  ForgotPasswordRequest,
+  ResetPasswordRequest,
+  UserAvailabilityCheck,
+  UserVerificationStatus,
+  UserProfile,
+  DetailedUserProfile,
+  UserListItem,
+  UserQueryParams,
+  UserFilterOptions,
+  UserStatistics,
+  UserActivitySummary,
+  UpdateSubscriptionRequest,
+  CreditTransactionRequest,
+  CreditBalance,
+  TeamMember,
+  EnterpriseTeam,
+  TeamInvitationRequest,
+  TeamMemberUpdateRequest,
+  UserDevice,
+  DeviceManagementRequest,
+  UserPreferences,
+  UpdatePreferencesRequest,
+  BulkUserOperation,
+  BulkOperationResult,
+  UserImportData,
+  UserExportOptions,
+  ValidationResponse,
+  AuthResponse,
+  UserResponse,
+  DetailedUserResponse,
+  UserListResponse,
+  UserStatisticsResponse,
+  CreditBalanceResponse,
+  EnterpriseTeamResponse,
+  UserDevicesResponse,
+  UserPreferencesResponse,
+  BulkOperationResponse
+};

@@ -18,17 +18,6 @@ import type {
   AuthUser
 } from '../types';
 
-declare global {
-  namespace Express {
-    interface Request {
-      user?: AuthUser & {
-        id: string;
-        roles?: string[];
-      };
-    }
-  }
-}
-
 export interface IProfileController {
   createProfile(req: Request, res: Response, next: NextFunction): Promise<void>;
   getProfile(req: Request, res: Response, next: NextFunction): Promise<void>;

@@ -5,6 +5,7 @@ import type {
   IUserService,
   ServiceContainer 
 } from '../services';
+import { User } from '../models/User.model';  
 import type {
   RegisterRequest,
   LoginRequest,
@@ -16,23 +17,9 @@ import type {
   AuthResponse,
   UserResponse,
   AuthUser,
-  User,
   TokenPair,
   DeviceInfo
 } from '../types';
-
-declare global {
-  namespace Express {
-    interface Request {
-      user?: AuthUser;
-      session?: {
-        id: string;
-        userId: string;
-        expiresAt: Date;
-      };
-    }
-  }
-}
 
 export interface IAuthController {
   register(req: Request, res: Response, next: NextFunction): Promise<void>;

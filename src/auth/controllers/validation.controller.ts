@@ -15,17 +15,6 @@ import type {
   AuthUser
 } from '../types';
 
-declare global {
-  namespace Express {
-    interface Request {
-      user?: AuthUser & {
-        id: string;
-        roles?: string[];
-      };
-    }
-  }
-}
-
 export interface IValidationController {
   sendEmailVerification(req: Request, res: Response, next: NextFunction): Promise<void>;
   verifyEmail(req: Request, res: Response, next: NextFunction): Promise<void>;
