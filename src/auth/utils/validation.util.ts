@@ -111,8 +111,8 @@ export const validateRegistrationData = (data: {
   errors.push(...validateUserRole(data.role));
 
   if (data.authProvider === 'local' && data.password) {
-    const { validatePasswordStrength } = require('./password.util');
-    errors.push(...validatePasswordStrength(data.password));
+//     const { validatePasswordStrength } = require('./password.util');
+//     errors.push(...validatePasswordStrength(data.password));
   }
 
   const validProviders = Object.values(AUTH_CONSTANTS.AUTH_PROVIDERS);
