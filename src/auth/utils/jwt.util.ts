@@ -14,13 +14,11 @@ export const generateAccessToken = (
     role
   };
 
-  const options: SignOptions = {
-    expiresIn: environment.JWT_EXPIRES_IN,
+  return jwt.sign(payload, environment.JWT_SECRET, {
+    expiresIn: environment.JWT_EXPIRES_IN as string | number,
     issuer: 'buildhive-auth',
     audience: 'buildhive-app'
-  };
-
-  return jwt.sign(payload, environment.JWT_SECRET, options);
+  } as SignOptions);
 };
 
 export const generateEmailVerificationToken = (
@@ -33,13 +31,11 @@ export const generateEmailVerificationToken = (
     type: 'email_verification'
   };
 
-  const options: SignOptions = {
+  return jwt.sign(payload, environment.JWT_SECRET, {
     expiresIn: '24h',
     issuer: 'buildhive-auth',
     audience: 'buildhive-verification'
-  };
-
-  return jwt.sign(payload, environment.JWT_SECRET, options);
+  } as SignOptions);
 };
 
 export const verifyToken = (token: string): AuthTokenPayload => {
@@ -108,3 +104,4 @@ export const isTokenExpired = (token: string): boolean => {
     return true;
   }
 };
+
