@@ -1,4 +1,4 @@
-import { Pool, PoolClient, QueryResult } from 'pg';
+import { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
 import Redis from 'ioredis';
 import { databaseConfig, redisConfig } from '../../config/auth';
 import { DatabaseClient, DatabaseTransaction, QueryResult as CustomQueryResult } from '../types';
@@ -38,7 +38,7 @@ class DatabaseConnection implements DatabaseClient {
       this.isConnected = true;
     });
 
-    this.pool.on('error', (err) => {
+    this.pool.on('error', (err: any) => {
       logger.error('Database connection error:', err);
       this.isConnected = false;
     });
@@ -47,15 +47,15 @@ class DatabaseConnection implements DatabaseClient {
       logger.info('Redis connection established');
     });
 
-    this.redis.on('error', (err) => {
+    this.redis.on('error', (err: any) => {
       logger.error('Redis connection error:', err);
     });
   }
 
-  async query<T = any>(text: string, params?: any[]): Promise<CustomQueryResult<T>> {
+  async query<T extends QueryResultRow = any>(text: string, params?: any[]): Promise<CustomQueryResult<T>> {
     const client = await this.pool.connect();
     try {
-      const result: QueryResult<T> = await client.query(text, params);
+      const result: QueryResult<T> = await client.query<T>(text, params);
       return {
         rows: result.rows,
         rowCount: result.rowCount || 0,
@@ -71,8 +71,8 @@ class DatabaseConnection implements DatabaseClient {
     await client.query('BEGIN');
 
     return {
-      query: async <T = any>(text: string, params?: any[]): Promise<CustomQueryResult<T>> => {
-        const result: QueryResult<T> = await client.query(text, params);
+      query: async <T extends QueryResultRow = any>(text: string, params?: any[]): Promise<CustomQueryResult<T>> => {
+        const result: QueryResult<T> = await client.query<T>(text, params);
         return {
           rows: result.rows,
           rowCount: result.rowCount || 0,
@@ -96,11 +96,31 @@ class DatabaseConnection implements DatabaseClient {
     };
   }
 
+  async testConnection(): Promise<boolean> {
+    try {
+      await this.query('SELECT 1');
+      await this.redis.ping();
+      return true;
+    } catch (error) {
+      logger.error('Database connection test failed:', error);
+      return false;
+    }
+  }
+
+  async disconnect(): Promise<void> {
+    try {
+      await this.pool.end();
+      await this.redis.quit();
+      this.isConnected = false;
+      logger.info('Database connections closed');
+    } catch (error) {
+      logger.error('Error closing database connections:', error);
+      throw error;
+    }
+  }
+
   async end(): Promise<void> {
-    await this.pool.end();
-    await this.redis.quit();
-    this.isConnected = false;
-    logger.info('Database connections closed');
+    await this.disconnect();
   }
 
   getRedisClient(): Redis {
@@ -124,6 +144,19 @@ class DatabaseConnection implements DatabaseClient {
 }
 
 export const database = new DatabaseConnection();
+
+export const connectDatabase = async (): Promise<void> => {
+  try {
+    const isHealthy = await database.healthCheck();
+    if (!isHealthy) {
+      throw new Error('Database health check failed');
+    }
+    logger.info('Database connected successfully');
+  } catch (error) {
+    logger.error('Failed to connect to database:', error);
+    throw error;
+  }
+};
 
 export const initializeDatabase = async (): Promise<void> => {
   try {

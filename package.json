@@ -75,6 +75,7 @@
     "deps:update": "npm update"
   },
   "dependencies": {
+    "bcrypt": "^5.1.1",
     "bcryptjs": "^2.4.3",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.0",
@@ -88,6 +89,7 @@
     "google-auth-library": "^9.4.0",
     "googleapis": "^129.0.0",
     "helmet": "^7.1.0",
+    "ioredis": "^5.3.2",
     "joi": "^17.11.0",
     "jsonwebtoken": "^9.0.2",
     "lodash": "^4.17.21",
@@ -108,6 +110,7 @@
     "zod": "^3.22.4"
   },
   "devDependencies": {
+    "@types/bcrypt": "^5.0.2",
     "@types/bcryptjs": "^2.4.6",
     "@types/compression": "^1.7.5",
     "@types/cookie-parser": "^1.4.6",

@@ -8,11 +8,12 @@ import {
   corsOptions,
   securityHeaders,
   addSecurityHeaders,
-  validateOrigin
-} from './shared/middleware';
-import { 
+  validateOrigin,
   requestLogger,
   sensitiveDataFilter
+} from './shared/middleware';
+import { 
+  registrationLogger
 } from './auth/middleware';
 import { 
   authRoutes, 
@@ -27,25 +28,20 @@ export async function createApp(): Promise<Application> {
   try {
     logger.info('Initializing BuildHive application...');
 
-    // Connect to database
     await connectDatabase();
     logger.info('Database connected successfully');
 
-    // Security middleware
     app.use(securityHeaders);
     app.use(addSecurityHeaders);
     app.use(validateOrigin);
     app.use(corsOptions);
 
-    // Body parsing middleware
     app.use(express.json({ limit: '1mb' }));
     app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
-    // Request logging and filtering
     app.use(requestLogger);
     app.use(sensitiveDataFilter);
 
-    // Health check route
     app.get('/health', (req: Request, res: Response) => {
       res.json({
         success: true,
@@ -56,13 +52,11 @@ export async function createApp(): Promise<Application> {
       });
     });
 
-    // API routes with rate limiting
     app.use('/api', generalApiRateLimit);
-    app.use('/api/v1/auth', authRoutes);
+    app.use('/api/v1/auth', registrationLogger, authRoutes);
     app.use('/api/v1/profile', profileRoutes);
     app.use('/api/v1/validation', validationRoutes);
 
-    // Root endpoint
     app.get('/', (req: Request, res: Response) => {
       res.json({
         success: true,
@@ -91,10 +85,7 @@ export async function createApp(): Promise<Application> {
       });
     });
 
-    // 404 handler
     app.use('*', notFoundHandler);
-
-    // Global error handler
     app.use(errorHandler);
 
     logger.info('BuildHive application initialized successfully');

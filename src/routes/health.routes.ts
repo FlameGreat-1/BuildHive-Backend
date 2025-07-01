@@ -40,7 +40,7 @@ router.get('/', async (req: Request, res: Response) => {
 
 router.get('/detailed', async (req: Request, res: Response) => {
   try {
-    const databaseStatus = await database.testConnection();
+    const databaseStatus = await database.healthCheck();
     
     const detailedHealth = {
       status: 'healthy',
@@ -88,10 +88,10 @@ router.get('/detailed', async (req: Request, res: Response) => {
 
 router.get('/ready', async (req: Request, res: Response) => {
   try {
-    const databaseReady = await database.testConnection();
+    const databaseReady = await database.healthCheck();
     const memoryUsage = process.memoryUsage();
-    const memoryOk = memoryUsage.heapUsed < (1024 * 1024 * 1024); // Less than 1GB
-    const uptimeOk = process.uptime() > 5; // At least 5 seconds uptime
+    const memoryOk = memoryUsage.heapUsed < (1024 * 1024 * 1024);
+    const uptimeOk = process.uptime() > 5;
 
     const readinessCheck = {
       ready: databaseReady && memoryOk && uptimeOk,

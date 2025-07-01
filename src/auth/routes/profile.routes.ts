@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request } from 'express';
 import { ProfileController } from '../controllers';
 import { 
   validateProfileCreation, 
@@ -11,10 +11,18 @@ import {
 } from '../middleware';
 import { generalApiRateLimit } from '../../shared/middleware';
 
+interface AuthenticatedRequest extends Request {
+  user?: {
+    id: string;
+    email: string;
+    role: string;
+    emailVerified: boolean;
+  };
+}
+
 const router = Router();
 const profileController = new ProfileController();
 
-// Create Profile Route (for registration completion)
 router.post(
   '/create',
   generalApiRateLimit,
@@ -26,7 +34,6 @@ router.post(
   profileController.createProfile
 );
 
-// Get Profile Route (for registration flow)
 router.get(
   '/me',
   generalApiRateLimit,
@@ -34,7 +41,6 @@ router.get(
   profileController.getProfile
 );
 
-// Get Profile Completeness Route
 router.get(
   '/completeness',
   generalApiRateLimit,
@@ -42,7 +48,6 @@ router.get(
   profileController.getProfileCompleteness
 );
 
-// Update Registration Source Route
 router.patch(
   '/registration-source',
   generalApiRateLimit,

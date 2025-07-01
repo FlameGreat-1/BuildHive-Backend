@@ -98,12 +98,13 @@ export const validateOrigin = (
     const allowedOrigins = environment.CORS_ORIGIN.split(',').map(o => o.trim());
     
     if (origin && !allowedOrigins.includes('*') && !allowedOrigins.includes(origin)) {
-      return res.status(403).json({
+      res.status(403).json({
         success: false,
         message: 'Forbidden: Invalid origin',
         timestamp: new Date().toISOString(),
         requestId: res.locals.requestId || 'unknown'
       });
+      return;
     }
   }
 

@@ -58,10 +58,15 @@ export class AuthService {
 
       logRegistrationAttempt(user.email, AuthProvider.LOCAL, true, requestId);
 
+      const userData = this.userService.getUserPublicData(user);
+
       return {
         success: true,
         message: 'Registration successful. Please check your email to verify your account.',
-        user: this.userService.getUserPublicData(user),
+        user: {
+          ...userData,
+          createdAt: userData.createdAt.toISOString()
+        },
         requiresVerification: true,
         verificationSent: true
       };
@@ -92,10 +97,15 @@ export class AuthService {
       if (existingUser) {
         logRegistrationAttempt(request.socialData.email, request.authProvider, true, requestId);
         
+        const userData = this.userService.getUserPublicData(existingUser);
+        
         return {
           success: true,
           message: 'Social account already registered. Please login.',
-          user: this.userService.getUserPublicData(existingUser),
+          user: {
+            ...userData,
+            createdAt: userData.createdAt.toISOString()
+          },
           requiresVerification: false,
           verificationSent: false
         };
@@ -116,10 +126,15 @@ export class AuthService {
 
       logRegistrationAttempt(user.email, request.authProvider, true, requestId);
 
+      const userData = this.userService.getUserPublicData(user);
+
       return {
         success: true,
         message: 'Social registration successful.',
-        user: this.userService.getUserPublicData(user),
+        user: {
+          ...userData,
+          createdAt: userData.createdAt.toISOString()
+        },
         requiresVerification: false,
         verificationSent: false
       };

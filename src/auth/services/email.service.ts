@@ -8,7 +8,7 @@ export class EmailService {
   private transporter: nodemailer.Transporter;
 
   constructor() {
-    this.transporter = nodemailer.createTransporter({
+    this.transporter = nodemailer.createTransport({
       service: environment.EMAIL_SERVICE,
       auth: {
         user: environment.EMAIL_USER,

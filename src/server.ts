@@ -40,7 +40,7 @@ async function startServer(): Promise<void> {
 
         try {
           // Close database connections
-          await database.disconnect();
+          await database.end();
           logger.info('Database connections closed');
 
           logger.info('Graceful shutdown completed');

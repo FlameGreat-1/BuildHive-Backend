@@ -1,3 +1,4 @@
+import { Request, Response, NextFunction } from 'express';
 import { ValidationError, ErrorResponse } from '../types';
 import { ERROR_CODES, HTTP_STATUS_CODES } from '../../config/auth';
 
@@ -86,6 +87,12 @@ export const isOperationalError = (error: Error): boolean => {
 
 export const handleAsyncError = (fn: Function) => {
   return (req: any, res: any, next: any) => {
+    Promise.resolve(fn(req, res, next)).catch(next);
+  };
+};
+
+export const asyncErrorHandler = (fn: Function) => {
+  return (req: Request, res: Response, next: NextFunction) => {
     Promise.resolve(fn(req, res, next)).catch(next);
   };
 };
