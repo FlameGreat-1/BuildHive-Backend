@@ -1,5 +1,5 @@
 import express, { Application, Request, Response, NextFunction } from 'express';
-import { connectDatabase } from './shared/database';
+import { initializeDatabase } from './shared/database';
 import { logger } from './shared/utils';
 import { 
   errorHandler, 
@@ -28,7 +28,7 @@ export async function createApp(): Promise<Application> {
   try {
     logger.info('Initializing BuildHive application...');
 
-    await connectDatabase();
+    await initializeDatabase();
     logger.info('Database connected successfully');
 
     app.use(securityHeaders);
