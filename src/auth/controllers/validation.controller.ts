@@ -64,10 +64,6 @@ export class ValidationController {
     }
 
     if (password && authProvider === 'local') {
-//       const { validatePasswordStrength } = require('../utils');
-//       const passwordErrors = validatePasswordStrength(password);
-//       validationErrors.push(...passwordErrors);
-    }
 
     if (validationErrors.length > 0) {
       throw new ValidationAppError('Registration data validation failed', validationErrors, requestId);
