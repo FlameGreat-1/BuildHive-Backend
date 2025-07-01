@@ -128,30 +128,20 @@ class DatabaseConnection implements DatabaseClient {
         );
       `;
 
-      // Create profiles table
+      // Create profiles table - Updated to match ProfileModel expectations
       const createProfilesTable = `
         CREATE TABLE IF NOT EXISTS profiles (
           id SERIAL PRIMARY KEY,
           user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
           first_name VARCHAR(50),
           last_name VARCHAR(50),
+          phone VARCHAR(20),
           avatar VARCHAR(500),
           bio TEXT,
-          phone VARCHAR(20),
           location VARCHAR(100),
-          website VARCHAR(255),
-          linkedin_url VARCHAR(255),
-          github_url VARCHAR(255),
-          portfolio_url VARCHAR(255),
-          skills TEXT[],
-          experience_level VARCHAR(20),
-          hourly_rate DECIMAL(10,2),
-          availability VARCHAR(20),
           timezone VARCHAR(50),
-          languages TEXT[],
-          profile_completeness INTEGER DEFAULT 0,
-          registration_source VARCHAR(20),
-          registration_metadata JSONB,
+          preferences JSONB DEFAULT '{}',
+          metadata JSONB DEFAULT '{}',
           created_at TIMESTAMP DEFAULT NOW(),
           updated_at TIMESTAMP DEFAULT NOW()
         );
