@@ -20,7 +20,7 @@ export const generateAccessToken = (
     audience: 'buildhive-app'
   };
 
-  return jwt.sign(payload, environment.JWT_SECRET as string, options);
+  return jwt.sign(payload, environment.JWT_SECRET, options);
 };
 
 export const generateEmailVerificationToken = (
@@ -39,12 +39,12 @@ export const generateEmailVerificationToken = (
     audience: 'buildhive-verification'
   };
 
-  return jwt.sign(payload, environment.JWT_SECRET as string, options);
+  return jwt.sign(payload, environment.JWT_SECRET, options);
 };
 
 export const verifyToken = (token: string): AuthTokenPayload => {
   try {
-    const decoded = jwt.verify(token, environment.JWT_SECRET as string, {
+    const decoded = jwt.verify(token, environment.JWT_SECRET, {
       issuer: 'buildhive-auth',
       audience: 'buildhive-app'
     }) as AuthTokenPayload;
@@ -63,7 +63,7 @@ export const verifyToken = (token: string): AuthTokenPayload => {
 
 export const verifyEmailVerificationToken = (token: string): { userId: string; email: string } => {
   try {
-    const decoded = jwt.verify(token, environment.JWT_SECRET as string, {
+    const decoded = jwt.verify(token, environment.JWT_SECRET, {
       issuer: 'buildhive-auth',
       audience: 'buildhive-verification'
     }) as any;
