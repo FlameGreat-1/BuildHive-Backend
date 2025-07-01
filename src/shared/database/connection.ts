@@ -107,7 +107,7 @@ class DatabaseConnection implements DatabaseClient {
     }
   }
 
-  private async createTables(): Promise<void> {
+  async createTables(): Promise<void> {
     try {
       // Create users table
       const createUsersTable = `
@@ -232,7 +232,7 @@ export const initializeDatabase = async (): Promise<void> => {
     }
     
     // Create tables if they don't exist
-    await (database as any).createTables();
+    await database.createTables();
     
     logger.info('Database initialized successfully');
   } catch (error) {
