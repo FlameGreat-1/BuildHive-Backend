@@ -24,7 +24,7 @@ export const validateLocalRegistration = (): ValidationChain[] => {
       .isLength({ min: AUTH_CONSTANTS.PASSWORD_REQUIREMENTS.MIN_LENGTH, max: AUTH_CONSTANTS.PASSWORD_REQUIREMENTS.MAX_LENGTH })
       .withMessage(`Password must be between ${AUTH_CONSTANTS.PASSWORD_REQUIREMENTS.MIN_LENGTH} and ${AUTH_CONSTANTS.PASSWORD_REQUIREMENTS.MAX_LENGTH} characters`)
       // .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>]).*$/)
-      .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).*$/)
+      .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
       .withMessage('Password must contain at least one uppercase letter, one lowercase letter, and one number'),
 
     body('role')
