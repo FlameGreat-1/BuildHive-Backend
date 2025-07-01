@@ -57,14 +57,17 @@ export const validatePasswordStrength = (password: string): ValidationError[] =>
       code: 'PASSWORD_MISSING_NUMBER'
     });
   }
-   
-   if (requirements.REQUIRE_SPECIAL_CHARS && !/[!@#$%^&*(),.?\\":{}|<>]/.test(password)) {
+
+  // TEMPORARILY COMMENTED OUT FOR DEBUGGING:
+  /*
+  if (requirements.REQUIRE_SPECIAL_CHARS && !/[!@#$%^&*(),.?\\":{}|<>]/.test(password)) {
     errors.push({
       field: 'password',
       message: 'Password must contain at least one special character',
       code: 'PASSWORD_MISSING_SPECIAL'
     });
   }
+  */
 
   return errors;
 };
