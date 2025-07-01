@@ -9,7 +9,7 @@ const parseDatabaseUrl = (url: string) => {
     database: parsed.pathname.slice(1),
     username: parsed.username,
     password: parsed.password,
-    ssl: true,
+    ssl: false,
     connectionTimeoutMillis: 30000,
     idleTimeoutMillis: 30000,
     max: 20
