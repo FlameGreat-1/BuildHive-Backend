@@ -1,8 +1,7 @@
+import bcrypt from 'bcrypt';
 import { UserRepository, ProfileRepository } from '../repositories';
 import { User, CreateUserData, UserPublicData, UserRegistrationData } from '../types';
 import { UserRole, AuthProvider } from '../../shared/types';
-import { hashPassword } from '../utils';
-import { AppError, ConflictError } from '../../shared/utils';
 import { HTTP_STATUS_CODES, ERROR_CODES } from '../../config/auth';
 
 export class UserService {
@@ -43,7 +42,7 @@ export class UserService {
     };
 
     if (registrationData.password && registrationData.authProvider === AuthProvider.LOCAL) {
-      createUserData.password = await hashPassword(registrationData.password);
+      createUserData.password = await bcrypt.hash(registrationData.password);
     }
 
     const user = await this.userRepository.createUser(createUserData);
