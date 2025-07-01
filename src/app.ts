@@ -1,110 +1,100 @@
 import express, { Application, Request, Response, NextFunction } from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
-import compression from 'compression';
-import cookieParser from 'cookie-parser';
-import { buildHiveLogger, errorHandler, generalRateLimit } from './shared';
-import { createAuthModuleRoutes } from './auth/routes';
-import { createServiceContainer } from './auth/services';
-import { createControllerContainer } from './auth/controllers';
-import { initializeMiddleware } from './auth/middleware';
 import { connectDatabase } from './shared/database';
-import healthRoutes from './routes/health.routes';
+import { logger } from './shared/utils';
+import { 
+  errorHandler, 
+  notFoundHandler,
+  generalApiRateLimit,
+  corsOptions,
+  securityHeaders,
+  addSecurityHeaders,
+  validateOrigin
+} from './shared/middleware';
+import { 
+  requestLogger,
+  sensitiveDataFilter
+} from './auth/middleware';
+import { 
+  authRoutes, 
+  profileRoutes, 
+  validationRoutes 
+} from './auth/routes';
+import { environment } from './config/auth';
 
 export async function createApp(): Promise<Application> {
   const app = express();
-  const logger = buildHiveLogger;
 
   try {
     logger.info('Initializing BuildHive application...');
 
+    // Connect to database
     await connectDatabase();
     logger.info('Database connected successfully');
 
-    const serviceContainer = createServiceContainer();
-    const controllerContainer = createControllerContainer(serviceContainer);
-    
-    initializeMiddleware(serviceContainer);
-    logger.info('Middleware initialized');
+    // Security middleware
+    app.use(securityHeaders);
+    app.use(addSecurityHeaders);
+    app.use(validateOrigin);
+    app.use(corsOptions);
 
-    app.use(helmet({
-      contentSecurityPolicy: {
-        directives: {
-          defaultSrc: ["'self'"],
-          styleSrc: ["'self'", "'unsafe-inline'"],
-          scriptSrc: ["'self'"],
-          imgSrc: ["'self'", "data:", "https:"],
-          connectSrc: ["'self'"],
-          fontSrc: ["'self'"],
-          objectSrc: ["'none'"],
-          mediaSrc: ["'self'"],
-          frameSrc: ["'none'"],
-        },
-      },
-      crossOriginEmbedderPolicy: false
-    }));
+    // Body parsing middleware
+    app.use(express.json({ limit: '1mb' }));
+    app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
-    app.use(cors({
-      origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'],
-      credentials: true,
-      methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-      exposedHeaders: ['X-RateLimit-Remaining', 'X-RateLimit-Limit', 'X-RateLimit-Reset']
-    }));
+    // Request logging and filtering
+    app.use(requestLogger);
+    app.use(sensitiveDataFilter);
 
-    app.use(express.json({ limit: '10mb' }));
-    app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-    app.use(cookieParser());
-    app.use(compression());
-
-    app.use((req: Request, res: Response, next: NextFunction) => {
-      logger.info('Incoming request', {
-        method: req.method,
-        url: req.url,
-        ip: req.ip,
-        userAgent: req.get('User-Agent')
+    // Health check route
+    app.get('/health', (req: Request, res: Response) => {
+      res.json({
+        success: true,
+        message: 'BuildHive API is healthy',
+        timestamp: new Date().toISOString(),
+        environment: environment.NODE_ENV,
+        version: '1.0.0'
       });
-      next();
     });
 
-    app.use('/api', generalRateLimit);
-    app.use('/health', healthRoutes);
-    app.use('/api/v1', createAuthModuleRoutes(controllerContainer));
+    // API routes with rate limiting
+    app.use('/api', generalApiRateLimit);
+    app.use('/api/v1/auth', authRoutes);
+    app.use('/api/v1/profile', profileRoutes);
+    app.use('/api/v1/validation', validationRoutes);
 
+    // Root endpoint
     app.get('/', (req: Request, res: Response) => {
       res.json({
         success: true,
         message: 'BuildHive API is running',
-        version: process.env.APP_VERSION || '1.0.0',
-        environment: process.env.NODE_ENV || 'development',
+        version: '1.0.0',
+        environment: environment.NODE_ENV,
         timestamp: new Date().toISOString(),
         endpoints: {
           health: '/health',
-          api: '/api/v1',
-          docs: '/api/v1/docs'
+          auth: '/api/v1/auth',
+          profile: '/api/v1/profile',
+          validation: '/api/v1/validation'
+        },
+        features: {
+          registration: {
+            local: '/api/v1/auth/register/local',
+            social: '/api/v1/auth/register/social',
+            verification: '/api/v1/auth/verify-email',
+            resend: '/api/v1/auth/resend-verification'
+          },
+          validation: {
+            email: '/api/v1/validation/email/availability',
+            username: '/api/v1/validation/username/availability'
+          }
         }
       });
     });
 
-    app.use('*', (req: Request, res: Response) => {
-      logger.warn('Route not found', {
-        method: req.method,
-        url: req.originalUrl,
-        ip: req.ip
-      });
+    // 404 handler
+    app.use('*', notFoundHandler);
 
-      res.status(404).json({
-        success: false,
-        message: 'Route not found',
-        code: 'ROUTE_NOT_FOUND',
-        data: {
-          method: req.method,
-          path: req.originalUrl,
-          availableEndpoints: ['/health', '/api/v1']
-        }
-      });
-    });
-
+    // Global error handler
     app.use(errorHandler);
 
     logger.info('BuildHive application initialized successfully');

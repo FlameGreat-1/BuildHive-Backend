@@ -1,17 +1,17 @@
 import { createApp } from './app';
-import { buildHiveLogger } from './shared';
-import { gracefulShutdown } from './shared/utils';
+import { logger } from './shared/utils';
+import { database } from './shared/database';
+import { environment } from './config/auth';
 
-const logger = buildHiveLogger;
-const PORT = process.env.PORT || 3000;
-const HOST = process.env.HOST || '0.0.0.0';
+const PORT = environment.PORT;
+const HOST = environment.HOST;
 
 async function startServer(): Promise<void> {
   try {
     logger.info('Starting BuildHive server...', {
       port: PORT,
       host: HOST,
-      environment: process.env.NODE_ENV || 'development',
+      environment: environment.NODE_ENV,
       nodeVersion: process.version
     });
 
@@ -21,14 +21,15 @@ async function startServer(): Promise<void> {
       logger.info('BuildHive server started successfully', {
         port: PORT,
         host: HOST,
-        environment: process.env.NODE_ENV || 'development',
+        environment: environment.NODE_ENV,
         processId: process.pid,
-        uptime: process.uptime()
+        uptime: process.uptime(),
+        features: ['registration', 'email-verification', 'profile-creation']
       });
     });
 
-    // Graceful shutdown handlers
-    const shutdown = async (signal: string) => {
+    // Graceful shutdown handler
+    const gracefulShutdown = async (signal: string) => {
       logger.info(`Received ${signal}, starting graceful shutdown...`);
       
       server.close(async (err) => {
@@ -38,7 +39,10 @@ async function startServer(): Promise<void> {
         }
 
         try {
-          await gracefulShutdown();
+          // Close database connections
+          await database.disconnect();
+          logger.info('Database connections closed');
+
           logger.info('Graceful shutdown completed');
           process.exit(0);
         } catch (shutdownError) {
@@ -55,8 +59,8 @@ async function startServer(): Promise<void> {
     };
 
     // Handle shutdown signals
-    process.on('SIGTERM', () => shutdown('SIGTERM'));
-    process.on('SIGINT', () => shutdown('SIGINT'));
+    process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+    process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
     // Handle uncaught exceptions
     process.on('uncaughtException', (error) => {

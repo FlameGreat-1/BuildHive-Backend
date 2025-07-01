@@ -1,25 +1,35 @@
 import { Router } from 'express';
-import { buildHiveLogger } from '../shared';
+import { logger, sendSuccess } from '../shared/utils';
+import { environment } from '../config/auth';
 import healthRoutes from './health.routes';
 
 const router = Router();
-const logger = buildHiveLogger;
 
 router.use('/health', healthRoutes);
 
 router.get('/', (req, res) => {
-  res.json({
-    success: true,
-    message: 'BuildHive API Routes',
-    version: process.env.APP_VERSION || '1.0.0',
+  const routeData = {
+    service: 'BuildHive API Routes',
+    version: '1.0.0',
+    environment: environment.NODE_ENV,
     timestamp: new Date().toISOString(),
     availableRoutes: {
       health: '/health',
       api: '/api/v1'
+    },
+    features: {
+      registration: 'enabled',
+      emailVerification: 'enabled',
+      socialAuth: 'enabled'
     }
-  });
+  };
+
+  return sendSuccess(res, 'BuildHive API Routes', routeData);
 });
 
-logger.info('Main routes initialized');
+logger.info('Main routes initialized', {
+  routes: ['health', 'api'],
+  environment: environment.NODE_ENV
+});
 
 export default router;

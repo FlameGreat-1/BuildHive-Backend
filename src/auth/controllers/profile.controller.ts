@@ -1,903 +1,122 @@
 import { Request, Response, NextFunction } from 'express';
-import { buildHiveLogger, buildHiveResponse, AuthErrorFactory } from '../../shared';
-import type { 
-  IProfileService,
-  ServiceContainer 
-} from '../services';
-import type {
-  CreateProfileRequest,
-  UpdateProfileRequest,
-  ProfileSearchRequest,
-  TradieProfile,
-  ClientProfile,
-  EnterpriseProfile,
-  ProfileResponse,
-  ProfileListResponse,
-  ProfileCompletion,
-  QualityScore,
-  AuthUser
-} from '../types';
+import { ProfileService } from '../services';
+import { CreateProfileData } from '../types';
+import { sendSuccess, sendCreated, asyncErrorHandler } from '../../shared/utils';
+import { HTTP_STATUS_CODES } from '../../config/auth';
 
-export interface IProfileController {
-  createProfile(req: Request, res: Response, next: NextFunction): Promise<void>;
-  getProfile(req: Request, res: Response, next: NextFunction): Promise<void>;
-  updateProfile(req: Request, res: Response, next: NextFunction): Promise<void>;
-  deleteProfile(req: Request, res: Response, next: NextFunction): Promise<void>;
-  searchProfiles(req: Request, res: Response, next: NextFunction): Promise<void>;
-  getProfilesByRole(req: Request, res: Response, next: NextFunction): Promise<void>;
-  uploadProfileImage(req: Request, res: Response, next: NextFunction): Promise<void>;
-  updateTradieServices(req: Request, res: Response, next: NextFunction): Promise<void>;
-  updateTradieAvailability(req: Request, res: Response, next: NextFunction): Promise<void>;
-  addTradieQualification(req: Request, res: Response, next: NextFunction): Promise<void>;
-  updateTradieInsurance(req: Request, res: Response, next: NextFunction): Promise<void>;
-  addPortfolioItem(req: Request, res: Response, next: NextFunction): Promise<void>;
-  getProfileCompletion(req: Request, res: Response, next: NextFunction): Promise<void>;
-  getQualityScore(req: Request, res: Response, next: NextFunction): Promise<void>;
-  verifyProfile(req: Request, res: Response, next: NextFunction): Promise<void>;
-  deactivateProfile(req: Request, res: Response, next: NextFunction): Promise<void>;
-  healthCheck(req: Request, res: Response, next: NextFunction): Promise<void>;
+interface AuthenticatedRequest extends Request {
+  user?: {
+    id: string;
+    email: string;
+    role: string;
+    emailVerified: boolean;
+  };
 }
 
-export class ProfileController implements IProfileController {
-  private readonly profileService: IProfileService;
-  private readonly logger = buildHiveLogger;
+export class ProfileController {
+  private profileService: ProfileService;
 
-  constructor(serviceContainer: ServiceContainer) {
-    this.profileService = serviceContainer.getProfileService();
+  constructor() {
+    this.profileService = new ProfileService();
+  }
 
-    this.logger.info('ProfileController initialized', {
-      controller: 'ProfileController',
-      dependencies: ['ProfileService']
+  createProfile = asyncErrorHandler(async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<Response> => {
+    const userId = req.user?.id;
+    if (!userId) {
+      throw new Error('User ID not found in request');
+    }
+
+    const profileData: CreateProfileData = {
+      userId,
+      firstName: req.body.firstName,
+      lastName: req.body.lastName,
+      phone: req.body.phone,
+      avatar: req.body.avatar,
+      preferences: req.body.preferences
+    };
+
+    const profile = await this.profileService.createProfile(profileData);
+
+    return sendCreated(res, 'Profile created successfully', {
+      profile: {
+        id: profile.id,
+        userId: profile.userId,
+        firstName: profile.firstName,
+        lastName: profile.lastName,
+        phone: profile.phone,
+        avatar: profile.avatar,
+        preferences: profile.preferences,
+        metadata: profile.metadata,
+        createdAt: profile.createdAt
+      }
     });
-  }
+  });
 
-  async createProfile(req: Request, res: Response, next: NextFunction): Promise<void> {
-    try {
-      const userId = req.user?.id;
-
-      this.logger.info('Profile creation attempt', {
-        userId,
-        role: req.body.role,
-        ip: req.ip
-      });
-
-      if (!userId) {
-        throw AuthErrorFactory.unauthorized('User not authenticated');
-      }
-
-      const profileData: CreateProfileRequest = {
-        userId,
-        role: req.body.role,
-        firstName: req.body.firstName,
-        lastName: req.body.lastName,
-        displayName: req.body.displayName,
-        dateOfBirth: req.body.dateOfBirth,
-        gender: req.body.gender,
-        phone: req.body.phone,
-        email: req.body.email,
-        alternatePhone: req.body.alternatePhone,
-        preferredContact: req.body.preferredContact,
-        address: req.body.address,
-        businessInfo: req.body.businessInfo,
-        tradieInfo: req.body.tradieInfo,
-        clientInfo: req.body.clientInfo,
-        enterpriseInfo: req.body.enterpriseInfo,
-        metadata: {
-          createdBy: userId,
-          userAgent: req.get('User-Agent'),
-          ipAddress: req.ip,
-          timestamp: new Date()
-        }
-      };
-
-      const result = await this.profileService.createProfile(profileData);
-
-      this.logger.info('Profile created successfully', {
-        userId,
-        profileId: result.data.id,
-        role: result.data.role
-      });
-
-      res.status(201).json(result);
-
-    } catch (error) {
-      this.logger.error('Profile creation failed', error as Error, {
-        userId: req.user?.id,
-        role: req.body.role,
-        ip: req.ip
-      });
-
-      next(error);
+  getProfile = asyncErrorHandler(async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<Response> => {
+    const userId = req.user?.id;
+    if (!userId) {
+      throw new Error('User ID not found in request');
     }
-  }
 
-  async getProfile(req: Request, res: Response, next: NextFunction): Promise<void> {
-    try {
-      const profileId = req.params.id;
-      const requesterId = req.user?.id;
-
-      this.logger.debug('Profile retrieval request', {
-        profileId,
-        requesterId,
-        ip: req.ip
-      });
-
-      const result = await this.profileService.getProfileById(profileId);
-
-      const canViewFullProfile = this.canViewFullProfile(requesterId, result.data, req);
-      
-      if (!canViewFullProfile) {
-        const publicProfile = this.filterPublicProfileData(result.data);
-        const publicResult = buildHiveResponse.success(publicProfile, 'Public profile retrieved');
-        
-        this.logger.debug('Public profile retrieved', {
-          profileId,
-          requesterId,
-          profileRole: result.data.role
-        });
-
-        return res.status(200).json(publicResult);
-      }
-
-      this.logger.debug('Full profile retrieved', {
-        profileId,
-        requesterId,
-        profileRole: result.data.role
-      });
-
-      res.status(200).json(result);
-
-    } catch (error) {
-      this.logger.error('Profile retrieval failed', error as Error, {
-        profileId: req.params.id,
-        requesterId: req.user?.id,
-        ip: req.ip
-      });
-
-      next(error);
+    const profile = await this.profileService.getProfileByUserId(userId);
+    if (!profile) {
+      return sendSuccess(res, 'Profile not found', null, HTTP_STATUS_CODES.NOT_FOUND);
     }
-  }
 
-  async updateProfile(req: Request, res: Response, next: NextFunction): Promise<void> {
-    try {
-      const profileId = req.params.id;
-      const userId = req.user?.id;
-
-      this.logger.info('Profile update attempt', {
-        profileId,
-        userId,
-        fieldsToUpdate: Object.keys(req.body),
-        ip: req.ip
-      });
-
-      if (!userId) {
-        throw AuthErrorFactory.unauthorized('User not authenticated');
-      }
-
-      await this.validateProfileOwnership(profileId, userId, req);
-
-      const updateData: UpdateProfileRequest = {
-        ...req.body,
-        updatedBy: userId,
-        metadata: {
-          updatedBy: userId,
-          userAgent: req.get('User-Agent'),
-          ipAddress: req.ip,
-          timestamp: new Date()
-        }
-      };
-
-      const result = await this.profileService.updateProfile(profileId, updateData);
-
-      this.logger.info('Profile updated successfully', {
-        profileId,
-        userId,
-        updatedFields: Object.keys(req.body)
-      });
-
-      res.status(200).json(result);
-
-    } catch (error) {
-      this.logger.error('Profile update failed', error as Error, {
-        profileId: req.params.id,
-        userId: req.user?.id,
-        fieldsToUpdate: Object.keys(req.body),
-        ip: req.ip
-      });
-
-      next(error);
-    }
-  }
-
-  async deleteProfile(req: Request, res: Response, next: NextFunction): Promise<void> {
-    try {
-      const profileId = req.params.id;
-      const userId = req.user?.id;
-      const reason = req.body.reason || 'User requested deletion';
-
-      this.logger.info('Profile deletion attempt', {
-        profileId,
-        userId,
-        reason,
-        ip: req.ip
-      });
-
-      if (!userId) {
-        throw AuthErrorFactory.unauthorized('User not authenticated');
-      }
-
-      await this.validateProfileOwnership(profileId, userId, req);
-
-      const result = await this.profileService.deleteProfile(profileId, reason);
-
-      this.logger.info('Profile deleted successfully', {
-        profileId,
-        userId,
-        reason
-      });
-
-      res.status(200).json(result);
-
-    } catch (error) {
-      this.logger.error('Profile deletion failed', error as Error, {
-        profileId: req.params.id,
-        userId: req.user?.id,
-        ip: req.ip
-      });
-
-      next(error);
-    }
-  }
-
-  async searchProfiles(req: Request, res: Response, next: NextFunction): Promise<void> {
-    try {
-      const requesterId = req.user?.id;
-
-      this.logger.info('Profile search request', {
-        requesterId,
-        query: req.query.q,
-        role: req.query.role,
-        location: req.query.location,
-        page: req.query.page,
-        limit: req.query.limit,
-        ip: req.ip
-      });
-
-      const serviceCategories = Array.isArray(req.query.serviceCategories) 
-        ? req.query.serviceCategories as string[]
-        : req.query.serviceCategories 
-          ? [req.query.serviceCategories as string]
-          : undefined;
-
-      const searchParams: ProfileSearchRequest = {
-        query: req.query.q as string,
-        role: req.query.role as string,
-        location: req.query.location as string,
-        serviceCategories,
-        availability: req.query.availability as string,
-        rating: req.query.rating ? parseFloat(req.query.rating as string) : undefined,
-        verified: req.query.verified === 'true',
-        radius: req.query.radius ? parseInt(req.query.radius as string) : undefined,
-        priceRange: {
-          min: req.query.minPrice ? parseFloat(req.query.minPrice as string) : undefined,
-          max: req.query.maxPrice ? parseFloat(req.query.maxPrice as string) : undefined
-        },
-        sortBy: req.query.sortBy as string || 'relevance',
-        sortOrder: req.query.sortOrder as 'asc' | 'desc' || 'desc',
-        page: parseInt(req.query.page as string) || 1,
-        limit: Math.min(parseInt(req.query.limit as string) || 20, 100)
-      };
-
-      const result = await this.profileService.searchProfiles(searchParams);
-
-      this.logger.info('Profile search completed', {
-        requesterId,
-        resultsCount: result.data.profiles.length,
-        totalResults: result.data.pagination.total,
-        page: result.data.pagination.page
-      });
-
-      res.status(200).json(result);
-
-    } catch (error) {
-      this.logger.error('Profile search failed', error as Error, {
-        requesterId: req.user?.id,
-        query: req.query.q,
-        ip: req.ip
-      });
-
-      next(error);
-    }
-  }
-
-  async getProfilesByRole(req: Request, res: Response, next: NextFunction): Promise<void> {
-    try {
-      const role = req.params.role;
-      const requesterId = req.user?.id;
-
-      this.logger.info('Get profiles by role request', {
-        role,
-        requesterId,
-        page: req.query.page,
-        limit: req.query.limit,
-        ip: req.ip
-      });
-
-      const page = parseInt(req.query.page as string) || 1;
-      const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
-
-      const result = await this.profileService.getProfilesByRole(role, { page, limit });
-
-      this.logger.info('Profiles by role retrieved', {
-        role,
-        requesterId,
-        resultsCount: result.data.profiles.length,
-        totalResults: result.data.pagination.total
-      });
-
-      res.status(200).json(result);
-
-    } catch (error) {
-      this.logger.error('Get profiles by role failed', error as Error, {
-        role: req.params.role,
-        requesterId: req.user?.id,
-        ip: req.ip
-      });
-
-      next(error);
-    }
-  }
-
-  async uploadProfileImage(req: Request, res: Response, next: NextFunction): Promise<void> {
-    try {
-      const profileId = req.params.id;
-      const userId = req.user?.id;
-      const imageType = req.body.type || 'avatar';
-
-      this.logger.info('Profile image upload attempt', {
-        profileId,
-        userId,
-        imageType,
-        fileSize: req.file?.size,
-        ip: req.ip
-      });
-
-      if (!userId) {
-        throw AuthErrorFactory.unauthorized('User not authenticated');
-      }
-
-      if (!req.file) {
-        throw AuthErrorFactory.validationError('No image file provided');
-      }
-
-      this.validateImageFile(req.file);
-      await this.validateProfileOwnership(profileId, userId, req);
-
-      const result = await this.profileService.uploadProfileImage(
-        profileId,
-        req.file.buffer,
-        imageType
-      );
-
-      this.logger.info('Profile image uploaded successfully', {
-        profileId,
-        userId,
-        imageType,
-        imageUrl: result.data.imageUrl
-      });
-
-      res.status(200).json(result);
-
-    } catch (error) {
-      this.logger.error('Profile image upload failed', error as Error, {
-        profileId: req.params.id,
-        userId: req.user?.id,
-        imageType: req.body.type,
-        ip: req.ip
-      });
-
-      next(error);
-    }
-  }
-
-  async updateTradieServices(req: Request, res: Response, next: NextFunction): Promise<void> {
-    try {
-      const profileId = req.params.id;
-      const userId = req.user?.id;
-
-      this.logger.info('Tradie services update attempt', {
-        profileId,
-        userId,
-        serviceCategories: req.body.serviceCategories?.length,
-        specializations: req.body.specializations?.length,
-        ip: req.ip
-      });
-
-      if (!userId) {
-        throw AuthErrorFactory.unauthorized('User not authenticated');
-      }
-
-      await this.validateProfileOwnership(profileId, userId, req);
-
-      const serviceData = {
-        serviceCategories: req.body.serviceCategories,
-        specializations: req.body.specializations,
-        hourlyRate: req.body.hourlyRate,
-        calloutFee: req.body.calloutFee,
-        minimumJobValue: req.body.minimumJobValue,
-        travelRadius: req.body.travelRadius
-      };
-
-      const result = await this.profileService.updateTradieServices(profileId, serviceData);
-
-      this.logger.info('Tradie services updated successfully', {
-        profileId,
-        userId,
-        serviceCategories: serviceData.serviceCategories?.length
-      });
-
-      res.status(200).json(result);
-
-    } catch (error) {
-      this.logger.error('Tradie services update failed', error as Error, {
-        profileId: req.params.id,
-        userId: req.user?.id,
-        ip: req.ip
-      });
-
-      next(error);
-    }
-  }
-
-  async updateTradieAvailability(req: Request, res: Response, next: NextFunction): Promise<void> {
-    try {
-      const profileId = req.params.id;
-      const userId = req.user?.id;
-
-      this.logger.info('Tradie availability update attempt', {
-        profileId,
-        userId,
-        status: req.body.status,
-        ip: req.ip
-      });
-
-      if (!userId) {
-        throw AuthErrorFactory.unauthorized('User not authenticated');
-      }
-
-      await this.validateProfileOwnership(profileId, userId, req);
-
-      const availabilityData = {
-        status: req.body.status,
-        workingHours: req.body.workingHours,
-        serviceRadius: req.body.serviceRadius,
-        emergencyAvailable: req.body.emergencyAvailable,
-        weekendAvailable: req.body.weekendAvailable,
-        unavailableDates: req.body.unavailableDates
-      };
-
-      const result = await this.profileService.updateTradieAvailability(profileId, availabilityData);
-
-      this.logger.info('Tradie availability updated successfully', {
-        profileId,
-        userId,
-        status: availabilityData.status
-      });
-
-      res.status(200).json(result);
-
-    } catch (error) {
-      this.logger.error('Tradie availability update failed', error as Error, {
-        profileId: req.params.id,
-        userId: req.user?.id,
-        ip: req.ip
-      });
-
-      next(error);
-    }
-  }
-
-  async addTradieQualification(req: Request, res: Response, next: NextFunction): Promise<void> {
-    try {
-      const profileId = req.params.id;
-      const userId = req.user?.id;
-
-      this.logger.info('Tradie qualification addition attempt', {
-        profileId,
-        userId,
-        qualificationName: req.body.name,
-        ip: req.ip
-      });
-
-      if (!userId) {
-        throw AuthErrorFactory.unauthorized('User not authenticated');
-      }
-
-      await this.validateProfileOwnership(profileId, userId, req);
-
-      const qualificationData = {
-        name: req.body.name,
-        issuingBody: req.body.issuingBody,
-        issueDate: req.body.issueDate,
-        expiryDate: req.body.expiryDate,
-        certificateNumber: req.body.certificateNumber,
-        verificationStatus: 'pending' as const,
-        documents: req.body.documents || []
-      };
-
-      const result = await this.profileService.addTradieQualification(profileId, qualificationData);
-
-      this.logger.info('Tradie qualification added successfully', {
-        profileId,
-        userId,
-        qualificationName: qualificationData.name
-      });
-
-      res.status(201).json(result);
-
-    } catch (error) {
-      this.logger.error('Tradie qualification addition failed', error as Error, {
-        profileId: req.params.id,
-        userId: req.user?.id,
-        qualificationName: req.body.name,
-        ip: req.ip
-      });
-
-      next(error);
-    }
-  }
-
-  async updateTradieInsurance(req: Request, res: Response, next: NextFunction): Promise<void> {
-    try {
-      const profileId = req.params.id;
-      const userId = req.user?.id;
-
-      this.logger.info('Tradie insurance update attempt', {
-        profileId,
-        userId,
-        provider: req.body.provider,
-        ip: req.ip
-      });
-
-      if (!userId) {
-        throw AuthErrorFactory.unauthorized('User not authenticated');
-      }
-
-      await this.validateProfileOwnership(profileId, userId, req);
-
-      const insuranceData = {
-        provider: req.body.provider,
-        policyNumber: req.body.policyNumber,
-        coverageType: req.body.coverageType,
-        coverageAmount: req.body.coverageAmount,
-        expiryDate: req.body.expiryDate,
-        documents: req.body.documents || []
-      };
-
-      const result = await this.profileService.updateTradieInsurance(profileId, insuranceData);
-
-      this.logger.info('Tradie insurance updated successfully', {
-        profileId,
-        userId,
-        provider: insuranceData.provider
-      });
-
-      res.status(200).json(result);
-
-    } catch (error) {
-      this.logger.error('Tradie insurance update failed', error as Error, {
-        profileId: req.params.id,
-        userId: req.user?.id,
-        ip: req.ip
-      });
-
-      next(error);
-    }
-  }
-
-  async addPortfolioItem(req: Request, res: Response, next: NextFunction): Promise<void> {
-    try {
-      const profileId = req.params.id;
-      const userId = req.user?.id;
-
-      this.logger.info('Portfolio item addition attempt', {
-        profileId,
-        userId,
-        title: req.body.title,
-        ip: req.ip
-      });
-
-      if (!userId) {
-        throw AuthErrorFactory.unauthorized('User not authenticated');
-      }
-
-      await this.validateProfileOwnership(profileId, userId, req);
-
-      const portfolioItem = {
-        title: req.body.title,
-        description: req.body.description,
-        category: req.body.category,
-        images: req.body.images || [],
-        completionDate: req.body.completionDate,
-        location: req.body.location,
-        clientTestimonial: req.body.clientTestimonial,
-        projectValue: req.body.projectValue,
-        tags: req.body.tags || []
-      };
-
-      const result = await this.profileService.addPortfolioItem(profileId, portfolioItem);
-
-      this.logger.info('Portfolio item added successfully', {
-        profileId,
-        userId,
-        title: portfolioItem.title
-      });
-
-      res.status(201).json(result);
-
-    } catch (error) {
-      this.logger.error('Portfolio item addition failed', error as Error, {
-        profileId: req.params.id,
-        userId: req.user?.id,
-        title: req.body.title,
-        ip: req.ip
-      });
-
-      next(error);
-    }
-  }
-
-  async getProfileCompletion(req: Request, res: Response, next: NextFunction): Promise<void> {
-    try {
-      const profileId = req.params.id;
-      const userId = req.user?.id;
-
-      this.logger.debug('Profile completion request', {
-        profileId,
-        userId,
-        ip: req.ip
-      });
-
-      if (!userId) {
-        throw AuthErrorFactory.unauthorized('User not authenticated');
-      }
-
-      await this.validateProfileOwnership(profileId, userId, req);
-
-      const result = await this.profileService.calculateProfileCompletion(profileId);
-
-      this.logger.debug('Profile completion calculated', {
-        profileId,
-        userId,
-        completionPercentage: result.percentage
-      });
-
-      res.status(200).json(buildHiveResponse.success(result, 'Profile completion calculated'));
-
-    } catch (error) {
-      this.logger.error('Profile completion calculation failed', error as Error, {
-        profileId: req.params.id,
-        userId: req.user?.id,
-        ip: req.ip
-      });
-
-      next(error);
-    }
-  }
-
-  async getQualityScore(req: Request, res: Response, next: NextFunction): Promise<void> {
-    try {
-      const profileId = req.params.id;
-      const userId = req.user?.id;
-
-      this.logger.debug('Quality score request', {
-        profileId,
-        userId,
-        ip: req.ip
-      });
-
-      if (!userId) {
-        throw AuthErrorFactory.unauthorized('User not authenticated');
-      }
-
-      await this.validateProfileOwnership(profileId, userId, req);
-
-      const result = await this.profileService.calculateQualityScore(profileId);
-
-      this.logger.debug('Quality score calculated', {
-        profileId,
-        userId,
-        qualityScore: result.score
-      });
-
-      res.status(200).json(buildHiveResponse.success(result, 'Quality score calculated'));
-
-    } catch (error) {
-      this.logger.error('Quality score calculation failed', error as Error, {
-        profileId: req.params.id,
-        userId: req.user?.id,
-        ip: req.ip
-      });
-
-      next(error);
-    }
-  }
-
-  async verifyProfile(req: Request, res: Response, next: NextFunction): Promise<void> {
-    try {
-      const profileId = req.params.id;
-      const verifierId = req.user?.id;
-
-      this.logger.info('Profile verification attempt', {
-        profileId,
-        verifierId,
-        ip: req.ip
-      });
-
-      if (!verifierId) {
-        throw AuthErrorFactory.unauthorized('User not authenticated');
-      }
-
-      if (!req.user?.roles?.includes('admin')) {
-        throw AuthErrorFactory.forbidden('Insufficient permissions to verify profiles');
-      }
-
-      const result = await this.profileService.verifyProfile(profileId, verifierId);
-
-      this.logger.info('Profile verified successfully', {
-        profileId,
-        verifierId
-      });
-
-      res.status(200).json(result);
-
-    } catch (error) {
-      this.logger.error('Profile verification failed', error as Error, {
-        profileId: req.params.id,
-        verifierId: req.user?.id,
-        ip: req.ip
-      });
-
-      next(error);
-    }
-  }
-
-  async deactivateProfile(req: Request, res: Response, next: NextFunction): Promise<void> {
-    try {
-      const profileId = req.params.id;
-      const userId = req.user?.id;
-      const reason = req.body.reason;
-
-      this.logger.info('Profile deactivation attempt', {
-        profileId,
-        userId,
-        reason,
-        ip: req.ip
-      });
-
-      if (!userId) {
-        throw AuthErrorFactory.unauthorized('User not authenticated');
-      }
-
-      await this.validateProfileOwnership(profileId, userId, req);
-
-      const result = await this.profileService.deactivateProfile(profileId, reason);
-
-      this.logger.info('Profile deactivated successfully', {
-        profileId,
-        userId,
-        reason
-      });
-
-      res.status(200).json(result);
-
-    } catch (error) {
-      this.logger.error('Profile deactivation failed', error as Error, {
-        profileId: req.params.id,
-        userId: req.user?.id,
-        ip: req.ip
-      });
-
-      next(error);
-    }
-  }
-
-  async healthCheck(req: Request, res: Response, next: NextFunction): Promise<void> {
-    try {
-      const health = {
-        status: 'healthy',
-        timestamp: new Date().toISOString(),
-        service: 'profile-controller',
-        version: process.env.APP_VERSION || '1.0.0',
-        dependencies: {
-          profileService: 'connected'
-        }
-      };
-
-      res.status(200).json(buildHiveResponse.success(health, 'Profile controller is healthy'));
-
-    } catch (error) {
-      this.logger.error('Profile controller health check failed', error as Error);
-      next(error);
-    }
-  }
-
-  private async validateProfileOwnership(profileId: string, userId: string, req: Request): Promise<void> {
-    const profile = await this.profileService.getProfileById(profileId);
-    
-    if (profile.data.userId !== userId && !this.isAdminUser(req)) {
-      throw AuthErrorFactory.forbidden('You do not have permission to modify this profile');
-    }
-  }
-
-  private canViewFullProfile(requesterId: string | undefined, profile: any, req: Request): boolean {
-    if (requesterId === profile.userId) return true;
-    
-    if (this.isAdminUser(req)) return true;
-    
-    if (profile.visibility === 'public' && requesterId) return true;
-    
-    return false;
-  }
-
-  private filterPublicProfileData(profile: any): any {
-    return {
-      id: profile.id,
-      displayName: profile.displayName,
-      role: profile.role,
-      ratings: profile.ratings,
-      verificationStatus: profile.verificationStatus,
-      media: {
-        avatar: profile.media?.avatar,
-        cover: profile.media?.cover
+    const completeness = await this.profileService.calculateProfileCompleteness(userId);
+    const summary = this.profileService.getProfileSummary(profile);
+
+    return sendSuccess(res, 'Profile retrieved successfully', {
+      profile: {
+        id: profile.id,
+        userId: profile.userId,
+        firstName: profile.firstName,
+        lastName: profile.lastName,
+        phone: profile.phone,
+        avatar: profile.avatar,
+        bio: profile.bio,
+        location: profile.location,
+        timezone: profile.timezone,
+        preferences: profile.preferences,
+        metadata: profile.metadata,
+        createdAt: profile.createdAt,
+        updatedAt: profile.updatedAt
       },
-      tradieInfo: profile.role === 'tradie' ? {
-        serviceCategories: profile.tradieInfo?.serviceCategories,
-        specializations: profile.tradieInfo?.specializations,
-        yearsExperience: profile.tradieInfo?.yearsExperience,
-        availability: {
-          status: profile.tradieInfo?.availability?.status
-        },
-        portfolio: profile.tradieInfo?.portfolio?.slice(0, 3)
-      } : undefined,
-      statistics: {
-        jobsCompleted: profile.statistics?.jobsCompleted,
-        responseRate: profile.statistics?.responseRate,
-        onTimeCompletionRate: profile.statistics?.onTimeCompletionRate
-      },
-      createdAt: profile.createdAt
-    };
-  }
+      completeness,
+      summary
+    });
+  });
 
-  private isAdminUser(req: Request): boolean {
-    return req.user?.roles?.includes('admin') || false;
-  }
-
-  private validateImageFile(file: Express.Multer.File): void {
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
-    const maxSize = 5 * 1024 * 1024;
-
-    if (!allowedTypes.includes(file.mimetype)) {
-      throw AuthErrorFactory.validationError('Invalid image format. Only JPEG, PNG, and WebP are allowed');
+  getProfileCompleteness = asyncErrorHandler(async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<Response> => {
+    const userId = req.user?.id;
+    if (!userId) {
+      throw new Error('User ID not found in request');
     }
 
-    if (file.size > maxSize) {
-      throw AuthErrorFactory.validationError('Image file too large. Maximum size is 5MB');
+    const completeness = await this.profileService.calculateProfileCompleteness(userId);
+    const profile = await this.profileService.getProfileByUserId(userId);
+    
+    let tips: string[] = [];
+    if (profile) {
+      tips = this.profileService.getProfileCompletionTips(profile);
     }
-  }
 
-  private sanitizeSearchParams(params: any): any {
-    return {
-      ...params,
-      page: Math.max(1, parseInt(params.page) || 1),
-      limit: Math.min(100, Math.max(1, parseInt(params.limit) || 20)),
-      radius: params.radius ? Math.min(200, Math.max(1, parseInt(params.radius))) : undefined
-    };
-  }
+    return sendSuccess(res, 'Profile completeness calculated', {
+      completeness,
+      tips,
+      profileExists: profile !== null
+    });
+  });
+
+  updateRegistrationSource = asyncErrorHandler(async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<Response> => {
+    const userId = req.user?.id;
+    if (!userId) {
+      throw new Error('User ID not found in request');
+    }
+
+    const source = req.body.source || 'web';
+    await this.profileService.updateRegistrationSource(userId, source);
+
+    return sendSuccess(res, 'Registration source updated successfully');
+  });
 }
-
-export function createProfileController(serviceContainer: ServiceContainer): IProfileController {
-  return new ProfileController(serviceContainer);
-}
-
-export default ProfileController;

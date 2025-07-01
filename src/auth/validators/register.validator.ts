@@ -1,93 +1,130 @@
-import Joi from 'joi';
+import { body, ValidationChain } from 'express-validator';
+import { AUTH_CONSTANTS } from '../../config/auth';
+import { UserRole, AuthProvider } from '../../shared/types';
 
-// Password validation schema
-const passwordSchema = Joi.string()
-  .min(8)
-  .max(128)
-  .pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>])/)
-  .required()
-  .messages({
-    'string.min': 'Password must be at least 8 characters long',
-    'string.max': 'Password cannot exceed 128 characters',
-    'string.pattern.base': 'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character',
-    'any.required': 'Password is required'
-  });
+export const validateLocalRegistration = (): ValidationChain[] => {
+  return [
+    body('username')
+      .trim()
+      .isLength({ min: AUTH_CONSTANTS.USERNAME_REQUIREMENTS.MIN_LENGTH, max: AUTH_CONSTANTS.USERNAME_REQUIREMENTS.MAX_LENGTH })
+      .withMessage(`Username must be between ${AUTH_CONSTANTS.USERNAME_REQUIREMENTS.MIN_LENGTH} and ${AUTH_CONSTANTS.USERNAME_REQUIREMENTS.MAX_LENGTH} characters`)
+      .matches(AUTH_CONSTANTS.USERNAME_REQUIREMENTS.ALLOWED_PATTERN)
+      .withMessage('Username can only contain letters, numbers, underscores, and hyphens')
+      .toLowerCase(),
 
-// Email validation schema
-const emailSchema = Joi.string()
-  .email({ tlds: { allow: false } })
-  .lowercase()
-  .trim()
-  .max(255)
-  .required()
-  .messages({
-    'string.email': 'Please provide a valid email address',
-    'string.max': 'Email cannot exceed 255 characters',
-    'any.required': 'Email is required'
-  });
+    body('email')
+      .trim()
+      .isEmail()
+      .withMessage('Please provide a valid email address')
+      .isLength({ max: AUTH_CONSTANTS.EMAIL_REQUIREMENTS.MAX_LENGTH })
+      .withMessage(`Email must not exceed ${AUTH_CONSTANTS.EMAIL_REQUIREMENTS.MAX_LENGTH} characters`)
+      .normalizeEmail(),
 
-// Australian phone number schema
-const phoneSchema = Joi.string()
-  .pattern(/^(\+61|0)[2-9]\d{8}$/)
-  .required()
-  .messages({
-    'string.pattern.base': 'Please provide a valid Australian phone number',
-    'any.required': 'Phone number is required'
-  });
+    body('password')
+      .isLength({ min: AUTH_CONSTANTS.PASSWORD_REQUIREMENTS.MIN_LENGTH, max: AUTH_CONSTANTS.PASSWORD_REQUIREMENTS.MAX_LENGTH })
+      .withMessage(`Password must be between ${AUTH_CONSTANTS.PASSWORD_REQUIREMENTS.MIN_LENGTH} and ${AUTH_CONSTANTS.PASSWORD_REQUIREMENTS.MAX_LENGTH} characters`)
+      .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>])/)
+      .withMessage('Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character'),
 
-// Name validation schema
-const nameSchema = Joi.string()
-  .trim()
-  .min(2)
-  .max(50)
-  .pattern(/^[a-zA-Z\s'-]+$/)
-  .required()
-  .messages({
-    'string.min': 'Name must be at least 2 characters long',
-    'string.max': 'Name cannot exceed 50 characters',
-    'string.pattern.base': 'Name can only contain letters, spaces, hyphens, and apostrophes',
-    'any.required': 'Name is required'
-  });
+    body('role')
+      .isIn(Object.values(AUTH_CONSTANTS.USER_ROLES))
+      .withMessage(`Role must be one of: ${Object.values(AUTH_CONSTANTS.USER_ROLES).join(', ')}`),
 
-// User registration schema
-export const registerSchema = Joi.object({
-  email: emailSchema,
-  password: passwordSchema,
-  confirmPassword: Joi.string()
-    .valid(Joi.ref('password'))
-    .required()
-    .messages({
-      'any.only': 'Passwords do not match',
-      'any.required': 'Password confirmation is required'
-    }),
-  firstName: nameSchema,
-  lastName: nameSchema,
-  phone: phoneSchema,
-  role: Joi.string()
-    .valid('homeowner', 'tradie', 'business')
-    .required()
-    .messages({
-      'any.only': 'Role must be either homeowner, tradie, or business',
-      'any.required': 'Role is required'
-    }),
-  acceptTerms: Joi.boolean()
-    .valid(true)
-    .required()
-    .messages({
-      'any.only': 'You must accept the terms and conditions',
-      'any.required': 'Terms acceptance is required'
-    }),
-  marketingConsent: Joi.boolean().default(false),
-  referralCode: Joi.string()
-    .alphanum()
-    .min(6)
-    .max(20)
-    .optional()
-    .messages({
-      'string.alphanum': 'Referral code must contain only letters and numbers',
-      'string.min': 'Referral code must be at least 6 characters',
-      'string.max': 'Referral code cannot exceed 20 characters'
-    })
-}).options({ stripUnknown: true });
+    body('confirmPassword')
+      .custom((value, { req }) => {
+        if (value !== req.body.password) {
+          throw new Error('Password confirmation does not match password');
+        }
+        return true;
+      })
+  ];
+};
 
-export default registerSchema;
+export const validateSocialRegistration = (): ValidationChain[] => {
+  return [
+    body('authProvider')
+      .isIn([AuthProvider.GOOGLE, AuthProvider.LINKEDIN, AuthProvider.FACEBOOK])
+      .withMessage('Invalid social authentication provider'),
+
+    body('socialId')
+      .notEmpty()
+      .withMessage('Social ID is required')
+      .isLength({ min: 1, max: 255 })
+      .withMessage('Social ID must be between 1 and 255 characters'),
+
+    body('socialData')
+      .isObject()
+      .withMessage('Social data must be an object'),
+
+    body('socialData.email')
+      .isEmail()
+      .withMessage('Valid email is required from social provider')
+      .normalizeEmail(),
+
+    body('socialData.name')
+      .notEmpty()
+      .withMessage('Name is required from social provider')
+      .isLength({ min: 1, max: 100 })
+      .withMessage('Name must be between 1 and 100 characters'),
+
+    body('socialData.provider')
+      .isIn([AuthProvider.GOOGLE, AuthProvider.LINKEDIN, AuthProvider.FACEBOOK])
+      .withMessage('Invalid social provider in social data'),
+
+    body('role')
+      .isIn(Object.values(AUTH_CONSTANTS.USER_ROLES))
+      .withMessage(`Role must be one of: ${Object.values(AUTH_CONSTANTS.USER_ROLES).join(', ')}`),
+
+    body('socialData.picture')
+      .optional()
+      .isURL()
+      .withMessage('Profile picture must be a valid URL')
+  ];
+};
+
+export const validateEmailVerification = (): ValidationChain[] => {
+  return [
+    body('token')
+      .notEmpty()
+      .withMessage('Verification token is required')
+      .isLength({ min: 10 })
+      .withMessage('Invalid verification token format'),
+
+    body('email')
+      .isEmail()
+      .withMessage('Valid email address is required')
+      .normalizeEmail()
+  ];
+};
+
+export const validateResendVerification = (): ValidationChain[] => {
+  return [
+    body('email')
+      .isEmail()
+      .withMessage('Valid email address is required')
+      .normalizeEmail()
+  ];
+};
+
+export const validateUsernameAvailability = (): ValidationChain[] => {
+  return [
+    body('username')
+      .trim()
+      .isLength({ min: AUTH_CONSTANTS.USERNAME_REQUIREMENTS.MIN_LENGTH, max: AUTH_CONSTANTS.USERNAME_REQUIREMENTS.MAX_LENGTH })
+      .withMessage(`Username must be between ${AUTH_CONSTANTS.USERNAME_REQUIREMENTS.MIN_LENGTH} and ${AUTH_CONSTANTS.USERNAME_REQUIREMENTS.MAX_LENGTH} characters`)
+      .matches(AUTH_CONSTANTS.USERNAME_REQUIREMENTS.ALLOWED_PATTERN)
+      .withMessage('Username can only contain letters, numbers, underscores, and hyphens')
+      .toLowerCase()
+  ];
+};
+
+export const validateEmailAvailability = (): ValidationChain[] => {
+  return [
+    body('email')
+      .isEmail()
+      .withMessage('Valid email address is required')
+      .isLength({ max: AUTH_CONSTANTS.EMAIL_REQUIREMENTS.MAX_LENGTH })
+      .withMessage(`Email must not exceed ${AUTH_CONSTANTS.EMAIL_REQUIREMENTS.MAX_LENGTH} characters`)
+      .normalizeEmail()
+  ];
+};

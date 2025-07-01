@@ -1,93 +1,64 @@
 import { Router } from 'express';
+import { ValidationController } from '../controllers';
 import { 
-  asyncHandler, 
-  validateRequest, 
-  rateLimiters,
-  requireAuth,
-  type IValidationController 
-} from '../controllers';
-import { validationSchemas } from '../validators';
-import { authMiddleware } from '../middleware';
+  validateEmailAvailability, 
+  validateUsernameAvailability 
+} from '../validators';
+import { 
+  handleValidationErrors,
+  validateContentType,
+  sanitizeRegistrationInput
+} from '../middleware';
+import { strictRateLimit } from '../../shared/middleware';
 
-export function createValidationRoutes(validationController: IValidationController): Router {
-  const router = Router();
+const router = Router();
+const validationController = new ValidationController();
 
-  router.post('/email/send',
-    rateLimiters.verification,
-    validateRequest(validationSchemas.sendEmailVerification),
-    asyncHandler(validationController.sendEmailVerification.bind(validationController))
-  );
+// Check Email Availability Route
+router.post(
+  '/email/availability',
+  strictRateLimit,
+  validateContentType,
+  sanitizeRegistrationInput,
+  validateEmailAvailability(),
+  handleValidationErrors,
+  validationController.checkEmailAvailability
+);
 
-  router.post('/email/verify',
-    rateLimiters.verification,
-    validateRequest(validationSchemas.verifyEmail),
-    asyncHandler(validationController.verifyEmail.bind(validationController))
-  );
+// Check Username Availability Route
+router.post(
+  '/username/availability',
+  strictRateLimit,
+  validateContentType,
+  sanitizeRegistrationInput,
+  validateUsernameAvailability(),
+  handleValidationErrors,
+  validationController.checkUsernameAvailability
+);
 
-  router.post('/email/resend',
-    rateLimiters.verification,
-    validateRequest(validationSchemas.resendEmailVerification),
-    asyncHandler(validationController.resendEmailVerification.bind(validationController))
-  );
+// Validate Registration Data Route
+router.post(
+  '/registration-data',
+  strictRateLimit,
+  validateContentType,
+  sanitizeRegistrationInput,
+  validationController.validateRegistrationData
+);
 
-  router.post('/phone/send',
-    rateLimiters.verification,
-    validateRequest(validationSchemas.sendPhoneVerification),
-    asyncHandler(validationController.sendPhoneVerification.bind(validationController))
-  );
+// Generate Username from Name Route
+router.post(
+  '/generate-username',
+  strictRateLimit,
+  validateContentType,
+  validationController.generateUsernameFromName
+);
 
-  router.post('/phone/verify',
-    rateLimiters.verification,
-    validateRequest(validationSchemas.verifyPhone),
-    asyncHandler(validationController.verifyPhone.bind(validationController))
-  );
+// Bulk Availability Check Route
+router.post(
+  '/bulk-availability',
+  strictRateLimit,
+  validateContentType,
+  validationController.bulkAvailabilityCheck
+);
 
-  router.post('/phone/resend',
-    rateLimiters.verification,
-    validateRequest(validationSchemas.resendPhoneVerification),
-    asyncHandler(validationController.resendPhoneVerification.bind(validationController))
-  );
-
-  router.post('/business/validate',
-    rateLimiters.general,
-    validateRequest(validationSchemas.validateBusinessNumber),
-    asyncHandler(validationController.validateBusinessNumber.bind(validationController))
-  );
-
-  router.post('/trade-license/validate',
-    rateLimiters.general,
-    validateRequest(validationSchemas.validateTradeLicense),
-    asyncHandler(validationController.validateTradeLicense.bind(validationController))
-  );
-
-  router.get('/email/availability',
-    rateLimiters.general,
-    validateRequest(validationSchemas.checkEmailAvailability),
-    asyncHandler(validationController.checkEmailAvailability.bind(validationController))
-  );
-
-  router.get('/phone/availability',
-    rateLimiters.general,
-    validateRequest(validationSchemas.checkPhoneAvailability),
-    asyncHandler(validationController.checkPhoneAvailability.bind(validationController))
-  );
-
-  router.get('/postcode/validate',
-    rateLimiters.general,
-    validateRequest(validationSchemas.validatePostcode),
-    asyncHandler(validationController.validatePostcode.bind(validationController))
-  );
-
-  router.get('/status',
-    authMiddleware,
-    asyncHandler(validationController.getVerificationStatus.bind(validationController))
-  );
-
-  router.get('/health',
-    asyncHandler(validationController.healthCheck.bind(validationController))
-  );
-
-  return router;
-}
-
-export default createValidationRoutes;
+export { router as validationRoutes };

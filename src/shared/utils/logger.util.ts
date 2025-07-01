@@ -1,329 +1,94 @@
 import winston from 'winston';
-import path from 'path';
-import fs from 'fs';
-import { env, isProduction, isDevelopment } from '../../config/auth';
+import { environment } from '../../config/auth';
 
-const LOG_LEVELS = {
-  error: 0,
-  warn: 1,
-  info: 2,
-  debug: 3,
-} as const;
-
-const ensureLogDirectory = (): void => {
-  const logDir = path.join(process.cwd(), 'logs');
-  if (!fs.existsSync(logDir)) {
-    fs.mkdirSync(logDir, { recursive: true });
-  }
-};
-
-ensureLogDirectory();
-
-const buildHiveFormat = winston.format.combine(
+const logFormat = winston.format.combine(
   winston.format.timestamp({
-    format: 'YYYY-MM-DD HH:mm:ss',
+    format: 'YYYY-MM-DD HH:mm:ss'
   }),
   winston.format.errors({ stack: true }),
   winston.format.json(),
-  winston.format.printf(({ timestamp, level, message, service, userId, action, ...meta }) => {
-    const logEntry = {
-      timestamp,
-      level: level.toUpperCase(),
-      service: service || 'BuildHive-Auth',
-      message,
-      ...(userId && { userId }),
-      ...(action && { action }),
-      ...(Object.keys(meta).length > 0 && { meta }),
-    };
+  winston.format.printf(({ timestamp, level, message, stack, ...meta }) => {
+    let log = `${timestamp} [${level.toUpperCase()}]: ${message}`;
     
-    return JSON.stringify(logEntry);
+    if (Object.keys(meta).length > 0) {
+      log += ` ${JSON.stringify(meta)}`;
+    }
+    
+    if (stack) {
+      log += `\n${stack}`;
+    }
+    
+    return log;
   })
 );
 
-const consoleFormat = winston.format.combine(
-  winston.format.colorize(),
-  winston.format.timestamp({
-    format: 'HH:mm:ss',
-  }),
-  winston.format.printf(({ timestamp, level, message, service }) => {
-    return `[${timestamp}] ${level} [${service || 'BuildHive'}]: ${message}`;
+const transports: winston.transport[] = [
+  new winston.transports.Console({
+    format: winston.format.combine(
+      winston.format.colorize(),
+      logFormat
+    )
   })
-);
+];
 
-const logger = winston.createLogger({
-  levels: LOG_LEVELS,
-  level: env.LOG_LEVEL,
-  format: buildHiveFormat,
-  defaultMeta: {
-    service: 'BuildHive-Auth',
-    environment: env.NODE_ENV,
-  },
-  transports: [
+if (environment.NODE_ENV === 'production') {
+  transports.push(
     new winston.transports.File({
-      filename: path.join('logs', 'error.log'),
+      filename: 'logs/error.log',
       level: 'error',
-      maxsize: 5242880,
-      maxFiles: 5,
+      format: logFormat
     }),
     new winston.transports.File({
-      filename: path.join('logs', 'combined.log'),
-      maxsize: 5242880,
-      maxFiles: 10,
-    }),
-  ],
-  exceptionHandlers: [
-    new winston.transports.File({
-      filename: path.join('logs', 'exceptions.log'),
-      maxsize: 5242880,
-      maxFiles: 3,
-    }),
-  ],
-  rejectionHandlers: [
-    new winston.transports.File({
-      filename: path.join('logs', 'rejections.log'),
-      maxsize: 5242880,
-      maxFiles: 3,
-    }),
-  ],
+      filename: 'logs/combined.log',
+      format: logFormat
+    })
+  );
+}
+
+export const logger = winston.createLogger({
+  level: environment.LOG_LEVEL,
+  format: logFormat,
+  transports,
+  exitOnError: false
 });
 
-if (isDevelopment()) {
-  logger.add(new winston.transports.Console({
-    format: consoleFormat,
-  }));
-}
+export const logRegistrationAttempt = (
+  email: string,
+  authProvider: string,
+  success: boolean,
+  requestId: string
+): void => {
+  logger.info('Registration attempt', {
+    email,
+    authProvider,
+    success,
+    requestId,
+    timestamp: new Date().toISOString()
+  });
+};
 
-interface LogContext {
-  userId?: string;
-  action?: string;
-  ip?: string;
-  userAgent?: string;
-  requestId?: string;
-  duration?: number;
-  statusCode?: number;
-  [key: string]: any;
-}
+export const logRegistrationError = (
+  email: string,
+  error: string,
+  requestId: string
+): void => {
+  logger.error('Registration failed', {
+    email,
+    error,
+    requestId,
+    timestamp: new Date().toISOString()
+  });
+};
 
-class BuildHiveLogger {
-  private logger: winston.Logger;
-
-  constructor(logger: winston.Logger) {
-    this.logger = logger;
-  }
-
-  auth = {
-    login: (userId: string, ip: string, success: boolean, context?: LogContext): void => {
-      const level = success ? 'info' : 'warn';
-      const message = success ? 'User login successful' : 'User login failed';
-      
-      this.logger.log(level, message, {
-        action: 'AUTH_LOGIN',
-        userId,
-        ip,
-        success,
-        ...context,
-      });
-    },
-
-    register: (email: string, role: string, ip: string, context?: LogContext): void => {
-      this.logger.info('User registration initiated', {
-        action: 'AUTH_REGISTER',
-        email,
-        role,
-        ip,
-        ...context,
-      });
-    },
-
-    logout: (userId: string, ip: string, context?: LogContext): void => {
-      this.logger.info('User logout', {
-        action: 'AUTH_LOGOUT',
-        userId,
-        ip,
-        ...context,
-      });
-    },
-
-    passwordReset: (email: string, ip: string, context?: LogContext): void => {
-      this.logger.info('Password reset requested', {
-        action: 'AUTH_PASSWORD_RESET',
-        email,
-        ip,
-        ...context,
-      });
-    },
-
-    emailVerification: (userId: string, email: string, success: boolean, context?: LogContext): void => {
-      const level = success ? 'info' : 'warn';
-      const message = success ? 'Email verification successful' : 'Email verification failed';
-      
-      this.logger.log(level, message, {
-        action: 'AUTH_EMAIL_VERIFY',
-        userId,
-        email,
-        success,
-        ...context,
-      });
-    },
-  };
-
-  profile = {
-    update: (userId: string, fields: string[], context?: LogContext): void => {
-      this.logger.info('Profile updated', {
-        action: 'PROFILE_UPDATE',
-        userId,
-        updatedFields: fields,
-        ...context,
-      });
-    },
-
-    imageUpload: (userId: string, fileName: string, fileSize: number, context?: LogContext): void => {
-      this.logger.info('Profile image uploaded', {
-        action: 'PROFILE_IMAGE_UPLOAD',
-        userId,
-        fileName,
-        fileSize,
-        ...context,
-      });
-    },
-
-    verification: (userId: string, verificationType: string, status: string, context?: LogContext): void => {
-      this.logger.info('Profile verification status changed', {
-        action: 'PROFILE_VERIFICATION',
-        userId,
-        verificationType,
-        status,
-        ...context,
-      });
-    },
-  };
-
-  security = {
-    suspiciousActivity: (userId: string, activity: string, ip: string, context?: LogContext): void => {
-      this.logger.warn('Suspicious activity detected', {
-        action: 'SECURITY_SUSPICIOUS',
-        userId,
-        activity,
-        ip,
-        ...context,
-      });
-    },
-
-    rateLimitExceeded: (ip: string, endpoint: string, context?: LogContext): void => {
-      this.logger.warn('Rate limit exceeded', {
-        action: 'SECURITY_RATE_LIMIT',
-        ip,
-        endpoint,
-        ...context,
-      });
-    },
-
-    invalidToken: (token: string, ip: string, context?: LogContext): void => {
-      this.logger.warn('Invalid token used', {
-        action: 'SECURITY_INVALID_TOKEN',
-        token: token.substring(0, 10) + '...',
-        ip,
-        ...context,
-      });
-    },
-
-    accountLocked: (username: string, context?: LogContext): void => {
-      this.logger.warn('Account locked due to failed login attempts', {
-        action: 'SECURITY_ACCOUNT_LOCKED',
-        username,
-        ...context,
-      });
-    },
-
-    loginAttempt: (identifier: string, success: boolean, reason?: string, context?: LogContext): void => {
-      const level = success ? 'info' : 'warn';
-      const message = success ? 'Login attempt successful' : 'Login attempt failed';
-      
-      this.logger.log(level, message, {
-        action: 'SECURITY_LOGIN_ATTEMPT',
-        identifier,
-        success,
-        reason,
-        ...context,
-      });
-    },
-
-    passwordChanged: (username: string, context?: LogContext): void => {
-      this.logger.info('User password changed', {
-        action: 'SECURITY_PASSWORD_CHANGED',
-        username,
-        ...context,
-      });
-    },
-  };
-
-  api = {
-    request: (method: string, url: string, statusCode: number, duration: number, context?: LogContext): void => {
-      const level = statusCode >= 400 ? 'warn' : 'info';
-      
-      this.logger.log(level, 'API request', {
-        action: 'API_REQUEST',
-        method,
-        url,
-        statusCode,
-        duration,
-        ...context,
-      });
-    },
-
-    error: (error: Error, context?: LogContext): void => {
-      this.logger.error('API error', {
-        action: 'API_ERROR',
-        error: error.message,
-        stack: error.stack,
-        ...context,
-      });
-    },
-  };
-
-  database = {
-    connection: (database: string, status: 'connected' | 'disconnected' | 'error', context?: LogContext): void => {
-      const level = status === 'error' ? 'error' : 'info';
-      
-      this.logger.log(level, `Database ${status}`, {
-        action: 'DATABASE_CONNECTION',
-        database,
-        status,
-        ...context,
-      });
-    },
-
-    query: (collection: string, operation: string, duration: number, context?: LogContext): void => {
-      this.logger.debug('Database query', {
-        action: 'DATABASE_QUERY',
-        collection,
-        operation,
-        duration,
-        ...context,
-      });
-    },
-  };
-
-  info(message: string, context?: LogContext): void {
-    this.logger.info(message, context);
-  }
-
-  warn(message: string, context?: LogContext): void {
-    this.logger.warn(message, context);
-  }
-
-  error(message: string, error?: Error, context?: LogContext): void {
-    this.logger.error(message, {
-      ...(error && { error: error.message, stack: error.stack }),
-      ...context,
-    });
-  }
-
-  debug(message: string, context?: LogContext): void {
-    this.logger.debug(message, context);
-  }
-}
-
-export const buildHiveLogger = new BuildHiveLogger(logger);
-export { logger as winstonLogger };
-export default buildHiveLogger;
+export const logEmailVerification = (
+  email: string,
+  success: boolean,
+  requestId: string
+): void => {
+  logger.info('Email verification attempt', {
+    email,
+    success,
+    requestId,
+    timestamp: new Date().toISOString()
+  });
+};

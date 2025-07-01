@@ -1,91 +1,71 @@
 import { Router } from 'express';
+import { AuthController } from '../controllers';
 import { 
-  asyncHandler, 
-  validateRequest, 
-  rateLimiters,
-  requireAuth,
-  requireEmailVerification,
-  type IAuthController 
-} from '../controllers';
-import { 
-  registerSchema, 
-  loginSchema, 
-  forgotPasswordSchema, 
-  resetPasswordSchema, 
-  changePasswordSchema, 
-  refreshTokenSchema 
+  validateLocalRegistration, 
+  validateSocialRegistration, 
+  validateEmailVerification, 
+  validateResendVerification 
 } from '../validators';
-import { authMiddleware, sessionMiddleware } from '../middleware';
+import { 
+  handleValidationErrors, 
+  sanitizeRegistrationInput, 
+  validateContentType,
+  registrationLogger,
+  sensitiveDataFilter
+} from '../middleware';
+import { 
+  registrationRateLimit, 
+  emailVerificationRateLimit 
+} from '../../shared/middleware';
 
-export function createAuthRoutes(authController: IAuthController): Router {
-  const router = Router();
+const router = Router();
+const authController = new AuthController();
 
-  router.post('/register',
-    rateLimiters.register,
-    validateRequest(registerSchema),
-    asyncHandler(authController.register.bind(authController))
-  );
+// Local Registration Route
+router.post(
+  '/register/local',
+  registrationRateLimit,
+  validateContentType,
+  sensitiveDataFilter,
+  registrationLogger,
+  sanitizeRegistrationInput,
+  validateLocalRegistration(),
+  handleValidationErrors,
+  authController.registerLocal
+);
 
-  router.post('/login',
-    rateLimiters.auth,
-    validateRequest(loginSchema),
-    asyncHandler(authController.login.bind(authController))
-  );
+// Social Registration Route
+router.post(
+  '/register/social',
+  registrationRateLimit,
+  validateContentType,
+  registrationLogger,
+  sanitizeRegistrationInput,
+  validateSocialRegistration(),
+  handleValidationErrors,
+  authController.registerSocial
+);
 
-  router.post('/forgot-password',
-    rateLimiters.passwordReset,
-    validateRequest(forgotPasswordSchema),
-    asyncHandler(authController.forgotPassword.bind(authController))
-  );
+// Email Verification Route
+router.post(
+  '/verify-email',
+  emailVerificationRateLimit,
+  validateContentType,
+  registrationLogger,
+  validateEmailVerification(),
+  handleValidationErrors,
+  authController.verifyEmail
+);
 
-  router.post('/reset-password',
-    rateLimiters.passwordReset,
-    validateRequest(resetPasswordSchema),
-    asyncHandler(authController.resetPassword.bind(authController))
-  );
+// Resend Email Verification Route
+router.post(
+  '/resend-verification',
+  emailVerificationRateLimit,
+  validateContentType,
+  registrationLogger,
+  validateResendVerification(),
+  handleValidationErrors,
+  authController.resendVerificationEmail
+);
 
-  router.post('/logout',
-    authMiddleware,
-    sessionMiddleware,
-    asyncHandler(authController.logout.bind(authController))
-  );
-
-  router.post('/refresh-token',
-    rateLimiters.auth,
-    validateRequest(refreshTokenSchema),
-    asyncHandler(authController.refreshToken.bind(authController))
-  );
-
-  router.post('/change-password',
-    authMiddleware,
-    requireEmailVerification,
-    rateLimiters.passwordReset,
-    validateRequest(changePasswordSchema),
-    asyncHandler(authController.changePassword.bind(authController))
-  );
-
-  router.get('/me',
-    authMiddleware,
-    asyncHandler(authController.getCurrentUser.bind(authController))
-  );
-
-  router.put('/me',
-    authMiddleware,
-    rateLimiters.general,
-    validateRequest(changePasswordSchema),
-    asyncHandler(authController.updateProfile.bind(authController))
-  );
-
-  router.get('/health',
-    asyncHandler(authController.healthCheck.bind(authController))
-  );
-
-  router.get('/rate-limit-info',
-    authMiddleware,
-    asyncHandler(authController.getRateLimitInfo.bind(authController))
-  );
-
-  return router;
-}
-
-export default createAuthRoutes;
+export { router as authRoutes };
