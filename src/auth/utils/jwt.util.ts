@@ -1,4 +1,4 @@
-import jwt from 'jsonwebtoken';
+import jwt, { SignOptions } from 'jsonwebtoken';
 import { environment } from '../../config/auth';
 import { AuthTokenPayload } from '../types';
 import { UserRole } from '../../shared/types';
@@ -14,11 +14,13 @@ export const generateAccessToken = (
     role
   };
 
-  return jwt.sign(payload, environment.JWT_SECRET, {
+  const options: SignOptions = {
     expiresIn: environment.JWT_EXPIRES_IN,
     issuer: 'buildhive-auth',
     audience: 'buildhive-app'
-  });
+  };
+
+  return jwt.sign(payload, environment.JWT_SECRET as string, options);
 };
 
 export const generateEmailVerificationToken = (
@@ -31,16 +33,18 @@ export const generateEmailVerificationToken = (
     type: 'email_verification'
   };
 
-  return jwt.sign(payload, environment.JWT_SECRET, {
+  const options: SignOptions = {
     expiresIn: '24h',
     issuer: 'buildhive-auth',
     audience: 'buildhive-verification'
-  });
+  };
+
+  return jwt.sign(payload, environment.JWT_SECRET as string, options);
 };
 
 export const verifyToken = (token: string): AuthTokenPayload => {
   try {
-    const decoded = jwt.verify(token, environment.JWT_SECRET, {
+    const decoded = jwt.verify(token, environment.JWT_SECRET as string, {
       issuer: 'buildhive-auth',
       audience: 'buildhive-app'
     }) as AuthTokenPayload;
@@ -59,7 +63,7 @@ export const verifyToken = (token: string): AuthTokenPayload => {
 
 export const verifyEmailVerificationToken = (token: string): { userId: string; email: string } => {
   try {
-    const decoded = jwt.verify(token, environment.JWT_SECRET, {
+    const decoded = jwt.verify(token, environment.JWT_SECRET as string, {
       issuer: 'buildhive-auth',
       audience: 'buildhive-verification'
     }) as any;

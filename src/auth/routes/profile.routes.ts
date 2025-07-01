@@ -1,4 +1,4 @@
-import { Router, Request } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { ProfileController } from '../controllers';
 import { 
   validateProfileCreation, 
@@ -11,13 +11,17 @@ import {
 } from '../middleware';
 import { generalApiRateLimit } from '../../shared/middleware';
 
-interface AuthenticatedRequest extends Request {
-  user?: {
-    id: string;
-    email: string;
-    role: string;
-    emailVerified: boolean;
-  };
+declare global {
+  namespace Express {
+    interface Request {
+      user?: {
+        id: string;
+        email: string;
+        role: string;
+        emailVerified: boolean;
+      };
+    }
+  }
 }
 
 const router = Router();

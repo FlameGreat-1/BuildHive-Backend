@@ -1,5 +1,5 @@
-import { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
-import Redis from 'ioredis';
+import { Pool, PoolClient, QueryResult } from 'pg';
+import Redis, { RedisOptions } from 'ioredis';
 import { databaseConfig, redisConfig } from '../../config/auth';
 import { DatabaseClient, DatabaseTransaction, QueryResult as CustomQueryResult } from '../types';
 import { logger } from '../utils/logger.util';
@@ -22,13 +22,14 @@ class DatabaseConnection implements DatabaseClient {
       max: databaseConfig.max
     });
 
-    this.redis = new Redis(redisConfig.url, {
-      retryDelayOnFailover: redisConfig.retryDelayOnFailover,
+    const redisOptions: RedisOptions = {
       enableReadyCheck: redisConfig.enableReadyCheck,
       maxRetriesPerRequest: redisConfig.maxRetriesPerRequest,
-      lazyConnect: redisConfig.lazyConnect
-    });
+      lazyConnect: redisConfig.lazyConnect,
+      retryDelayOnFailover: 100
+    };
 
+    this.redis = new Redis(redisConfig.url, redisOptions);
     this.setupEventHandlers();
   }
 
@@ -52,7 +53,7 @@ class DatabaseConnection implements DatabaseClient {
     });
   }
 
-  async query<T extends QueryResultRow = any>(text: string, params?: any[]): Promise<CustomQueryResult<T>> {
+  async query<T = any>(text: string, params?: any[]): Promise<CustomQueryResult<T>> {
     const client = await this.pool.connect();
     try {
       const result: QueryResult<T> = await client.query<T>(text, params);
@@ -71,7 +72,7 @@ class DatabaseConnection implements DatabaseClient {
     await client.query('BEGIN');
 
     return {
-      query: async <T extends QueryResultRow = any>(text: string, params?: any[]): Promise<CustomQueryResult<T>> => {
+      query: async <T = any>(text: string, params?: any[]): Promise<CustomQueryResult<T>> => {
         const result: QueryResult<T> = await client.query<T>(text, params);
         return {
           rows: result.rows,

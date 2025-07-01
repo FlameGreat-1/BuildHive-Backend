@@ -10,18 +10,17 @@ import {
   handleValidationErrors, 
   sanitizeRegistrationInput, 
   validateContentType,
-  registrationLogger,
-  sensitiveDataFilter
+  registrationLogger
 } from '../middleware';
 import { 
   registrationRateLimit, 
-  emailVerificationRateLimit 
+  emailVerificationRateLimit,
+  sensitiveDataFilter
 } from '../../shared/middleware';
 
 const router = Router();
 const authController = new AuthController();
 
-// Local Registration Route
 router.post(
   '/register/local',
   registrationRateLimit,
@@ -34,7 +33,6 @@ router.post(
   authController.registerLocal
 );
 
-// Social Registration Route
 router.post(
   '/register/social',
   registrationRateLimit,
@@ -46,7 +44,6 @@ router.post(
   authController.registerSocial
 );
 
-// Email Verification Route
 router.post(
   '/verify-email',
   emailVerificationRateLimit,
@@ -57,7 +54,6 @@ router.post(
   authController.verifyEmail
 );
 
-// Resend Email Verification Route
 router.post(
   '/resend-verification',
   emailVerificationRateLimit,
