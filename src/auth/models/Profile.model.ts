@@ -45,13 +45,23 @@ export class ProfileModel {
       JSON.stringify(defaultMetadata)
     ];
 
-    const result = await database.query<Profile>(query, values);
-    const profile = result.rows[0];
+    const result = await database.query<any>(query, values);
+    const dbProfile = result.rows[0];
     
     return {
-      ...profile,
-      preferences: typeof profile.preferences === 'string' ? JSON.parse(profile.preferences) : profile.preferences,
-      metadata: typeof profile.metadata === 'string' ? JSON.parse(profile.metadata) : profile.metadata
+      id: dbProfile.id,
+      userId: dbProfile.user_id,
+      firstName: dbProfile.first_name,
+      lastName: dbProfile.last_name,
+      phone: dbProfile.phone,
+      avatar: dbProfile.avatar,
+      bio: dbProfile.bio,
+      location: dbProfile.location,
+      timezone: dbProfile.timezone,
+      preferences: typeof dbProfile.preferences === 'string' ? JSON.parse(dbProfile.preferences) : dbProfile.preferences,
+      metadata: typeof dbProfile.metadata === 'string' ? JSON.parse(dbProfile.metadata) : dbProfile.metadata,
+      createdAt: dbProfile.created_at,
+      updatedAt: dbProfile.updated_at
     };
   }
 
@@ -63,16 +73,27 @@ export class ProfileModel {
       WHERE user_id = $1
     `;
 
-    const result = await database.query<Profile>(query, [parseInt(userId)]);
+    const result = await database.query<any>(query, [parseInt(userId)]);
     if (result.rows.length === 0) {
       return null;
     }
 
-    const profile = result.rows[0];
+    const dbProfile = result.rows[0];
+    
     return {
-      ...profile,
-      preferences: typeof profile.preferences === 'string' ? JSON.parse(profile.preferences) : profile.preferences,
-      metadata: typeof profile.metadata === 'string' ? JSON.parse(profile.metadata) : profile.metadata
+      id: dbProfile.id,
+      userId: dbProfile.user_id,
+      firstName: dbProfile.first_name,
+      lastName: dbProfile.last_name,
+      phone: dbProfile.phone,
+      avatar: dbProfile.avatar,
+      bio: dbProfile.bio,
+      location: dbProfile.location,
+      timezone: dbProfile.timezone,
+      preferences: typeof dbProfile.preferences === 'string' ? JSON.parse(dbProfile.preferences) : dbProfile.preferences,
+      metadata: typeof dbProfile.metadata === 'string' ? JSON.parse(dbProfile.metadata) : dbProfile.metadata,
+      createdAt: dbProfile.created_at,
+      updatedAt: dbProfile.updated_at
     };
   }
 
@@ -103,9 +124,8 @@ export class ProfileModel {
 
     let completeness = 20; // Base for having a profile
 
-    // Use database column names (first_name, last_name) not camelCase
-    if (profile.first_name) completeness += 15;
-    if (profile.last_name) completeness += 15;
+    if (profile.firstName) completeness += 15;
+    if (profile.lastName) completeness += 15;
     if (profile.phone) completeness += 10;
     if (profile.avatar) completeness += 10;
     if (profile.bio) completeness += 10;
@@ -135,3 +155,4 @@ export class ProfileModel {
     await database.query(query, [JSON.stringify(updatedMetadata), parseInt(userId)]);
   }
 }
+
