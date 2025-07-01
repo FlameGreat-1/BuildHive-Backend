@@ -1,20 +1,25 @@
 import { environment } from './environment';
 import { DatabaseConnection } from '../../shared/types';
 
-export const databaseConfig: DatabaseConnection = {
-  host: process.env.DATABASE_HOST || 'localhost',
-  port: parseInt(process.env.DATABASE_PORT || '5432', 10),
-  database: process.env.DATABASE_NAME || 'buildhive',
-  username: process.env.DATABASE_USER || 'postgres',
-  password: process.env.DATABASE_PASSWORD || '',
-  ssl: environment.NODE_ENV === 'production',
-  connectionTimeoutMillis: 30000,
-  idleTimeoutMillis: 30000,
-  max: 20
+const parseDatabaseUrl = (url: string) => {
+  const parsed = new URL(url);
+  return {
+    host: parsed.hostname,
+    port: parseInt(parsed.port) || 5432,
+    database: parsed.pathname.slice(1),
+    username: parsed.username,
+    password: parsed.password,
+    ssl: { rejectUnauthorized: false },
+    connectionTimeoutMillis: 30000,
+    idleTimeoutMillis: 30000,
+    max: 20
+  };
 };
 
+export const databaseConfig: DatabaseConnection = parseDatabaseUrl(process.env.DATABASE_URL!);
+
 export const redisConfig = {
-  url: environment.REDIS_URL,
+  url: process.env.REDIS_URL!,
   retryDelayOnFailover: 100,
   enableReadyCheck: true,
   maxRetriesPerRequest: 3,
@@ -34,3 +39,4 @@ export const DATABASE_INDEXES = {
   SESSIONS_USER_ID: 'idx_sessions_user_id',
   SESSIONS_TOKEN: 'idx_sessions_token'
 } as const;
+

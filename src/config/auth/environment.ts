@@ -2,21 +2,22 @@ import { config } from 'dotenv';
 
 config();
 
-// ORIGINAL PRODUCTION CODE (COMMENTED OUT FOR TESTING PHASE)
-/*
 export const environment = {
-  NODE_ENV: process.env.NODE_ENV || 'development',
-  PORT: parseInt(process.env.PORT || '3000', 10),
+  NODE_ENV: process.env.NODE_ENV!,
+  PORT: parseInt(process.env.PORT!, 10),
+  HOST: '0.0.0.0',
   
-  JWT_SECRET: process.env.JWT_SECRET || '',
+  JWT_SECRET: process.env.JWT_SECRET!,
   JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || '24h',
   
-  BCRYPT_SALT_ROUNDS: parseInt(process.env.BCRYPT_SALT_ROUNDS || '12', 10),
+  BCRYPT_SALT_ROUNDS: 12,
   
-  EMAIL_SERVICE: process.env.EMAIL_SERVICE || 'gmail',
+  DATABASE_URL: process.env.DATABASE_URL!,
+  
+  EMAIL_SERVICE: 'gmail',
   EMAIL_USER: process.env.EMAIL_USER || '',
   EMAIL_PASSWORD: process.env.EMAIL_PASSWORD || '',
-  EMAIL_FROM: process.env.EMAIL_FROM || '',
+  EMAIL_FROM: process.env.EMAIL_FROM || 'BuildHive <noreply@buildhive.com>',
   
   GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || '',
   GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || '',
@@ -27,22 +28,24 @@ export const environment = {
   FACEBOOK_APP_ID: process.env.FACEBOOK_APP_ID || '',
   FACEBOOK_APP_SECRET: process.env.FACEBOOK_APP_SECRET || '',
   
-  REDIS_URL: process.env.REDIS_URL || 'redis://localhost:6379',
+  REDIS_URL: process.env.REDIS_URL!,
   
-  RATE_LIMIT_WINDOW_MS: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000', 10),
-  RATE_LIMIT_MAX_REQUESTS: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100', 10),
+  RATE_LIMIT_WINDOW_MS: 900000,
+  RATE_LIMIT_MAX_REQUESTS: 100,
   
-  CORS_ORIGIN: process.env.CORS_ORIGIN || '*',
+  CORS_ORIGIN: process.env.CORS_ORIGIN!,
   
-  LOG_LEVEL: process.env.LOG_LEVEL || 'info'
+  LOG_LEVEL: 'info'
 } as const;
 
 export const validateEnvironment = (): void => {
   const requiredVars = [
+    'NODE_ENV',
+    'PORT', 
     'JWT_SECRET',
     'DATABASE_URL',
-    'EMAIL_USER',
-    'EMAIL_PASSWORD'
+    'REDIS_URL',
+    'CORS_ORIGIN'
   ];
 
   const missingVars = requiredVars.filter(varName => !process.env[varName]);
@@ -50,48 +53,4 @@ export const validateEnvironment = (): void => {
   if (missingVars.length > 0) {
     throw new Error(`Missing required environment variables: ${missingVars.join(', ')}`);
   }
-};
-*/
-
-// TEMPORARY TESTING IMPLEMENTATION WITH DUMMY VALUES
-export const environment = {
-  NODE_ENV: process.env.NODE_ENV || 'development',
-  PORT: parseInt(process.env.PORT || '3000', 10),
-  HOST: process.env.HOST || '0.0.0.0',
-  
-  JWT_SECRET: process.env.JWT_SECRET || 'buildhive-temp-jwt-secret-key-for-testing-only-2024',
-  JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || '24h',
-  
-  BCRYPT_SALT_ROUNDS: parseInt(process.env.BCRYPT_SALT_ROUNDS || '12', 10),
-  
-  DATABASE_URL: process.env.DATABASE_URL || 'postgresql://localhost:5432/buildhive_test',
-  
-  EMAIL_SERVICE: process.env.EMAIL_SERVICE || 'gmail',
-  EMAIL_USER: process.env.EMAIL_USER || 'test@buildhive.com',
-  EMAIL_PASSWORD: process.env.EMAIL_PASSWORD || 'temp-email-password',
-  EMAIL_FROM: process.env.EMAIL_FROM || 'BuildHive <noreply@buildhive.com>',
-  
-  GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || 'dummy-google-client-id',
-  GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || 'dummy-google-client-secret',
-  
-  LINKEDIN_CLIENT_ID: process.env.LINKEDIN_CLIENT_ID || 'dummy-linkedin-client-id',
-  LINKEDIN_CLIENT_SECRET: process.env.LINKEDIN_CLIENT_SECRET || 'dummy-linkedin-client-secret',
-  
-  FACEBOOK_APP_ID: process.env.FACEBOOK_APP_ID || 'dummy-facebook-app-id',
-  FACEBOOK_APP_SECRET: process.env.FACEBOOK_APP_SECRET || 'dummy-facebook-app-secret',
-  
-  REDIS_URL: process.env.REDIS_URL || 'redis://localhost:6379',
-  
-  RATE_LIMIT_WINDOW_MS: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000', 10),
-  RATE_LIMIT_MAX_REQUESTS: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100', 10),
-  
-  CORS_ORIGIN: process.env.CORS_ORIGIN || '*',
-  
-  LOG_LEVEL: process.env.LOG_LEVEL || 'info'
-} as const;
-
-// TEMPORARY: Disabled validation for testing phase
-export const validateEnvironment = (): void => {
-  console.log('Environment validation disabled for testing phase');
-  // Validation will be re-enabled in production
 };
