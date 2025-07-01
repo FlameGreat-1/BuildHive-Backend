@@ -63,8 +63,6 @@ export class ValidationController {
       validationErrors.push(...usernameErrors);
     }
 
-    if (password && authProvider === 'local') {
-
     if (validationErrors.length > 0) {
       throw new ValidationAppError('Registration data validation failed', validationErrors, requestId);
     }
