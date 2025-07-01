@@ -109,7 +109,7 @@ class DatabaseConnection implements DatabaseClient {
 
   async createTables(): Promise<void> {
     try {
-      // Create users table
+      // Create users table FIRST
       const createUsersTable = `
         CREATE TABLE IF NOT EXISTS users (
           id SERIAL PRIMARY KEY,
@@ -127,6 +127,11 @@ class DatabaseConnection implements DatabaseClient {
           updated_at TIMESTAMP DEFAULT NOW()
         );
       `;
+
+      await this.query(createUsersTable);
+      
+      // THEN drop and recreate profiles table with correct structure
+      await this.query('DROP TABLE IF EXISTS profiles CASCADE');
 
       // Create profiles table - Updated to match ProfileModel expectations
       const createProfilesTable = `
@@ -147,7 +152,6 @@ class DatabaseConnection implements DatabaseClient {
         );
       `;
 
-      await this.query(createUsersTable);
       await this.query(createProfilesTable);
       
       logger.info('Database tables created successfully');
