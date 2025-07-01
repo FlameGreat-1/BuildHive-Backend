@@ -22,17 +22,18 @@ export class ProfileModel {
 
     const preferences = { ...defaultPreferences, ...profileData.preferences };
 
+    // Remove created_at, updated_at from INSERT - they have DEFAULT NOW()
     const query = `
       INSERT INTO ${this.tableName} (
         user_id, first_name, last_name, phone, avatar, bio, 
-        location, timezone, preferences, metadata, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())
+        location, timezone, preferences, metadata
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       RETURNING id, user_id, first_name, last_name, phone, avatar, bio,
                 location, timezone, preferences, metadata, created_at, updated_at
     `;
 
     const values = [
-      profileData.userId,
+      parseInt(profileData.userId), // Ensure INTEGER type
       profileData.firstName || null,
       profileData.lastName || null,
       profileData.phone || null,
@@ -49,8 +50,8 @@ export class ProfileModel {
     
     return {
       ...profile,
-      preferences: JSON.parse(profile.preferences as any),
-      metadata: JSON.parse(profile.metadata as any)
+      preferences: typeof profile.preferences === 'string' ? JSON.parse(profile.preferences) : profile.preferences,
+      metadata: typeof profile.metadata === 'string' ? JSON.parse(profile.metadata) : profile.metadata
     };
   }
 
@@ -62,7 +63,7 @@ export class ProfileModel {
       WHERE user_id = $1
     `;
 
-    const result = await database.query<Profile>(query, [userId]);
+    const result = await database.query<Profile>(query, [parseInt(userId)]);
     if (result.rows.length === 0) {
       return null;
     }
@@ -70,8 +71,8 @@ export class ProfileModel {
     const profile = result.rows[0];
     return {
       ...profile,
-      preferences: JSON.parse(profile.preferences as any),
-      metadata: JSON.parse(profile.metadata as any)
+      preferences: typeof profile.preferences === 'string' ? JSON.parse(profile.preferences) : profile.preferences,
+      metadata: typeof profile.metadata === 'string' ? JSON.parse(profile.metadata) : profile.metadata
     };
   }
 
@@ -93,7 +94,7 @@ export class ProfileModel {
       WHERE user_id = $2
     `;
 
-    await database.query(query, [JSON.stringify(updatedMetadata), userId]);
+    await database.query(query, [JSON.stringify(updatedMetadata), parseInt(userId)]);
   }
 
   static async calculateCompleteness(userId: string): Promise<number> {
@@ -102,8 +103,9 @@ export class ProfileModel {
 
     let completeness = 20; // Base for having a profile
 
-    if (profile.firstName) completeness += 15;
-    if (profile.lastName) completeness += 15;
+    // Use database column names (first_name, last_name) not camelCase
+    if (profile.first_name) completeness += 15;
+    if (profile.last_name) completeness += 15;
     if (profile.phone) completeness += 10;
     if (profile.avatar) completeness += 10;
     if (profile.bio) completeness += 10;
@@ -130,6 +132,6 @@ export class ProfileModel {
       WHERE user_id = $2
     `;
 
-    await database.query(query, [JSON.stringify(updatedMetadata), userId]);
+    await database.query(query, [JSON.stringify(updatedMetadata), parseInt(userId)]);
   }
 }
