@@ -98,7 +98,7 @@ class DatabaseConnection implements DatabaseClient {
   async testConnection(): Promise<boolean> {
     try {
       await this.query('SELECT 1');
-      // Temporarily disable Redis check until Redis service is fixed
+      // Temporarily disabled Redis check until Redis service is fixed
       // await this.redis.ping();
       return true;
     } catch (error) {
