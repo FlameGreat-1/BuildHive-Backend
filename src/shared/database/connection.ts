@@ -107,6 +107,66 @@ class DatabaseConnection implements DatabaseClient {
     }
   }
 
+  private async createTables(): Promise<void> {
+    try {
+      // Create users table
+      const createUsersTable = `
+        CREATE TABLE IF NOT EXISTS users (
+          id SERIAL PRIMARY KEY,
+          username VARCHAR(50) UNIQUE NOT NULL,
+          email VARCHAR(255) UNIQUE NOT NULL,
+          password_hash VARCHAR(255),
+          role VARCHAR(20) NOT NULL,
+          status VARCHAR(20) NOT NULL DEFAULT 'pending',
+          auth_provider VARCHAR(20) NOT NULL,
+          social_id VARCHAR(255),
+          email_verified BOOLEAN DEFAULT FALSE,
+          email_verification_token VARCHAR(255),
+          email_verification_expires TIMESTAMP,
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW()
+        );
+      `;
+
+      // Create profiles table
+      const createProfilesTable = `
+        CREATE TABLE IF NOT EXISTS profiles (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+          first_name VARCHAR(50),
+          last_name VARCHAR(50),
+          avatar VARCHAR(500),
+          bio TEXT,
+          phone VARCHAR(20),
+          location VARCHAR(100),
+          website VARCHAR(255),
+          linkedin_url VARCHAR(255),
+          github_url VARCHAR(255),
+          portfolio_url VARCHAR(255),
+          skills TEXT[],
+          experience_level VARCHAR(20),
+          hourly_rate DECIMAL(10,2),
+          availability VARCHAR(20),
+          timezone VARCHAR(50),
+          languages TEXT[],
+          profile_completeness INTEGER DEFAULT 0,
+          registration_source VARCHAR(20),
+          registration_metadata JSONB,
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW()
+        );
+      `;
+
+      await this.query(createUsersTable);
+      await this.query(createProfilesTable);
+      
+      logger.info('Database tables created successfully');
+    } catch (error) {
+      logger.error('Failed to create database tables:', error);
+      throw error;
+    }
+  }
+
   async disconnect(): Promise<void> {
     try {
       await this.pool.end();
@@ -170,6 +230,10 @@ export const initializeDatabase = async (): Promise<void> => {
     if (!isHealthy) {
       throw new Error('Database health check failed');
     }
+    
+    // Create tables if they don't exist
+    await (database as any).createTables();
+    
     logger.info('Database initialized successfully');
   } catch (error) {
     logger.error('Failed to initialize database:', error);
