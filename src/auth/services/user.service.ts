@@ -3,6 +3,7 @@ import { UserRepository, ProfileRepository } from '../repositories';
 import { User, CreateUserData, UserPublicData, UserRegistrationData } from '../types';
 import { UserRole, AuthProvider } from '../../shared/types';
 import { HTTP_STATUS_CODES, ERROR_CODES } from '../../config/auth';
+import { ConflictError, AppError } from '../../shared/utils';
 
 export class UserService {
   private userRepository: UserRepository;
@@ -42,7 +43,7 @@ export class UserService {
     };
 
     if (registrationData.password && registrationData.authProvider === AuthProvider.LOCAL) {
-      createUserData.password = await bcrypt.hash(registrationData.password);
+      createUserData.password = await bcrypt.hash(registrationData.password, 12);
     }
 
     const user = await this.userRepository.createUser(createUserData);
