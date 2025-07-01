@@ -152,7 +152,21 @@ class DatabaseConnection implements DatabaseClient {
         );
       `;
 
+      // Create sessions table - Required for SessionModel
+      const createSessionsTable = `
+        CREATE TABLE IF NOT EXISTS sessions (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+          token VARCHAR(255) UNIQUE NOT NULL,
+          type VARCHAR(50) NOT NULL,
+          expires_at TIMESTAMP NOT NULL,
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW()
+        );
+      `;
+
       await this.query(createProfilesTable);
+      await this.query(createSessionsTable);
       
       logger.info('Database tables created successfully');
     } catch (error) {
