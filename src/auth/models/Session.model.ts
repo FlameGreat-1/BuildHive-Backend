@@ -30,7 +30,7 @@ export class SessionModel {
     `;
 
     const values = [
-      parseInt(sessionData.userId),
+      sessionData.userId,
       sessionData.token,
       sessionData.type,
       sessionData.expiresAt
@@ -80,7 +80,7 @@ export class SessionModel {
       WHERE user_id = $1 AND expires_at > NOW()
     `;
     
-    const values: any[] = [parseInt(userId)];
+    const values: any[] = [userId];
 
     if (type) {
       query += ' AND type = $2';
@@ -109,7 +109,7 @@ export class SessionModel {
 
   static async deleteByUserId(userId: string, type?: string): Promise<void> {
     let query = `DELETE FROM ${this.tableName} WHERE user_id = $1`;
-    const values: any[] = [parseInt(userId)];
+    const values: any[] = [userId];
 
     if (type) {
       query += ' AND type = $2';
@@ -135,4 +135,3 @@ export class SessionModel {
     await database.query(query, [expiresAt, token]);
   }
 }
-
