@@ -1,5 +1,5 @@
 import { database } from '../../shared/database';
-import { Profile, CreateProfileData, ProfilePreferences, ProfileMetadata } from '../types';
+import { Profile, CreateProfileData, UpdateProfileData, ProfilePreferences, ProfileMetadata } from '../types';
 import { DATABASE_TABLES } from '../../config/auth';
 
 export class ProfileModel {
@@ -47,21 +47,114 @@ export class ProfileModel {
     const result = await database.query<any>(query, values);
     const dbProfile = result.rows[0];
     
-    return {
-      id: dbProfile.id,
-      userId: dbProfile.user_id,
-      firstName: dbProfile.first_name,
-      lastName: dbProfile.last_name,
-      phone: dbProfile.phone,
-      avatar: dbProfile.avatar,
-      bio: dbProfile.bio,
-      location: dbProfile.location,
-      timezone: dbProfile.timezone,
-      preferences: typeof dbProfile.preferences === 'string' ? JSON.parse(dbProfile.preferences) : dbProfile.preferences,
-      metadata: typeof dbProfile.metadata === 'string' ? JSON.parse(dbProfile.metadata) : dbProfile.metadata,
-      createdAt: dbProfile.created_at,
-      updatedAt: dbProfile.updated_at
-    };
+    return this.mapDbProfileToProfile(dbProfile);
+  }
+
+  static async updateProfile(userId: string, updateData: UpdateProfileData): Promise<Profile> {
+    const setClause = [];
+    const values = [];
+    let paramIndex = 1;
+
+    if (updateData.firstName !== undefined) {
+      setClause.push(`first_name = $${paramIndex++}`);
+      values.push(updateData.firstName);
+    }
+    if (updateData.lastName !== undefined) {
+      setClause.push(`last_name = $${paramIndex++}`);
+      values.push(updateData.lastName);
+    }
+    if (updateData.phone !== undefined) {
+      setClause.push(`phone = $${paramIndex++}`);
+      values.push(updateData.phone);
+    }
+    if (updateData.avatar !== undefined) {
+      setClause.push(`avatar = $${paramIndex++}`);
+      values.push(updateData.avatar);
+    }
+    if (updateData.bio !== undefined) {
+      setClause.push(`bio = $${paramIndex++}`);
+      values.push(updateData.bio);
+    }
+    if (updateData.location !== undefined) {
+      setClause.push(`location = $${paramIndex++}`);
+      values.push(updateData.location);
+    }
+    if (updateData.timezone !== undefined) {
+      setClause.push(`timezone = $${paramIndex++}`);
+      values.push(updateData.timezone);
+    }
+
+    setClause.push(`updated_at = NOW()`);
+    values.push(parseInt(userId));
+
+    const query = `
+      UPDATE ${this.tableName}
+      SET ${setClause.join(', ')}
+      WHERE user_id = $${paramIndex}
+      RETURNING id, user_id, first_name, last_name, phone, avatar, bio,
+                location, timezone, preferences, metadata, created_at, updated_at
+    `;
+
+    const result = await database.query<any>(query, values);
+    return this.mapDbProfileToProfile(result.rows[0]);
+  }
+
+  static async updatePreferences(userId: string, preferences: Partial<ProfilePreferences>): Promise<Profile> {
+    const currentProfile = await this.findByUserId(userId);
+    if (!currentProfile) {
+      throw new Error('Profile not found');
+    }
+
+    const updatedPreferences = { ...currentProfile.preferences, ...preferences };
+
+    const query = `
+      UPDATE ${this.tableName}
+      SET preferences = $1, updated_at = NOW()
+      WHERE user_id = $2
+      RETURNING id, user_id, first_name, last_name, phone, avatar, bio,
+                location, timezone, preferences, metadata, created_at, updated_at
+    `;
+
+    const result = await database.query<any>(query, [JSON.stringify(updatedPreferences), parseInt(userId)]);
+    return this.mapDbProfileToProfile(result.rows[0]);
+  }
+
+  static async updateAvatar(userId: string, avatar: string | null): Promise<Profile> {
+    const query = `
+      UPDATE ${this.tableName}
+      SET avatar = $1, updated_at = NOW()
+      WHERE user_id = $2
+      RETURNING id, user_id, first_name, last_name, phone, avatar, bio,
+                location, timezone, preferences, metadata, created_at, updated_at
+    `;
+
+    const result = await database.query<any>(query, [avatar, parseInt(userId)]);
+    return this.mapDbProfileToProfile(result.rows[0]);
+  }
+
+  static async updateMetadata(userId: string, metadata: Partial<ProfileMetadata>): Promise<Profile> {
+    const currentProfile = await this.findByUserId(userId);
+    if (!currentProfile) {
+      throw new Error('Profile not found');
+    }
+
+    const updatedMetadata = { ...currentProfile.metadata, ...metadata };
+
+    const query = `
+      UPDATE ${this.tableName}
+      SET metadata = $1, updated_at = NOW()
+      WHERE user_id = $2
+      RETURNING id, user_id, first_name, last_name, phone, avatar, bio,
+                location, timezone, preferences, metadata, created_at, updated_at
+    `;
+
+    const result = await database.query<any>(query, [JSON.stringify(updatedMetadata), parseInt(userId)]);
+    return this.mapDbProfileToProfile(result.rows[0]);
+  }
+
+  static async deleteProfile(userId: string): Promise<void> {
+    const query = `DELETE FROM ${this.tableName} WHERE user_id = $1`;
+    await database.query(query, [parseInt(userId)]);
   }
 
   static async findByUserId(userId: string): Promise<Profile | null> {
@@ -77,23 +170,7 @@ export class ProfileModel {
       return null;
     }
 
-    const dbProfile = result.rows[0];
-    
-    return {
-      id: dbProfile.id,
-      userId: dbProfile.user_id,
-      firstName: dbProfile.first_name,
-      lastName: dbProfile.last_name,
-      phone: dbProfile.phone,
-      avatar: dbProfile.avatar,
-      bio: dbProfile.bio,
-      location: dbProfile.location,
-      timezone: dbProfile.timezone,
-      preferences: typeof dbProfile.preferences === 'string' ? JSON.parse(dbProfile.preferences) : dbProfile.preferences,
-      metadata: typeof dbProfile.metadata === 'string' ? JSON.parse(dbProfile.metadata) : dbProfile.metadata,
-      createdAt: dbProfile.created_at,
-      updatedAt: dbProfile.updated_at
-    };
+    return this.mapDbProfileToProfile(result.rows[0]);
   }
 
   static async updateRegistrationMetadata(userId: string, source: string): Promise<void> {
@@ -168,5 +245,23 @@ export class ProfileModel {
     `;
 
     await database.query(query, [JSON.stringify(updatedMetadata), parseInt(userId)]);
+  }
+
+  private static mapDbProfileToProfile(dbProfile: any): Profile {
+    return {
+      id: dbProfile.id,
+      userId: dbProfile.user_id,
+      firstName: dbProfile.first_name,
+      lastName: dbProfile.last_name,
+      phone: dbProfile.phone,
+      avatar: dbProfile.avatar,
+      bio: dbProfile.bio,
+      location: dbProfile.location,
+      timezone: dbProfile.timezone,
+      preferences: typeof dbProfile.preferences === 'string' ? JSON.parse(dbProfile.preferences) : dbProfile.preferences,
+      metadata: typeof dbProfile.metadata === 'string' ? JSON.parse(dbProfile.metadata) : dbProfile.metadata,
+      createdAt: dbProfile.created_at,
+      updatedAt: dbProfile.updated_at
+    };
   }
 }
