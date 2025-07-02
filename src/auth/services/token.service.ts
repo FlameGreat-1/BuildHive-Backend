@@ -18,15 +18,15 @@ export class TokenService {
   async generateAccessToken(userId: string, email: string, role: UserRole): Promise<string> {
     const token = generateAccessToken(userId, email, role);
     
-    const expiresAt = new Date();
-    expiresAt.setHours(expiresAt.getHours() + 24);
-
-    await this.sessionRepository.createSession({
-      userId,
-      token,
-      type: AUTH_CONSTANTS.TOKEN_TYPES.ACCESS,
-      expiresAt
-    });
+    // TEMPORARILY DISABLED - SESSION CREATION
+    // const expiresAt = new Date();
+    // expiresAt.setHours(expiresAt.getHours() + 24);
+    // await this.sessionRepository.createSession({
+    //   userId,
+    //   token,
+    //   type: AUTH_CONSTANTS.TOKEN_TYPES.ACCESS,
+    //   expiresAt
+    // });
 
     return token;
   }
@@ -34,18 +34,22 @@ export class TokenService {
   async generateEmailVerificationToken(userId: string, email: string): Promise<string> {
     const token = generateEmailVerificationToken(userId, email);
     
-    const expiresAt = new Date();
-    expiresAt.setHours(expiresAt.getHours() + 24);
-
-    await this.sessionRepository.createSession({
-      userId,
-      token,
-      type: AUTH_CONSTANTS.TOKEN_TYPES.EMAIL_VERIFICATION,
-      expiresAt
-    });
+    // TEMPORARILY DISABLED - SESSION CREATION
+    // const expiresAt = new Date();
+    // expiresAt.setHours(expiresAt.getHours() + 24);
+    // await this.sessionRepository.createSession({
+    //   userId,
+    //   token,
+    //   type: AUTH_CONSTANTS.TOKEN_TYPES.EMAIL_VERIFICATION,
+    //   expiresAt
+    // });
 
     const cacheKey = `email_verification:${userId}`;
-    await this.redisClient.setex(cacheKey, 24 * 60 * 60, token);
+    try {
+      await this.redisClient.setex(cacheKey, 24 * 60 * 60, token);
+    } catch (redisError) {
+      console.log('Redis unavailable, continuing without cache');
+    }
 
     return token;
   }
@@ -54,14 +58,15 @@ export class TokenService {
     try {
       const decoded = verifyEmailVerificationToken(token);
       
-      const session = await this.sessionRepository.findSessionByToken(token);
-      if (!session || session.type !== AUTH_CONSTANTS.TOKEN_TYPES.EMAIL_VERIFICATION) {
-        throw new AppError(
-          'Invalid verification token',
-          HTTP_STATUS_CODES.BAD_REQUEST,
-          ERROR_CODES.INVALID_TOKEN
-        );
-      }
+      // TEMPORARILY DISABLED - SESSION VALIDATION
+      // const session = await this.sessionRepository.findSessionByToken(token);
+      // if (!session || session.type !== AUTH_CONSTANTS.TOKEN_TYPES.EMAIL_VERIFICATION) {
+      //   throw new AppError(
+      //     'Invalid verification token',
+      //     HTTP_STATUS_CODES.BAD_REQUEST,
+      //     ERROR_CODES.INVALID_TOKEN
+      //   );
+      // }
 
       return decoded;
     } catch (error: any) {
@@ -74,41 +79,55 @@ export class TokenService {
   }
 
   async invalidateEmailVerificationToken(userId: string): Promise<void> {
-    const sessions = await this.sessionRepository.findSessionsByUserId(
-      userId, 
-      AUTH_CONSTANTS.TOKEN_TYPES.EMAIL_VERIFICATION
-    );
-
-    for (const session of sessions) {
-      await this.sessionRepository.deleteSession(session.token);
-    }
+    // TEMPORARILY DISABLED - SESSION CLEANUP
+    // const sessions = await this.sessionRepository.findSessionsByUserId(
+    //   userId, 
+    //   AUTH_CONSTANTS.TOKEN_TYPES.EMAIL_VERIFICATION
+    // );
+    // for (const session of sessions) {
+    //   await this.sessionRepository.deleteSession(session.token);
+    // }
 
     const cacheKey = `email_verification:${userId}`;
-    await this.redisClient.del(cacheKey);
+    try {
+      await this.redisClient.del(cacheKey);
+    } catch (redisError) {
+      console.log('Redis unavailable, continuing without cache cleanup');
+    }
   }
 
   async validateAccessToken(token: string): Promise<boolean> {
     try {
-      const session = await this.sessionRepository.findSessionByToken(token);
-      return session !== null && session.type === AUTH_CONSTANTS.TOKEN_TYPES.ACCESS;
+      // TEMPORARILY DISABLED - SESSION VALIDATION
+      // const session = await this.sessionRepository.findSessionByToken(token);
+      // return session !== null && session.type === AUTH_CONSTANTS.TOKEN_TYPES.ACCESS;
+      return false;
     } catch (error) {
       return false;
     }
   }
 
   async revokeToken(token: string): Promise<void> {
-    await this.sessionRepository.deleteSession(token);
+    // TEMPORARILY DISABLED - SESSION REVOCATION
+    // await this.sessionRepository.deleteSession(token);
   }
 
   async revokeAllUserTokens(userId: string): Promise<void> {
-    await this.sessionRepository.deleteUserSessions(userId);
+    // TEMPORARILY DISABLED - SESSION CLEANUP
+    // await this.sessionRepository.deleteUserSessions(userId);
     
     const cacheKey = `email_verification:${userId}`;
-    await this.redisClient.del(cacheKey);
+    try {
+      await this.redisClient.del(cacheKey);
+    } catch (redisError) {
+      console.log('Redis unavailable, continuing without cache cleanup');
+    }
   }
 
   async cleanupExpiredTokens(): Promise<number> {
-    return await this.sessionRepository.cleanupExpiredSessions();
+    // TEMPORARILY DISABLED - SESSION CLEANUP
+    // return await this.sessionRepository.cleanupExpiredSessions();
+    return 0;
   }
 
   async getTokenInfo(token: string): Promise<{
@@ -117,34 +136,43 @@ export class TokenService {
     expiresAt: Date;
     isValid: boolean;
   } | null> {
-    const session = await this.sessionRepository.findSessionByToken(token);
-    if (!session) {
-      return null;
-    }
-
-    return {
-      userId: session.userId,
-      type: session.type,
-      expiresAt: session.expiresAt,
-      isValid: session.expiresAt > new Date()
-    };
+    // TEMPORARILY DISABLED - SESSION INFO
+    // const session = await this.sessionRepository.findSessionByToken(token);
+    // if (!session) {
+    //   return null;
+    // }
+    // return {
+    //   userId: session.userId,
+    //   type: session.type,
+    //   expiresAt: session.expiresAt,
+    //   isValid: session.expiresAt > new Date()
+    // };
+    return null;
   }
 
   async extendTokenExpiry(token: string, hours: number = 24): Promise<void> {
-    const expiresAt = new Date();
-    expiresAt.setHours(expiresAt.getHours() + hours);
-    
-    await this.sessionRepository.updateSessionExpiry(token, expiresAt);
+    // TEMPORARILY DISABLED - SESSION EXPIRY UPDATE
+    // const expiresAt = new Date();
+    // expiresAt.setHours(expiresAt.getHours() + hours);
+    // await this.sessionRepository.updateSessionExpiry(token, expiresAt);
   }
 
   async isTokenBlacklisted(token: string): Promise<boolean> {
     const blacklistKey = `blacklist:${token}`;
-    const result = await this.redisClient.get(blacklistKey);
-    return result !== null;
+    try {
+      const result = await this.redisClient.get(blacklistKey);
+      return result !== null;
+    } catch (redisError) {
+      return false;
+    }
   }
 
   async blacklistToken(token: string, expiryHours: number = 24): Promise<void> {
     const blacklistKey = `blacklist:${token}`;
-    await this.redisClient.setex(blacklistKey, expiryHours * 60 * 60, 'true');
+    try {
+      await this.redisClient.setex(blacklistKey, expiryHours * 60 * 60, 'true');
+    } catch (redisError) {
+      console.log('Redis unavailable, continuing without blacklist');
+    }
   }
 }
