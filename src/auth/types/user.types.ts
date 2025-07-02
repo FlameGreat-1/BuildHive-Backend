@@ -12,6 +12,11 @@ export interface User {
   emailVerified: boolean;
   emailVerificationToken?: string;
   emailVerificationExpires?: Date;
+  passwordResetToken?: string;
+  passwordResetExpires?: Date;
+  loginAttempts?: number;
+  lockedUntil?: Date;
+  lastLoginAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }

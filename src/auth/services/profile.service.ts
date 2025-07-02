@@ -1,5 +1,5 @@
 import { ProfileRepository } from '../repositories';
-import { Profile, CreateProfileData } from '../types';
+import { Profile, CreateProfileData, UpdateProfileData, ProfilePreferences, ProfileMetadata } from '../types';
 import { AppError } from '../../shared/utils';
 import { HTTP_STATUS_CODES, ERROR_CODES } from '../../config/auth';
 
@@ -26,8 +26,98 @@ export class ProfileService {
     return profile;
   }
 
+  async updateProfile(userId: string, updateData: UpdateProfileData): Promise<Profile> {
+    const profileExists = await this.profileRepository.profileExists(userId);
+    if (!profileExists) {
+      throw new AppError(
+        'Profile not found',
+        HTTP_STATUS_CODES.NOT_FOUND,
+        ERROR_CODES.INVALID_CREDENTIALS
+      );
+    }
+
+    const profile = await this.profileRepository.updateProfile(userId, updateData);
+    await this.profileRepository.updateProfileCompleteness(userId);
+    return profile;
+  }
+
   async getProfileByUserId(userId: string): Promise<Profile | null> {
     return await this.profileRepository.findProfileByUserId(userId);
+  }
+
+  async updatePreferences(userId: string, preferences: Partial<ProfilePreferences>): Promise<Profile> {
+    const profileExists = await this.profileRepository.profileExists(userId);
+    if (!profileExists) {
+      throw new AppError(
+        'Profile not found',
+        HTTP_STATUS_CODES.NOT_FOUND,
+        ERROR_CODES.INVALID_CREDENTIALS
+      );
+    }
+
+    return await this.profileRepository.updatePreferences(userId, preferences);
+  }
+
+  async getPreferences(userId: string): Promise<ProfilePreferences | null> {
+    const profile = await this.profileRepository.findProfileByUserId(userId);
+    return profile?.preferences || null;
+  }
+
+  async updateAvatar(userId: string, avatar: string): Promise<Profile> {
+    const profileExists = await this.profileRepository.profileExists(userId);
+    if (!profileExists) {
+      throw new AppError(
+        'Profile not found',
+        HTTP_STATUS_CODES.NOT_FOUND,
+        ERROR_CODES.INVALID_CREDENTIALS
+      );
+    }
+
+    return await this.profileRepository.updateAvatar(userId, avatar);
+  }
+
+  async deleteAvatar(userId: string): Promise<void> {
+    const profileExists = await this.profileRepository.profileExists(userId);
+    if (!profileExists) {
+      throw new AppError(
+        'Profile not found',
+        HTTP_STATUS_CODES.NOT_FOUND,
+        ERROR_CODES.INVALID_CREDENTIALS
+      );
+    }
+
+    await this.profileRepository.updateAvatar(userId, null);
+  }
+
+  async getMetadata(userId: string): Promise<ProfileMetadata | null> {
+    const profile = await this.profileRepository.findProfileByUserId(userId);
+    return profile?.metadata || null;
+  }
+
+  async updateMetadata(userId: string, metadata: Partial<ProfileMetadata>): Promise<Profile> {
+    const profileExists = await this.profileRepository.profileExists(userId);
+    if (!profileExists) {
+      throw new AppError(
+        'Profile not found',
+        HTTP_STATUS_CODES.NOT_FOUND,
+        ERROR_CODES.INVALID_CREDENTIALS
+      );
+    }
+
+    return await this.profileRepository.updateMetadata(userId, metadata);
+  }
+
+  async deleteProfile(userId: string): Promise<void> {
+    const profileExists = await this.profileRepository.profileExists(userId);
+    if (!profileExists) {
+      throw new AppError(
+        'Profile not found',
+        HTTP_STATUS_CODES.NOT_FOUND,
+        ERROR_CODES.INVALID_CREDENTIALS
+      );
+    }
+
+    await this.profileRepository.deleteProfile(userId);
   }
 
   async updateRegistrationSource(userId: string, source: string): Promise<void> {

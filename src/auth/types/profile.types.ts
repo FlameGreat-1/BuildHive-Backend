@@ -40,6 +40,16 @@ export interface CreateProfileData {
   preferences?: Partial<ProfilePreferences>;
 }
 
+export interface UpdateProfileData {
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
+  avatar?: string;
+  bio?: string;
+  location?: string;
+  timezone?: string;
+}
+
 export interface ClientProfileExtension {
   companyName?: string;
   industry?: string;

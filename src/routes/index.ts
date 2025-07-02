@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { logger, sendSuccess } from '../shared/utils';
 import { environment } from '../config/auth';
 import healthRoutes from './health.routes';
-import authRoutes from '../auth/routes';
+import { authRoutes, profileRoutes, validationRoutes } from '../auth/routes'; 
 import { generalApiRateLimit } from '../shared/middleware';
 
 const router = Router();
@@ -10,7 +10,9 @@ const router = Router();
 router.use(generalApiRateLimit);
 
 router.use('/health', healthRoutes);
-router.use('/api/v1', authRoutes);
+router.use('/api/v1/auth', authRoutes);     
+router.use('/api/v1/profile', profileRoutes);
+router.use('/api/v1/validation', validationRoutes);
 
 router.get('/', (req, res) => {
   const routeData = {
@@ -50,7 +52,10 @@ router.get('/', (req, res) => {
         'GET /api/v1/profile/preferences',
         'PUT /api/v1/profile/preferences',
         'PUT /api/v1/profile/avatar',
-        'DELETE /api/v1/profile/avatar'
+        'DELETE /api/v1/profile/avatar',
+        'GET /api/v1/profile/metadata',
+        'PUT /api/v1/profile/metadata',
+        'PATCH /api/v1/profile/registration-source'
       ],
       validation: [
         'POST /api/v1/validation/email/availability',
@@ -58,7 +63,11 @@ router.get('/', (req, res) => {
         'POST /api/v1/validation/email/format',
         'POST /api/v1/validation/username/format',
         'POST /api/v1/validation/password/strength',
+        'POST /api/v1/validation/login/credentials',
+        'POST /api/v1/validation/password-reset/data',
+        'POST /api/v1/validation/change-password/data',
         'POST /api/v1/validation/registration-data',
+        'POST /api/v1/validation/social/data',
         'POST /api/v1/validation/generate-username',
         'POST /api/v1/validation/bulk-availability'
       ]
@@ -77,7 +86,9 @@ router.get('/', (req, res) => {
       rateLimiting: 'active',
       inputValidation: 'active',
       authenticationRequired: 'selective',
-      emailVerificationRequired: 'selective'
+      emailVerificationRequired: 'selective',
+      passwordComplexity: 'enforced',
+      tokenSecurity: 'jwt-based'
     }
   };
 
@@ -92,4 +103,3 @@ logger.info('Main routes initialized', {
 });
 
 export default router;
-
