@@ -30,7 +30,7 @@ export class SessionModel {
     `;
 
     const values = [
-      sessionData.userId,
+      parseInt(sessionData.userId),
       sessionData.token,
       sessionData.type,
       sessionData.expiresAt
