@@ -159,7 +159,7 @@ export class UserModel {
       WHERE id = $1
     `;
 
-    const result = await database.query<any>(query, [id]);
+    const result = await database.query<any>(query, [parseInt(id, 10)]);
     if (!result.rows[0]) return null;
 
     const row = result.rows[0];
@@ -247,7 +247,7 @@ export class UserModel {
       WHERE id = $3
     `;
 
-    await database.query(query, [token, expires, userId]);
+    await database.query(query, [token, expires, parseInt(userId, 10)]);
   }
 
   static async verifyEmail(userId: string): Promise<void> {
@@ -261,7 +261,7 @@ export class UserModel {
       WHERE id = $2
     `;
 
-    await database.query(query, [UserStatus.ACTIVE, userId]);
+    await database.query(query, [UserStatus.ACTIVE, parseInt(userId, 10)]);
   }
 
   static async updatePasswordResetToken(userId: string, token: string, expires: Date): Promise<void> {
@@ -273,7 +273,7 @@ export class UserModel {
       WHERE id = $3
     `;
 
-    await database.query(query, [token, expires, userId]);
+    await database.query(query, [token, expires, parseInt(userId, 10)]);
   }
 
   static async clearPasswordResetToken(userId: string): Promise<void> {
@@ -285,7 +285,7 @@ export class UserModel {
       WHERE id = $1
     `;
 
-    await database.query(query, [userId]);
+    await database.query(query, [parseInt(userId, 10)]);
   }
 
   static async updatePassword(userId: string, passwordHash: string): Promise<void> {
@@ -298,7 +298,7 @@ export class UserModel {
       WHERE id = $2
     `;
 
-    await database.query(query, [passwordHash, userId]);
+    await database.query(query, [passwordHash, parseInt(userId, 10)]);
   }
 
   static async incrementLoginAttempts(userId: string): Promise<void> {
@@ -309,7 +309,7 @@ export class UserModel {
       WHERE id = $1
     `;
 
-    await database.query(query, [userId]);
+    await database.query(query, [parseInt(userId, 10)]);
   }
 
   static async resetLoginAttempts(userId: string): Promise<void> {
@@ -321,7 +321,7 @@ export class UserModel {
       WHERE id = $1
     `;
 
-    await database.query(query, [userId]);
+    await database.query(query, [parseInt(userId, 10)]);
   }
 
   static async lockAccount(userId: string, lockUntil: Date): Promise<void> {
@@ -332,7 +332,7 @@ export class UserModel {
       WHERE id = $2
     `;
 
-    await database.query(query, [lockUntil, userId]);
+    await database.query(query, [lockUntil, parseInt(userId, 10)]);
   }
 
   static async updateLastLogin(userId: string): Promise<void> {
@@ -345,6 +345,6 @@ export class UserModel {
       WHERE id = $1
     `;
 
-    await database.query(query, [userId]);
+    await database.query(query, [parseInt(userId, 10)]);
   }
 }
