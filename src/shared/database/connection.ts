@@ -133,6 +133,7 @@ class DatabaseConnection implements DatabaseClient {
       await this.query(createUsersTable);
       
       await this.query('DROP TABLE IF EXISTS profiles CASCADE');
+      await this.query('DROP TABLE IF EXISTS sessions CASCADE');
 
       const createProfilesTable = `
         CREATE TABLE IF NOT EXISTS profiles (
@@ -253,4 +254,3 @@ export const closeDatabase = async (): Promise<void> => {
     throw error;
   }
 };
-

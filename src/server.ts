@@ -1,6 +1,6 @@
 import { createApp } from './app';
 import { logger } from './shared/utils';
-import { database, initializeDatabase } from './shared/database';
+import { database } from './shared/database';
 import { environment } from './config/auth';
 
 const PORT = environment.PORT;
@@ -14,10 +14,6 @@ async function startServer(): Promise<void> {
       environment: environment.NODE_ENV,
       nodeVersion: process.version
     });
-
-    logger.info('Initializing database...');
-    await initializeDatabase();
-    logger.info('Database initialization completed');
 
     const app = await createApp();
     
@@ -106,4 +102,3 @@ startServer().catch((error) => {
   logger.error('Server startup failed', error);
   process.exit(1);
 });
-
