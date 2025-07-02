@@ -12,7 +12,7 @@ export class UserModel {
         username, email, password_hash, role, status, auth_provider, 
         social_id, email_verified, created_at, updated_at
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
-      RETURNING id, username, email, role, status, auth_provider, 
+      RETURNING id, username, email, password_hash, role, status, auth_provider, 
                 social_id, email_verified, created_at, updated_at
     `;
 
@@ -27,8 +27,22 @@ export class UserModel {
       userData.authProvider !== AuthProvider.LOCAL
     ];
 
-    const result = await database.query<User>(query, values);
-    return result.rows[0];
+    const result = await database.query<any>(query, values);
+    const row = result.rows[0];
+    
+    return {
+      id: row.id,
+      username: row.username,
+      email: row.email,
+      passwordHash: row.password_hash,
+      role: row.role,
+      status: row.status,
+      authProvider: row.auth_provider,
+      socialId: row.social_id,
+      emailVerified: row.email_verified,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    };
   }
 
   static async findByEmail(email: string): Promise<User | null> {
@@ -41,8 +55,25 @@ export class UserModel {
       WHERE email = $1
     `;
 
-    const result = await database.query<User>(query, [email]);
-    return result.rows[0] || null;
+    const result = await database.query<any>(query, [email]);
+    if (!result.rows[0]) return null;
+
+    const row = result.rows[0];
+    return {
+      id: row.id,
+      username: row.username,
+      email: row.email,
+      passwordHash: row.password_hash,
+      role: row.role,
+      status: row.status,
+      authProvider: row.auth_provider,
+      socialId: row.social_id,
+      emailVerified: row.email_verified,
+      emailVerificationToken: row.email_verification_token,
+      emailVerificationExpires: row.email_verification_expires,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    };
   }
 
   static async findByUsername(username: string): Promise<User | null> {
@@ -54,20 +85,78 @@ export class UserModel {
       WHERE username = $1
     `;
 
-    const result = await database.query<User>(query, [username]);
-    return result.rows[0] || null;
+    const result = await database.query<any>(query, [username]);
+    if (!result.rows[0]) return null;
+
+    const row = result.rows[0];
+    return {
+      id: row.id,
+      username: row.username,
+      email: row.email,
+      passwordHash: row.password_hash,
+      role: row.role,
+      status: row.status,
+      authProvider: row.auth_provider,
+      socialId: row.social_id,
+      emailVerified: row.email_verified,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    };
   }
 
   static async findBySocialId(socialId: string, provider: AuthProvider): Promise<User | null> {
     const query = `
-      SELECT id, username, email, role, status, auth_provider, 
+      SELECT id, username, email, password_hash, role, status, auth_provider, 
              social_id, email_verified, created_at, updated_at
       FROM ${this.tableName}
       WHERE social_id = $1 AND auth_provider = $2
     `;
 
-    const result = await database.query<User>(query, [socialId, provider]);
-    return result.rows[0] || null;
+    const result = await database.query<any>(query, [socialId, provider]);
+    if (!result.rows[0]) return null;
+
+    const row = result.rows[0];
+    return {
+      id: row.id,
+      username: row.username,
+      email: row.email,
+      passwordHash: row.password_hash,
+      role: row.role,
+      status: row.status,
+      authProvider: row.auth_provider,
+      socialId: row.social_id,
+      emailVerified: row.email_verified,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    };
+  }
+
+  static async findById(id: string): Promise<User | null> {
+    const query = `
+      SELECT id, username, email, password_hash, role, status, 
+             auth_provider, social_id, email_verified,
+             created_at, updated_at
+      FROM ${this.tableName}
+      WHERE id = $1
+    `;
+
+    const result = await database.query<any>(query, [id]);
+    if (!result.rows[0]) return null;
+
+    const row = result.rows[0];
+    return {
+      id: row.id,
+      username: row.username,
+      email: row.email,
+      passwordHash: row.password_hash,
+      role: row.role,
+      status: row.status,
+      authProvider: row.auth_provider,
+      socialId: row.social_id,
+      emailVerified: row.email_verified,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    };
   }
 
   static async checkExists(email: string, username: string, socialId?: string): Promise<UserExistsCheck> {
@@ -120,18 +209,5 @@ export class UserModel {
     `;
 
     await database.query(query, [UserStatus.ACTIVE, userId]);
-  }
-
-  static async findById(id: string): Promise<User | null> {
-    const query = `
-      SELECT id, username, email, password_hash, role, status, 
-             auth_provider, social_id, email_verified,
-             created_at, updated_at
-      FROM ${this.tableName}
-      WHERE id = $1
-    `;
-
-    const result = await database.query<User>(query, [id]);
-    return result.rows[0] || null;
   }
 }
