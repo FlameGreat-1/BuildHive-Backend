@@ -22,32 +22,39 @@ export class SessionModel {
   private static tableName = DATABASE_TABLES.SESSIONS;
 
   static async create(sessionData: CreateSessionData): Promise<Session> {
-    const query = `
-      INSERT INTO ${this.tableName} (
-        user_id, token, type, expires_at
-      ) VALUES ($1, $2, $3, $4)
-      RETURNING id, user_id, token, type, expires_at, created_at, updated_at
-    `;
+    try {
+      const query = `
+        INSERT INTO ${this.tableName} (
+          user_id, token, type, expires_at
+        ) VALUES ($1, $2, $3, $4)
+        RETURNING id, user_id, token, type, expires_at, created_at, updated_at
+      `;
 
-    const values = [
-      parseInt(sessionData.userId),
-      sessionData.token,
-      sessionData.type,
-      sessionData.expiresAt
-    ];
+      const values = [
+        parseInt(sessionData.userId, 10),
+        sessionData.token,
+        sessionData.type,
+        sessionData.expiresAt
+      ];
 
-    const result = await database.query<any>(query, values);
-    const dbSession = result.rows[0];
-    
-    return {
-      id: dbSession.id.toString(),
-      userId: dbSession.user_id.toString(),
-      token: dbSession.token,
-      type: dbSession.type,
-      expiresAt: dbSession.expires_at,
-      createdAt: dbSession.created_at,
-      updatedAt: dbSession.updated_at
-    };
+      console.log('Creating session with values:', values); // Debug log
+
+      const result = await database.query<any>(query, values);
+      const dbSession = result.rows[0];
+      
+      return {
+        id: dbSession.id.toString(),
+        userId: dbSession.user_id.toString(),
+        token: dbSession.token,
+        type: dbSession.type,
+        expiresAt: dbSession.expires_at,
+        createdAt: dbSession.created_at,
+        updatedAt: dbSession.updated_at
+      };
+    } catch (error) {
+      console.error('SessionModel.create error:', error); // Debug log
+      throw error;
+    }
   }
 
   static async findByToken(token: string): Promise<Session | null> {
@@ -80,7 +87,7 @@ export class SessionModel {
       WHERE user_id = $1 AND expires_at > NOW()
     `;
     
-    const values: any[] = [userId];
+    const values: any[] = [parseInt(userId, 10)];
 
     if (type) {
       query += ' AND type = $2';
@@ -109,7 +116,7 @@ export class SessionModel {
 
   static async deleteByUserId(userId: string, type?: string): Promise<void> {
     let query = `DELETE FROM ${this.tableName} WHERE user_id = $1`;
-    const values: any[] = [userId];
+    const values: any[] = [parseInt(userId, 10)];
 
     if (type) {
       query += ' AND type = $2';
