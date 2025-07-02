@@ -13,7 +13,8 @@ export class UserModel {
         social_id, email_verified, created_at, updated_at
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
       RETURNING id, username, email, password_hash, role, status, auth_provider, 
-                social_id, email_verified, created_at, updated_at
+                social_id, email_verified, login_attempts, locked_until, last_login_at,
+                created_at, updated_at
     `;
 
     const values = [
@@ -40,6 +41,9 @@ export class UserModel {
       authProvider: row.auth_provider,
       socialId: row.social_id,
       emailVerified: row.email_verified,
+      loginAttempts: row.login_attempts || 0,
+      lockedUntil: row.locked_until,
+      lastLoginAt: row.last_login_at,
       createdAt: row.created_at,
       updatedAt: row.updated_at
     };
@@ -50,6 +54,8 @@ export class UserModel {
       SELECT id, username, email, password_hash, role, status, 
              auth_provider, social_id, email_verified, 
              email_verification_token, email_verification_expires,
+             password_reset_token, password_reset_expires,
+             login_attempts, locked_until, last_login_at,
              created_at, updated_at
       FROM ${this.tableName}
       WHERE email = $1
@@ -71,6 +77,11 @@ export class UserModel {
       emailVerified: row.email_verified,
       emailVerificationToken: row.email_verification_token,
       emailVerificationExpires: row.email_verification_expires,
+      passwordResetToken: row.password_reset_token,
+      passwordResetExpires: row.password_reset_expires,
+      loginAttempts: row.login_attempts || 0,
+      lockedUntil: row.locked_until,
+      lastLoginAt: row.last_login_at,
       createdAt: row.created_at,
       updatedAt: row.updated_at
     };
@@ -80,6 +91,7 @@ export class UserModel {
     const query = `
       SELECT id, username, email, password_hash, role, status, 
              auth_provider, social_id, email_verified,
+             login_attempts, locked_until, last_login_at,
              created_at, updated_at
       FROM ${this.tableName}
       WHERE username = $1
@@ -99,6 +111,9 @@ export class UserModel {
       authProvider: row.auth_provider,
       socialId: row.social_id,
       emailVerified: row.email_verified,
+      loginAttempts: row.login_attempts || 0,
+      lockedUntil: row.locked_until,
+      lastLoginAt: row.last_login_at,
       createdAt: row.created_at,
       updatedAt: row.updated_at
     };
@@ -107,7 +122,8 @@ export class UserModel {
   static async findBySocialId(socialId: string, provider: AuthProvider): Promise<User | null> {
     const query = `
       SELECT id, username, email, password_hash, role, status, auth_provider, 
-             social_id, email_verified, created_at, updated_at
+             social_id, email_verified, login_attempts, locked_until, last_login_at,
+             created_at, updated_at
       FROM ${this.tableName}
       WHERE social_id = $1 AND auth_provider = $2
     `;
@@ -126,6 +142,9 @@ export class UserModel {
       authProvider: row.auth_provider,
       socialId: row.social_id,
       emailVerified: row.email_verified,
+      loginAttempts: row.login_attempts || 0,
+      lockedUntil: row.locked_until,
+      lastLoginAt: row.last_login_at,
       createdAt: row.created_at,
       updatedAt: row.updated_at
     };
@@ -135,6 +154,7 @@ export class UserModel {
     const query = `
       SELECT id, username, email, password_hash, role, status, 
              auth_provider, social_id, email_verified,
+             login_attempts, locked_until, last_login_at,
              created_at, updated_at
       FROM ${this.tableName}
       WHERE id = $1
@@ -154,6 +174,44 @@ export class UserModel {
       authProvider: row.auth_provider,
       socialId: row.social_id,
       emailVerified: row.email_verified,
+      loginAttempts: row.login_attempts || 0,
+      lockedUntil: row.locked_until,
+      lastLoginAt: row.last_login_at,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    };
+  }
+
+  static async findByPasswordResetToken(token: string): Promise<User | null> {
+    const query = `
+      SELECT id, username, email, password_hash, role, status, 
+             auth_provider, social_id, email_verified,
+             password_reset_token, password_reset_expires,
+             login_attempts, locked_until, last_login_at,
+             created_at, updated_at
+      FROM ${this.tableName}
+      WHERE password_reset_token = $1 AND password_reset_expires > NOW()
+    `;
+
+    const result = await database.query<any>(query, [token]);
+    if (!result.rows[0]) return null;
+
+    const row = result.rows[0];
+    return {
+      id: row.id,
+      username: row.username,
+      email: row.email,
+      passwordHash: row.password_hash,
+      role: row.role,
+      status: row.status,
+      authProvider: row.auth_provider,
+      socialId: row.social_id,
+      emailVerified: row.email_verified,
+      passwordResetToken: row.password_reset_token,
+      passwordResetExpires: row.password_reset_expires,
+      loginAttempts: row.login_attempts || 0,
+      lockedUntil: row.locked_until,
+      lastLoginAt: row.last_login_at,
       createdAt: row.created_at,
       updatedAt: row.updated_at
     };
@@ -181,11 +239,7 @@ export class UserModel {
     };
   }
 
-  static async updateEmailVerificationToken(
-    userId: string, 
-    token: string, 
-    expires: Date
-  ): Promise<void> {
+  static async updateEmailVerificationToken(userId: string, token: string, expires: Date): Promise<void> {
     const query = `
       UPDATE ${this.tableName}
       SET email_verification_token = $1, 
@@ -209,5 +263,89 @@ export class UserModel {
     `;
 
     await database.query(query, [UserStatus.ACTIVE, userId]);
+  }
+
+  static async updatePasswordResetToken(userId: string, token: string, expires: Date): Promise<void> {
+    const query = `
+      UPDATE ${this.tableName}
+      SET password_reset_token = $1,
+          password_reset_expires = $2,
+          updated_at = NOW()
+      WHERE id = $3
+    `;
+
+    await database.query(query, [token, expires, userId]);
+  }
+
+  static async clearPasswordResetToken(userId: string): Promise<void> {
+    const query = `
+      UPDATE ${this.tableName}
+      SET password_reset_token = NULL,
+          password_reset_expires = NULL,
+          updated_at = NOW()
+      WHERE id = $1
+    `;
+
+    await database.query(query, [userId]);
+  }
+
+  static async updatePassword(userId: string, passwordHash: string): Promise<void> {
+    const query = `
+      UPDATE ${this.tableName}
+      SET password_hash = $1,
+          password_reset_token = NULL,
+          password_reset_expires = NULL,
+          updated_at = NOW()
+      WHERE id = $2
+    `;
+
+    await database.query(query, [passwordHash, userId]);
+  }
+
+  static async incrementLoginAttempts(userId: string): Promise<void> {
+    const query = `
+      UPDATE ${this.tableName}
+      SET login_attempts = login_attempts + 1,
+          updated_at = NOW()
+      WHERE id = $1
+    `;
+
+    await database.query(query, [userId]);
+  }
+
+  static async resetLoginAttempts(userId: string): Promise<void> {
+    const query = `
+      UPDATE ${this.tableName}
+      SET login_attempts = 0,
+          locked_until = NULL,
+          updated_at = NOW()
+      WHERE id = $1
+    `;
+
+    await database.query(query, [userId]);
+  }
+
+  static async lockAccount(userId: string, lockUntil: Date): Promise<void> {
+    const query = `
+      UPDATE ${this.tableName}
+      SET locked_until = $1,
+          updated_at = NOW()
+      WHERE id = $2
+    `;
+
+    await database.query(query, [lockUntil, userId]);
+  }
+
+  static async updateLastLogin(userId: string): Promise<void> {
+    const query = `
+      UPDATE ${this.tableName}
+      SET last_login_at = NOW(),
+          login_attempts = 0,
+          locked_until = NULL,
+          updated_at = NOW()
+      WHERE id = $1
+    `;
+
+    await database.query(query, [userId]);
   }
 }

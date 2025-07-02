@@ -56,6 +56,90 @@ export interface RegisterResponse {
   requiresVerification: boolean;
 }
 
+export interface LoginRequest {
+  email: string;
+  password: string;
+  rememberMe?: boolean;
+}
+
+export interface LoginResponse {
+  user: {
+    id: string;
+    username: string;
+    email: string;
+    role: string;
+    status: string;
+    emailVerified: boolean;
+  };
+  tokens: {
+    accessToken: string;
+    refreshToken: string;
+    expiresIn: number;
+  };
+  profile?: {
+    firstName?: string;
+    lastName?: string;
+    avatar?: string;
+  };
+}
+
+export interface RefreshTokenRequest {
+  refreshToken: string;
+}
+
+export interface RefreshTokenResponse {
+  tokens: {
+    accessToken: string;
+    refreshToken: string;
+    expiresIn: number;
+  };
+}
+
+export interface PasswordResetRequest {
+  email: string;
+}
+
+export interface PasswordResetResponse {
+  success: boolean;
+  message: string;
+  resetTokenSent: boolean;
+}
+
+export interface PasswordResetConfirmRequest {
+  token: string;
+  newPassword: string;
+  confirmPassword: string;
+}
+
+export interface PasswordResetConfirmResponse {
+  success: boolean;
+  message: string;
+  passwordReset: boolean;
+}
+
+export interface ChangePasswordRequest {
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+}
+
+export interface ChangePasswordResponse {
+  success: boolean;
+  message: string;
+  passwordChanged: boolean;
+}
+
+export interface LogoutRequest {
+  refreshToken?: string;
+  logoutAllDevices?: boolean;
+}
+
+export interface LogoutResponse {
+  success: boolean;
+  message: string;
+  loggedOut: boolean;
+}
+
 export interface ErrorResponse {
   success: false;
   message: string;
@@ -64,3 +148,4 @@ export interface ErrorResponse {
   requestId: string;
   statusCode: number;
 }
+

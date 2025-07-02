@@ -1,6 +1,7 @@
 import { UserService } from './user.service';
 import { TokenService } from './token.service';
 import { EmailService } from './email.service';
+import { ProfileService } from './profile.service';
 import { 
   RegisterLocalRequest, 
   RegisterSocialRequest, 
@@ -8,10 +9,22 @@ import {
   EmailVerificationRequest,
   EmailVerificationResponse,
   ResendVerificationRequest,
-  ResendVerificationResponse
+  ResendVerificationResponse,
+  LoginCredentials,
+  LoginResult,
+  RefreshTokenData,
+  RefreshTokenResult,
+  PasswordResetData,
+  PasswordResetResult,
+  PasswordResetConfirmData,
+  PasswordResetConfirmResult,
+  ChangePasswordData,
+  ChangePasswordResult,
+  LogoutData,
+  LogoutResult
 } from '../types';
 import { AuthProvider, UserRole } from '../../shared/types';
-import { validateRegistrationData } from '../utils';
+import { validateRegistrationData, validateLoginCredentials, validatePasswordReset, validateChangePassword, validatePasswordResetRequest } from '../utils';
 import { ValidationAppError, AppError } from '../../shared/utils';
 import { HTTP_STATUS_CODES, ERROR_CODES } from '../../config/auth';
 import { logRegistrationAttempt, logRegistrationError } from '../../shared/utils';
@@ -20,11 +33,13 @@ export class AuthService {
   private userService: UserService;
   private tokenService: TokenService;
   private emailService: EmailService;
+  private profileService: ProfileService;
 
   constructor() {
     this.userService = new UserService();
     this.tokenService = new TokenService();
     this.emailService = new EmailService();
+    this.profileService = new ProfileService();
   }
 
   async registerLocal(request: RegisterLocalRequest, requestId: string): Promise<RegisterResponse> {
@@ -144,6 +159,206 @@ export class AuthService {
     }
   }
 
+  async login(credentials: LoginCredentials, requestId: string): Promise<LoginResult> {
+    const validationErrors = validateLoginCredentials({
+      email: credentials.email,
+      password: credentials.password
+    });
+
+    if (validationErrors.length > 0) {
+      throw new ValidationAppError('Login validation failed', validationErrors, requestId);
+    }
+
+    try {
+      const user = await this.userService.authenticateUser(credentials.email, credentials.password);
+      
+      const tokens = await this.tokenService.generateTokenPair(user.id, user.email, user.role);
+      
+      const profile = await this.profileService.getProfileByUserId(user.id);
+      
+      return {
+        user: {
+          id: user.id,
+          username: user.username,
+          email: user.email,
+          role: user.role,
+          status: user.status,
+          emailVerified: user.emailVerified
+        },
+        tokens,
+        profile: profile ? {
+          firstName: profile.firstName,
+          lastName: profile.lastName,
+          avatar: profile.avatar
+        } : undefined
+      };
+    } catch (error: any) {
+      throw error;
+    }
+  }
+
+  async refreshToken(data: RefreshTokenData, requestId: string): Promise<RefreshTokenResult> {
+    try {
+      const tokenData = await this.tokenService.verifyRefreshToken(data.refreshToken);
+      
+      const user = await this.userService.getUserById(tokenData.userId);
+      if (!user) {
+        throw new AppError(
+          'User not found',
+          HTTP_STATUS_CODES.UNAUTHORIZED,
+          ERROR_CODES.INVALID_TOKEN
+        );
+      }
+
+      const newTokens = await this.tokenService.generateTokenPair(user.id, user.email, user.role);
+      
+      await this.tokenService.revokeToken(data.refreshToken);
+
+      return {
+        tokens: newTokens
+      };
+    } catch (error: any) {
+      throw new AppError(
+        'Invalid refresh token',
+        HTTP_STATUS_CODES.UNAUTHORIZED,
+        ERROR_CODES.INVALID_TOKEN,
+        true,
+        requestId
+      );
+    }
+  }
+
+  async logout(data: LogoutData, requestId: string): Promise<LogoutResult> {
+    try {
+      if (data.refreshToken) {
+        const tokenData = await this.tokenService.verifyRefreshToken(data.refreshToken);
+        
+        if (data.logoutAllDevices) {
+          await this.tokenService.revokeAllUserTokens(tokenData.userId);
+        } else {
+          await this.tokenService.revokeToken(data.refreshToken);
+        }
+      }
+
+      return {
+        success: true,
+        message: data.logoutAllDevices ? 'Logged out from all devices successfully' : 'Logged out successfully',
+        loggedOut: true
+      };
+    } catch (error: any) {
+      return {
+        success: true,
+        message: 'Logged out successfully',
+        loggedOut: true
+      };
+    }
+  }
+
+  async requestPasswordReset(data: PasswordResetData, requestId: string): Promise<PasswordResetResult> {
+    const validationErrors = validatePasswordResetRequest({
+      email: data.email
+    });
+
+    if (validationErrors.length > 0) {
+      throw new ValidationAppError('Password reset validation failed', validationErrors, requestId);
+    }
+
+    try {
+      const user = await this.userService.initiatePasswordReset(data.email);
+      
+      const resetToken = await this.tokenService.generatePasswordResetToken(user.id, user.email);
+      
+      await this.emailService.sendPasswordResetEmail(user.email, user.username, resetToken);
+
+      return {
+        success: true,
+        message: 'Password reset instructions have been sent to your email',
+        resetTokenSent: true
+      };
+    } catch (error: any) {
+      if (error.code === ERROR_CODES.INVALID_CREDENTIALS) {
+        return {
+          success: true,
+          message: 'If an account with that email exists, password reset instructions have been sent',
+          resetTokenSent: false
+        };
+      }
+      throw error;
+    }
+  }
+
+  async confirmPasswordReset(data: PasswordResetConfirmData, requestId: string): Promise<PasswordResetConfirmResult> {
+    const validationErrors = validatePasswordReset({
+      token: data.token,
+      newPassword: data.newPassword,
+      confirmPassword: data.confirmPassword
+    });
+
+    if (validationErrors.length > 0) {
+      throw new ValidationAppError('Password reset confirmation validation failed', validationErrors, requestId);
+    }
+
+    try {
+      const tokenData = await this.tokenService.verifyPasswordResetToken(data.token);
+      
+      await this.userService.resetPassword(data.token, data.newPassword);
+      
+      await this.tokenService.invalidatePasswordResetToken(tokenData.userId);
+      
+      await this.tokenService.revokeAllUserTokens(tokenData.userId);
+
+      const user = await this.userService.getUserById(tokenData.userId);
+      if (user) {
+        await this.emailService.sendPasswordChangedNotification(user.email, user.username);
+      }
+
+      return {
+        success: true,
+        message: 'Password has been reset successfully',
+        passwordReset: true
+      };
+    } catch (error: any) {
+      throw new AppError(
+        'Password reset failed',
+        HTTP_STATUS_CODES.BAD_REQUEST,
+        ERROR_CODES.INVALID_PASSWORD_RESET_TOKEN,
+        true,
+        requestId
+      );
+    }
+  }
+
+  async changePassword(data: ChangePasswordData, userId: string, requestId: string): Promise<ChangePasswordResult> {
+    const validationErrors = validateChangePassword({
+      currentPassword: data.currentPassword,
+      newPassword: data.newPassword,
+      confirmPassword: data.confirmPassword
+    });
+
+    if (validationErrors.length > 0) {
+      throw new ValidationAppError('Change password validation failed', validationErrors, requestId);
+    }
+
+    try {
+      await this.userService.changePassword(userId, data.currentPassword, data.newPassword);
+      
+      await this.tokenService.revokeUserTokensByType(userId, 'refresh');
+
+      const user = await this.userService.getUserById(userId);
+      if (user) {
+        await this.emailService.sendPasswordChangedNotification(user.email, user.username);
+      }
+
+      return {
+        success: true,
+        message: 'Password changed successfully',
+        passwordChanged: true
+      };
+    } catch (error: any) {
+      throw error;
+    }
+  }
+
   async verifyEmail(request: EmailVerificationRequest, requestId: string): Promise<EmailVerificationResponse> {
     try {
       const tokenData = await this.tokenService.verifyEmailVerificationToken(request.token);
@@ -175,6 +390,7 @@ export class AuthService {
 
       await this.userService.verifyUserEmail(user.id);
       await this.tokenService.invalidateEmailVerificationToken(user.id);
+      await this.emailService.sendWelcomeEmail(user.email, user.username, user.role);
 
       return {
         success: true,

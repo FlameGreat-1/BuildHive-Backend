@@ -22,7 +22,6 @@ export class ProfileModel {
 
     const preferences = { ...defaultPreferences, ...profileData.preferences };
 
-    // Remove created_at, updated_at from INSERT - they have DEFAULT NOW()
     const query = `
       INSERT INTO ${this.tableName} (
         user_id, first_name, last_name, phone, avatar, bio, 
@@ -33,14 +32,14 @@ export class ProfileModel {
     `;
 
     const values = [
-      parseInt(profileData.userId), // Ensure INTEGER type
+      parseInt(profileData.userId),
       profileData.firstName || null,
       profileData.lastName || null,
       profileData.phone || null,
       profileData.avatar || null,
-      null, // bio
-      null, // location
-      null, // timezone
+      null,
+      null,
+      null,
       JSON.stringify(preferences),
       JSON.stringify(defaultMetadata)
     ];
@@ -97,10 +96,7 @@ export class ProfileModel {
     };
   }
 
-  static async updateRegistrationMetadata(
-    userId: string, 
-    source: string
-  ): Promise<void> {
+  static async updateRegistrationMetadata(userId: string, source: string): Promise<void> {
     const profile = await this.findByUserId(userId);
     if (!profile) return;
 
@@ -118,11 +114,30 @@ export class ProfileModel {
     await database.query(query, [JSON.stringify(updatedMetadata), parseInt(userId)]);
   }
 
+  static async updateLoginCount(userId: string): Promise<void> {
+    const profile = await this.findByUserId(userId);
+    if (!profile) return;
+
+    const updatedMetadata = {
+      ...profile.metadata,
+      loginCount: (profile.metadata.loginCount || 0) + 1,
+      lastLoginAt: new Date()
+    };
+
+    const query = `
+      UPDATE ${this.tableName}
+      SET metadata = $1, updated_at = NOW()
+      WHERE user_id = $2
+    `;
+
+    await database.query(query, [JSON.stringify(updatedMetadata), parseInt(userId)]);
+  }
+
   static async calculateCompleteness(userId: string): Promise<number> {
     const profile = await this.findByUserId(userId);
     if (!profile) return 0;
 
-    let completeness = 20; // Base for having a profile
+    let completeness = 20;
 
     if (profile.firstName) completeness += 15;
     if (profile.lastName) completeness += 15;
@@ -155,4 +170,3 @@ export class ProfileModel {
     await database.query(query, [JSON.stringify(updatedMetadata), parseInt(userId)]);
   }
 }
-

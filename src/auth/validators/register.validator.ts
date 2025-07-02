@@ -20,16 +20,24 @@ export const validateLocalRegistration = (): ValidationChain[] => {
       .withMessage(`Email must not exceed ${AUTH_CONSTANTS.EMAIL_REQUIREMENTS.MAX_LENGTH} characters`)
       .normalizeEmail(),
 
-    // TEMPORARILY DISABLED - Password validation removed to unblock registration
-    // body('password')
-    //   .isLength({ min: AUTH_CONSTANTS.PASSWORD_REQUIREMENTS.MIN_LENGTH, max: AUTH_CONSTANTS.PASSWORD_REQUIREMENTS.MAX_LENGTH })
-    //   .withMessage(`Password must be between ${AUTH_CONSTANTS.PASSWORD_REQUIREMENTS.MIN_LENGTH} and ${AUTH_CONSTANTS.PASSWORD_REQUIREMENTS.MAX_LENGTH} characters`)
-    //   .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
-    //   .withMessage('Password must contain at least one uppercase letter, one lowercase letter, and one number'),
-
-    body('role')
-      .isIn(Object.values(AUTH_CONSTANTS.USER_ROLES))
-      .withMessage(`Role must be one of: ${Object.values(AUTH_CONSTANTS.USER_ROLES).join(', ')}`),
+    body('password')
+      .isLength({ min: AUTH_CONSTANTS.PASSWORD_REQUIREMENTS.MIN_LENGTH, max: AUTH_CONSTANTS.PASSWORD_REQUIREMENTS.MAX_LENGTH })
+      .withMessage(`Password must be between ${AUTH_CONSTANTS.PASSWORD_REQUIREMENTS.MIN_LENGTH} and ${AUTH_CONSTANTS.PASSWORD_REQUIREMENTS.MAX_LENGTH} characters`)
+      .custom((value) => {
+        if (AUTH_CONSTANTS.PASSWORD_REQUIREMENTS.REQUIRE_UPPERCASE && !/[A-Z]/.test(value)) {
+          throw new Error('Password must contain at least one uppercase letter');
+        }
+        if (AUTH_CONSTANTS.PASSWORD_REQUIREMENTS.REQUIRE_LOWERCASE && !/[a-z]/.test(value)) {
+          throw new Error('Password must contain at least one lowercase letter');
+        }
+        if (AUTH_CONSTANTS.PASSWORD_REQUIREMENTS.REQUIRE_NUMBERS && !/\d/.test(value)) {
+          throw new Error('Password must contain at least one number');
+        }
+        if (AUTH_CONSTANTS.PASSWORD_REQUIREMENTS.REQUIRE_SPECIAL_CHARS && !/[!@#$%^&*(),.?":{}|<>]/.test(value)) {
+          throw new Error('Password must contain at least one special character');
+        }
+        return true;
+      }),
 
     body('confirmPassword')
       .custom((value, { req }) => {
@@ -37,7 +45,11 @@ export const validateLocalRegistration = (): ValidationChain[] => {
           throw new Error('Password confirmation does not match password');
         }
         return true;
-      })
+      }),
+
+    body('role')
+      .isIn(Object.values(AUTH_CONSTANTS.USER_ROLES))
+      .withMessage(`Role must be one of: ${Object.values(AUTH_CONSTANTS.USER_ROLES).join(', ')}`)
   ];
 };
 
@@ -79,7 +91,11 @@ export const validateSocialRegistration = (): ValidationChain[] => {
     body('socialData.picture')
       .optional()
       .isURL()
-      .withMessage('Profile picture must be a valid URL')
+      .withMessage('Profile picture must be a valid URL'),
+
+    body('socialData.id')
+      .notEmpty()
+      .withMessage('Social user ID is required')
   ];
 };
 

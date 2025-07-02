@@ -9,15 +9,14 @@ import {
   validateContentType,
   sanitizeRegistrationInput
 } from '../middleware';
-import { strictRateLimit } from '../../shared/middleware';
+import { strictRateLimit, validationRateLimit } from '../../shared/middleware';
 
 const router = Router();
 const validationController = new ValidationController();
 
-// Check Email Availability Route
 router.post(
   '/email/availability',
-  strictRateLimit,
+  validationRateLimit,
   validateContentType,
   sanitizeRegistrationInput,
   validateEmailAvailability(),
@@ -25,10 +24,9 @@ router.post(
   validationController.checkEmailAvailability
 );
 
-// Check Username Availability Route
 router.post(
   '/username/availability',
-  strictRateLimit,
+  validationRateLimit,
   validateContentType,
   sanitizeRegistrationInput,
   validateUsernameAvailability(),
@@ -36,7 +34,48 @@ router.post(
   validationController.checkUsernameAvailability
 );
 
-// Validate Registration Data Route
+router.post(
+  '/email/format',
+  validationRateLimit,
+  validateContentType,
+  validationController.validateEmailFormat
+);
+
+router.post(
+  '/username/format',
+  validationRateLimit,
+  validateContentType,
+  validationController.validateUsernameFormat
+);
+
+router.post(
+  '/password/strength',
+  validationRateLimit,
+  validateContentType,
+  validationController.validatePassword
+);
+
+router.post(
+  '/login/credentials',
+  validationRateLimit,
+  validateContentType,
+  validationController.validateLoginCredentials
+);
+
+router.post(
+  '/password-reset/data',
+  validationRateLimit,
+  validateContentType,
+  validationController.validatePasswordReset
+);
+
+router.post(
+  '/change-password/data',
+  validationRateLimit,
+  validateContentType,
+  validationController.validateChangePassword
+);
+
 router.post(
   '/registration-data',
   strictRateLimit,
@@ -45,7 +84,13 @@ router.post(
   validationController.validateRegistrationData
 );
 
-// Generate Username from Name Route
+router.post(
+  '/social/data',
+  validationRateLimit,
+  validateContentType,
+  validationController.validateSocialData
+);
+
 router.post(
   '/generate-username',
   strictRateLimit,
@@ -53,7 +98,6 @@ router.post(
   validationController.generateUsernameFromName
 );
 
-// Bulk Availability Check Route
 router.post(
   '/bulk-availability',
   strictRateLimit,

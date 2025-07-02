@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { UserService } from '../services';
 import { sendSuccess, asyncErrorHandler } from '../../shared/utils';
-import { validateEmail, validateUsername } from '../utils';
+import { validateEmail, validateUsername, validatePassword, validateLoginCredentials, validatePasswordReset, validateChangePassword } from '../utils';
 import { ValidationAppError } from '../../shared/utils';
 
 export class ValidationController {
@@ -47,6 +47,88 @@ export class ValidationController {
     });
   });
 
+  validatePassword = asyncErrorHandler(async (req: Request, res: Response, next: NextFunction): Promise<Response> => {
+    const { password } = req.body;
+    const requestId = res.locals.requestId;
+
+    const passwordValidationErrors = validatePassword(password);
+    const isValid = passwordValidationErrors.length === 0;
+
+    if (!isValid) {
+      return sendSuccess(res, 'Password validation completed', {
+        valid: false,
+        errors: passwordValidationErrors,
+        requirements: {
+          minLength: 8,
+          requireUppercase: true,
+          requireLowercase: true,
+          requireNumbers: true,
+          requireSpecialChars: true
+        }
+      });
+    }
+
+    return sendSuccess(res, 'Password is valid', {
+      valid: true,
+      strength: 'strong'
+    });
+  });
+
+  validateLoginCredentials = asyncErrorHandler(async (req: Request, res: Response, next: NextFunction): Promise<Response> => {
+    const { email, password } = req.body;
+    const requestId = res.locals.requestId;
+
+    const validationErrors = validateLoginCredentials({ email, password });
+    const isValid = validationErrors.length === 0;
+
+    if (!isValid) {
+      throw new ValidationAppError('Login credentials validation failed', validationErrors, requestId);
+    }
+
+    return sendSuccess(res, 'Login credentials are valid', {
+      valid: true,
+      email,
+      passwordProvided: !!password
+    });
+  });
+
+  validatePasswordReset = asyncErrorHandler(async (req: Request, res: Response, next: NextFunction): Promise<Response> => {
+    const { token, newPassword, confirmPassword } = req.body;
+    const requestId = res.locals.requestId;
+
+    const validationErrors = validatePasswordReset({ token, newPassword, confirmPassword });
+    const isValid = validationErrors.length === 0;
+
+    if (!isValid) {
+      throw new ValidationAppError('Password reset validation failed', validationErrors, requestId);
+    }
+
+    return sendSuccess(res, 'Password reset data is valid', {
+      valid: true,
+      tokenProvided: !!token,
+      passwordsMatch: newPassword === confirmPassword
+    });
+  });
+
+  validateChangePassword = asyncErrorHandler(async (req: Request, res: Response, next: NextFunction): Promise<Response> => {
+    const { currentPassword, newPassword, confirmPassword } = req.body;
+    const requestId = res.locals.requestId;
+
+    const validationErrors = validateChangePassword({ currentPassword, newPassword, confirmPassword });
+    const isValid = validationErrors.length === 0;
+
+    if (!isValid) {
+      throw new ValidationAppError('Change password validation failed', validationErrors, requestId);
+    }
+
+    return sendSuccess(res, 'Change password data is valid', {
+      valid: true,
+      currentPasswordProvided: !!currentPassword,
+      passwordsMatch: newPassword === confirmPassword,
+      passwordsDifferent: currentPassword !== newPassword
+    });
+  });
+
   validateRegistrationData = asyncErrorHandler(async (req: Request, res: Response, next: NextFunction): Promise<Response> => {
     const { email, username, password, role, authProvider } = req.body;
     const requestId = res.locals.requestId;
@@ -61,6 +143,11 @@ export class ValidationController {
     if (username) {
       const usernameErrors = validateUsername(username);
       validationErrors.push(...usernameErrors);
+    }
+
+    if (password && authProvider === 'local') {
+      const passwordErrors = validatePassword(password);
+      validationErrors.push(...passwordErrors);
     }
 
     if (validationErrors.length > 0) {
@@ -142,6 +229,96 @@ export class ValidationController {
         availableEmails: emailChecks.filter(check => check.available).length,
         totalUsernames: usernames.length,
         availableUsernames: usernameChecks.filter(check => check.available).length
+      }
+    });
+  });
+
+  validateEmailFormat = asyncErrorHandler(async (req: Request, res: Response, next: NextFunction): Promise<Response> => {
+    const { email } = req.body;
+    const requestId = res.locals.requestId;
+
+    const emailValidationErrors = validateEmail(email);
+    const isValid = emailValidationErrors.length === 0;
+
+    return sendSuccess(res, 'Email format validation completed', {
+      email,
+      valid: isValid,
+      errors: emailValidationErrors
+    });
+  });
+
+  validateUsernameFormat = asyncErrorHandler(async (req: Request, res: Response, next: NextFunction): Promise<Response> => {
+    const { username } = req.body;
+    const requestId = res.locals.requestId;
+
+    const usernameValidationErrors = validateUsername(username);
+    const isValid = usernameValidationErrors.length === 0;
+
+    return sendSuccess(res, 'Username format validation completed', {
+      username,
+      valid: isValid,
+      errors: usernameValidationErrors
+    });
+  });
+
+  validateSocialData = asyncErrorHandler(async (req: Request, res: Response, next: NextFunction): Promise<Response> => {
+    const { socialData, authProvider } = req.body;
+    const requestId = res.locals.requestId;
+
+    const validationErrors = [];
+
+    if (!socialData || typeof socialData !== 'object') {
+      validationErrors.push({
+        field: 'socialData',
+        message: 'Social data is required and must be an object',
+        code: 'SOCIAL_DATA_REQUIRED'
+      });
+    } else {
+      if (!socialData.email) {
+        validationErrors.push({
+          field: 'socialData.email',
+          message: 'Email is required from social provider',
+          code: 'SOCIAL_EMAIL_REQUIRED'
+        });
+      } else {
+        const emailErrors = validateEmail(socialData.email);
+        validationErrors.push(...emailErrors.map(error => ({
+          ...error,
+          field: `socialData.${error.field}`
+        })));
+      }
+
+      if (!socialData.name) {
+        validationErrors.push({
+          field: 'socialData.name',
+          message: 'Name is required from social provider',
+          code: 'SOCIAL_NAME_REQUIRED'
+        });
+      }
+
+      if (!socialData.id) {
+        validationErrors.push({
+          field: 'socialData.id',
+          message: 'Social ID is required from social provider',
+          code: 'SOCIAL_ID_REQUIRED'
+        });
+      }
+    }
+
+    const isValid = validationErrors.length === 0;
+
+    if (!isValid) {
+      throw new ValidationAppError('Social data validation failed', validationErrors, requestId);
+    }
+
+    return sendSuccess(res, 'Social data is valid', {
+      valid: true,
+      provider: authProvider,
+      socialData: {
+        hasEmail: !!socialData?.email,
+        hasName: !!socialData?.name,
+        hasId: !!socialData?.id,
+        hasPicture: !!socialData?.picture
       }
     });
   });

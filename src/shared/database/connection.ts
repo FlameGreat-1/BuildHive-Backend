@@ -98,8 +98,6 @@ class DatabaseConnection implements DatabaseClient {
   async testConnection(): Promise<boolean> {
     try {
       await this.query('SELECT 1');
-      // Temporarily disabled Redis check until Redis service is fixed
-      // await this.redis.ping();
       return true;
     } catch (error) {
       logger.error('Database connection test failed:', error);
@@ -109,7 +107,6 @@ class DatabaseConnection implements DatabaseClient {
 
   async createTables(): Promise<void> {
     try {
-      // Create users table FIRST
       const createUsersTable = `
         CREATE TABLE IF NOT EXISTS users (
           id SERIAL PRIMARY KEY,
@@ -123,6 +120,11 @@ class DatabaseConnection implements DatabaseClient {
           email_verified BOOLEAN DEFAULT FALSE,
           email_verification_token VARCHAR(255),
           email_verification_expires TIMESTAMP,
+          password_reset_token VARCHAR(255),
+          password_reset_expires TIMESTAMP,
+          login_attempts INTEGER DEFAULT 0,
+          locked_until TIMESTAMP,
+          last_login_at TIMESTAMP,
           created_at TIMESTAMP DEFAULT NOW(),
           updated_at TIMESTAMP DEFAULT NOW()
         );
@@ -130,10 +132,8 @@ class DatabaseConnection implements DatabaseClient {
 
       await this.query(createUsersTable);
       
-      // THEN drop and recreate profiles table with correct structure
       await this.query('DROP TABLE IF EXISTS profiles CASCADE');
 
-      // Create profiles table - Updated to match ProfileModel expectations
       const createProfilesTable = `
         CREATE TABLE IF NOT EXISTS profiles (
           id SERIAL PRIMARY KEY,
@@ -152,7 +152,6 @@ class DatabaseConnection implements DatabaseClient {
         );
       `;
 
-      // Create sessions table - Required for SessionModel
       const createSessionsTable = `
         CREATE TABLE IF NOT EXISTS sessions (
           id SERIAL PRIMARY KEY,
@@ -178,7 +177,6 @@ class DatabaseConnection implements DatabaseClient {
   async disconnect(): Promise<void> {
     try {
       await this.pool.end();
-      // Gracefully handle Redis disconnect
       try {
         await this.redis.quit();
       } catch (redisError) {
@@ -203,8 +201,6 @@ class DatabaseConnection implements DatabaseClient {
   async healthCheck(): Promise<boolean> {
     try {
       await this.query('SELECT 1');
-      // Temporarily disable Redis check until Redis service is fixed
-      // await this.redis.ping();
       return true;
     } catch (error) {
       logger.error('Database health check failed:', error);
@@ -239,7 +235,6 @@ export const initializeDatabase = async (): Promise<void> => {
       throw new Error('Database health check failed');
     }
     
-    // Create tables if they don't exist
     await database.createTables();
     
     logger.info('Database initialized successfully');
@@ -258,3 +253,4 @@ export const closeDatabase = async (): Promise<void> => {
     throw error;
   }
 };
+

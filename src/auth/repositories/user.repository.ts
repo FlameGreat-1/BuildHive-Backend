@@ -142,4 +142,100 @@ export class UserRepository {
       );
     }
   }
+
+  async findUserByPasswordResetToken(token: string): Promise<User | null> {
+    try {
+      return await UserModel.findByPasswordResetToken(token);
+    } catch (error) {
+      throw new AppError(
+        'Failed to retrieve user by password reset token',
+        HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR,
+        ERROR_CODES.INTERNAL_ERROR
+      );
+    }
+  }
+
+  async updatePasswordResetToken(userId: string, token: string, expires: Date): Promise<void> {
+    try {
+      await UserModel.updatePasswordResetToken(userId, token, expires);
+    } catch (error) {
+      throw new AppError(
+        'Failed to update password reset token',
+        HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR,
+        ERROR_CODES.INTERNAL_ERROR
+      );
+    }
+  }
+
+  async clearPasswordResetToken(userId: string): Promise<void> {
+    try {
+      await UserModel.clearPasswordResetToken(userId);
+    } catch (error) {
+      throw new AppError(
+        'Failed to clear password reset token',
+        HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR,
+        ERROR_CODES.INTERNAL_ERROR
+      );
+    }
+  }
+
+  async updatePassword(userId: string, passwordHash: string): Promise<void> {
+    try {
+      await UserModel.updatePassword(userId, passwordHash);
+    } catch (error) {
+      throw new AppError(
+        'Failed to update password',
+        HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR,
+        ERROR_CODES.INTERNAL_ERROR
+      );
+    }
+  }
+
+  async incrementLoginAttempts(userId: string): Promise<void> {
+    try {
+      await UserModel.incrementLoginAttempts(userId);
+    } catch (error) {
+      throw new AppError(
+        'Failed to increment login attempts',
+        HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR,
+        ERROR_CODES.INTERNAL_ERROR
+      );
+    }
+  }
+
+  async resetLoginAttempts(userId: string): Promise<void> {
+    try {
+      await UserModel.resetLoginAttempts(userId);
+    } catch (error) {
+      throw new AppError(
+        'Failed to reset login attempts',
+        HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR,
+        ERROR_CODES.INTERNAL_ERROR
+      );
+    }
+  }
+
+  async lockAccount(userId: string, lockUntil: Date): Promise<void> {
+    try {
+      await UserModel.lockAccount(userId, lockUntil);
+    } catch (error) {
+      throw new AppError(
+        'Failed to lock account',
+        HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR,
+        ERROR_CODES.INTERNAL_ERROR
+      );
+    }
+  }
+
+  async updateLastLogin(userId: string): Promise<void> {
+    try {
+      await UserModel.updateLastLogin(userId);
+    } catch (error) {
+      throw new AppError(
+        'Failed to update last login',
+        HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR,
+        ERROR_CODES.INTERNAL_ERROR
+      );
+    }
+  }
 }

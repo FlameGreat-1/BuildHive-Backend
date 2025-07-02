@@ -13,7 +13,12 @@ import {
   sensitiveDataFilter
 } from './shared/middleware';
 import { 
-  registrationLogger
+  registrationLogger,
+  loginLogger,
+  passwordResetLogger,
+  logoutLogger,
+  tokenLogger,
+  profileLogger
 } from './auth/middleware';
 import { 
   authRoutes, 
@@ -53,8 +58,15 @@ export async function createApp(): Promise<Application> {
     });
 
     app.use('/api', generalApiRateLimit);
-    app.use('/api/v1/auth', registrationLogger, authRoutes);
-    app.use('/api/v1/profile', profileRoutes);
+    app.use('/api/v1/auth', 
+      registrationLogger, 
+      loginLogger, 
+      passwordResetLogger, 
+      logoutLogger, 
+      tokenLogger, 
+      authRoutes
+    );
+    app.use('/api/v1/profile', profileLogger, profileRoutes);
     app.use('/api/v1/validation', validationRoutes);
 
     app.get('/', (req: Request, res: Response) => {
@@ -71,16 +83,65 @@ export async function createApp(): Promise<Application> {
           validation: '/api/v1/validation'
         },
         features: {
-          registration: {
-            local: '/api/v1/auth/register/local',
-            social: '/api/v1/auth/register/social',
-            verification: '/api/v1/auth/verify-email',
-            resend: '/api/v1/auth/resend-verification'
+          authentication: {
+            registration: {
+              local: '/api/v1/auth/register/local',
+              social: '/api/v1/auth/register/social'
+            },
+            login: '/api/v1/auth/login',
+            logout: '/api/v1/auth/logout',
+            tokenRefresh: '/api/v1/auth/refresh-token',
+            passwordReset: {
+              request: '/api/v1/auth/forgot-password',
+              confirm: '/api/v1/auth/reset-password',
+              change: '/api/v1/auth/change-password'
+            },
+            emailVerification: {
+              verify: '/api/v1/auth/verify-email',
+              resend: '/api/v1/auth/resend-verification'
+            },
+            session: {
+              current: '/api/v1/auth/me',
+              validate: '/api/v1/auth/validate-session'
+            }
+          },
+          profile: {
+            create: '/api/v1/profile/create',
+            view: '/api/v1/profile/me',
+            update: '/api/v1/profile/me',
+            delete: '/api/v1/profile/me',
+            completeness: '/api/v1/profile/completeness',
+            summary: '/api/v1/profile/summary',
+            preferences: '/api/v1/profile/preferences',
+            avatar: '/api/v1/profile/avatar',
+            metadata: '/api/v1/profile/metadata'
           },
           validation: {
-            email: '/api/v1/validation/email/availability',
-            username: '/api/v1/validation/username/availability'
+            email: {
+              availability: '/api/v1/validation/email/availability',
+              format: '/api/v1/validation/email/format'
+            },
+            username: {
+              availability: '/api/v1/validation/username/availability',
+              format: '/api/v1/validation/username/format',
+              generate: '/api/v1/validation/generate-username'
+            },
+            password: {
+              strength: '/api/v1/validation/password/strength'
+            },
+            credentials: '/api/v1/validation/login/credentials',
+            registration: '/api/v1/validation/registration-data',
+            social: '/api/v1/validation/social/data',
+            bulk: '/api/v1/validation/bulk-availability'
           }
+        },
+        security: {
+          rateLimiting: 'enabled',
+          inputValidation: 'enabled',
+          authenticationRequired: 'selective',
+          emailVerificationRequired: 'selective',
+          passwordComplexity: 'enforced',
+          tokenSecurity: 'jwt-based'
         }
       });
     });

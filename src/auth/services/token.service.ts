@@ -1,5 +1,5 @@
 import { SessionRepository } from '../repositories';
-import { generateAccessToken, generateEmailVerificationToken, verifyEmailVerificationToken } from '../utils';
+import { generateAccessToken, generateRefreshToken, generatePasswordResetToken, generateEmailVerificationToken, verifyToken, verifyRefreshToken, verifyPasswordResetToken, verifyEmailVerificationToken, generateTokenId } from '../utils';
 import { UserRole } from '../../shared/types';
 import { AUTH_CONSTANTS } from '../../config/auth';
 import { AppError } from '../../shared/utils';
@@ -18,15 +18,52 @@ export class TokenService {
   async generateAccessToken(userId: string, email: string, role: UserRole): Promise<string> {
     const token = generateAccessToken(userId, email, role);
     
-    // TEMPORARILY DISABLED - SESSION CREATION
-    // const expiresAt = new Date();
-    // expiresAt.setHours(expiresAt.getHours() + 24);
-    // await this.sessionRepository.createSession({
-    //   userId,
-    //   token,
-    //   type: AUTH_CONSTANTS.TOKEN_TYPES.ACCESS,
-    //   expiresAt
-    // });
+    const expiresAt = new Date();
+    expiresAt.setHours(expiresAt.getHours() + 24);
+    await this.sessionRepository.createSession({
+      userId,
+      token,
+      type: AUTH_CONSTANTS.TOKEN_TYPES.ACCESS,
+      expiresAt
+    });
+
+    return token;
+  }
+
+  async generateRefreshToken(userId: string, email: string, role: UserRole): Promise<string> {
+    const tokenId = generateTokenId();
+    const token = generateRefreshToken(userId, email, role, tokenId);
+    
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7);
+    await this.sessionRepository.createSession({
+      userId,
+      token,
+      type: AUTH_CONSTANTS.TOKEN_TYPES.REFRESH,
+      expiresAt
+    });
+
+    return token;
+  }
+
+  async generatePasswordResetToken(userId: string, email: string): Promise<string> {
+    const token = generatePasswordResetToken(userId, email);
+    
+    const expiresAt = new Date();
+    expiresAt.setMinutes(expiresAt.getMinutes() + AUTH_CONSTANTS.PASSWORD_RESET.TOKEN_EXPIRES_MINUTES);
+    await this.sessionRepository.createSession({
+      userId,
+      token,
+      type: AUTH_CONSTANTS.TOKEN_TYPES.PASSWORD_RESET,
+      expiresAt
+    });
+
+    const cacheKey = `password_reset:${userId}`;
+    try {
+      await this.redisClient.setex(cacheKey, AUTH_CONSTANTS.PASSWORD_RESET.TOKEN_EXPIRES_MINUTES * 60, token);
+    } catch (redisError) {
+      console.log('Redis unavailable, continuing without cache');
+    }
 
     return token;
   }
@@ -34,15 +71,14 @@ export class TokenService {
   async generateEmailVerificationToken(userId: string, email: string): Promise<string> {
     const token = generateEmailVerificationToken(userId, email);
     
-    // TEMPORARILY DISABLED - SESSION CREATION
-    // const expiresAt = new Date();
-    // expiresAt.setHours(expiresAt.getHours() + 24);
-    // await this.sessionRepository.createSession({
-    //   userId,
-    //   token,
-    //   type: AUTH_CONSTANTS.TOKEN_TYPES.EMAIL_VERIFICATION,
-    //   expiresAt
-    // });
+    const expiresAt = new Date();
+    expiresAt.setHours(expiresAt.getHours() + 24);
+    await this.sessionRepository.createSession({
+      userId,
+      token,
+      type: AUTH_CONSTANTS.TOKEN_TYPES.EMAIL_VERIFICATION,
+      expiresAt
+    });
 
     const cacheKey = `email_verification:${userId}`;
     try {
@@ -54,19 +90,99 @@ export class TokenService {
     return token;
   }
 
+  async verifyAccessToken(token: string): Promise<{ userId: string; email: string; role: UserRole }> {
+    try {
+      const decoded = verifyToken(token);
+      
+      const session = await this.sessionRepository.findSessionByToken(token);
+      if (!session || session.type !== AUTH_CONSTANTS.TOKEN_TYPES.ACCESS) {
+        throw new AppError(
+          'Invalid access token',
+          HTTP_STATUS_CODES.UNAUTHORIZED,
+          ERROR_CODES.INVALID_TOKEN
+        );
+      }
+
+      return {
+        userId: decoded.userId,
+        email: decoded.email,
+        role: decoded.role
+      };
+    } catch (error: any) {
+      throw new AppError(
+        'Invalid or expired access token',
+        HTTP_STATUS_CODES.UNAUTHORIZED,
+        ERROR_CODES.INVALID_TOKEN
+      );
+    }
+  }
+
+  async verifyRefreshToken(token: string): Promise<{ userId: string; email: string; role: UserRole; tokenId: string }> {
+    try {
+      const decoded = verifyRefreshToken(token);
+      
+      const session = await this.sessionRepository.findSessionByToken(token);
+      if (!session || session.type !== AUTH_CONSTANTS.TOKEN_TYPES.REFRESH) {
+        throw new AppError(
+          'Invalid refresh token',
+          HTTP_STATUS_CODES.UNAUTHORIZED,
+          ERROR_CODES.INVALID_TOKEN
+        );
+      }
+
+      return {
+        userId: decoded.userId,
+        email: decoded.email,
+        role: decoded.role,
+        tokenId: decoded.tokenId
+      };
+    } catch (error: any) {
+      throw new AppError(
+        'Invalid or expired refresh token',
+        HTTP_STATUS_CODES.UNAUTHORIZED,
+        ERROR_CODES.INVALID_TOKEN
+      );
+    }
+  }
+
+  async verifyPasswordResetToken(token: string): Promise<{ userId: string; email: string }> {
+    try {
+      const decoded = verifyPasswordResetToken(token);
+      
+      const session = await this.sessionRepository.findSessionByToken(token);
+      if (!session || session.type !== AUTH_CONSTANTS.TOKEN_TYPES.PASSWORD_RESET) {
+        throw new AppError(
+          'Invalid password reset token',
+          HTTP_STATUS_CODES.BAD_REQUEST,
+          ERROR_CODES.INVALID_TOKEN
+        );
+      }
+
+      return {
+        userId: decoded.userId,
+        email: decoded.email
+      };
+    } catch (error: any) {
+      throw new AppError(
+        'Invalid or expired password reset token',
+        HTTP_STATUS_CODES.BAD_REQUEST,
+        ERROR_CODES.INVALID_TOKEN
+      );
+    }
+  }
+
   async verifyEmailVerificationToken(token: string): Promise<{ userId: string; email: string }> {
     try {
       const decoded = verifyEmailVerificationToken(token);
       
-      // TEMPORARILY DISABLED - SESSION VALIDATION
-      // const session = await this.sessionRepository.findSessionByToken(token);
-      // if (!session || session.type !== AUTH_CONSTANTS.TOKEN_TYPES.EMAIL_VERIFICATION) {
-      //   throw new AppError(
-      //     'Invalid verification token',
-      //     HTTP_STATUS_CODES.BAD_REQUEST,
-      //     ERROR_CODES.INVALID_TOKEN
-      //   );
-      // }
+      const session = await this.sessionRepository.findSessionByToken(token);
+      if (!session || session.type !== AUTH_CONSTANTS.TOKEN_TYPES.EMAIL_VERIFICATION) {
+        throw new AppError(
+          'Invalid verification token',
+          HTTP_STATUS_CODES.BAD_REQUEST,
+          ERROR_CODES.INVALID_TOKEN
+        );
+      }
 
       return decoded;
     } catch (error: any) {
@@ -78,17 +194,38 @@ export class TokenService {
     }
   }
 
+  async rotateRefreshToken(oldToken: string, userId: string, email: string, role: UserRole): Promise<string> {
+    await this.revokeToken(oldToken);
+    return await this.generateRefreshToken(userId, email, role);
+  }
+
   async invalidateEmailVerificationToken(userId: string): Promise<void> {
-    // TEMPORARILY DISABLED - SESSION CLEANUP
-    // const sessions = await this.sessionRepository.findSessionsByUserId(
-    //   userId, 
-    //   AUTH_CONSTANTS.TOKEN_TYPES.EMAIL_VERIFICATION
-    // );
-    // for (const session of sessions) {
-    //   await this.sessionRepository.deleteSession(session.token);
-    // }
+    const sessions = await this.sessionRepository.findSessionsByUserId(
+      userId, 
+      AUTH_CONSTANTS.TOKEN_TYPES.EMAIL_VERIFICATION
+    );
+    for (const session of sessions) {
+      await this.sessionRepository.deleteSession(session.token);
+    }
 
     const cacheKey = `email_verification:${userId}`;
+    try {
+      await this.redisClient.del(cacheKey);
+    } catch (redisError) {
+      console.log('Redis unavailable, continuing without cache cleanup');
+    }
+  }
+
+  async invalidatePasswordResetToken(userId: string): Promise<void> {
+    const sessions = await this.sessionRepository.findSessionsByUserId(
+      userId, 
+      AUTH_CONSTANTS.TOKEN_TYPES.PASSWORD_RESET
+    );
+    for (const session of sessions) {
+      await this.sessionRepository.deleteSession(session.token);
+    }
+
+    const cacheKey = `password_reset:${userId}`;
     try {
       await this.redisClient.del(cacheKey);
     } catch (redisError) {
@@ -98,36 +235,47 @@ export class TokenService {
 
   async validateAccessToken(token: string): Promise<boolean> {
     try {
-      // TEMPORARILY DISABLED - SESSION VALIDATION
-      // const session = await this.sessionRepository.findSessionByToken(token);
-      // return session !== null && session.type === AUTH_CONSTANTS.TOKEN_TYPES.ACCESS;
-      return false;
+      const session = await this.sessionRepository.findSessionByToken(token);
+      return session !== null && session.type === AUTH_CONSTANTS.TOKEN_TYPES.ACCESS;
     } catch (error) {
       return false;
     }
   }
 
   async revokeToken(token: string): Promise<void> {
-    // TEMPORARILY DISABLED - SESSION REVOCATION
-    // await this.sessionRepository.deleteSession(token);
+    await this.sessionRepository.deleteSession(token);
+    await this.blacklistToken(token);
   }
 
   async revokeAllUserTokens(userId: string): Promise<void> {
-    // TEMPORARILY DISABLED - SESSION CLEANUP
-    // await this.sessionRepository.deleteUserSessions(userId);
+    const sessions = await this.sessionRepository.findSessionsByUserId(userId);
+    for (const session of sessions) {
+      await this.blacklistToken(session.token);
+    }
     
-    const cacheKey = `email_verification:${userId}`;
+    await this.sessionRepository.deleteUserSessions(userId);
+    
+    const emailCacheKey = `email_verification:${userId}`;
+    const passwordCacheKey = `password_reset:${userId}`;
     try {
-      await this.redisClient.del(cacheKey);
+      await this.redisClient.del(emailCacheKey);
+      await this.redisClient.del(passwordCacheKey);
     } catch (redisError) {
       console.log('Redis unavailable, continuing without cache cleanup');
     }
   }
 
+  async revokeUserTokensByType(userId: string, type: string): Promise<void> {
+    const sessions = await this.sessionRepository.findSessionsByUserId(userId, type);
+    for (const session of sessions) {
+      await this.blacklistToken(session.token);
+    }
+    
+    await this.sessionRepository.deleteUserSessions(userId, type);
+  }
+
   async cleanupExpiredTokens(): Promise<number> {
-    // TEMPORARILY DISABLED - SESSION CLEANUP
-    // return await this.sessionRepository.cleanupExpiredSessions();
-    return 0;
+    return await this.sessionRepository.cleanupExpiredSessions();
   }
 
   async getTokenInfo(token: string): Promise<{
@@ -136,25 +284,22 @@ export class TokenService {
     expiresAt: Date;
     isValid: boolean;
   } | null> {
-    // TEMPORARILY DISABLED - SESSION INFO
-    // const session = await this.sessionRepository.findSessionByToken(token);
-    // if (!session) {
-    //   return null;
-    // }
-    // return {
-    //   userId: session.userId,
-    //   type: session.type,
-    //   expiresAt: session.expiresAt,
-    //   isValid: session.expiresAt > new Date()
-    // };
-    return null;
+    const session = await this.sessionRepository.findSessionByToken(token);
+    if (!session) {
+      return null;
+    }
+    return {
+      userId: session.userId,
+      type: session.type,
+      expiresAt: session.expiresAt,
+      isValid: session.expiresAt > new Date()
+    };
   }
 
   async extendTokenExpiry(token: string, hours: number = 24): Promise<void> {
-    // TEMPORARILY DISABLED - SESSION EXPIRY UPDATE
-    // const expiresAt = new Date();
-    // expiresAt.setHours(expiresAt.getHours() + hours);
-    // await this.sessionRepository.updateSessionExpiry(token, expiresAt);
+    const expiresAt = new Date();
+    expiresAt.setHours(expiresAt.getHours() + hours);
+    await this.sessionRepository.updateSessionExpiry(token, expiresAt);
   }
 
   async isTokenBlacklisted(token: string): Promise<boolean> {
@@ -174,5 +319,20 @@ export class TokenService {
     } catch (redisError) {
       console.log('Redis unavailable, continuing without blacklist');
     }
+  }
+
+  async generateTokenPair(userId: string, email: string, role: UserRole): Promise<{
+    accessToken: string;
+    refreshToken: string;
+    expiresIn: number;
+  }> {
+    const accessToken = await this.generateAccessToken(userId, email, role);
+    const refreshToken = await this.generateRefreshToken(userId, email, role);
+    
+    return {
+      accessToken,
+      refreshToken,
+      expiresIn: 24 * 60 * 60
+    };
   }
 }

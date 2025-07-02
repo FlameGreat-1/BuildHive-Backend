@@ -35,6 +35,53 @@ export const registrationRateLimit = rateLimit({
   }
 });
 
+export const loginRateLimit = rateLimit({
+  windowMs: AUTH_CONSTANTS.RATE_LIMITS.LOGIN.WINDOW_MS,
+  max: AUTH_CONSTANTS.RATE_LIMITS.LOGIN.MAX_ATTEMPTS,
+  message: 'Too many login attempts, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: createRateLimitHandler('Too many login attempts from this IP, please try again after 15 minutes'),
+  keyGenerator: (req: Request): string => {
+    const email = req.body?.email;
+    return email ? `${req.ip}-${email}` : req.ip || 'unknown';
+  },
+  skip: (req: Request): boolean => {
+    return req.ip === '127.0.0.1' || req.ip === '::1';
+  }
+});
+
+export const passwordResetRateLimit = rateLimit({
+  windowMs: AUTH_CONSTANTS.RATE_LIMITS.PASSWORD_RESET.WINDOW_MS,
+  max: AUTH_CONSTANTS.RATE_LIMITS.PASSWORD_RESET.MAX_ATTEMPTS,
+  message: 'Too many password reset attempts, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: createRateLimitHandler('Too many password reset attempts from this IP, please try again after 1 hour'),
+  keyGenerator: (req: Request): string => {
+    const email = req.body?.email;
+    return email ? `${req.ip}-${email}` : req.ip || 'unknown';
+  },
+  skip: (req: Request): boolean => {
+    return req.ip === '127.0.0.1' || req.ip === '::1';
+  }
+});
+
+export const changePasswordRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: 'Too many password change attempts, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: createRateLimitHandler('Too many password change attempts, please try again after 15 minutes'),
+  keyGenerator: (req: Request): string => {
+    return req.ip || 'unknown';
+  },
+  skip: (req: Request): boolean => {
+    return req.ip === '127.0.0.1' || req.ip === '::1';
+  }
+});
+
 export const emailVerificationRateLimit = rateLimit({
   windowMs: AUTH_CONSTANTS.RATE_LIMITS.EMAIL_VERIFICATION.WINDOW_MS,
   max: AUTH_CONSTANTS.RATE_LIMITS.EMAIL_VERIFICATION.MAX_ATTEMPTS,
@@ -45,6 +92,36 @@ export const emailVerificationRateLimit = rateLimit({
   keyGenerator: (req: Request): string => {
     const email = req.body?.email || req.query?.email;
     return email ? `${req.ip}-${email}` : req.ip || 'unknown';
+  }
+});
+
+export const refreshTokenRateLimit = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  max: 10,
+  message: 'Too many token refresh attempts, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: createRateLimitHandler('Too many token refresh attempts, please try again after 5 minutes'),
+  keyGenerator: (req: Request): string => {
+    return req.ip || 'unknown';
+  },
+  skip: (req: Request): boolean => {
+    return req.ip === '127.0.0.1' || req.ip === '::1';
+  }
+});
+
+export const profileUpdateRateLimit = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 20,
+  message: 'Too many profile update attempts, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: createRateLimitHandler('Too many profile update attempts, please try again after 10 minutes'),
+  keyGenerator: (req: Request): string => {
+    return req.ip || 'unknown';
+  },
+  skip: (req: Request): boolean => {
+    return req.ip === '127.0.0.1' || req.ip === '::1';
   }
 });
 
@@ -67,4 +144,34 @@ export const strictRateLimit = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   handler: createRateLimitHandler('Too many requests, please slow down and try again in 5 minutes')
+});
+
+export const validationRateLimit = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 50,
+  message: 'Too many validation requests, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: createRateLimitHandler('Too many validation requests from this IP, please try again after 10 minutes'),
+  keyGenerator: (req: Request): string => {
+    return req.ip || 'unknown';
+  },
+  skip: (req: Request): boolean => {
+    return req.ip === '127.0.0.1' || req.ip === '::1';
+  }
+});
+
+export const logoutRateLimit = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  max: 20,
+  message: 'Too many logout attempts, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: createRateLimitHandler('Too many logout attempts, please try again after 5 minutes'),
+  keyGenerator: (req: Request): string => {
+    return req.ip || 'unknown';
+  },
+  skip: (req: Request): boolean => {
+    return req.ip === '127.0.0.1' || req.ip === '::1';
+  }
 });

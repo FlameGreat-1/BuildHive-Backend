@@ -2,14 +2,19 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { ProfileController } from '../controllers';
 import { 
   validateProfileCreation, 
-  validateRegistrationPreferences 
+  validateProfileUpdate,
+  validateRegistrationPreferences,
+  validatePreferencesUpdate
 } from '../validators';
 import { 
   requireEmailVerification,
+  authenticate,
   handleValidationErrors,
-  validateContentType
+  validateContentType,
+  sanitizeProfileInput,
+  profileLogger
 } from '../middleware';
-import { generalApiRateLimit } from '../../shared/middleware';
+import { generalApiRateLimit, profileUpdateRateLimit } from '../../shared/middleware';
 
 declare global {
   namespace Express {
@@ -27,11 +32,14 @@ declare global {
 const router = Router();
 const profileController = new ProfileController();
 
+router.use(authenticate);
+router.use(profileLogger);
+
 router.post(
   '/create',
-  generalApiRateLimit,
+  profileUpdateRateLimit,
   validateContentType,
-  requireEmailVerification,
+  sanitizeProfileInput,
   validateProfileCreation(),
   validateRegistrationPreferences(),
   handleValidationErrors,
@@ -41,22 +49,80 @@ router.post(
 router.get(
   '/me',
   generalApiRateLimit,
-  requireEmailVerification,
   profileController.getProfile
+);
+
+router.put(
+  '/me',
+  profileUpdateRateLimit,
+  validateContentType,
+  sanitizeProfileInput,
+  validateProfileUpdate(),
+  handleValidationErrors,
+  profileController.updateProfile
+);
+
+router.delete(
+  '/me',
+  profileController.deleteProfile
 );
 
 router.get(
   '/completeness',
   generalApiRateLimit,
-  requireEmailVerification,
   profileController.getProfileCompleteness
+);
+
+router.get(
+  '/summary',
+  generalApiRateLimit,
+  profileController.getProfileSummary
+);
+
+router.get(
+  '/preferences',
+  generalApiRateLimit,
+  profileController.getPreferences
+);
+
+router.put(
+  '/preferences',
+  profileUpdateRateLimit,
+  validateContentType,
+  validatePreferencesUpdate(),
+  handleValidationErrors,
+  profileController.updatePreferences
+);
+
+router.put(
+  '/avatar',
+  profileUpdateRateLimit,
+  validateContentType,
+  profileController.updateAvatar
+);
+
+router.delete(
+  '/avatar',
+  profileController.deleteAvatar
+);
+
+router.get(
+  '/metadata',
+  generalApiRateLimit,
+  profileController.getMetadata
+);
+
+router.put(
+  '/metadata',
+  profileUpdateRateLimit,
+  validateContentType,
+  profileController.updateMetadata
 );
 
 router.patch(
   '/registration-source',
   generalApiRateLimit,
   validateContentType,
-  requireEmailVerification,
   profileController.updateRegistrationSource
 );
 

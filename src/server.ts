@@ -24,7 +24,28 @@ async function startServer(): Promise<void> {
         environment: environment.NODE_ENV,
         processId: process.pid,
         uptime: process.uptime(),
-        features: ['registration', 'email-verification', 'profile-creation']
+        features: [
+          'registration',
+          'login',
+          'logout', 
+          'email-verification',
+          'password-reset',
+          'password-change',
+          'token-refresh',
+          'profile-management',
+          'social-authentication',
+          'input-validation',
+          'rate-limiting',
+          'security-headers',
+          'comprehensive-logging'
+        ],
+        endpoints: {
+          total: 25,
+          authentication: 12,
+          profile: 10,
+          validation: 11,
+          health: 4
+        }
       });
     });
 
