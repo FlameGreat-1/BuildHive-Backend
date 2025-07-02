@@ -10,17 +10,16 @@ export class UserModel {
     const query = `
       INSERT INTO ${this.tableName} (
         username, email, password_hash, role, status, auth_provider, 
-        social_id, email_verified, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
+        social_id, email_verified
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       RETURNING id, username, email, password_hash, role, status, auth_provider, 
-                social_id, email_verified, login_attempts, locked_until, last_login_at,
-                created_at, updated_at
+                social_id, email_verified, created_at, updated_at
     `;
 
     const values = [
       userData.username,
       userData.email,
-      userData.password || null,
+      userData.passwordHash || null,
       userData.role,
       UserStatus.PENDING,
       userData.authProvider,
@@ -41,9 +40,9 @@ export class UserModel {
       authProvider: row.auth_provider,
       socialId: row.social_id,
       emailVerified: row.email_verified,
-      loginAttempts: row.login_attempts || 0,
-      lockedUntil: row.locked_until,
-      lastLoginAt: row.last_login_at,
+      loginAttempts: 0,
+      lockedUntil: null,
+      lastLoginAt: null,
       createdAt: row.created_at,
       updatedAt: row.updated_at
     };
