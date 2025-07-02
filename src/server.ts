@@ -1,6 +1,6 @@
 import { createApp } from './app';
 import { logger } from './shared/utils';
-import { database } from './shared/database';
+import { database, initializeDatabase } from './shared/database';
 import { environment } from './config/auth';
 
 const PORT = environment.PORT;
@@ -14,6 +14,10 @@ async function startServer(): Promise<void> {
       environment: environment.NODE_ENV,
       nodeVersion: process.version
     });
+
+    logger.info('Initializing database...');
+    await initializeDatabase();
+    logger.info('Database initialization completed');
 
     const app = await createApp();
     
@@ -49,7 +53,6 @@ async function startServer(): Promise<void> {
       });
     });
 
-    // Graceful shutdown handler
     const gracefulShutdown = async (signal: string) => {
       logger.info(`Received ${signal}, starting graceful shutdown...`);
       
@@ -60,7 +63,6 @@ async function startServer(): Promise<void> {
         }
 
         try {
-          // Close database connections
           await database.end();
           logger.info('Database connections closed');
 
@@ -72,24 +74,20 @@ async function startServer(): Promise<void> {
         }
       });
 
-      // Force shutdown after 30 seconds
       setTimeout(() => {
         logger.error('Forced shutdown after timeout');
         process.exit(1);
       }, 30000);
     };
 
-    // Handle shutdown signals
     process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
     process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
-    // Handle uncaught exceptions
     process.on('uncaughtException', (error) => {
       logger.error('Uncaught exception', error);
       process.exit(1);
     });
 
-    // Handle unhandled promise rejections
     process.on('unhandledRejection', (reason, promise) => {
       logger.error('Unhandled promise rejection', {
         reason,
@@ -104,8 +102,8 @@ async function startServer(): Promise<void> {
   }
 }
 
-// Start the server
 startServer().catch((error) => {
   logger.error('Server startup failed', error);
   process.exit(1);
 });
+

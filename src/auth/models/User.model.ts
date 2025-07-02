@@ -19,7 +19,7 @@ export class UserModel {
     const values = [
       userData.username,
       userData.email,
-      userData.passwordHash || null,
+      userData.password || null,
       userData.role,
       UserStatus.PENDING,
       userData.authProvider,
@@ -41,8 +41,8 @@ export class UserModel {
       socialId: row.social_id,
       emailVerified: row.email_verified,
       loginAttempts: 0,
-      lockedUntil: null,
-      lastLoginAt: null,
+      lockedUntil: undefined,
+      lastLoginAt: undefined,
       createdAt: row.created_at,
       updatedAt: row.updated_at
     };
