@@ -22,22 +22,28 @@ export const validateLocalRegistration = (): ValidationChain[] => {
 
     body('password')
       .isLength({ min: AUTH_CONSTANTS.PASSWORD_REQUIREMENTS.MIN_LENGTH, max: AUTH_CONSTANTS.PASSWORD_REQUIREMENTS.MAX_LENGTH })
-      .withMessage(`Password must be between ${AUTH_CONSTANTS.PASSWORD_REQUIREMENTS.MIN_LENGTH} and ${AUTH_CONSTANTS.PASSWORD_REQUIREMENTS.MAX_LENGTH} characters`)
-      .custom((value) => {
-        if (AUTH_CONSTANTS.PASSWORD_REQUIREMENTS.REQUIRE_UPPERCASE && !/[A-Z]/.test(value)) {
-          throw new Error('Password must contain at least one uppercase letter');
-        }
-        if (AUTH_CONSTANTS.PASSWORD_REQUIREMENTS.REQUIRE_LOWERCASE && !/[a-z]/.test(value)) {
-          throw new Error('Password must contain at least one lowercase letter');
-        }
-        if (AUTH_CONSTANTS.PASSWORD_REQUIREMENTS.REQUIRE_NUMBERS && !/\d/.test(value)) {
-          throw new Error('Password must contain at least one number');
-        }
-        if (AUTH_CONSTANTS.PASSWORD_REQUIREMENTS.REQUIRE_SPECIAL_CHARS && !/[!@#$%^&*(),.?":{}|<>]/.test(value)) {
-          throw new Error('Password must contain at least one special character');
-        }
-        return true;
-      }),
+      .withMessage(`Password must be between ${AUTH_CONSTANTS.PASSWORD_REQUIREMENTS.MIN_LENGTH} and ${AUTH_CONSTANTS.PASSWORD_REQUIREMENTS.MAX_LENGTH} characters`),
+
+    // Separate validation chains for each password requirement
+    body('password')
+      .if(() => AUTH_CONSTANTS.PASSWORD_REQUIREMENTS.REQUIRE_UPPERCASE)
+      .matches(/[A-Z]/)
+      .withMessage('Password must contain at least one uppercase letter'),
+
+    body('password')
+      .if(() => AUTH_CONSTANTS.PASSWORD_REQUIREMENTS.REQUIRE_LOWERCASE)
+      .matches(/[a-z]/)
+      .withMessage('Password must contain at least one lowercase letter'),
+
+    body('password')
+      .if(() => AUTH_CONSTANTS.PASSWORD_REQUIREMENTS.REQUIRE_NUMBERS)
+      .matches(/\d/)
+      .withMessage('Password must contain at least one number'),
+
+    body('password')
+      .if(() => AUTH_CONSTANTS.PASSWORD_REQUIREMENTS.REQUIRE_SPECIAL_CHARS)
+      .matches(/[!@#$%^&*(),.?":{}|<>]/)
+      .withMessage('Password must contain at least one special character'),
 
     body('confirmPassword')
       .custom((value, { req }) => {
