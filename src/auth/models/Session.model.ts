@@ -22,7 +22,6 @@ export class SessionModel {
   private static tableName = DATABASE_TABLES.SESSIONS;
 
   static async create(sessionData: CreateSessionData): Promise<Session> {
-    // Remove created_at, updated_at from INSERT - they have DEFAULT NOW()
     const query = `
       INSERT INTO ${this.tableName} (
         user_id, token, type, expires_at
@@ -31,7 +30,7 @@ export class SessionModel {
     `;
 
     const values = [
-      parseInt(sessionData.userId), // Convert string to INTEGER for database
+      parseInt(sessionData.userId),
       sessionData.token,
       sessionData.type,
       sessionData.expiresAt
@@ -40,10 +39,9 @@ export class SessionModel {
     const result = await database.query<any>(query, values);
     const dbSession = result.rows[0];
     
-    // Convert database snake_case to TypeScript camelCase
     return {
       id: dbSession.id.toString(),
-      userId: dbSession.user_id.toString(), // Convert back to string for interface
+      userId: dbSession.user_id.toString(),
       token: dbSession.token,
       type: dbSession.type,
       expiresAt: dbSession.expires_at,
@@ -64,7 +62,6 @@ export class SessionModel {
 
     const dbSession = result.rows[0];
     
-    // Convert database snake_case to TypeScript camelCase
     return {
       id: dbSession.id.toString(),
       userId: dbSession.user_id.toString(),
@@ -83,7 +80,7 @@ export class SessionModel {
       WHERE user_id = $1 AND expires_at > NOW()
     `;
     
-    const values = [parseInt(userId)]; // Convert string to INTEGER
+    const values: any[] = [parseInt(userId)];
 
     if (type) {
       query += ' AND type = $2';
@@ -94,7 +91,6 @@ export class SessionModel {
 
     const result = await database.query<any>(query, values);
     
-    // Convert all database results to TypeScript format
     return result.rows.map((dbSession: any) => ({
       id: dbSession.id.toString(),
       userId: dbSession.user_id.toString(),
@@ -113,7 +109,7 @@ export class SessionModel {
 
   static async deleteByUserId(userId: string, type?: string): Promise<void> {
     let query = `DELETE FROM ${this.tableName} WHERE user_id = $1`;
-    const values = [parseInt(userId)]; // Convert string to INTEGER
+    const values: any[] = [parseInt(userId)];
 
     if (type) {
       query += ' AND type = $2';
@@ -139,3 +135,4 @@ export class SessionModel {
     await database.query(query, [expiresAt, token]);
   }
 }
+
