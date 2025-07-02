@@ -156,7 +156,7 @@ class DatabaseConnection implements DatabaseClient {
         CREATE TABLE IF NOT EXISTS sessions (
           id SERIAL PRIMARY KEY,
           user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-          token VARCHAR(255) UNIQUE NOT NULL,
+          token TEXT UNIQUE NOT NULL,
           type VARCHAR(50) NOT NULL,
           expires_at TIMESTAMP NOT NULL,
           created_at TIMESTAMP DEFAULT NOW(),
