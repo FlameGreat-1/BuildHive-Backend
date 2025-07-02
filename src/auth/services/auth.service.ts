@@ -65,7 +65,7 @@ export class AuthService {
         message: 'Registration successful. Please check your email to verify your account.',
         user: {
           ...userData,
-          createdAt: userData.createdAt.toISOString()
+          createdAt: userData.createdAt ? userData.createdAt.toISOString() : user.createdAt.toISOString()
         },
         requiresVerification: true,
         verificationSent: true
@@ -104,7 +104,7 @@ export class AuthService {
           message: 'Social account already registered. Please login.',
           user: {
             ...userData,
-            createdAt: userData.createdAt.toISOString()
+            createdAt: userData.createdAt ? userData.createdAt.toISOString() : existingUser.createdAt.toISOString()
           },
           requiresVerification: false,
           verificationSent: false
@@ -133,7 +133,7 @@ export class AuthService {
         message: 'Social registration successful.',
         user: {
           ...userData,
-          createdAt: userData.createdAt.toISOString()
+          createdAt: userData.createdAt ? userData.createdAt.toISOString() : user.createdAt.toISOString()
         },
         requiresVerification: false,
         verificationSent: false
