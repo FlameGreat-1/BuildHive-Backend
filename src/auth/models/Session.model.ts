@@ -22,22 +22,34 @@ export class SessionModel {
   private static tableName = DATABASE_TABLES.SESSIONS;
 
   static async create(sessionData: CreateSessionData): Promise<Session> {
+    // Remove created_at, updated_at from INSERT - they have DEFAULT NOW()
     const query = `
       INSERT INTO ${this.tableName} (
-        user_id, token, type, expires_at, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, NOW(), NOW())
+        user_id, token, type, expires_at
+      ) VALUES ($1, $2, $3, $4)
       RETURNING id, user_id, token, type, expires_at, created_at, updated_at
     `;
 
     const values = [
-      sessionData.userId,
+      parseInt(sessionData.userId), // Convert string to INTEGER for database
       sessionData.token,
       sessionData.type,
       sessionData.expiresAt
     ];
 
-    const result = await database.query<Session>(query, values);
-    return result.rows[0];
+    const result = await database.query<any>(query, values);
+    const dbSession = result.rows[0];
+    
+    // Convert database snake_case to TypeScript camelCase
+    return {
+      id: dbSession.id.toString(),
+      userId: dbSession.user_id.toString(), // Convert back to string for interface
+      token: dbSession.token,
+      type: dbSession.type,
+      expiresAt: dbSession.expires_at,
+      createdAt: dbSession.created_at,
+      updatedAt: dbSession.updated_at
+    };
   }
 
   static async findByToken(token: string): Promise<Session | null> {
@@ -47,8 +59,21 @@ export class SessionModel {
       WHERE token = $1 AND expires_at > NOW()
     `;
 
-    const result = await database.query<Session>(query, [token]);
-    return result.rows[0] || null;
+    const result = await database.query<any>(query, [token]);
+    if (!result.rows[0]) return null;
+
+    const dbSession = result.rows[0];
+    
+    // Convert database snake_case to TypeScript camelCase
+    return {
+      id: dbSession.id.toString(),
+      userId: dbSession.user_id.toString(),
+      token: dbSession.token,
+      type: dbSession.type,
+      expiresAt: dbSession.expires_at,
+      createdAt: dbSession.created_at,
+      updatedAt: dbSession.updated_at
+    };
   }
 
   static async findByUserId(userId: string, type?: string): Promise<Session[]> {
@@ -58,7 +83,7 @@ export class SessionModel {
       WHERE user_id = $1 AND expires_at > NOW()
     `;
     
-    const values = [userId];
+    const values = [parseInt(userId)]; // Convert string to INTEGER
 
     if (type) {
       query += ' AND type = $2';
@@ -67,8 +92,18 @@ export class SessionModel {
 
     query += ' ORDER BY created_at DESC';
 
-    const result = await database.query<Session>(query, values);
-    return result.rows;
+    const result = await database.query<any>(query, values);
+    
+    // Convert all database results to TypeScript format
+    return result.rows.map((dbSession: any) => ({
+      id: dbSession.id.toString(),
+      userId: dbSession.user_id.toString(),
+      token: dbSession.token,
+      type: dbSession.type,
+      expiresAt: dbSession.expires_at,
+      createdAt: dbSession.created_at,
+      updatedAt: dbSession.updated_at
+    }));
   }
 
   static async deleteByToken(token: string): Promise<void> {
@@ -78,7 +113,7 @@ export class SessionModel {
 
   static async deleteByUserId(userId: string, type?: string): Promise<void> {
     let query = `DELETE FROM ${this.tableName} WHERE user_id = $1`;
-    const values = [userId];
+    const values = [parseInt(userId)]; // Convert string to INTEGER
 
     if (type) {
       query += ' AND type = $2';
