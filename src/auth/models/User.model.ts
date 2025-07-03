@@ -49,6 +49,11 @@ export class UserModel {
   }
 
   static async findByEmail(email: string): Promise<User | null> {
+    console.log('🔍 UserModel.findByEmail() called');
+    console.log('📧 Email parameter:', email);
+    console.log('🏷️ Table name:', this.tableName);
+    console.log('📊 DATABASE_TABLES:', DATABASE_TABLES);
+    
     const query = `
       SELECT id, username, email, password_hash, role, status, 
              auth_provider, social_id, email_verified, 
@@ -60,30 +65,62 @@ export class UserModel {
       WHERE email = $1
     `;
 
-    const result = await database.query<any>(query, [email]);
-    if (!result.rows[0]) return null;
+    console.log('📝 Generated SQL query:', query);
+    console.log('🔢 Query parameters:', [email]);
 
-    const row = result.rows[0];
-    return {
-      id: row.id,
-      username: row.username,
-      email: row.email,
-      passwordHash: row.password_hash,
-      role: row.role,
-      status: row.status,
-      authProvider: row.auth_provider,
-      socialId: row.social_id,
-      emailVerified: row.email_verified,
-      emailVerificationToken: row.email_verification_token,
-      emailVerificationExpires: row.email_verification_expires,
-      passwordResetToken: row.password_reset_token,
-      passwordResetExpires: row.password_reset_expires,
-      loginAttempts: row.login_attempts || 0,
-      lockedUntil: row.locked_until,
-      lastLoginAt: row.last_login_at,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at
-    };
+    try {
+      console.log('⚡ Executing database query...');
+      const result = await database.query<any>(query, [email]);
+      
+      console.log('✅ Query executed successfully');
+      console.log('📊 Query result:', {
+        rowCount: result.rowCount,
+        rows: result.rows,
+        command: result.command
+      });
+      
+      if (!result.rows[0]) {
+        console.log('❌ No user found with email:', email);
+        return null;
+      }
+
+      const row = result.rows[0];
+      console.log('👤 User found:', {
+        id: row.id,
+        username: row.username,
+        email: row.email,
+        role: row.role,
+        status: row.status
+      });
+
+      return {
+        id: row.id,
+        username: row.username,
+        email: row.email,
+        passwordHash: row.password_hash,
+        role: row.role,
+        status: row.status,
+        authProvider: row.auth_provider,
+        socialId: row.social_id,
+        emailVerified: row.email_verified,
+        emailVerificationToken: row.email_verification_token,
+        emailVerificationExpires: row.email_verification_expires,
+        passwordResetToken: row.password_reset_token,
+        passwordResetExpires: row.password_reset_expires,
+        loginAttempts: row.login_attempts || 0,
+        lockedUntil: row.locked_until,
+        lastLoginAt: row.last_login_at,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at
+      };
+    } catch (error) {
+      console.error('💥 Database query error in findByEmail:');
+      console.error('❌ Error details:', error);
+      console.error('📝 Failed query:', query);
+      console.error('🔢 Failed parameters:', [email]);
+      console.error('🏷️ Table name used:', this.tableName);
+      throw error;
+    }
   }
 
   static async findByUsername(username: string): Promise<User | null> {
