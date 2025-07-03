@@ -9,8 +9,7 @@ import {
   securityHeaders,
   addSecurityHeaders,
   validateOrigin,
-  requestLogger,
-  sensitiveDataFilter
+  requestLogger
 } from './shared/middleware';
 import { 
   registrationLogger,
@@ -45,7 +44,6 @@ export async function createApp(): Promise<Application> {
     app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
     app.use(requestLogger);
-    app.use(sensitiveDataFilter);
 
     app.get('/health', (req: Request, res: Response) => {
       res.json({
