@@ -35,8 +35,7 @@ import {
   passwordResetRateLimit,
   changePasswordRateLimit,
   refreshTokenRateLimit,
-  logoutRateLimit,
-  sensitiveDataFilter
+  logoutRateLimit
 } from '../../shared/middleware';
 
 const router = Router();
@@ -46,7 +45,6 @@ router.post(
   '/register/local',
   registrationRateLimit,
   validateContentType,
-  sensitiveDataFilter,
   registrationLogger,
   sanitizeRegistrationInput,
   validateLocalRegistration(),
