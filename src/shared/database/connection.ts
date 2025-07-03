@@ -105,8 +105,42 @@ class DatabaseConnection implements DatabaseClient {
     }
   }
 
+  async addMissingColumns(): Promise<void> {
+    try {
+      logger.info('Checking and adding missing columns to users table...');
+
+      // Add missing columns to users table if they don't exist
+      const alterQueries = [
+        `ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verification_token VARCHAR(255);`,
+        `ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verification_expires TIMESTAMP;`,
+        `ALTER TABLE users ADD COLUMN IF NOT EXISTS password_reset_token VARCHAR(255);`,
+        `ALTER TABLE users ADD COLUMN IF NOT EXISTS password_reset_expires TIMESTAMP;`,
+        `ALTER TABLE users ADD COLUMN IF NOT EXISTS login_attempts INTEGER DEFAULT 0;`,
+        `ALTER TABLE users ADD COLUMN IF NOT EXISTS locked_until TIMESTAMP;`,
+        `ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMP;`
+      ];
+
+      for (const query of alterQueries) {
+        try {
+          await this.query(query);
+          logger.info(`Executed: ${query}`);
+        } catch (error: any) {
+          // Log but don't throw - column might already exist
+          logger.warn(`Column might already exist: ${error.message}`);
+        }
+      }
+
+      logger.info('Missing columns check completed');
+    } catch (error) {
+      logger.error('Failed to add missing columns:', error);
+      throw error;
+    }
+  }
+
   async createTables(): Promise<void> {
     try {
+      logger.info('Creating database tables...');
+
       const createUsersTable = `
         CREATE TABLE IF NOT EXISTS users (
           id SERIAL PRIMARY KEY,
@@ -131,6 +165,10 @@ class DatabaseConnection implements DatabaseClient {
       `;
 
       await this.query(createUsersTable);
+      logger.info('Users table created/verified');
+
+      // Add missing columns to existing users table
+      await this.addMissingColumns();
       
       await this.query('DROP TABLE IF EXISTS profiles CASCADE');
       await this.query('DROP TABLE IF EXISTS sessions CASCADE');
@@ -166,11 +204,33 @@ class DatabaseConnection implements DatabaseClient {
       `;
 
       await this.query(createProfilesTable);
+      logger.info('Profiles table created/verified');
+      
       await this.query(createSessionsTable);
+      logger.info('Sessions table created/verified');
       
       logger.info('Database tables created successfully');
     } catch (error) {
       logger.error('Failed to create database tables:', error);
+      throw error;
+    }
+  }
+
+  async recreateTables(): Promise<void> {
+    try {
+      logger.info('Recreating database tables...');
+
+      // Drop all tables in correct order (due to foreign key constraints)
+      await this.query('DROP TABLE IF EXISTS sessions CASCADE');
+      await this.query('DROP TABLE IF EXISTS profiles CASCADE');
+      await this.query('DROP TABLE IF EXISTS users CASCADE');
+
+      // Recreate all tables
+      await this.createTables();
+      
+      logger.info('Database tables recreated successfully');
+    } catch (error) {
+      logger.error('Failed to recreate database tables:', error);
       throw error;
     }
   }
@@ -241,6 +301,22 @@ export const initializeDatabase = async (): Promise<void> => {
     logger.info('Database initialized successfully');
   } catch (error) {
     logger.error('Failed to initialize database:', error);
+    throw error;
+  }
+};
+
+export const recreateDatabase = async (): Promise<void> => {
+  try {
+    const isHealthy = await database.healthCheck();
+    if (!isHealthy) {
+      throw new Error('Database health check failed');
+    }
+    
+    await database.recreateTables();
+    
+    logger.info('Database recreated successfully');
+  } catch (error) {
+    logger.error('Failed to recreate database:', error);
     throw error;
   }
 };
