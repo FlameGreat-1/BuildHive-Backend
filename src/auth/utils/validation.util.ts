@@ -245,10 +245,14 @@ export const validateChangePassword = (data: {
     });
   }
 
+  console.log('DEBUG SERVICE LAYER - newPassword:', JSON.stringify(data.newPassword));
+  console.log('DEBUG SERVICE LAYER - confirmPassword:', JSON.stringify(data.confirmPassword));
+  console.log('DEBUG SERVICE LAYER - Are they equal?:', data.newPassword === data.confirmPassword);
+
   if (data.newPassword !== data.confirmPassword) {
     errors.push({
       field: 'confirmPassword',
-      message: 'Passwords do not match',
+      message: 'Password confirmation does not match new password',
       code: 'PASSWORDS_MISMATCH'
     });
   }
