@@ -71,11 +71,10 @@ export const validatePasswordResetConfirm = (): ValidationChain[] => {
 
     body('confirmPassword')
       .custom((value, { req }) => {
-      console.log('DEBUG CHANGE PASSWORD - req.body.newPassword:', JSON.stringify(req.body.newPassword));
-     console.log('DEBUG CHANGE PASSWORD - confirmPassword value:', JSON.stringify(value));
-     console.log('DEBUG CHANGE PASSWORD - Are they equal?:', value === req.body.newPassword);
-       
-
+        console.log('DEBUG RESET PASSWORD - req.body.newPassword:', JSON.stringify(req.body.newPassword));
+        console.log('DEBUG RESET PASSWORD - confirmPassword value:', JSON.stringify(value));
+        console.log('DEBUG RESET PASSWORD - Are they equal?:', value === req.body.newPassword);
+        
         if (value !== req.body.newPassword) {
           throw new Error('Password confirmation does not match new password');
         }
@@ -116,6 +115,10 @@ export const validateChangePassword = (): ValidationChain[] => {
 
     body('confirmPassword')
       .custom((value, { req }) => {
+        console.log('DEBUG CHANGE PASSWORD - req.body.newPassword:', JSON.stringify(req.body.newPassword));
+        console.log('DEBUG CHANGE PASSWORD - confirmPassword value:', JSON.stringify(value));
+        console.log('DEBUG CHANGE PASSWORD - Are they equal?:', value === req.body.newPassword);
+        
         if (value !== req.body.newPassword) {
           throw new Error('Password confirmation does not match new password');
         }
