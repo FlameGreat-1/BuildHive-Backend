@@ -20,6 +20,7 @@ export interface Job {
   dueDate: Date;
   estimatedDuration: number;
   hoursWorked: number;
+  totalCost?: number;
   notes: string[];
   tags: JobTag[];
   materials: Material[];
@@ -103,6 +104,12 @@ export interface JobSummary {
   onHold: number;
   totalRevenue: number;
   averageHours: number;
+  totalJobs: number;
+  activeJobs: number;
+  completedJobs: number;
+  pendingJobs: number;
+  overdueJobs: number;
+  averageJobValue: number;
 }
 
 export interface Client {
@@ -182,6 +189,7 @@ export interface Material {
   unitCost: number;
   totalCost: number;
   supplier?: string;
+  notes?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -192,6 +200,7 @@ export interface CreateMaterialData {
   unit: MaterialUnit;
   unitCost: number;
   supplier?: string;
+  notes?: string;
 }
 
 export interface UpdateMaterialData {
@@ -200,6 +209,7 @@ export interface UpdateMaterialData {
   unit?: MaterialUnit;
   unitCost?: number;
   supplier?: string;
+  notes?: string;
 }
 
 export interface JobAttachment {
@@ -210,6 +220,8 @@ export interface JobAttachment {
   filePath: string;
   fileSize: number;
   mimeType: string;
+  path: string;
+  size: number;
   uploadedAt: Date;
 }
 
@@ -240,6 +252,20 @@ export interface JobStatistics {
   completionRate: number;
   clientCount: number;
   materialCosts: number;
+  jobsByStatus: Record<JobStatus, number>;
+  jobsByType: Record<JobType, number>;
+  jobsByPriority: Record<JobPriority, number>;
+  monthlyStats: Array<{
+    month: string;
+    jobsCompleted: number;
+    revenue: number;
+  }>;
+}
+
+export interface ValidationError {
+  field: string;
+  message: string;
+  code: string;
 }
 
 export enum JobStatus {
@@ -256,11 +282,19 @@ export enum JobType {
   CARPENTRY = 'carpentry',
   PAINTING = 'painting',
   ROOFING = 'roofing',
+  FLOORING = 'flooring',
+  TILING = 'tiling',
   HVAC = 'hvac',
   LANDSCAPING = 'landscaping',
   CLEANING = 'cleaning',
+  MAINTENANCE = 'maintenance',
+  RENOVATION = 'renovation',
+  INSTALLATION = 'installation',
+  REPAIR = 'repair',
+  INSPECTION = 'inspection',
   HANDYMAN = 'handyman',
-  GENERAL = 'general'
+  GENERAL = 'general',
+  OTHER = 'other'
 }
 
 export enum JobPriority {

@@ -1,3 +1,45 @@
+export const CLIENT_CONSTANTS = {
+  TAGS: {
+    VIP: 'vip',
+    REPEAT_CUSTOMER: 'repeat_customer',
+    HIGH_VALUE: 'high_value',
+    DIFFICULT: 'difficult',
+    PREFERRED: 'preferred',
+    CORPORATE: 'corporate',
+    RESIDENTIAL: 'residential'
+  },
+  
+  VALIDATION: {
+    NAME_MIN_LENGTH: 2,
+    NAME_MAX_LENGTH: 100,
+    EMAIL_MAX_LENGTH: 255,
+    PHONE_MIN_LENGTH: 8,
+    PHONE_MAX_LENGTH: 20,
+    COMPANY_MAX_LENGTH: 100,
+    ADDRESS_MAX_LENGTH: 500,
+    NOTES_MAX_LENGTH: 2000,
+    MAX_TAGS: 10
+  }
+} as const;
+
+export const MATERIAL_CONSTANTS = {
+  VALIDATION: {
+    NAME_MIN_LENGTH: 2,
+    NAME_MAX_LENGTH: 200,
+    MIN_QUANTITY: 0.01,
+    MAX_QUANTITY: 99999.99,
+    MIN_UNIT_COST: 0,
+    MAX_UNIT_COST: 999999.99,
+    SUPPLIER_MAX_LENGTH: 100
+  },
+  
+  CALCULATION: {
+    DECIMAL_PLACES: 2,
+    TAX_RATE: 0.10
+  }
+} as const;
+
+
 export const JOB_CONSTANTS = {
   STATUS: {
     PENDING: 'pending',
@@ -13,11 +55,19 @@ export const JOB_CONSTANTS = {
     CARPENTRY: 'carpentry',
     PAINTING: 'painting',
     ROOFING: 'roofing',
+    FLOORING: 'flooring',
+    TILING: 'tiling',
     HVAC: 'hvac',
     LANDSCAPING: 'landscaping',
     CLEANING: 'cleaning',
+    MAINTENANCE: 'maintenance',
+    RENOVATION: 'renovation',
+    INSTALLATION: 'installation',
+    REPAIR: 'repair',
+    INSPECTION: 'inspection',
     HANDYMAN: 'handyman',
-    GENERAL: 'general'
+    GENERAL: 'general',
+    OTHER: 'other'
   },
   
   PRIORITY: {
@@ -67,6 +117,7 @@ export const JOB_CONSTANTS = {
     NOTES_MAX_LENGTH: 1000,
     MAX_MATERIALS_PER_JOB: 100,
     MAX_ATTACHMENTS_PER_JOB: 20,
+    MAX_FILES_PER_JOB: 20,
     MAX_FILE_SIZE: 10 * 1024 * 1024,
     MIN_ESTIMATED_DURATION: 0.5,
     MAX_ESTIMATED_DURATION: 720,
@@ -100,6 +151,46 @@ export const JOB_CONSTANTS = {
       '.docx',
       '.txt'
     ]
+  },
+
+  FILE_UPLOAD: {
+    UPLOAD_PATH: 'uploads/jobs',
+    MAX_FILE_SIZE: 10 * 1024 * 1024,
+    ALLOWED_TYPES: [
+      'image/jpeg',
+      'image/png',
+      'image/gif',
+      'image/webp',
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'text/plain'
+    ]
+  },
+
+  RATE_LIMITS: {
+    JOB_CREATION: {
+      WINDOW_MS: 15 * 60 * 1000,
+      MAX_REQUESTS: 10
+    },
+    FILE_UPLOAD: {
+      WINDOW_MS: 15 * 60 * 1000,
+      MAX_REQUESTS: 20
+    },
+    JOB_UPDATE: {
+      WINDOW_MS: 15 * 60 * 1000,
+      MAX_REQUESTS: 50
+    },
+    GENERAL: {
+      WINDOW_MS: 15 * 60 * 1000,
+      MAX_REQUESTS: 100
+    }
+  },
+
+  CALCULATIONS: {
+    DEFAULT_HOURLY_RATE: 75,
+    OVERHEAD_PERCENTAGE: 0.15,
+    TAX_RATE: 0.10
   },
   
   PAGINATION: {
@@ -197,6 +288,11 @@ export const CLIENT_CONSTANTS = {
     ADDRESS_MAX_LENGTH: 500,
     NOTES_MAX_LENGTH: 2000,
     MAX_TAGS: 10
+  },
+
+  VIP_THRESHOLDS: {
+    REVENUE: 10000,
+    JOB_COUNT: 10
   }
 } as const;
 
@@ -216,3 +312,4 @@ export const MATERIAL_CONSTANTS = {
     TAX_RATE: 0.10
   }
 } as const;
+

@@ -8,18 +8,22 @@ import {
   logger 
 } from '../../shared/utils';
 import { jobRepository, clientRepository } from '../repositories';
+import { Job, Client } from '../types';
 
 export interface AuthenticatedRequest extends Request {
   user: {
-    id: number;
+    id: string;
     email: string;
     role: string;
+    emailVerified: boolean;
   };
+  job?: Job;
+  client?: Client;
 }
 
 export const requireJobOwnership = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const tradieId = req.user.id;
+    const tradieId = parseInt(req.user.id);
     const jobId = parseInt(req.params.id || req.params.jobId);
 
     if (isNaN(jobId)) {
@@ -62,7 +66,7 @@ export const requireJobOwnership = async (req: AuthenticatedRequest, res: Respon
 
 export const requireClientOwnership = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const tradieId = req.user.id;
+    const tradieId = parseInt(req.user.id);
     const clientId = parseInt(req.params.id || req.params.clientId);
 
     if (isNaN(clientId)) {

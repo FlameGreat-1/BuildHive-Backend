@@ -151,3 +151,27 @@ export const sendPaginatedJobResponse = <T = any>(
 ): Response => {
   return sendSuccess(res, message, { jobs, meta });
 };
+
+export const sendSuccessResponse = <T = any>(
+  res: Response,
+  message: string,
+  data?: T,
+  statusCode: number = HTTP_STATUS_CODES.OK
+): Response => {
+  return sendSuccess(res, message, data, statusCode);
+};
+
+export const sendErrorResponse = (
+  res: Response,
+  message: string,
+  statusCode: number = HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR
+): Response => {
+  return sendError(res, message, statusCode);
+};
+
+export const sendNotFoundResponse = (
+  res: Response,
+  message: string = 'Resource not found'
+): Response => {
+  return sendError(res, message, HTTP_STATUS_CODES.NOT_FOUND);
+};
