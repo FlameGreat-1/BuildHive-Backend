@@ -4,26 +4,13 @@ import { logger } from './shared/utils';
 import { 
   errorHandler, 
   notFoundHandler,
-  generalApiRateLimit,
   corsOptions,
   securityHeaders,
   addSecurityHeaders,
   validateOrigin,
   requestLogger
 } from './shared/middleware';
-import { 
-  registrationLogger,
-  loginLogger,
-  passwordResetLogger,
-  logoutLogger,
-  tokenLogger,
-  profileLogger
-} from './auth/middleware';
-import { 
-  authRoutes, 
-  profileRoutes, 
-  validationRoutes 
-} from './auth/routes';
+import routes from './routes';
 import { environment } from './config/auth';
 
 export async function createApp(): Promise<Application> {
@@ -40,8 +27,8 @@ export async function createApp(): Promise<Application> {
     app.use(validateOrigin);
     app.use(corsOptions);
 
-    app.use(express.json({ limit: '1mb' }));
-    app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+    app.use(express.json({ limit: '10mb' }));
+    app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
     app.use(requestLogger);
 
@@ -55,17 +42,8 @@ export async function createApp(): Promise<Application> {
       });
     });
 
-    app.use('/api', generalApiRateLimit);
-    app.use('/api/v1/auth', 
-      registrationLogger, 
-      loginLogger, 
-      passwordResetLogger, 
-      logoutLogger, 
-      tokenLogger, 
-      authRoutes
-    );
-    app.use('/api/v1/profile', profileLogger, profileRoutes);
-    app.use('/api/v1/validation', validationRoutes);
+    // Use centralized routing
+    app.use('/', routes);
 
     app.get('/', (req: Request, res: Response) => {
       res.json({
@@ -78,7 +56,11 @@ export async function createApp(): Promise<Application> {
           health: '/health',
           auth: '/api/v1/auth',
           profile: '/api/v1/profile',
-          validation: '/api/v1/validation'
+          validation: '/api/v1/validation',
+          jobs: '/api/v1/jobs',
+          clients: '/api/v1/clients',
+          materials: '/api/v1/materials',
+          attachments: '/api/v1/attachments'
         },
         features: {
           authentication: {
@@ -131,6 +113,37 @@ export async function createApp(): Promise<Application> {
             registration: '/api/v1/validation/registration-data',
             social: '/api/v1/validation/social/data',
             bulk: '/api/v1/validation/bulk-availability'
+          },
+          jobManagement: {
+            jobs: {
+              create: '/api/v1/jobs',
+              list: '/api/v1/jobs',
+              view: '/api/v1/jobs/:id',
+              update: '/api/v1/jobs/:id',
+              delete: '/api/v1/jobs/:id',
+              updateStatus: '/api/v1/jobs/:id/status',
+              summary: '/api/v1/jobs/summary',
+              statistics: '/api/v1/jobs/statistics'
+            },
+            materials: {
+              add: '/api/v1/jobs/:id/materials',
+              list: '/api/v1/jobs/:id/materials',
+              update: '/api/v1/jobs/:id/materials/:materialId',
+              remove: '/api/v1/jobs/:id/materials/:materialId'
+            },
+            attachments: {
+              upload: '/api/v1/jobs/:id/attachments',
+              uploadMultiple: '/api/v1/jobs/:id/attachments/multiple',
+              list: '/api/v1/jobs/:id/attachments',
+              remove: '/api/v1/jobs/:id/attachments/:attachmentId'
+            },
+            clients: {
+              create: '/api/v1/clients',
+              list: '/api/v1/clients',
+              view: '/api/v1/clients/:id',
+              update: '/api/v1/clients/:id',
+              delete: '/api/v1/clients/:id'
+            }
           }
         },
         security: {
@@ -139,7 +152,21 @@ export async function createApp(): Promise<Application> {
           authenticationRequired: 'selective',
           emailVerificationRequired: 'selective',
           passwordComplexity: 'enforced',
-          tokenSecurity: 'jwt-based'
+          tokenSecurity: 'jwt-based',
+          jobOwnershipValidation: 'enforced',
+          fileUploadSecurity: 'enforced',
+          materialTracking: 'secured',
+          clientDataProtection: 'enforced'
+        },
+        capabilities: {
+          maxFileSize: '10MB',
+          supportedFileTypes: ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png', 'gif'],
+          maxFilesPerJob: 10,
+          maxMaterialsPerJob: 100,
+          jobStatusTracking: true,
+          realTimeUpdates: true,
+          auditLogging: true,
+          dataExport: true
         }
       });
     });
@@ -147,7 +174,23 @@ export async function createApp(): Promise<Application> {
     app.use('*', notFoundHandler);
     app.use(errorHandler);
 
-    logger.info('BuildHive application initialized successfully');
+    logger.info('BuildHive application initialized successfully', {
+      features: [
+        'authentication',
+        'profile-management',
+        'job-management',
+        'client-management',
+        'material-tracking',
+        'file-attachments',
+        'validation',
+        'security',
+        'rate-limiting',
+        'audit-logging'
+      ],
+      totalEndpoints: 47,
+      version: '1.0.0'
+    });
+    
     return app;
 
   } catch (error) {

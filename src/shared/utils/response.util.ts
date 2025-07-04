@@ -80,3 +80,74 @@ export const attachRequestId = (res: Response, requestId: string): void => {
   res.locals.requestId = requestId;
   res.setHeader('X-Request-ID', requestId);
 };
+
+export const sendJobSuccess = <T = any>(
+  res: Response,
+  message: string,
+  data?: T,
+  statusCode: number = HTTP_STATUS_CODES.OK
+): Response => {
+  return sendSuccess(res, message, data, statusCode);
+};
+
+export const sendJobCreated = <T = any>(
+  res: Response,
+  message: string,
+  data?: T
+): Response => {
+  return sendCreated(res, message, data);
+};
+
+export const sendJobNotFound = (
+  res: Response,
+  message: string = 'Job not found'
+): Response => {
+  return sendError(res, message, HTTP_STATUS_CODES.NOT_FOUND);
+};
+
+export const sendUnauthorizedJobAccess = (
+  res: Response,
+  message: string = 'Unauthorized access to job'
+): Response => {
+  return sendError(res, message, HTTP_STATUS_CODES.FORBIDDEN);
+};
+
+export const sendJobValidationError = (
+  res: Response,
+  message: string,
+  errors: ValidationError[]
+): Response => {
+  return sendValidationError(res, message, errors);
+};
+
+export const sendClientNotFound = (
+  res: Response,
+  message: string = 'Client not found'
+): Response => {
+  return sendError(res, message, HTTP_STATUS_CODES.NOT_FOUND);
+};
+
+export const sendFileUploadError = (
+  res: Response,
+  message: string = 'File upload failed'
+): Response => {
+  return sendError(res, message, HTTP_STATUS_CODES.BAD_REQUEST);
+};
+
+export const sendJobListResponse = <T = any>(
+  res: Response,
+  message: string,
+  jobs: T[],
+  summary: any
+): Response => {
+  return sendSuccess(res, message, { jobs, summary });
+};
+
+export const sendPaginatedJobResponse = <T = any>(
+  res: Response,
+  message: string,
+  jobs: T[],
+  meta: any
+): Response => {
+  return sendSuccess(res, message, { jobs, meta });
+};

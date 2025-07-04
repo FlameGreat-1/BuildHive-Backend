@@ -149,3 +149,146 @@ export interface ErrorResponse {
   statusCode: number;
 }
 
+export interface CreateJobRequest {
+  title: string;
+  description: string;
+  jobType: string;
+  priority?: string;
+  clientName: string;
+  clientEmail: string;
+  clientPhone: string;
+  clientCompany?: string;
+  siteAddress: string;
+  siteCity: string;
+  siteState: string;
+  sitePostcode: string;
+  siteAccessInstructions?: string;
+  startDate: string;
+  dueDate: string;
+  estimatedDuration: number;
+  materials?: CreateMaterialRequest[];
+  notes?: string[];
+}
+
+export interface CreateMaterialRequest {
+  name: string;
+  quantity: number;
+  unit: string;
+  unitCost: number;
+  supplier?: string;
+}
+
+export interface UpdateJobRequest {
+  title?: string;
+  description?: string;
+  status?: string;
+  priority?: string;
+  hoursWorked?: number;
+  materials?: UpdateMaterialRequest[];
+  notes?: string[];
+  tags?: string[];
+}
+
+export interface UpdateMaterialRequest {
+  id?: number;
+  name?: string;
+  quantity?: number;
+  unit?: string;
+  unitCost?: number;
+  supplier?: string;
+}
+
+export interface JobResponse {
+  id: number;
+  tradieId: number;
+  clientId: number;
+  title: string;
+  description: string;
+  jobType: string;
+  status: string;
+  priority: string;
+  clientName: string;
+  clientEmail: string;
+  clientPhone: string;
+  clientCompany?: string;
+  siteAddress: string;
+  siteCity: string;
+  siteState: string;
+  sitePostcode: string;
+  siteAccessInstructions?: string;
+  startDate: string;
+  dueDate: string;
+  estimatedDuration: number;
+  hoursWorked: number;
+  notes: string[];
+  tags: string[];
+  materials: MaterialResponse[];
+  attachments: AttachmentResponse[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MaterialResponse {
+  id: number;
+  name: string;
+  quantity: number;
+  unit: string;
+  unitCost: number;
+  totalCost: number;
+  supplier?: string;
+}
+
+export interface AttachmentResponse {
+  id: number;
+  filename: string;
+  originalName: string;
+  fileSize: number;
+  mimeType: string;
+  uploadedAt: string;
+}
+
+export interface JobListResponse {
+  jobs: JobResponse[];
+  summary: {
+    total: number;
+    pending: number;
+    active: number;
+    completed: number;
+    cancelled: number;
+    onHold: number;
+  };
+}
+
+export interface ClientResponse {
+  id: number;
+  tradieId: number;
+  name: string;
+  email: string;
+  phone: string;
+  company?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  postcode?: string;
+  notes?: string;
+  tags: string[];
+  totalJobs: number;
+  totalRevenue: number;
+  lastJobDate?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface JobFilterRequest {
+  status?: string;
+  jobType?: string;
+  priority?: string;
+  clientId?: number;
+  startDate?: string;
+  endDate?: string;
+  tags?: string[];
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+}

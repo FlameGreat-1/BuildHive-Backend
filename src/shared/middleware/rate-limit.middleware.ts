@@ -175,3 +175,81 @@ export const logoutRateLimit = rateLimit({
     return req.ip === '127.0.0.1' || req.ip === '::1';
   }
 });
+
+export const jobCreationRateLimit = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 30,
+  message: 'Too many job creation attempts, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: createRateLimitHandler('Too many job creation attempts, please try again after 10 minutes'),
+  keyGenerator: (req: Request): string => {
+    const userId = req.user?.id;
+    return userId ? `job-create-${userId}` : req.ip || 'unknown';
+  }
+});
+
+export const jobUpdateRateLimit = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  max: 50,
+  message: 'Too many job update attempts, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: createRateLimitHandler('Too many job update attempts, please try again after 5 minutes'),
+  keyGenerator: (req: Request): string => {
+    const userId = req.user?.id;
+    return userId ? `job-update-${userId}` : req.ip || 'unknown';
+  }
+});
+
+export const fileUploadRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: 'Too many file upload attempts, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: createRateLimitHandler('Too many file upload attempts, please try again after 15 minutes'),
+  keyGenerator: (req: Request): string => {
+    const userId = req.user?.id;
+    return userId ? `file-upload-${userId}` : req.ip || 'unknown';
+  }
+});
+
+export const clientOperationRateLimit = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 40,
+  message: 'Too many client operations, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: createRateLimitHandler('Too many client operations, please try again after 10 minutes'),
+  keyGenerator: (req: Request): string => {
+    const userId = req.user?.id;
+    return userId ? `client-ops-${userId}` : req.ip || 'unknown';
+  }
+});
+
+export const materialUpdateRateLimit = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  max: 60,
+  message: 'Too many material updates, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: createRateLimitHandler('Too many material updates, please try again after 5 minutes'),
+  keyGenerator: (req: Request): string => {
+    const userId = req.user?.id;
+    return userId ? `material-update-${userId}` : req.ip || 'unknown';
+  }
+});
+
+export const jobSearchRateLimit = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 30,
+  message: 'Too many search requests, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: createRateLimitHandler('Too many search requests, please try again after 1 minute'),
+  keyGenerator: (req: Request): string => {
+    const userId = req.user?.id;
+    return userId ? `job-search-${userId}` : req.ip || 'unknown';
+  }
+});

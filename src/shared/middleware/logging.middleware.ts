@@ -64,6 +64,17 @@ export const sensitiveDataFilter = (
       filteredBody.socialData.accessToken = '[FILTERED]';
     }
 
+    if (filteredBody.clientPhone) {
+      filteredBody.clientPhone = filteredBody.clientPhone.replace(/(\d{3})\d{4}(\d{3})/, '$1****$2');
+    }
+
+    if (filteredBody.materials) {
+      filteredBody.materials = filteredBody.materials.map((material: any) => ({
+        ...material,
+        unitCost: material.unitCost ? '[FILTERED]' : material.unitCost
+      }));
+    }
+
     req.body = filteredBody;
   }
 
@@ -89,4 +100,128 @@ export const errorLogger = (
   });
 
   next(error);
+};
+
+export const jobOperationLogger = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const requestId = res.locals.requestId || 'unknown';
+  const userId = req.user?.id;
+  const jobId = req.params.jobId;
+
+  if (req.path.includes('/jobs')) {
+    const operation = req.method === 'POST' ? 'create' : 
+                     req.method === 'PUT' ? 'update' : 
+                     req.method === 'DELETE' ? 'delete' : 'read';
+
+    logger.info('Job operation initiated', {
+      requestId,
+      userId,
+      jobId,
+      operation,
+      method: req.method,
+      path: req.path,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  next();
+};
+
+export const clientOperationLogger = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const requestId = res.locals.requestId || 'unknown';
+  const userId = req.user?.id;
+  const clientId = req.params.clientId;
+
+  if (req.path.includes('/clients')) {
+    const operation = req.method === 'POST' ? 'create' : 
+                     req.method === 'PUT' ? 'update' : 
+                     req.method === 'DELETE' ? 'delete' : 'read';
+
+    logger.info('Client operation initiated', {
+      requestId,
+      userId,
+      clientId,
+      operation,
+      method: req.method,
+      path: req.path,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  next();
+};
+
+export const fileUploadLogger = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const requestId = res.locals.requestId || 'unknown';
+  const userId = req.user?.id;
+
+  if (req.file) {
+    logger.info('File upload initiated', {
+      requestId,
+      userId,
+      filename: req.file.filename,
+      originalName: req.file.originalname,
+      size: req.file.size,
+      mimetype: req.file.mimetype,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  next();
+};
+
+export const materialOperationLogger = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const requestId = res.locals.requestId || 'unknown';
+  const userId = req.user?.id;
+  const jobId = req.params.jobId;
+
+  if (req.body.materials && Array.isArray(req.body.materials)) {
+    logger.info('Material operation initiated', {
+      requestId,
+      userId,
+      jobId,
+      materialCount: req.body.materials.length,
+      operation: req.method === 'POST' ? 'add' : 'update',
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  next();
+};
+
+export const jobStatusChangeLogger = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const requestId = res.locals.requestId || 'unknown';
+  const userId = req.user?.id;
+  const jobId = req.params.jobId;
+
+  if (req.body.status && req.method === 'PUT') {
+    logger.info('Job status change initiated', {
+      requestId,
+      userId,
+      jobId,
+      newStatus: req.body.status,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  next();
 };

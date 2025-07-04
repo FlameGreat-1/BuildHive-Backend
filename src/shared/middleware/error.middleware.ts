@@ -87,3 +87,144 @@ export const asyncErrorHandler = (fn: Function) => {
     Promise.resolve(fn(req, res, next)).catch(next);
   };
 };
+
+export const jobErrorHandler = (
+  error: Error,
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Response | void => {
+  const requestId = res.locals.requestId || 'unknown';
+  const userId = req.user?.id;
+
+  if (error.message.includes('Job not found')) {
+    logger.warn('Job not found error', {
+      requestId,
+      userId,
+      path: req.path,
+      method: req.method,
+      jobId: req.params.jobId
+    });
+
+    const jobError = new AppError(
+      'Job not found',
+      HTTP_STATUS_CODES.NOT_FOUND,
+      'JOB_NOT_FOUND',
+      true,
+      requestId
+    );
+
+    const errorResponse = createErrorResponse(jobError, requestId);
+    return res.status(HTTP_STATUS_CODES.NOT_FOUND).json(errorResponse);
+  }
+
+  if (error.message.includes('Unauthorized access')) {
+    logger.warn('Unauthorized job access attempt', {
+      requestId,
+      userId,
+      path: req.path,
+      method: req.method,
+      jobId: req.params.jobId
+    });
+
+    const authError = new AppError(
+      'Unauthorized access to job',
+      HTTP_STATUS_CODES.FORBIDDEN,
+      'UNAUTHORIZED_JOB_ACCESS',
+      true,
+      requestId
+    );
+
+    const errorResponse = createErrorResponse(authError, requestId);
+    return res.status(HTTP_STATUS_CODES.FORBIDDEN).json(errorResponse);
+  }
+
+  return errorHandler(error, req, res, next);
+};
+
+export const clientErrorHandler = (
+  error: Error,
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Response | void => {
+  const requestId = res.locals.requestId || 'unknown';
+  const userId = req.user?.id;
+
+  if (error.message.includes('Client not found')) {
+    logger.warn('Client not found error', {
+      requestId,
+      userId,
+      path: req.path,
+      method: req.method,
+      clientId: req.params.clientId
+    });
+
+    const clientError = new AppError(
+      'Client not found',
+      HTTP_STATUS_CODES.NOT_FOUND,
+      'CLIENT_NOT_FOUND',
+      true,
+      requestId
+    );
+
+    const errorResponse = createErrorResponse(clientError, requestId);
+    return res.status(HTTP_STATUS_CODES.NOT_FOUND).json(errorResponse);
+  }
+
+  return errorHandler(error, req, res, next);
+};
+
+export const fileUploadErrorHandler = (
+  error: Error,
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Response | void => {
+  const requestId = res.locals.requestId || 'unknown';
+  const userId = req.user?.id;
+
+  if (error.message.includes('File too large')) {
+    logger.warn('File upload size error', {
+      requestId,
+      userId,
+      path: req.path,
+      method: req.method,
+      fileSize: req.file?.size
+    });
+
+    const fileError = new AppError(
+      'File size exceeds maximum allowed limit',
+      HTTP_STATUS_CODES.BAD_REQUEST,
+      'FILE_TOO_LARGE',
+      true,
+      requestId
+    );
+
+    const errorResponse = createErrorResponse(fileError, requestId);
+    return res.status(HTTP_STATUS_CODES.BAD_REQUEST).json(errorResponse);
+  }
+
+  if (error.message.includes('Invalid file type')) {
+    logger.warn('File upload type error', {
+      requestId,
+      userId,
+      path: req.path,
+      method: req.method,
+      fileType: req.file?.mimetype
+    });
+
+    const fileError = new AppError(
+      'Invalid file type. Only images and documents are allowed',
+      HTTP_STATUS_CODES.BAD_REQUEST,
+      'INVALID_FILE_TYPE',
+      true,
+      requestId
+    );
+
+    const errorResponse = createErrorResponse(fileError, requestId);
+    return res.status(HTTP_STATUS_CODES.BAD_REQUEST).json(errorResponse);
+  }
+
+  return errorHandler(error, req, res, next);
+};

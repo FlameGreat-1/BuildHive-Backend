@@ -109,7 +109,6 @@ class DatabaseConnection implements DatabaseClient {
     try {
       logger.info('Checking and adding missing columns to users table...');
 
-      // Add missing columns to users table if they don't exist
       const alterQueries = [
         `ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verification_token VARCHAR(255);`,
         `ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verification_expires TIMESTAMP;`,
@@ -125,7 +124,6 @@ class DatabaseConnection implements DatabaseClient {
           await this.query(query);
           logger.info(`Executed: ${query}`);
         } catch (error: any) {
-          // Log but don't throw - column might already exist
           logger.warn(`Column might already exist: ${error.message}`);
         }
       }
@@ -167,7 +165,6 @@ class DatabaseConnection implements DatabaseClient {
       await this.query(createUsersTable);
       logger.info('Users table created/verified');
 
-      // Add missing columns to existing users table
       await this.addMissingColumns();
       
       await this.query('DROP TABLE IF EXISTS profiles CASCADE');
@@ -208,6 +205,8 @@ class DatabaseConnection implements DatabaseClient {
       
       await this.query(createSessionsTable);
       logger.info('Sessions table created/verified');
+
+      await this.createJobTables();
       
       logger.info('Database tables created successfully');
     } catch (error) {
@@ -216,16 +215,158 @@ class DatabaseConnection implements DatabaseClient {
     }
   }
 
+  async createJobTables(): Promise<void> {
+    try {
+      logger.info('Creating job management tables...');
+
+      const createClientsTable = `
+        CREATE TABLE IF NOT EXISTS clients (
+          id SERIAL PRIMARY KEY,
+          tradie_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+          name VARCHAR(100) NOT NULL,
+          email VARCHAR(255) NOT NULL,
+          phone VARCHAR(20) NOT NULL,
+          company VARCHAR(100),
+          address TEXT,
+          city VARCHAR(50),
+          state VARCHAR(50),
+          postcode VARCHAR(10),
+          notes TEXT,
+          tags TEXT[] DEFAULT '{}',
+          total_jobs INTEGER DEFAULT 0,
+          total_revenue DECIMAL(10,2) DEFAULT 0.00,
+          last_job_date TIMESTAMP,
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW(),
+          UNIQUE(tradie_id, email)
+        );
+      `;
+
+      const createJobsTable = `
+        CREATE TABLE IF NOT EXISTS jobs (
+          id SERIAL PRIMARY KEY,
+          tradie_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+          client_id INTEGER REFERENCES clients(id) ON DELETE CASCADE,
+          title VARCHAR(200) NOT NULL,
+          description TEXT NOT NULL,
+          job_type VARCHAR(50) NOT NULL,
+          status VARCHAR(20) NOT NULL DEFAULT 'pending',
+          priority VARCHAR(20) NOT NULL DEFAULT 'medium',
+          client_name VARCHAR(100) NOT NULL,
+          client_email VARCHAR(255) NOT NULL,
+          client_phone VARCHAR(20) NOT NULL,
+          client_company VARCHAR(100),
+          site_address TEXT NOT NULL,
+          site_city VARCHAR(50) NOT NULL,
+          site_state VARCHAR(50) NOT NULL,
+          site_postcode VARCHAR(10) NOT NULL,
+          site_access_instructions TEXT,
+          start_date TIMESTAMP NOT NULL,
+          due_date TIMESTAMP NOT NULL,
+          estimated_duration INTEGER NOT NULL,
+          hours_worked DECIMAL(5,2) DEFAULT 0.00,
+          notes TEXT[] DEFAULT '{}',
+          tags TEXT[] DEFAULT '{}',
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW()
+        );
+      `;
+
+      const createMaterialsTable = `
+        CREATE TABLE IF NOT EXISTS materials (
+          id SERIAL PRIMARY KEY,
+          job_id INTEGER REFERENCES jobs(id) ON DELETE CASCADE,
+          name VARCHAR(200) NOT NULL,
+          quantity DECIMAL(10,2) NOT NULL,
+          unit VARCHAR(20) NOT NULL,
+          unit_cost DECIMAL(10,2) NOT NULL,
+          total_cost DECIMAL(10,2) NOT NULL,
+          supplier VARCHAR(100),
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW()
+        );
+      `;
+
+      const createJobAttachmentsTable = `
+        CREATE TABLE IF NOT EXISTS job_attachments (
+          id SERIAL PRIMARY KEY,
+          job_id INTEGER REFERENCES jobs(id) ON DELETE CASCADE,
+          filename VARCHAR(255) NOT NULL,
+          original_name VARCHAR(255) NOT NULL,
+          file_path TEXT NOT NULL,
+          file_size INTEGER NOT NULL,
+          mime_type VARCHAR(100) NOT NULL,
+          uploaded_at TIMESTAMP DEFAULT NOW()
+        );
+      `;
+
+      await this.query(createClientsTable);
+      logger.info('Clients table created/verified');
+
+      await this.query(createJobsTable);
+      logger.info('Jobs table created/verified');
+
+      await this.query(createMaterialsTable);
+      logger.info('Materials table created/verified');
+
+      await this.query(createJobAttachmentsTable);
+      logger.info('Job attachments table created/verified');
+
+      await this.createJobIndexes();
+
+      logger.info('Job management tables created successfully');
+    } catch (error) {
+      logger.error('Failed to create job management tables:', error);
+      throw error;
+    }
+  }
+
+  async createJobIndexes(): Promise<void> {
+    try {
+      logger.info('Creating job management indexes...');
+
+      const indexes = [
+        'CREATE INDEX IF NOT EXISTS idx_jobs_tradie_id ON jobs(tradie_id);',
+        'CREATE INDEX IF NOT EXISTS idx_jobs_client_id ON jobs(client_id);',
+        'CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status);',
+        'CREATE INDEX IF NOT EXISTS idx_jobs_job_type ON jobs(job_type);',
+        'CREATE INDEX IF NOT EXISTS idx_jobs_priority ON jobs(priority);',
+        'CREATE INDEX IF NOT EXISTS idx_jobs_start_date ON jobs(start_date);',
+        'CREATE INDEX IF NOT EXISTS idx_jobs_due_date ON jobs(due_date);',
+        'CREATE INDEX IF NOT EXISTS idx_jobs_created_at ON jobs(created_at);',
+        'CREATE INDEX IF NOT EXISTS idx_clients_tradie_id ON clients(tradie_id);',
+        'CREATE INDEX IF NOT EXISTS idx_clients_email ON clients(email);',
+        'CREATE INDEX IF NOT EXISTS idx_materials_job_id ON materials(job_id);',
+        'CREATE INDEX IF NOT EXISTS idx_job_attachments_job_id ON job_attachments(job_id);'
+      ];
+
+      for (const indexQuery of indexes) {
+        try {
+          await this.query(indexQuery);
+        } catch (error: any) {
+          logger.warn(`Index might already exist: ${error.message}`);
+        }
+      }
+
+      logger.info('Job management indexes created successfully');
+    } catch (error) {
+      logger.error('Failed to create job management indexes:', error);
+      throw error;
+    }
+  }
+
   async recreateTables(): Promise<void> {
     try {
       logger.info('Recreating database tables...');
 
-      // Drop all tables in correct order (due to foreign key constraints)
+      await this.query('DROP TABLE IF EXISTS job_attachments CASCADE');
+      await this.query('DROP TABLE IF EXISTS materials CASCADE');
+      await this.query('DROP TABLE IF EXISTS jobs CASCADE');
+      await this.query('DROP TABLE IF EXISTS clients CASCADE');
       await this.query('DROP TABLE IF EXISTS sessions CASCADE');
       await this.query('DROP TABLE IF EXISTS profiles CASCADE');
       await this.query('DROP TABLE IF EXISTS users CASCADE');
 
-      // Recreate all tables
       await this.createTables();
       
       logger.info('Database tables recreated successfully');

@@ -110,3 +110,177 @@ export const validateOrigin = (
 
   next();
 };
+
+export const validateJobOwnership = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const userId = req.user?.id;
+  const userRole = req.user?.role;
+
+  if (!userId) {
+    res.status(401).json({
+      success: false,
+      message: 'Authentication required',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  if (userRole !== 'tradie' && userRole !== 'enterprise') {
+    res.status(403).json({
+      success: false,
+      message: 'Insufficient permissions for job operations',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  next();
+};
+
+export const validateFileUpload = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const allowedMimeTypes = [
+    'image/jpeg',
+    'image/png',
+    'image/gif',
+    'image/webp',
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  ];
+
+  const maxFileSize = 10 * 1024 * 1024; // 10MB
+
+  if (req.file) {
+    if (!allowedMimeTypes.includes(req.file.mimetype)) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid file type. Only images and documents are allowed',
+        timestamp: new Date().toISOString(),
+        requestId: res.locals.requestId || 'unknown'
+      });
+      return;
+    }
+
+    if (req.file.size > maxFileSize) {
+      res.status(400).json({
+        success: false,
+        message: 'File size exceeds maximum allowed limit of 10MB',
+        timestamp: new Date().toISOString(),
+        requestId: res.locals.requestId || 'unknown'
+      });
+      return;
+    }
+  }
+
+  next();
+};
+
+export const validateJobData = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const { title, description, clientEmail, siteAddress } = req.body;
+
+  if (title && typeof title === 'string' && title.length > 200) {
+    res.status(400).json({
+      success: false,
+      message: 'Job title cannot exceed 200 characters',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  if (description && typeof description === 'string' && description.length > 2000) {
+    res.status(400).json({
+      success: false,
+      message: 'Job description cannot exceed 2000 characters',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  if (clientEmail && typeof clientEmail === 'string') {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(clientEmail)) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid email format',
+        timestamp: new Date().toISOString(),
+        requestId: res.locals.requestId || 'unknown'
+      });
+      return;
+    }
+  }
+
+  next();
+};
+
+export const sanitizeJobInput = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  if (req.body) {
+    const sanitizeString = (str: string): string => {
+      return str.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+                .replace(/javascript:/gi, '')
+                .replace(/on\w+\s*=/gi, '');
+    };
+
+    if (req.body.title && typeof req.body.title === 'string') {
+      req.body.title = sanitizeString(req.body.title.trim());
+    }
+
+    if (req.body.description && typeof req.body.description === 'string') {
+      req.body.description = sanitizeString(req.body.description.trim());
+    }
+
+    if (req.body.clientName && typeof req.body.clientName === 'string') {
+      req.body.clientName = sanitizeString(req.body.clientName.trim());
+    }
+
+    if (req.body.siteAddress && typeof req.body.siteAddress === 'string') {
+      req.body.siteAddress = sanitizeString(req.body.siteAddress.trim());
+    }
+
+    if (req.body.notes && Array.isArray(req.body.notes)) {
+      req.body.notes = req.body.notes.map((note: string) => 
+        typeof note === 'string' ? sanitizeString(note.trim()) : note
+      );
+    }
+  }
+
+  next();
+};
+
+export const validateEnterpriseAccess = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const userRole = req.user?.role;
+
+  if (userRole !== 'enterprise') {
+    res.status(403).json({
+      success: false,
+      message: 'Enterprise access required',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  next();
+};

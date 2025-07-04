@@ -3,6 +3,7 @@ import { logger, sendSuccess } from '../shared/utils';
 import { environment } from '../config/auth';
 import healthRoutes from './health.routes';
 import { authRoutes, profileRoutes, validationRoutes } from '../auth/routes'; 
+import { jobRoutes, clientRoutes, materialRoutes, attachmentRoutes } from '../jobs/routes';
 import { generalApiRateLimit } from '../shared/middleware';
 
 const router = Router();
@@ -13,6 +14,10 @@ router.use('/health', healthRoutes);
 router.use('/api/v1/auth', authRoutes);     
 router.use('/api/v1/profile', profileRoutes);
 router.use('/api/v1/validation', validationRoutes);
+router.use('/api/v1/jobs', jobRoutes);
+router.use('/api/v1/clients', clientRoutes);
+router.use('/api/v1/materials', materialRoutes);
+router.use('/api/v1/attachments', attachmentRoutes);
 
 router.get('/', (req, res) => {
   const routeData = {
@@ -25,7 +30,11 @@ router.get('/', (req, res) => {
       api: '/api/v1',
       auth: '/api/v1/auth',
       profile: '/api/v1/profile',
-      validation: '/api/v1/validation'
+      validation: '/api/v1/validation',
+      jobs: '/api/v1/jobs',
+      clients: '/api/v1/clients',
+      materials: '/api/v1/materials',
+      attachments: '/api/v1/attachments'
     },
     endpoints: {
       authentication: [
@@ -70,6 +79,41 @@ router.get('/', (req, res) => {
         'POST /api/v1/validation/social/data',
         'POST /api/v1/validation/generate-username',
         'POST /api/v1/validation/bulk-availability'
+      ],
+      jobs: [
+        'POST /api/v1/jobs',
+        'GET /api/v1/jobs',
+        'GET /api/v1/jobs/summary',
+        'GET /api/v1/jobs/statistics',
+        'GET /api/v1/jobs/:id',
+        'PUT /api/v1/jobs/:id',
+        'PATCH /api/v1/jobs/:id/status',
+        'DELETE /api/v1/jobs/:id',
+        'POST /api/v1/jobs/:id/materials',
+        'GET /api/v1/jobs/:id/materials',
+        'PUT /api/v1/jobs/:id/materials/:materialId',
+        'DELETE /api/v1/jobs/:id/materials/:materialId',
+        'POST /api/v1/jobs/:id/attachments',
+        'POST /api/v1/jobs/:id/attachments/multiple',
+        'GET /api/v1/jobs/:id/attachments',
+        'DELETE /api/v1/jobs/:id/attachments/:attachmentId'
+      ],
+      clients: [
+        'POST /api/v1/clients',
+        'GET /api/v1/clients',
+        'GET /api/v1/clients/:id',
+        'PUT /api/v1/clients/:id',
+        'DELETE /api/v1/clients/:id'
+      ],
+      materials: [
+        'GET /api/v1/materials/jobs/:jobId/materials',
+        'PUT /api/v1/materials/jobs/:jobId/materials/:id',
+        'DELETE /api/v1/materials/jobs/:jobId/materials/:id'
+      ],
+      attachments: [
+        'GET /api/v1/attachments/jobs/:jobId/attachments',
+        'GET /api/v1/attachments/jobs/:jobId/attachments/:id',
+        'DELETE /api/v1/attachments/jobs/:jobId/attachments/:id'
       ]
     },
     features: {
@@ -80,7 +124,11 @@ router.get('/', (req, res) => {
       profileManagement: 'enabled',
       tokenRefresh: 'enabled',
       rateLimiting: 'enabled',
-      validation: 'enabled'
+      validation: 'enabled',
+      jobManagement: 'enabled',
+      clientManagement: 'enabled',
+      materialTracking: 'enabled',
+      fileAttachments: 'enabled'
     },
     security: {
       rateLimiting: 'active',
@@ -88,7 +136,9 @@ router.get('/', (req, res) => {
       authenticationRequired: 'selective',
       emailVerificationRequired: 'selective',
       passwordComplexity: 'enforced',
-      tokenSecurity: 'jwt-based'
+      tokenSecurity: 'jwt-based',
+      jobOwnershipValidation: 'enforced',
+      fileUploadSecurity: 'enforced'
     }
   };
 
@@ -96,10 +146,12 @@ router.get('/', (req, res) => {
 });
 
 logger.info('Main routes initialized', {
-  routes: ['health', 'auth', 'profile', 'validation'],
+  routes: ['health', 'auth', 'profile', 'validation', 'jobs', 'clients', 'materials', 'attachments'],
   environment: environment.NODE_ENV,
   authenticationEnabled: true,
-  rateLimitingEnabled: true
+  rateLimitingEnabled: true,
+  jobManagementEnabled: true,
+  totalEndpoints: 47
 });
 
 export default router;
