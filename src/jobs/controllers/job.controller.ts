@@ -646,8 +646,8 @@ export class JobController {
       next(error);
     }
   }
-}
 
+export class ClientController {
   async createClient(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const tradieId = parseInt(req.user!.id);

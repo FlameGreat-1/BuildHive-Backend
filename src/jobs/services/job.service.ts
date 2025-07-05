@@ -418,8 +418,7 @@ export class JobService {
     return updatedMaterial;
   }
 
-export class JobService {
-  async removeJobMaterial(materialId: number, jobId: number, tradieId: number): Promise<boolean> {
+    async removeJobMaterial(materialId: number, jobId: number, tradieId: number): Promise<boolean> {
     await this.getJobById(jobId, tradieId);
     
     const material = await materialRepository.findById(materialId);
@@ -788,6 +787,7 @@ export class MaterialService {
   }
 }
 
+export class AttachmentService {
   async getAttachmentById(attachmentId: number): Promise<JobAttachment> {
     const attachment = await attachmentRepository.findById(attachmentId);
     
