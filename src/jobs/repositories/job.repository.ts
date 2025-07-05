@@ -447,7 +447,6 @@ class ClientRepositoryImplementation implements ClientRepository {
     }
   }
 
-class ClientRepositoryImplementation implements ClientRepository {
   async update(id: number, data: UpdateClientData): Promise<Client | null> {
     try {
       const fields: string[] = [];
