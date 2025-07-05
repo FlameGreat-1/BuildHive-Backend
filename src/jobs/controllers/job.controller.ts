@@ -25,7 +25,8 @@ import {
   JobStatus,
   Job,
   Material,
-  Client
+  Client,
+  EnrichedClient
 } from '../types';
 import { JOB_CONSTANTS } from '../../config/jobs';
 import { 
@@ -707,11 +708,12 @@ export class ClientController {
       const client = await clientService.getClientById(clientId, tradieId);
       const clientJobs = await jobService.getJobsByClientId(clientId, tradieId);
 
-      const enrichedClient = {
+      const enrichedClient: EnrichedClient = {
         ...client,
         reference: ClientUtils.generateClientReference(client.id),
         isVIP: ClientUtils.isVIPClient(client),
         tags: ClientUtils.getClientTags(client),
+        value: ClientUtils.calculateClientValue(client),
         lifetimeValue: ClientUtils.getClientLifetimeValue(client, clientJobs),
         rating: ClientUtils.getClientRating(client, clientJobs),
         jobCount: ClientUtils.getClientJobCount(client)
@@ -780,7 +782,7 @@ export class ClientController {
 
       const result = await clientService.getClientsByTradieId(tradieId, options);
 
-      const enrichedClients = result.clients.map(client => ({
+      const enrichedClients: EnrichedClient[] = result.clients.map(client => ({
         ...client,
         reference: ClientUtils.generateClientReference(client.id),
         isVIP: ClientUtils.isVIPClient(client),

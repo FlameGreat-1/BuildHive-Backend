@@ -610,7 +610,7 @@ class ClientRepositoryImplementation implements ClientRepository {
       tags: row.tags || [],
       totalJobs: row.total_jobs || 0,
       totalRevenue: row.total_revenue || 0,
-      lastJobDate: row.last_job_date ? new Date(row.last_job_date) : null,
+      lastJobDate: row.last_job_date ? new Date(row.last_job_date) : undefined,
       createdAt: new Date(row.created_at),
       updatedAt: new Date(row.updated_at)
     };
@@ -1074,21 +1074,20 @@ class AttachmentRepositoryImplementation implements AttachmentRepository {
       throw error;
     }
   }
-
+  
   private mapRowToAttachment(row: any): JobAttachment {
-    return {
-      id: row.id,
-      jobId: row.job_id,
-      filename: row.filename,
-      originalName: row.original_name,
-      filePath: row.file_path,
-      fileSize: row.file_size,
-      mimeType: row.mime_type,
-      uploadedAt: new Date(row.uploaded_at),
-      createdAt: new Date(row.uploaded_at),
-      updatedAt: row.updated_at ? new Date(row.updated_at) : new Date(row.uploaded_at)
-    };
-  }
+  return {
+    id: row.id,
+    jobId: row.job_id,
+    filename: row.filename,
+    originalName: row.original_name,
+    filePath: row.file_path,
+    fileSize: row.file_size,
+    mimeType: row.mime_type,
+    path: row.file_path,
+    size: row.file_size,
+    uploadedAt: new Date(row.uploaded_at)
+  };
 }
 
 export const jobRepository = new JobRepositoryImplementation();

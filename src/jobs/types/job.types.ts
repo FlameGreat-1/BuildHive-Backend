@@ -81,6 +81,7 @@ export interface JobFilter {
   endDate?: Date;
   tags?: JobTag[];
   search?: string;
+  isOverdue?: boolean;  
 }
 
 export interface JobSortOptions {
@@ -132,6 +133,15 @@ export interface Client {
   updatedAt: Date;
 }
 
+export interface EnrichedClient extends Client {
+  reference: string;
+  isVIP: boolean;
+  value: number;
+  lifetimeValue?: number;
+  rating?: number;
+  jobCount?: number;
+}
+
 export interface CreateClientData {
   name: string;
   email: string;
@@ -143,6 +153,9 @@ export interface CreateClientData {
   postcode?: string;
   notes?: string;
   tags?: ClientTag[];
+  reference?: string;  
+  isVIP?: boolean;      
+  value?: number;
 }
 
 export interface UpdateClientData {
@@ -156,6 +169,9 @@ export interface UpdateClientData {
   postcode?: string;
   notes?: string;
   tags?: ClientTag[];
+  reference?: string;
+  isVIP?: boolean;
+  value?: number;
 }
 
 export interface ClientFilter {
@@ -266,6 +282,21 @@ export interface ValidationError {
   field: string;
   message: string;
   code: string;
+}
+
+export interface ClientService {
+  createClient(tradieId: number, data: CreateClientData): Promise<Client>;
+  getClientById(clientId: number, tradieId: number): Promise<Client>;
+  getAllClientsByTradieId(tradieId: number): Promise<Client[]>;
+  getClientsByTradieId(tradieId: number, options?: ClientListOptions): Promise<{
+    clients: Client[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }>;
+  updateClient(clientId: number, tradieId: number, data: UpdateClientData): Promise<Client>;
+  deleteClient(clientId: number, tradieId: number): Promise<boolean>;
 }
 
 export enum JobStatus {

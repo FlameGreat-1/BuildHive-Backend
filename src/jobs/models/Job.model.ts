@@ -465,17 +465,20 @@ export class JobModel {
     const row = result.rows[0];
 
     return {
-      totalJobs: parseInt(row.total_jobs),
-      pendingJobs: parseInt(row.pending_jobs),
-      activeJobs: parseInt(row.active_jobs),
-      completedJobs: parseInt(row.completed_jobs),
+      total: parseInt(row.total_jobs),
+      pending: parseInt(row.pending_jobs),
+      active: parseInt(row.active_jobs),
+      completed: parseInt(row.completed_jobs),
       cancelled: parseInt(row.cancelled_jobs),
-      cancelledJobs: parseInt(row.cancelled_jobs),
-      onHoldJobs: parseInt(row.on_hold_jobs),
+      onHold: parseInt(row.on_hold_jobs),
       totalRevenue: parseFloat(row.total_revenue),
       averageHours: parseFloat(row.average_hours),
-      overdueCount: parseInt(row.overdue_count),
-      upcomingCount: parseInt(row.upcoming_count)
+      totalJobs: parseInt(row.total_jobs),
+      activeJobs: parseInt(row.active_jobs),
+      completedJobs: parseInt(row.completed_jobs),
+      pendingJobs: parseInt(row.pending_jobs),
+      overdueJobs: parseInt(row.overdue_count),
+      averageJobValue: parseFloat(row.total_revenue) / Math.max(parseInt(row.completed_jobs), 1)
     };
   }
 
@@ -512,26 +515,52 @@ export class JobModel {
 
     const totalJobs = parseInt(row.total_jobs);
     const completedJobs = parseInt(row.completed_jobs);
-
+    
     return {
       totalJobs,
       completedJobs,
       activeJobs: parseInt(row.active_jobs),
       pendingJobs: parseInt(row.pending_jobs),
-      cancelledJobs: parseInt(row.cancelled_jobs),
-      onHoldJobs: parseInt(row.on_hold_jobs),
       totalRevenue: parseFloat(row.total_revenue),
       totalHours: parseFloat(row.total_hours),
       averageJobDuration: parseFloat(row.average_job_duration),
       completionRate: totalJobs > 0 ? (completedJobs / totalJobs) * 100 : 0,
       clientCount: parseInt(row.client_count),
       materialCosts: parseFloat(row.material_costs),
-      jobsByStatus: {},
-      jobsByType: {},
-      jobsByPriority: {},
-      monthlyStats: [],
-      averageEfficiency: 0,
-      healthScoreAverage: 0
+      jobsByStatus: {
+        [JobStatus.PENDING]: parseInt(row.pending_jobs),
+        [JobStatus.ACTIVE]: parseInt(row.active_jobs),
+        [JobStatus.COMPLETED]: parseInt(row.completed_jobs),
+        [JobStatus.CANCELLED]: parseInt(row.cancelled_jobs),
+        [JobStatus.ON_HOLD]: parseInt(row.on_hold_jobs)
+      },
+      jobsByType: {
+        [JobType.ELECTRICAL]: 0,
+        [JobType.PLUMBING]: 0,
+        [JobType.CARPENTRY]: 0,
+        [JobType.PAINTING]: 0,
+        [JobType.ROOFING]: 0,
+        [JobType.FLOORING]: 0,
+        [JobType.TILING]: 0,
+        [JobType.HVAC]: 0,
+        [JobType.LANDSCAPING]: 0,
+        [JobType.CLEANING]: 0,
+        [JobType.MAINTENANCE]: 0,
+        [JobType.RENOVATION]: 0,
+        [JobType.INSTALLATION]: 0,
+        [JobType.REPAIR]: 0,
+        [JobType.INSPECTION]: 0,
+        [JobType.HANDYMAN]: 0,
+        [JobType.GENERAL]: 0,
+        [JobType.OTHER]: 0
+      },
+      jobsByPriority: {
+        [JobPriority.LOW]: 0,
+        [JobPriority.MEDIUM]: 0,
+        [JobPriority.HIGH]: 0,
+        [JobPriority.URGENT]: 0
+      },
+      monthlyStats: []
     };
   }
 
@@ -679,7 +708,7 @@ export class JobModel {
       tags: row.tags || [],
       totalJobs: row.total_jobs || 0,
       totalRevenue: parseFloat(row.total_revenue || 0),
-      lastJobDate: row.last_job_date ? new Date(row.last_job_date) : null,
+      lastJobDate: row.last_job_date ? new Date(row.last_job_date) : undefined,
       createdAt: new Date(row.created_at),
       updatedAt: new Date(row.updated_at)
     };
@@ -704,3 +733,4 @@ export class JobModel {
     return str.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
   }
 }
+ 

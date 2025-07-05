@@ -55,14 +55,20 @@ export class JobService {
     }
     
     try {
+      const { materials, ...jobData } = data;
+      
       const formattedData = {
-        ...data,
+        ...jobData,
         title: JobUtils.formatJobTitle(data.title),
         clientName: ClientUtils.formatClientName(data.clientName),
         clientPhone: ClientUtils.formatPhoneNumber(data.clientPhone)
       };
 
       const job = await jobRepository.create(tradieId, formattedData);
+      
+      if (materials && materials.length > 0) {
+        await this.addJobMaterials(job.id, tradieId, materials);
+      }
       
       await this.publishJobEvent({
         type: JobEventType.CREATED,
