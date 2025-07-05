@@ -1,4 +1,5 @@
-import { Router, Request, Response, NextFunction } from 'express';
+import { Router, Response, NextFunction } from 'express';
+import { AuthenticatedRequest } from '../types';
 import { jobController } from '../controllers';
 import {
   requireTradieRole,
@@ -44,7 +45,7 @@ router.post(
   createJobValidationRules(),
   validateCreateJob,
   auditLogger('create_job'),
-  asyncErrorHandler(async (req: Request, res: Response, next: NextFunction) => {
+  asyncErrorHandler(async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     return await jobController.createJob(req, res, next);
   })
 );
@@ -54,7 +55,7 @@ router.get(
   '/',
   validatePaginationParams,
   auditLogger('list_jobs'),
-  asyncErrorHandler(async (req: Request, res: Response, next: NextFunction) => {
+  asyncErrorHandler(async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     return await jobController.getJobs(req, res, next);
   })
 );
@@ -63,7 +64,7 @@ router.get(
 router.get(
   '/summary',
   auditLogger('get_job_summary'),
-  asyncErrorHandler(async (req: Request, res: Response, next: NextFunction) => {
+  asyncErrorHandler(async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     return await jobController.getJobSummary(req, res, next);
   })
 );
@@ -72,7 +73,7 @@ router.get(
 router.get(
   '/statistics',
   auditLogger('get_job_statistics'),
-  asyncErrorHandler(async (req: Request, res: Response, next: NextFunction) => {
+  asyncErrorHandler(async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     return await jobController.getJobStatistics(req, res, next);
   })
 );
@@ -81,7 +82,7 @@ router.get(
 router.get(
   '/overdue',
   auditLogger('get_overdue_jobs'),
-  asyncErrorHandler(async (req: Request, res: Response, next: NextFunction) => {
+  asyncErrorHandler(async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     return await jobController.getOverdueJobs(req, res, next);
   })
 );
@@ -90,7 +91,7 @@ router.get(
 router.get(
   '/upcoming',
   auditLogger('get_upcoming_jobs'),
-  asyncErrorHandler(async (req: Request, res: Response, next: NextFunction) => {
+  asyncErrorHandler(async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     return await jobController.getUpcomingJobs(req, res, next);
   })
 );
@@ -100,7 +101,7 @@ router.get(
   '/:id',
   validateJobId,
   auditLogger('get_job'),
-  asyncErrorHandler(async (req: Request, res: Response, next: NextFunction) => {
+  asyncErrorHandler(async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     return await jobController.getJobById(req, res, next);
   })
 );
@@ -113,7 +114,7 @@ router.put(
   updateJobValidationRules(),
   validateUpdateJob,
   auditLogger('update_job'),
-  asyncErrorHandler(async (req: Request, res: Response, next: NextFunction) => {
+  asyncErrorHandler(async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     return await jobController.updateJob(req, res, next);
   })
 );
@@ -126,7 +127,7 @@ router.patch(
   updateJobStatusValidationRules(),
   validateUpdateJobStatus,
   auditLogger('update_job_status'),
-  asyncErrorHandler(async (req: Request, res: Response, next: NextFunction) => {
+  asyncErrorHandler(async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     return await jobController.updateJobStatus(req, res, next);
   })
 );
@@ -136,7 +137,7 @@ router.delete(
   '/:id',
   validateJobId,
   auditLogger('delete_job'),
-  asyncErrorHandler(async (req: Request, res: Response, next: NextFunction) => {
+  asyncErrorHandler(async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     return await jobController.deleteJob(req, res, next);
   })
 );
@@ -148,7 +149,7 @@ router.post(
   addMaterialValidationRules(),
   validateAddMaterial,
   auditLogger('add_job_materials'),
-  asyncErrorHandler(async (req: Request, res: Response, next: NextFunction) => {
+  asyncErrorHandler(async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     return await jobController.addJobMaterials(req, res, next);
   })
 );
@@ -158,7 +159,7 @@ router.get(
   '/:id/materials',
   validateJobId,
   auditLogger('get_job_materials'),
-  asyncErrorHandler(async (req: Request, res: Response, next: NextFunction) => {
+  asyncErrorHandler(async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     return await jobController.getJobMaterials(req, res, next);
   })
 );
@@ -171,7 +172,7 @@ router.put(
   updateMaterialValidationRules(),
   validateUpdateMaterial,
   auditLogger('update_job_material'),
-  asyncErrorHandler(async (req: Request, res: Response, next: NextFunction) => {
+  asyncErrorHandler(async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     return await jobController.updateJobMaterial(req, res, next);
   })
 );
@@ -182,7 +183,7 @@ router.delete(
   validateJobId,
   validateMaterialId,
   auditLogger('remove_job_material'),
-  asyncErrorHandler(async (req: Request, res: Response, next: NextFunction) => {
+  asyncErrorHandler(async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     return await jobController.removeJobMaterial(req, res, next);
   })
 );
@@ -195,7 +196,7 @@ router.post(
   uploadJobAttachment,
   handleUploadError,
   auditLogger('add_job_attachment'),
-  asyncErrorHandler(async (req: Request, res: Response, next: NextFunction) => {
+  asyncErrorHandler(async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     return await jobController.addJobAttachment(req, res, next);
   })
 );
@@ -208,7 +209,7 @@ router.post(
   uploadMultipleJobAttachments,
   handleUploadError,
   auditLogger('add_multiple_job_attachments'),
-  asyncErrorHandler(async (req: Request, res: Response, next: NextFunction) => {
+  asyncErrorHandler(async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     return await jobController.addMultipleJobAttachments(req, res, next);
   })
 );
@@ -218,7 +219,7 @@ router.get(
   '/:id/attachments',
   validateJobId,
   auditLogger('get_job_attachments'),
-  asyncErrorHandler(async (req: Request, res: Response, next: NextFunction) => {
+  asyncErrorHandler(async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     return await jobController.getJobAttachments(req, res, next);
   })
 );
@@ -229,7 +230,7 @@ router.delete(
   validateJobId,
   validateAttachmentId,
   auditLogger('remove_job_attachment'),
-  asyncErrorHandler(async (req: Request, res: Response, next: NextFunction) => {
+  asyncErrorHandler(async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     return await jobController.removeJobAttachment(req, res, next);
   })
 );

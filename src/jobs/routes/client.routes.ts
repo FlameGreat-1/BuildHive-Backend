@@ -1,4 +1,5 @@
-import { Router, Request, Response, NextFunction } from 'express';
+import { Router, Response, NextFunction } from 'express';
+import { AuthenticatedRequest } from '../types';
 import { clientController } from '../controllers';
 import {
   requireTradieRole,
@@ -172,7 +173,7 @@ router.post(
   createClientValidationRules(),
   handleValidationErrors,
   auditLogger('create_client'),
-  asyncErrorHandler(async (req: Request, res: Response, next: NextFunction) => {
+  asyncErrorHandler(async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     return await clientController.createClient(req, res, next);
   })
 );
@@ -182,7 +183,7 @@ router.get(
   '/',
   validatePaginationParams,
   auditLogger('list_clients'),
-  asyncErrorHandler(async (req: Request, res: Response, next: NextFunction) => {
+  asyncErrorHandler(async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     return await clientController.getClients(req, res, next);
   })
 );
@@ -191,7 +192,7 @@ router.get(
 router.get(
   '/vip',
   auditLogger('get_vip_clients'),
-  asyncErrorHandler(async (req: Request, res: Response, next: NextFunction) => {
+  asyncErrorHandler(async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     return await clientController.getVIPClients(req, res, next);
   })
 );
@@ -200,7 +201,7 @@ router.get(
 router.get(
   '/recent',
   auditLogger('get_recent_clients'),
-  asyncErrorHandler(async (req: Request, res: Response, next: NextFunction) => {
+  asyncErrorHandler(async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     return await clientController.getRecentClients(req, res, next);
   })
 );
@@ -209,17 +210,8 @@ router.get(
 router.get(
   '/inactive',
   auditLogger('get_inactive_clients'),
-  asyncErrorHandler(async (req: Request, res: Response, next: NextFunction) => {
+  asyncErrorHandler(async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     return await clientController.getInactiveClients(req, res, next);
-  })
-);
-
-// Search clients
-router.get(
-  '/search',
-  auditLogger('search_clients'),
-  asyncErrorHandler(async (req: Request, res: Response, next: NextFunction) => {
-    return await clientController.searchClients(req, res, next);
   })
 );
 
@@ -228,18 +220,8 @@ router.get(
   '/:id',
   validateClientId,
   auditLogger('get_client'),
-  asyncErrorHandler(async (req: Request, res: Response, next: NextFunction) => {
+  asyncErrorHandler(async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     return await clientController.getClientById(req, res, next);
-  })
-);
-
-// Get client jobs
-router.get(
-  '/:id/jobs',
-  validateClientId,
-  auditLogger('get_client_jobs'),
-  asyncErrorHandler(async (req: Request, res: Response, next: NextFunction) => {
-    return await clientController.getClientJobs(req, res, next);
   })
 );
 
@@ -250,7 +232,7 @@ router.put(
   updateClientValidationRules(),
   handleValidationErrors,
   auditLogger('update_client'),
-  asyncErrorHandler(async (req: Request, res: Response, next: NextFunction) => {
+  asyncErrorHandler(async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     return await clientController.updateClient(req, res, next);
   })
 );
@@ -260,7 +242,7 @@ router.delete(
   '/:id',
   validateClientId,
   auditLogger('delete_client'),
-  asyncErrorHandler(async (req: Request, res: Response, next: NextFunction) => {
+  asyncErrorHandler(async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     return await clientController.deleteClient(req, res, next);
   })
 );

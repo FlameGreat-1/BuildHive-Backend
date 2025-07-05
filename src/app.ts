@@ -187,7 +187,7 @@ export async function createApp(): Promise<Application> {
         'rate-limiting',
         'audit-logging'
       ],
-      totalEndpoints: 47,
+      totalEndpoints: 44,
       version: '1.0.0'
     });
     

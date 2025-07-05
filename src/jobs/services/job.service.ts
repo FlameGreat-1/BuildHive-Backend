@@ -813,5 +813,3 @@ export const jobService = new JobService();
 export const clientService = new ClientService();
 export const materialService = new MaterialService();
 export const attachmentService = new AttachmentService();
-
-export { JobService, ClientService, MaterialService, AttachmentService };

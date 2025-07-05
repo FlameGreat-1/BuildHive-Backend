@@ -1,4 +1,5 @@
-import { Router, Request, Response, NextFunction } from 'express';
+import { Router, Response, NextFunction } from 'express';
+import { AuthenticatedRequest } from '../types';
 import { jobController } from '../controllers';
 import {
   requireTradieRole,
@@ -22,27 +23,8 @@ router.get(
   '/jobs/:jobId/attachments',
   validateJobId,
   auditLogger('get_attachments_by_job'),
-  asyncErrorHandler(async (req: Request, res: Response, next: NextFunction) => {
+  asyncErrorHandler(async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     return await jobController.getJobAttachments(req, res, next);
-  })
-);
-
-// Get specific attachment by ID
-router.get(
-  '/jobs/:jobId/attachments/:attachmentId',
-  validateJobId,
-  validateAttachmentId,
-  auditLogger('get_attachment'),
-  asyncErrorHandler(async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      return await jobController.getJobAttachmentById(req, res, next);
-    } catch (error) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Attachment not found',
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
-    }
   })
 );
 
@@ -52,7 +34,7 @@ router.delete(
   validateJobId,
   validateAttachmentId,
   auditLogger('delete_attachment'),
-  asyncErrorHandler(async (req: Request, res: Response, next: NextFunction) => {
+  asyncErrorHandler(async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     return await jobController.removeJobAttachment(req, res, next);
   })
 );

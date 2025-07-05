@@ -70,16 +70,6 @@ export class JobController {
         notes: req.body.notes
       };
 
-      const validationErrors = JobUtils.validateJobData(jobData);
-      if (validationErrors.length > 0) {
-        sendValidationError(res, 'Job validation failed', validationErrors.map(error => ({
-          field: 'general',
-          message: error,
-          code: JOB_CONSTANTS.ERROR_CODES.INVALID_JOB_STATUS
-        })));
-        return;
-      }
-
       const job = await jobService.createJob(tradieId, jobData);
 
       logger.info('Job created successfully via API', {
@@ -786,8 +776,10 @@ export class ClientController {
         ...client,
         reference: ClientUtils.generateClientReference(client.id),
         isVIP: ClientUtils.isVIPClient(client),
-        tags: ClientUtils.getClientTags(client),
-        value: ClientUtils.calculateClientValue(client)
+        value: ClientUtils.calculateClientValue(client),
+        lifetimeValue: ClientUtils.getClientLifetimeValue(client, []),
+        rating: ClientUtils.getClientRating(client, []),
+        jobCount: ClientUtils.getClientJobCount(client)
       }));
 
       let sortedClients = enrichedClients;

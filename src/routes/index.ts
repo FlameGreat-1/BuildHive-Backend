@@ -112,7 +112,6 @@ router.get('/', (req, res) => {
       ],
       attachments: [
         'GET /api/v1/attachments/jobs/:jobId/attachments',
-        'GET /api/v1/attachments/jobs/:jobId/attachments/:id',
         'DELETE /api/v1/attachments/jobs/:jobId/attachments/:id'
       ]
     },
@@ -151,7 +150,7 @@ logger.info('Main routes initialized', {
   authenticationEnabled: true,
   rateLimitingEnabled: true,
   jobManagementEnabled: true,
-  totalEndpoints: 47
+  totalEndpoints: 44
 });
 
 export default router;

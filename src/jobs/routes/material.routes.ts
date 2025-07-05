@@ -1,4 +1,5 @@
-import { Router, Request, Response, NextFunction } from 'express';
+import { Router, Response, NextFunction } from 'express';
+import { AuthenticatedRequest } from '../types';
 import { jobController } from '../controllers';
 import {
   requireTradieRole,
@@ -64,29 +65,8 @@ router.get(
   '/jobs/:jobId/materials',
   validateJobId,
   auditLogger('get_materials_by_job'),
-  asyncErrorHandler(async (req: Request, res: Response, next: NextFunction) => {
+  asyncErrorHandler(async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     return await jobController.getJobMaterials(req, res, next);
-  })
-);
-
-// Get specific material by ID
-router.get(
-  '/jobs/:jobId/materials/:id',
-  validateJobId,
-  validateMaterialId,
-  auditLogger('get_material'),
-  asyncErrorHandler(async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      // Set the materialId parameter for the controller
-      req.params.materialId = req.params.id;
-      return await jobController.getJobMaterialById(req, res, next);
-    } catch (error) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Material not found',
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
-    }
   })
 );
 
@@ -98,7 +78,7 @@ router.put(
   updateMaterialValidationRules(),
   handleValidationErrors,
   auditLogger('update_material'),
-  asyncErrorHandler(async (req: Request, res: Response, next: NextFunction) => {
+  asyncErrorHandler(async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     // Set the materialId parameter for the controller
     req.params.materialId = req.params.id;
     return await jobController.updateJobMaterial(req, res, next);
@@ -111,20 +91,10 @@ router.delete(
   validateJobId,
   validateMaterialId,
   auditLogger('delete_material'),
-  asyncErrorHandler(async (req: Request, res: Response, next: NextFunction) => {
+  asyncErrorHandler(async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     // Set the materialId parameter for the controller
     req.params.materialId = req.params.id;
     return await jobController.removeJobMaterial(req, res, next);
-  })
-);
-
-// Get material summary for a job
-router.get(
-  '/summary/:jobId',
-  validateJobId,
-  auditLogger('get_material_summary'),
-  asyncErrorHandler(async (req: Request, res: Response, next: NextFunction) => {
-    return await jobController.getJobMaterialsSummary(req, res, next);
   })
 );
 
