@@ -1088,6 +1088,7 @@ class AttachmentRepositoryImplementation implements AttachmentRepository {
     size: row.file_size,
     uploadedAt: new Date(row.uploaded_at)
   };
+  }
 }
 
 export const jobRepository = new JobRepositoryImplementation();
