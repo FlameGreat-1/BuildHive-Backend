@@ -57,7 +57,7 @@ export class JobService {
     try {
       const { materials, ...jobData } = data;
       
-      const formattedData = {
+      const formattedData: Omit<CreateJobData, 'materials'> = {
         ...jobData,
         title: JobUtils.formatJobTitle(data.title),
         clientName: ClientUtils.formatClientName(data.clientName),
@@ -259,7 +259,6 @@ export class JobService {
     return {
       ...summary,
       cancelled: summary.cancelled || 0,
-      overdueCount: overdueJobs.length,
       upcomingCount: upcomingJobs.length,
       averageProgress: allJobs.length > 0 
         ? Math.round(allJobs.reduce((sum, job) => sum + JobUtils.calculateJobProgress(job), 0) / allJobs.length)
@@ -297,9 +296,6 @@ export class JobService {
       jobsByType,
       jobsByPriority,
       monthlyStats,
-      averageEfficiency: allJobs.length > 0 
-        ? Math.round(allJobs.reduce((sum, job) => sum + JobUtils.calculateJobEfficiency(job), 0) / allJobs.length)
-        : 0,
       healthScoreAverage: allJobs.length > 0 
         ? Math.round(allJobs.reduce((sum, job) => sum + JobUtils.getJobHealthScore(job), 0) / allJobs.length)
         : 0

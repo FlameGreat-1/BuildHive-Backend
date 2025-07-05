@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { AuthenticatedRequest } from './auth.middleware';
 import { 
   sendErrorResponse, 
   sendNotFoundResponse,
@@ -91,8 +92,8 @@ export const notFoundHandler = (req: Request, res: Response): void => {
   sendNotFoundResponse(res, 'Job endpoint not found');
 };
 
-export const asyncErrorHandler = (fn: Function) => {
-  return (req: Request, res: Response, next: NextFunction) => {
+export const asyncErrorHandler = (fn: (req: AuthenticatedRequest, res: Response, next: NextFunction) => Promise<any>) => {
+  return (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     Promise.resolve(fn(req, res, next)).catch(next);
   };
 };

@@ -1,5 +1,5 @@
 import { Router, Response, NextFunction } from 'express';
-import { AuthenticatedRequest } from '../types';
+import { AuthenticatedRequest } from '../middleware/auth.middleware';
 import { jobController } from '../controllers';
 import {
   requireTradieRole,

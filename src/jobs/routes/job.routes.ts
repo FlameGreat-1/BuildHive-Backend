@@ -1,5 +1,5 @@
 import { Router, Response, NextFunction } from 'express';
-import { AuthenticatedRequest } from '../types';
+import { AuthenticatedRequest } from '../middleware/auth.middleware';
 import { jobController } from '../controllers';
 import {
   requireTradieRole,
@@ -198,19 +198,6 @@ router.post(
   auditLogger('add_job_attachment'),
   asyncErrorHandler(async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     return await jobController.addJobAttachment(req, res, next);
-  })
-);
-
-// Add multiple job attachments
-router.post(
-  '/:id/attachments/multiple',
-  validateJobId,
-  fileUploadRateLimit,
-  uploadMultipleJobAttachments,
-  handleUploadError,
-  auditLogger('add_multiple_job_attachments'),
-  asyncErrorHandler(async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
-    return await jobController.addMultipleJobAttachments(req, res, next);
   })
 );
 

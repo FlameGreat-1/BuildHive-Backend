@@ -878,10 +878,14 @@ export class ClientController {
       const allClients = await clientService.getAllClientsByTradieId(tradieId);
       const vipClients = allClients.filter(client => ClientUtils.isVIPClient(client));
       
-      const enrichedVIPClients = vipClients.map(client => ({
+      const enrichedVIPClients: EnrichedClient[] = vipClients.map(client => ({
         ...client,
         reference: ClientUtils.generateClientReference(client.id),
+        isVIP: ClientUtils.isVIPClient(client),
         value: ClientUtils.calculateClientValue(client),
+        lifetimeValue: ClientUtils.getClientLifetimeValue(client, []),
+        rating: ClientUtils.getClientRating(client, []),
+        jobCount: ClientUtils.getClientJobCount(client),
         tags: ClientUtils.getClientTags(client)
       }));
 
@@ -904,10 +908,14 @@ export class ClientController {
       const allClients = await clientService.getAllClientsByTradieId(tradieId);
       const recentClients = ClientUtils.getRecentClients(allClients, days);
       
-      const enrichedRecentClients = recentClients.map(client => ({
+      const enrichedRecentClients: EnrichedClient[] = recentClients.map(client => ({
         ...client,
         reference: ClientUtils.generateClientReference(client.id),
         isVIP: ClientUtils.isVIPClient(client),
+        value: ClientUtils.calculateClientValue(client),
+        lifetimeValue: ClientUtils.getClientLifetimeValue(client, []),
+        rating: ClientUtils.getClientRating(client, []),
+        jobCount: ClientUtils.getClientJobCount(client),
         tags: ClientUtils.getClientTags(client)
       }));
 
@@ -929,10 +937,14 @@ export class ClientController {
       const allClients = await clientService.getAllClientsByTradieId(tradieId);
       const inactiveClients = ClientUtils.getInactiveClients(allClients, days);
       
-      const enrichedInactiveClients = inactiveClients.map(client => ({
+      const enrichedInactiveClients: EnrichedClient[] = inactiveClients.map(client => ({
         ...client,
         reference: ClientUtils.generateClientReference(client.id),
         isVIP: ClientUtils.isVIPClient(client),
+        value: ClientUtils.calculateClientValue(client),
+        lifetimeValue: ClientUtils.getClientLifetimeValue(client, []),
+        rating: ClientUtils.getClientRating(client, []),
+        jobCount: ClientUtils.getClientJobCount(client),
         tags: ClientUtils.getClientTags(client),
         daysSinceLastJob: client.lastJobDate 
           ? Math.floor((new Date().getTime() - client.lastJobDate.getTime()) / (1000 * 60 * 60 * 24))
@@ -948,6 +960,7 @@ export class ClientController {
       next(error);
     }
   }
+}  
 
   async searchClients(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
     try {
