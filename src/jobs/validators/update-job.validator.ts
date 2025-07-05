@@ -1,8 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 import { body, validationResult } from 'express-validator';
 import { JOB_CONSTANTS, CLIENT_CONSTANTS, MATERIAL_CONSTANTS } from '../../config/jobs';
-import { ValidationError, sendValidationError } from '../../shared/utils';
+import { ValidationAppError, sendValidationError } from '../../shared/utils';
 import { logger } from '../../shared/utils';
+import { AuthenticatedRequest } from '../middleware/auth.middleware';
 
 export const updateJobValidationRules = () => {
   return [
@@ -37,16 +38,18 @@ export const updateJobValidationRules = () => {
       .trim()
       .notEmpty()
       .withMessage('Client name cannot be empty')
-      .isLength({ max: JOB_CONSTANTS.VALIDATION.CLIENT_NAME_MAX_LENGTH })
-      .withMessage(`Client name cannot exceed ${JOB_CONSTANTS.VALIDATION.CLIENT_NAME_MAX_LENGTH} characters`),
+      .isLength({ min: CLIENT_CONSTANTS.VALIDATION.NAME_MIN_LENGTH })
+      .withMessage(`Client name must be at least ${CLIENT_CONSTANTS.VALIDATION.NAME_MIN_LENGTH} characters`)
+      .isLength({ max: CLIENT_CONSTANTS.VALIDATION.NAME_MAX_LENGTH })
+      .withMessage(`Client name cannot exceed ${CLIENT_CONSTANTS.VALIDATION.NAME_MAX_LENGTH} characters`),
 
     body('clientEmail')
       .optional()
       .trim()
       .isEmail()
       .withMessage('Valid client email is required')
-      .isLength({ max: JOB_CONSTANTS.VALIDATION.EMAIL_MAX_LENGTH })
-      .withMessage(`Client email cannot exceed ${JOB_CONSTANTS.VALIDATION.EMAIL_MAX_LENGTH} characters`)
+      .isLength({ max: CLIENT_CONSTANTS.VALIDATION.EMAIL_MAX_LENGTH })
+      .withMessage(`Client email cannot exceed ${CLIENT_CONSTANTS.VALIDATION.EMAIL_MAX_LENGTH} characters`)
       .normalizeEmail(),
 
     body('clientPhone')
@@ -54,56 +57,58 @@ export const updateJobValidationRules = () => {
       .trim()
       .notEmpty()
       .withMessage('Client phone cannot be empty')
-      .isLength({ max: JOB_CONSTANTS.VALIDATION.PHONE_MAX_LENGTH })
-      .withMessage(`Client phone cannot exceed ${JOB_CONSTANTS.VALIDATION.PHONE_MAX_LENGTH} characters`)
+      .isLength({ min: CLIENT_CONSTANTS.VALIDATION.PHONE_MIN_LENGTH })
+      .withMessage(`Client phone must be at least ${CLIENT_CONSTANTS.VALIDATION.PHONE_MIN_LENGTH} characters`)
+      .isLength({ max: CLIENT_CONSTANTS.VALIDATION.PHONE_MAX_LENGTH })
+      .withMessage(`Client phone cannot exceed ${CLIENT_CONSTANTS.VALIDATION.PHONE_MAX_LENGTH} characters`)
       .matches(/^[\d\s\-\+\(\)]+$/)
       .withMessage('Invalid phone number format'),
 
     body('clientCompany')
       .optional()
       .trim()
-      .isLength({ max: JOB_CONSTANTS.VALIDATION.COMPANY_NAME_MAX_LENGTH })
-      .withMessage(`Client company cannot exceed ${JOB_CONSTANTS.VALIDATION.COMPANY_NAME_MAX_LENGTH} characters`),
+      .isLength({ max: CLIENT_CONSTANTS.VALIDATION.COMPANY_MAX_LENGTH })
+      .withMessage(`Client company cannot exceed ${CLIENT_CONSTANTS.VALIDATION.COMPANY_MAX_LENGTH} characters`),
 
     body('siteAddress')
       .optional()
       .trim()
       .notEmpty()
       .withMessage('Site address cannot be empty')
-      .isLength({ max: JOB_CONSTANTS.VALIDATION.ADDRESS_MAX_LENGTH })
-      .withMessage(`Site address cannot exceed ${JOB_CONSTANTS.VALIDATION.ADDRESS_MAX_LENGTH} characters`),
+      .isLength({ max: CLIENT_CONSTANTS.VALIDATION.ADDRESS_MAX_LENGTH })
+      .withMessage(`Site address cannot exceed ${CLIENT_CONSTANTS.VALIDATION.ADDRESS_MAX_LENGTH} characters`),
 
     body('siteCity')
       .optional()
       .trim()
       .notEmpty()
       .withMessage('Site city cannot be empty')
-      .isLength({ max: JOB_CONSTANTS.VALIDATION.CITY_MAX_LENGTH })
-      .withMessage(`Site city cannot exceed ${JOB_CONSTANTS.VALIDATION.CITY_MAX_LENGTH} characters`),
+      .isLength({ max: 100 })
+      .withMessage('Site city cannot exceed 100 characters'),
 
     body('siteState')
       .optional()
       .trim()
       .notEmpty()
       .withMessage('Site state cannot be empty')
-      .isLength({ max: JOB_CONSTANTS.VALIDATION.STATE_MAX_LENGTH })
-      .withMessage(`Site state cannot exceed ${JOB_CONSTANTS.VALIDATION.STATE_MAX_LENGTH} characters`),
+      .isLength({ max: 50 })
+      .withMessage('Site state cannot exceed 50 characters'),
 
     body('sitePostcode')
       .optional()
       .trim()
       .notEmpty()
       .withMessage('Site postcode cannot be empty')
-      .isLength({ max: JOB_CONSTANTS.VALIDATION.POSTCODE_MAX_LENGTH })
-      .withMessage(`Site postcode cannot exceed ${JOB_CONSTANTS.VALIDATION.POSTCODE_MAX_LENGTH} characters`)
+      .isLength({ max: 20 })
+      .withMessage('Site postcode cannot exceed 20 characters')
       .matches(/^[A-Za-z0-9\s\-]+$/)
       .withMessage('Invalid postcode format'),
 
     body('siteAccessInstructions')
       .optional()
       .trim()
-      .isLength({ max: JOB_CONSTANTS.VALIDATION.NOTES_MAX_LENGTH })
-      .withMessage(`Site access instructions cannot exceed ${JOB_CONSTANTS.VALIDATION.NOTES_MAX_LENGTH} characters`),
+      .isLength({ max: CLIENT_CONSTANTS.VALIDATION.NOTES_MAX_LENGTH })
+      .withMessage(`Site access instructions cannot exceed ${CLIENT_CONSTANTS.VALIDATION.NOTES_MAX_LENGTH} characters`),
 
     body('startDate')
       .optional()
@@ -161,13 +166,19 @@ export const updateJobValidationRules = () => {
     body('notes.*')
       .if(body('notes').exists())
       .trim()
-      .isLength({ max: JOB_CONSTANTS.VALIDATION.NOTES_MAX_LENGTH })
-      .withMessage(`Each note cannot exceed ${JOB_CONSTANTS.VALIDATION.NOTES_MAX_LENGTH} characters`),
+      .isLength({ max: CLIENT_CONSTANTS.VALIDATION.NOTES_MAX_LENGTH })
+      .withMessage(`Each note cannot exceed ${CLIENT_CONSTANTS.VALIDATION.NOTES_MAX_LENGTH} characters`),
 
     body('tags')
       .optional()
       .isArray()
-      .withMessage('Tags must be an array'),
+      .withMessage('Tags must be an array')
+      .custom((tags) => {
+        if (tags && tags.length > CLIENT_CONSTANTS.VALIDATION.MAX_TAGS) {
+          throw new Error(`Maximum ${CLIENT_CONSTANTS.VALIDATION.MAX_TAGS} tags allowed`);
+        }
+        return true;
+      }),
 
     body('tags.*')
       .if(body('tags').exists())
@@ -176,12 +187,12 @@ export const updateJobValidationRules = () => {
   ];
 };
 
-export const validateUpdateJob = (req: Request, res: Response, next: NextFunction): void => {
+export const validateUpdateJob = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
   const errors = validationResult(req);
   
   if (!errors.isEmpty()) {
-    const validationErrors: ValidationError[] = errors.array().map(error => ({
-      field: error.param || error.type || 'unknown',
+    const validationErrors = errors.array().map(error => ({
+      field: error.type === 'field' ? (error as any).path : 'unknown',
       message: error.msg,
       code: JOB_CONSTANTS.ERROR_CODES.INVALID_JOB_STATUS
     }));
@@ -190,7 +201,11 @@ export const validateUpdateJob = (req: Request, res: Response, next: NextFunctio
       tradieId: req.user?.id,
       jobId: req.params.id,
       errors: validationErrors,
-      requestBody: req.body
+      requestBody: {
+        title: req.body.title,
+        status: req.body.status,
+        updatedFields: Object.keys(req.body)
+      }
     });
 
     sendValidationError(res, 'Job validation failed', validationErrors);
@@ -216,12 +231,12 @@ export const updateJobStatusValidationRules = () => {
   ];
 };
 
-export const validateUpdateJobStatus = (req: Request, res: Response, next: NextFunction): void => {
+export const validateUpdateJobStatus = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
   const errors = validationResult(req);
   
   if (!errors.isEmpty()) {
-    const validationErrors: ValidationError[] = errors.array().map(error => ({
-      field: error.param || error.type || 'unknown',
+    const validationErrors = errors.array().map(error => ({
+      field: error.type === 'field' ? (error as any).path : 'unknown',
       message: error.msg,
       code: JOB_CONSTANTS.ERROR_CODES.INVALID_JOB_STATUS
     }));
@@ -236,6 +251,12 @@ export const validateUpdateJobStatus = (req: Request, res: Response, next: NextF
     sendValidationError(res, 'Status validation failed', validationErrors);
     return;
   }
+
+  logger.info('Job status update validation passed', {
+    tradieId: req.user?.id,
+    jobId: req.params.id,
+    newStatus: req.body.status
+  });
 
   next();
 };
@@ -289,17 +310,17 @@ export const addMaterialValidationRules = () => {
     body('materials.*.supplier')
       .optional()
       .trim()
-      .isLength({ max: MATERIAL_CONSTANTS.VALIDATION.SUPPLIER_MAX_LENGTH })
-      .withMessage(`Material supplier cannot exceed ${MATERIAL_CONSTANTS.VALIDATION.SUPPLIER_MAX_LENGTH} characters`)
+      .isLength({ max: 200 })
+      .withMessage('Material supplier cannot exceed 200 characters')
   ];
 };
 
-export const validateAddMaterial = (req: Request, res: Response, next: NextFunction): void => {
+export const validateAddMaterial = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
   const errors = validationResult(req);
   
   if (!errors.isEmpty()) {
-    const validationErrors: ValidationError[] = errors.array().map(error => ({
-      field: error.param || error.type || 'unknown',
+    const validationErrors = errors.array().map(error => ({
+      field: error.type === 'field' ? (error as any).path : 'unknown',
       message: error.msg,
       code: JOB_CONSTANTS.ERROR_CODES.INVALID_MATERIAL_UNIT
     }));
@@ -308,12 +329,92 @@ export const validateAddMaterial = (req: Request, res: Response, next: NextFunct
       tradieId: req.user?.id,
       jobId: req.params.id,
       errors: validationErrors,
-      requestBody: req.body
+      materialCount: req.body.materials?.length || 0
     });
 
     sendValidationError(res, 'Material validation failed', validationErrors);
     return;
   }
+
+  logger.info('Material validation passed', {
+    tradieId: req.user?.id,
+    jobId: req.params.id,
+    materialCount: req.body.materials?.length || 0
+  });
+
+  next();
+};
+
+export const updateMaterialValidationRules = () => {
+  return [
+    body('name')
+      .optional()
+      .trim()
+      .notEmpty()
+      .withMessage('Material name cannot be empty')
+      .isLength({ 
+        min: MATERIAL_CONSTANTS.VALIDATION.NAME_MIN_LENGTH,
+        max: MATERIAL_CONSTANTS.VALIDATION.NAME_MAX_LENGTH 
+      })
+      .withMessage(`Material name must be between ${MATERIAL_CONSTANTS.VALIDATION.NAME_MIN_LENGTH} and ${MATERIAL_CONSTANTS.VALIDATION.NAME_MAX_LENGTH} characters`),
+
+    body('quantity')
+      .optional()
+      .isFloat({ 
+        min: MATERIAL_CONSTANTS.VALIDATION.MIN_QUANTITY,
+        max: MATERIAL_CONSTANTS.VALIDATION.MAX_QUANTITY 
+      })
+      .withMessage(`Material quantity must be between ${MATERIAL_CONSTANTS.VALIDATION.MIN_QUANTITY} and ${MATERIAL_CONSTANTS.VALIDATION.MAX_QUANTITY}`),
+
+    body('unit')
+      .optional()
+      .isIn(Object.values(JOB_CONSTANTS.MATERIAL_UNITS))
+      .withMessage('Invalid material unit'),
+
+    body('unitCost')
+      .optional()
+      .isFloat({ 
+        min: MATERIAL_CONSTANTS.VALIDATION.MIN_UNIT_COST,
+        max: MATERIAL_CONSTANTS.VALIDATION.MAX_UNIT_COST 
+      })
+      .withMessage(`Material unit cost must be between ${MATERIAL_CONSTANTS.VALIDATION.MIN_UNIT_COST} and ${MATERIAL_CONSTANTS.VALIDATION.MAX_UNIT_COST}`),
+
+    body('supplier')
+      .optional()
+      .trim()
+      .isLength({ max: 200 })
+      .withMessage('Material supplier cannot exceed 200 characters')
+  ];
+};
+
+export const validateUpdateMaterial = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
+  const errors = validationResult(req);
+  
+  if (!errors.isEmpty()) {
+    const validationErrors = errors.array().map(error => ({
+      field: error.type === 'field' ? (error as any).path : 'unknown',
+      message: error.msg,
+      code: JOB_CONSTANTS.ERROR_CODES.INVALID_MATERIAL_UNIT
+    }));
+
+    logger.warn('Material update validation failed', {
+      tradieId: req.user?.id,
+      jobId: req.params.id,
+      materialId: req.params.materialId,
+      errors: validationErrors,
+      updatedFields: Object.keys(req.body)
+    });
+
+    sendValidationError(res, 'Material validation failed', validationErrors);
+    return;
+  }
+
+  logger.info('Material update validation passed', {
+    tradieId: req.user?.id,
+    jobId: req.params.id,
+    materialId: req.params.materialId,
+    updatedFields: Object.keys(req.body)
+  });
 
   next();
 };

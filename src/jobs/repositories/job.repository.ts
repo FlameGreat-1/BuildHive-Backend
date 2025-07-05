@@ -23,6 +23,7 @@ import {
 } from '../types';
 import { JobModel } from '../models';
 import { logger } from '../../shared/utils';
+import { database } from '../../shared/database';
 
 export class JobRepositoryImpl implements JobRepository {
   private jobModel: JobModel;
@@ -66,6 +67,46 @@ export class JobRepositoryImpl implements JobRepository {
     } catch (error: any) {
       logger.error('Failed to find job by ID', {
         jobId: id,
+        error: error.message
+      });
+      throw error;
+    }
+  }
+
+  async findAllByTradieId(tradieId: number): Promise<Job[]> {
+    try {
+      const jobs = await this.jobModel.findAllByTradieId(tradieId);
+      
+      logger.info('All jobs retrieved for tradie', {
+        tradieId,
+        count: jobs.length
+      });
+
+      return jobs;
+    } catch (error: any) {
+      logger.error('Failed to find all jobs by tradie ID', {
+        tradieId,
+        error: error.message
+      });
+      throw error;
+    }
+  }
+
+  async findByClientId(clientId: number, tradieId: number): Promise<Job[]> {
+    try {
+      const jobs = await this.jobModel.findByClientId(clientId, tradieId);
+      
+      logger.info('Jobs retrieved for client', {
+        clientId,
+        tradieId,
+        count: jobs.length
+      });
+
+      return jobs;
+    } catch (error: any) {
+      logger.error('Failed to find jobs by client ID', {
+        clientId,
+        tradieId,
         error: error.message
       });
       throw error;
@@ -163,8 +204,8 @@ export class JobRepositoryImpl implements JobRepository {
       
       logger.info('Job summary retrieved', {
         tradieId,
-        totalJobs: summary.total,
-        completedJobs: summary.completed
+        totalJobs: summary.totalJobs,
+        completedJobs: summary.completedJobs
       });
 
       return summary;
@@ -191,6 +232,25 @@ export class JobRepositoryImpl implements JobRepository {
     } catch (error: any) {
       logger.error('Failed to get job statistics', {
         tradieId,
+        error: error.message
+      });
+      throw error;
+    }
+  }
+
+  async hasActiveJobsForClient(clientId: number): Promise<boolean> {
+    try {
+      const hasActiveJobs = await this.jobModel.hasActiveJobsForClient(clientId);
+      
+      logger.info('Active jobs check for client', {
+        clientId,
+        hasActiveJobs
+      });
+
+      return hasActiveJobs;
+    } catch (error: any) {
+      logger.error('Failed to check active jobs for client', {
+        clientId,
         error: error.message
       });
       throw error;
@@ -234,17 +294,43 @@ export class ClientRepositoryImpl implements ClientRepository {
         SELECT * FROM clients WHERE id = $1
       `;
       
-      const result = await this.jobModel['database'].query(query, [id]);
+      const result = await database.query(query, [id]);
       
       if (result.rows.length === 0) {
         logger.warn('Client not found', { clientId: id });
         return null;
       }
 
-      return this.jobModel['mapRowToClient'](result.rows[0]);
+      return this.mapRowToClient(result.rows[0]);
     } catch (error: any) {
       logger.error('Failed to find client by ID', {
         clientId: id,
+        error: error.message
+      });
+      throw error;
+    }
+  }
+
+  async findAllByTradieId(tradieId: number): Promise<Client[]> {
+    try {
+      const query = `
+        SELECT * FROM clients 
+        WHERE tradie_id = $1 
+        ORDER BY created_at DESC
+      `;
+      
+      const result = await database.query(query, [tradieId]);
+      const clients = result.rows.map((row: any) => this.mapRowToClient(row));
+      
+      logger.info('All clients retrieved for tradie', {
+        tradieId,
+        count: clients.length
+      });
+
+      return clients;
+    } catch (error: any) {
+      logger.error('Failed to find all clients by tradie ID', {
+        tradieId,
         error: error.message
       });
       throw error;
@@ -315,9 +401,9 @@ export class ClientRepositoryImpl implements ClientRepository {
       `;
 
       params.push(limit, offset);
-      const result = await this.jobModel['database'].query(query, params);
+      const result = await database.query(query, params);
       
-      const clients = result.rows.map(row => this.jobModel['mapRowToClient'](row));
+      const clients = result.rows.map((row: any) => this.mapRowToClient(row));
       
       logger.info('Clients retrieved for tradie', {
         tradieId,
@@ -336,16 +422,21 @@ export class ClientRepositoryImpl implements ClientRepository {
     }
   }
   
-    async findByEmail(tradieId: number, email: string): Promise<Client | null> {
+  async findByEmail(tradieId: number, email: string): Promise<Client | null> {
     try {
-      const client = await this.jobModel.findClientByEmail(tradieId, email);
+      const query = `
+        SELECT * FROM clients 
+        WHERE tradie_id = $1 AND email = $2
+      `;
       
-      if (!client) {
+      const result = await database.query(query, [tradieId, email]);
+      
+      if (result.rows.length === 0) {
         logger.warn('Client not found by email', { tradieId, email });
         return null;
       }
 
-      return client;
+      return this.mapRowToClient(result.rows[0]);
     } catch (error: any) {
       logger.error('Failed to find client by email', {
         tradieId,
@@ -355,8 +446,8 @@ export class ClientRepositoryImpl implements ClientRepository {
       throw error;
     }
   }
-
-  async update(id: number, data: UpdateClientData): Promise<Client | null> {
+  
+    async update(id: number, data: UpdateClientData): Promise<Client | null> {
     try {
       const fields: string[] = [];
       const values: any[] = [];
@@ -385,14 +476,14 @@ export class ClientRepositoryImpl implements ClientRepository {
         RETURNING *
       `;
 
-      const result = await this.jobModel['database'].query(query, values);
+      const result = await database.query(query, values);
       
       if (result.rows.length === 0) {
         logger.warn('Client not found for update', { clientId: id });
         return null;
       }
 
-      const client = this.jobModel['mapRowToClient'](result.rows[0]);
+      const client = this.mapRowToClient(result.rows[0]);
       
       logger.info('Client updated successfully', {
         clientId: id,
@@ -412,7 +503,7 @@ export class ClientRepositoryImpl implements ClientRepository {
   async delete(id: number): Promise<boolean> {
     try {
       const query = `DELETE FROM clients WHERE id = $1`;
-      const result = await this.jobModel['database'].query(query, [id]);
+      const result = await database.query(query, [id]);
       
       const deleted = result.rowCount > 0;
       
@@ -453,7 +544,7 @@ export class ClientRepositoryImpl implements ClientRepository {
       }
 
       const query = `SELECT COUNT(*) as count FROM clients ${whereClause}`;
-      const result = await this.jobModel['database'].query(query, params);
+      const result = await database.query(query, params);
       
       const count = parseInt(result.rows[0].count);
       
@@ -475,7 +566,23 @@ export class ClientRepositoryImpl implements ClientRepository {
 
   async updateStats(clientId: number): Promise<void> {
     try {
-      await this.jobModel.updateClientStats(clientId);
+      const query = `
+        UPDATE clients 
+        SET 
+          total_jobs = (
+            SELECT COUNT(*) FROM jobs WHERE client_id = $1
+          ),
+          total_revenue = (
+            SELECT COALESCE(SUM(total_cost), 0) FROM jobs WHERE client_id = $1
+          ),
+          last_job_date = (
+            SELECT MAX(created_at) FROM jobs WHERE client_id = $1
+          ),
+          updated_at = NOW()
+        WHERE id = $1
+      `;
+      
+      await database.query(query, [clientId]);
       
       logger.info('Client stats updated successfully', { clientId });
     } catch (error: any) {
@@ -485,6 +592,28 @@ export class ClientRepositoryImpl implements ClientRepository {
       });
       throw error;
     }
+  }
+
+  private mapRowToClient(row: any): Client {
+    return {
+      id: row.id,
+      tradieId: row.tradie_id,
+      name: row.name,
+      email: row.email,
+      phone: row.phone,
+      company: row.company,
+      address: row.address,
+      city: row.city,
+      state: row.state,
+      postcode: row.postcode,
+      notes: row.notes,
+      tags: row.tags || [],
+      totalJobs: row.total_jobs || 0,
+      totalRevenue: row.total_revenue || 0,
+      lastJobDate: row.last_job_date ? new Date(row.last_job_date) : null,
+      createdAt: new Date(row.created_at),
+      updatedAt: new Date(row.updated_at)
+    };
   }
 
   private camelToSnake(str: string): string {
@@ -501,7 +630,26 @@ export class MaterialRepositoryImpl implements MaterialRepository {
 
   async create(jobId: number, data: CreateMaterialData): Promise<Material> {
     try {
-      const material = await this.jobModel.createMaterial(jobId, data);
+      const totalCost = data.quantity * data.unitCost;
+      
+      const query = `
+        INSERT INTO materials (
+          job_id, name, quantity, unit, unit_cost, total_cost, supplier
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+        RETURNING *
+      `;
+
+      const result = await database.query(query, [
+        jobId,
+        data.name,
+        data.quantity,
+        data.unit,
+        data.unitCost,
+        totalCost,
+        data.supplier || null
+      ]);
+
+      const material = this.mapRowToMaterial(result.rows[0]);
       
       logger.info('Material created successfully', {
         materialId: material.id,
@@ -521,6 +669,26 @@ export class MaterialRepositoryImpl implements MaterialRepository {
     }
   }
 
+  async findById(id: number): Promise<Material | null> {
+    try {
+      const query = `SELECT * FROM materials WHERE id = $1`;
+      const result = await database.query(query, [id]);
+      
+      if (result.rows.length === 0) {
+        logger.warn('Material not found', { materialId: id });
+        return null;
+      }
+
+      return this.mapRowToMaterial(result.rows[0]);
+    } catch (error: any) {
+      logger.error('Failed to find material by ID', {
+        materialId: id,
+        error: error.message
+      });
+      throw error;
+    }
+  }
+
   async findByJobId(jobId: number): Promise<Material[]> {
     try {
       const query = `
@@ -529,9 +697,9 @@ export class MaterialRepositoryImpl implements MaterialRepository {
         ORDER BY created_at ASC
       `;
       
-      const result = await this.jobModel['database'].query(query, [jobId]);
+      const result = await database.query(query, [jobId]);
       
-      const materials = result.rows.map(row => this.jobModel['mapRowToMaterial'](row));
+      const materials = result.rows.map((row: any) => this.mapRowToMaterial(row));
       
       logger.info('Materials retrieved for job', {
         jobId,
@@ -564,15 +732,13 @@ export class MaterialRepositoryImpl implements MaterialRepository {
       });
 
       if (fields.length === 0) {
-        const query = `SELECT * FROM materials WHERE id = $1`;
-        const result = await this.jobModel['database'].query(query, [id]);
-        return result.rows.length > 0 ? this.jobModel['mapRowToMaterial'](result.rows[0]) : null;
+        return await this.findById(id);
       }
 
       if (data.quantity !== undefined || data.unitCost !== undefined) {
         const currentQuery = `SELECT * FROM materials WHERE id = $${paramIndex}`;
         values.push(id);
-        const currentResult = await this.jobModel['database'].query(currentQuery, [id]);
+        const currentResult = await database.query(currentQuery, [id]);
         
         if (currentResult.rows.length === 0) {
           return null;
@@ -598,14 +764,14 @@ export class MaterialRepositoryImpl implements MaterialRepository {
         RETURNING *
       `;
 
-      const result = await this.jobModel['database'].query(query, values);
+      const result = await database.query(query, values);
       
       if (result.rows.length === 0) {
         logger.warn('Material not found for update', { materialId: id });
         return null;
       }
 
-      const material = this.jobModel['mapRowToMaterial'](result.rows[0]);
+      const material = this.mapRowToMaterial(result.rows[0]);
       
       logger.info('Material updated successfully', {
         materialId: id,
@@ -625,7 +791,7 @@ export class MaterialRepositoryImpl implements MaterialRepository {
   async delete(id: number): Promise<boolean> {
     try {
       const query = `DELETE FROM materials WHERE id = $1`;
-      const result = await this.jobModel['database'].query(query, [id]);
+      const result = await database.query(query, [id]);
       
       const deleted = result.rowCount > 0;
       
@@ -648,7 +814,7 @@ export class MaterialRepositoryImpl implements MaterialRepository {
   async deleteByJobId(jobId: number): Promise<boolean> {
     try {
       const query = `DELETE FROM materials WHERE job_id = $1`;
-      const result = await this.jobModel['database'].query(query, [jobId]);
+      const result = await database.query(query, [jobId]);
       
       logger.info('Materials deleted for job', {
         jobId,
@@ -663,6 +829,21 @@ export class MaterialRepositoryImpl implements MaterialRepository {
       });
       throw error;
     }
+  }
+
+  private mapRowToMaterial(row: any): Material {
+    return {
+      id: row.id,
+      jobId: row.job_id,
+      name: row.name,
+      quantity: row.quantity,
+      unit: row.unit,
+      unitCost: row.unit_cost,
+      totalCost: row.total_cost,
+      supplier: row.supplier,
+      createdAt: new Date(row.created_at),
+      updatedAt: new Date(row.updated_at)
+    };
   }
 
   private camelToSnake(str: string): string {
@@ -686,7 +867,7 @@ export class AttachmentRepositoryImpl implements AttachmentRepository {
         RETURNING *
       `;
 
-      const result = await this.jobModel['database'].query(query, [
+      const result = await database.query(query, [
         jobId,
         data.filename,
         data.originalName,
@@ -715,37 +896,10 @@ export class AttachmentRepositoryImpl implements AttachmentRepository {
     }
   }
 
-  async findByJobId(jobId: number): Promise<JobAttachment[]> {
-    try {
-      const query = `
-        SELECT * FROM job_attachments 
-        WHERE job_id = $1 
-        ORDER BY uploaded_at DESC
-      `;
-      
-      const result = await this.jobModel['database'].query(query, [jobId]);
-      
-      const attachments = result.rows.map(row => this.mapRowToAttachment(row));
-      
-      logger.info('Attachments retrieved for job', {
-        jobId,
-        count: attachments.length
-      });
-
-      return attachments;
-    } catch (error: any) {
-      logger.error('Failed to find attachments by job ID', {
-        jobId,
-        error: error.message
-      });
-      throw error;
-    }
-  }
-
   async findById(id: number): Promise<JobAttachment | null> {
     try {
       const query = `SELECT * FROM job_attachments WHERE id = $1`;
-      const result = await this.jobModel['database'].query(query, [id]);
+      const result = await database.query(query, [id]);
       
       if (result.rows.length === 0) {
         logger.warn('Attachment not found', { attachmentId: id });
@@ -762,10 +916,37 @@ export class AttachmentRepositoryImpl implements AttachmentRepository {
     }
   }
 
-  async delete(id: number): Promise<boolean> {
+  async findByJobId(jobId: number): Promise<JobAttachment[]> {
+    try {
+      const query = `
+        SELECT * FROM job_attachments 
+        WHERE job_id = $1 
+        ORDER BY uploaded_at DESC
+      `;
+      
+      const result = await database.query(query, [jobId]);
+      
+      const attachments = result.rows.map((row: any) => this.mapRowToAttachment(row));
+      
+      logger.info('Attachments retrieved for job', {
+        jobId,
+        count: attachments.length
+      });
+
+      return attachments;
+    } catch (error: any) {
+      logger.error('Failed to find attachments by job ID', {
+        jobId,
+        error: error.message
+      });
+      throw error;
+    }
+  }
+  
+    async delete(id: number): Promise<boolean> {
     try {
       const query = `DELETE FROM job_attachments WHERE id = $1`;
-      const result = await this.jobModel['database'].query(query, [id]);
+      const result = await database.query(query, [id]);
       
       const deleted = result.rowCount > 0;
       
@@ -788,7 +969,7 @@ export class AttachmentRepositoryImpl implements AttachmentRepository {
   async deleteByJobId(jobId: number): Promise<boolean> {
     try {
       const query = `DELETE FROM job_attachments WHERE job_id = $1`;
-      const result = await this.jobModel['database'].query(query, [jobId]);
+      const result = await database.query(query, [jobId]);
       
       logger.info('Attachments deleted for job', {
         jobId,
@@ -805,16 +986,109 @@ export class AttachmentRepositoryImpl implements AttachmentRepository {
     }
   }
 
+  async updateFilePath(id: number, filePath: string): Promise<JobAttachment | null> {
+    try {
+      const query = `
+        UPDATE job_attachments 
+        SET file_path = $1, updated_at = NOW() 
+        WHERE id = $2 
+        RETURNING *
+      `;
+      
+      const result = await database.query(query, [filePath, id]);
+      
+      if (result.rows.length === 0) {
+        logger.warn('Attachment not found for file path update', { attachmentId: id });
+        return null;
+      }
+
+      const attachment = this.mapRowToAttachment(result.rows[0]);
+      
+      logger.info('Attachment file path updated successfully', {
+        attachmentId: id,
+        newFilePath: filePath
+      });
+
+      return attachment;
+    } catch (error: any) {
+      logger.error('Failed to update attachment file path', {
+        attachmentId: id,
+        filePath,
+        error: error.message
+      });
+      throw error;
+    }
+  }
+
+  async getAttachmentsByType(jobId: number, mimeType: string): Promise<JobAttachment[]> {
+    try {
+      const query = `
+        SELECT * FROM job_attachments 
+        WHERE job_id = $1 AND mime_type = $2 
+        ORDER BY uploaded_at DESC
+      `;
+      
+      const result = await database.query(query, [jobId, mimeType]);
+      
+      const attachments = result.rows.map((row: any) => this.mapRowToAttachment(row));
+      
+      logger.info('Attachments retrieved by type for job', {
+        jobId,
+        mimeType,
+        count: attachments.length
+      });
+
+      return attachments;
+    } catch (error: any) {
+      logger.error('Failed to find attachments by type', {
+        jobId,
+        mimeType,
+        error: error.message
+      });
+      throw error;
+    }
+  }
+
+  async getTotalFileSize(jobId: number): Promise<number> {
+    try {
+      const query = `
+        SELECT COALESCE(SUM(file_size), 0) as total_size 
+        FROM job_attachments 
+        WHERE job_id = $1
+      `;
+      
+      const result = await database.query(query, [jobId]);
+      const totalSize = parseInt(result.rows[0].total_size);
+      
+      logger.info('Total file size calculated for job', {
+        jobId,
+        totalSize
+      });
+
+      return totalSize;
+    } catch (error: any) {
+      logger.error('Failed to calculate total file size', {
+        jobId,
+        error: error.message
+      });
+      throw error;
+    }
+  }
+
   private mapRowToAttachment(row: any): JobAttachment {
     return {
       id: row.id,
       jobId: row.job_id,
       filename: row.filename,
       originalName: row.original_name,
+      path: row.file_path,
       filePath: row.file_path,
+      size: row.file_size,
       fileSize: row.file_size,
       mimeType: row.mime_type,
-      uploadedAt: new Date(row.uploaded_at)
+      uploadedAt: new Date(row.uploaded_at),
+      createdAt: new Date(row.uploaded_at),
+      updatedAt: row.updated_at ? new Date(row.updated_at) : new Date(row.uploaded_at)
     };
   }
 }
@@ -823,4 +1097,12 @@ export const jobRepository = new JobRepositoryImpl();
 export const clientRepository = new ClientRepositoryImpl();
 export const materialRepository = new MaterialRepositoryImpl();
 export const attachmentRepository = new AttachmentRepositoryImpl();
+
+export {
+  JobRepositoryImpl,
+  ClientRepositoryImpl,
+  MaterialRepositoryImpl,
+  AttachmentRepositoryImpl
+};
+
 

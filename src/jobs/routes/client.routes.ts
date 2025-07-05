@@ -1,27 +1,24 @@
 import { Router } from 'express';
 import { clientController } from '../controllers';
 import {
-  requireClientOwnership,
   requireTradieRole,
   validateClientId,
   validatePaginationParams,
   generalJobRateLimit,
   requestLogger,
   auditLogger,
-  asyncErrorHandler
+  asyncErrorHandler,
+  handleValidationErrors
 } from '../middleware';
-import { body, validationResult } from 'express-validator';
+import { body } from 'express-validator';
 import { CLIENT_CONSTANTS } from '../../config/jobs';
-import { handleValidationErrors } from '../middleware';
 
 const router = Router();
 
-// Apply general middleware to all client routes
 router.use(requireTradieRole);
 router.use(requestLogger);
 router.use(generalJobRateLimit);
 
-// Client validation rules
 const createClientValidationRules = () => [
   body('name')
     .trim()
@@ -60,20 +57,20 @@ const createClientValidationRules = () => [
   body('city')
     .optional()
     .trim()
-    .isLength({ max: CLIENT_CONSTANTS.VALIDATION.CITY_MAX_LENGTH })
-    .withMessage(`City cannot exceed ${CLIENT_CONSTANTS.VALIDATION.CITY_MAX_LENGTH} characters`),
+    .isLength({ max: 100 })
+    .withMessage('City cannot exceed 100 characters'),
 
   body('state')
     .optional()
     .trim()
-    .isLength({ max: CLIENT_CONSTANTS.VALIDATION.STATE_MAX_LENGTH })
-    .withMessage(`State cannot exceed ${CLIENT_CONSTANTS.VALIDATION.STATE_MAX_LENGTH} characters`),
+    .isLength({ max: 50 })
+    .withMessage('State cannot exceed 50 characters'),
 
   body('postcode')
     .optional()
     .trim()
-    .isLength({ max: CLIENT_CONSTANTS.VALIDATION.POSTCODE_MAX_LENGTH })
-    .withMessage(`Postcode cannot exceed ${CLIENT_CONSTANTS.VALIDATION.POSTCODE_MAX_LENGTH} characters`),
+    .isLength({ max: 20 })
+    .withMessage('Postcode cannot exceed 20 characters'),
 
   body('notes')
     .optional()
@@ -131,6 +128,24 @@ const updateClientValidationRules = () => [
     .isLength({ max: CLIENT_CONSTANTS.VALIDATION.ADDRESS_MAX_LENGTH })
     .withMessage(`Address cannot exceed ${CLIENT_CONSTANTS.VALIDATION.ADDRESS_MAX_LENGTH} characters`),
 
+  body('city')
+    .optional()
+    .trim()
+    .isLength({ max: 100 })
+    .withMessage('City cannot exceed 100 characters'),
+
+  body('state')
+    .optional()
+    .trim()
+    .isLength({ max: 50 })
+    .withMessage('State cannot exceed 50 characters'),
+
+  body('postcode')
+    .optional()
+    .trim()
+    .isLength({ max: 20 })
+    .withMessage('Postcode cannot exceed 20 characters'),
+
   body('notes')
     .optional()
     .trim()
@@ -149,7 +164,6 @@ const updateClientValidationRules = () => [
     })
 ];
 
-// Client CRUD Operations
 router.post(
   '/',
   createClientValidationRules(),
@@ -166,17 +180,46 @@ router.get(
 );
 
 router.get(
+  '/vip',
+  auditLogger('get_vip_clients'),
+  asyncErrorHandler(clientController.getVIPClients.bind(clientController))
+);
+
+router.get(
+  '/recent',
+  auditLogger('get_recent_clients'),
+  asyncErrorHandler(clientController.getRecentClients.bind(clientController))
+);
+
+router.get(
+  '/inactive',
+  auditLogger('get_inactive_clients'),
+  asyncErrorHandler(clientController.getInactiveClients.bind(clientController))
+);
+
+router.get(
+  '/search',
+  auditLogger('search_clients'),
+  asyncErrorHandler(clientController.searchClients.bind(clientController))
+);
+
+router.get(
   '/:id',
   validateClientId,
-  requireClientOwnership,
   auditLogger('get_client'),
   asyncErrorHandler(clientController.getClientById.bind(clientController))
+);
+
+router.get(
+  '/:id/jobs',
+  validateClientId,
+  auditLogger('get_client_jobs'),
+  asyncErrorHandler(clientController.getClientJobs.bind(clientController))
 );
 
 router.put(
   '/:id',
   validateClientId,
-  requireClientOwnership,
   updateClientValidationRules(),
   handleValidationErrors,
   auditLogger('update_client'),
@@ -186,7 +229,6 @@ router.put(
 router.delete(
   '/:id',
   validateClientId,
-  requireClientOwnership,
   auditLogger('delete_client'),
   asyncErrorHandler(clientController.deleteClient.bind(clientController))
 );

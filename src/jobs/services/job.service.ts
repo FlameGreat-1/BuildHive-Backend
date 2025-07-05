@@ -38,23 +38,41 @@ import {
   JobValidationError,
   MaterialValidationError,
   FileUploadError,
-  ValidationError
+  ValidationAppError,
+  logger
 } from '../../shared/utils';
-import { logger } from '../../shared/utils';
-import { database } from '../../shared/database';
+import { JobUtils, ClientUtils, MaterialUtils, DateUtils } from '../utils';
 
 export class JobService {
   async createJob(tradieId: number, data: CreateJobData): Promise<Job> {
-    await this.validateCreateJobData(data);
+    const validationErrors = JobUtils.validateJobData(data);
+    if (validationErrors.length > 0) {
+      throw new JobValidationError('Job validation failed', validationErrors.map(error => ({
+        field: 'general',
+        message: error,
+        code: JOB_CONSTANTS.ERROR_CODES.INVALID_JOB_STATUS
+      })));
+    }
     
     try {
-      const job = await jobRepository.create(tradieId, data);
+      const formattedData = {
+        ...data,
+        title: JobUtils.formatJobTitle(data.title),
+        clientName: ClientUtils.formatClientName(data.clientName),
+        clientPhone: ClientUtils.formatPhoneNumber(data.clientPhone)
+      };
+
+      const job = await jobRepository.create(tradieId, formattedData);
       
       await this.publishJobEvent({
         type: JobEventType.CREATED,
         jobId: job.id,
         tradieId,
-        data: { title: job.title, status: job.status },
+        data: { 
+          title: job.title, 
+          status: job.status,
+          reference: JobUtils.generateJobReference(job.id, job.jobType)
+        },
         timestamp: new Date()
       });
 
@@ -62,7 +80,9 @@ export class JobService {
         jobId: job.id,
         tradieId,
         title: job.title,
-        clientEmail: job.clientEmail
+        clientEmail: job.clientEmail,
+        reference: JobUtils.generateJobReference(job.id, job.jobType),
+        estimatedValue: JobUtils.calculateEstimatedJobValue(job)
       });
 
       return job;
@@ -90,6 +110,14 @@ export class JobService {
     return job;
   }
 
+  async getAllJobsByTradieId(tradieId: number): Promise<Job[]> {
+    return await jobRepository.findAllByTradieId(tradieId);
+  }
+
+  async getJobsByClientId(clientId: number, tradieId: number): Promise<Job[]> {
+    return await jobRepository.findByClientId(clientId, tradieId);
+  }
+
   async getJobsByTradieId(tradieId: number, options?: JobListOptions): Promise<{
     jobs: Job[];
     total: number;
@@ -97,12 +125,24 @@ export class JobService {
     limit: number;
     totalPages: number;
   }> {
-    const jobs = await jobRepository.findByTradieId(tradieId, options);
+    let jobs = await jobRepository.findByTradieId(tradieId, options);
     const total = await jobRepository.count(tradieId, options?.filter);
     
     const page = options?.page || JOB_CONSTANTS.PAGINATION.DEFAULT_PAGE;
     const limit = options?.limit || JOB_CONSTANTS.PAGINATION.DEFAULT_LIMIT;
     const totalPages = Math.ceil(total / limit);
+
+    if (options?.filter?.overdue) {
+      jobs = JobUtils.getOverdueJobs(jobs);
+    }
+
+    if (options?.filter?.startDate && options?.filter?.endDate) {
+      jobs = JobUtils.filterJobsByDateRange(jobs, options.filter.startDate, options.filter.endDate);
+    }
+
+    if (options?.filter?.status) {
+      jobs = JobUtils.getJobsByStatus(jobs, options.filter.status);
+    }
 
     return {
       jobs,
@@ -116,9 +156,29 @@ export class JobService {
   async updateJob(jobId: number, tradieId: number, data: UpdateJobData): Promise<Job> {
     const existingJob = await this.getJobById(jobId, tradieId);
     
-    await this.validateUpdateJobData(data, existingJob);
+    const validationErrors = JobUtils.validateJobData(data);
+    if (validationErrors.length > 0) {
+      throw new JobValidationError('Job validation failed', validationErrors.map(error => ({
+        field: 'general',
+        message: error,
+        code: JOB_CONSTANTS.ERROR_CODES.INVALID_JOB_STATUS
+      })));
+    }
+
+    if (data.status && !JobUtils.canTransitionStatus(existingJob.status, data.status)) {
+      throw new JobValidationError('Invalid status transition', [{
+        field: 'status',
+        message: `Cannot transition from ${existingJob.status} to ${data.status}`,
+        code: JOB_CONSTANTS.ERROR_CODES.INVALID_JOB_STATUS
+      }]);
+    }
     
-    const updatedJob = await jobRepository.update(jobId, data);
+    const formattedData = { ...data };
+    if (data.title) formattedData.title = JobUtils.formatJobTitle(data.title);
+    if (data.clientName) formattedData.clientName = ClientUtils.formatClientName(data.clientName);
+    if (data.clientPhone) formattedData.clientPhone = ClientUtils.formatPhoneNumber(data.clientPhone);
+
+    const updatedJob = await jobRepository.update(jobId, formattedData);
     
     if (!updatedJob) {
       throw new JobNotFoundError(`Job with ID ${jobId} not found`);
@@ -131,7 +191,8 @@ export class JobService {
         tradieId,
         data: { 
           fromStatus: existingJob.status, 
-          toStatus: data.status 
+          toStatus: data.status,
+          progress: JobUtils.calculateJobProgress(updatedJob)
         },
         timestamp: new Date()
       });
@@ -141,14 +202,19 @@ export class JobService {
       type: JobEventType.UPDATED,
       jobId,
       tradieId,
-      data: { updatedFields: Object.keys(data) },
+      data: { 
+        updatedFields: Object.keys(data),
+        healthScore: JobUtils.getJobHealthScore(updatedJob)
+      },
       timestamp: new Date()
     });
 
     logger.info('Job updated successfully', {
       jobId,
       tradieId,
-      updatedFields: Object.keys(data)
+      updatedFields: Object.keys(data),
+      newStatus: data.status,
+      progress: JobUtils.calculateJobProgress(updatedJob)
     });
 
     return updatedJob;
@@ -178,17 +244,71 @@ export class JobService {
   }
 
   async getJobSummary(tradieId: number): Promise<JobSummary> {
-    return await jobRepository.getSummary(tradieId);
+    const summary = await jobRepository.getSummary(tradieId);
+    const allJobs = await this.getAllJobsByTradieId(tradieId);
+    
+    const overdueJobs = JobUtils.getOverdueJobs(allJobs);
+    const upcomingJobs = JobUtils.getUpcomingJobs(allJobs, 7);
+    
+    return {
+      ...summary,
+      overdueCount: overdueJobs.length,
+      upcomingCount: upcomingJobs.length,
+      averageProgress: allJobs.length > 0 
+        ? Math.round(allJobs.reduce((sum, job) => sum + JobUtils.calculateJobProgress(job), 0) / allJobs.length)
+        : 0
+    };
   }
 
   async getJobStatistics(tradieId: number): Promise<JobStatistics> {
-    return await jobRepository.getStatistics(tradieId);
+    const statistics = await jobRepository.getStatistics(tradieId);
+    const allJobs = await this.getAllJobsByTradieId(tradieId);
+    
+    const jobsByStatus = {
+      pending: JobUtils.getJobsByStatus(allJobs, JobStatus.PENDING).length,
+      active: JobUtils.getJobsByStatus(allJobs, JobStatus.ACTIVE).length,
+      completed: JobUtils.getJobsByStatus(allJobs, JobStatus.COMPLETED).length,
+      cancelled: JobUtils.getJobsByStatus(allJobs, JobStatus.CANCELLED).length,
+      onHold: JobUtils.getJobsByStatus(allJobs, JobStatus.ON_HOLD).length
+    };
+
+    const jobsByType = allJobs.reduce((acc, job) => {
+      acc[job.jobType] = (acc[job.jobType] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    const jobsByPriority = allJobs.reduce((acc, job) => {
+      acc[job.priority] = (acc[job.priority] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    const monthlyStats = this.calculateMonthlyStats(allJobs);
+
+    return {
+      ...statistics,
+      jobsByStatus,
+      jobsByType,
+      jobsByPriority,
+      monthlyStats,
+      averageEfficiency: allJobs.length > 0 
+        ? Math.round(allJobs.reduce((sum, job) => sum + JobUtils.calculateJobEfficiency(job), 0) / allJobs.length)
+        : 0,
+      healthScoreAverage: allJobs.length > 0 
+        ? Math.round(allJobs.reduce((sum, job) => sum + JobUtils.getJobHealthScore(job), 0) / allJobs.length)
+        : 0
+    };
   }
 
   async updateJobStatus(jobId: number, tradieId: number, status: JobStatus): Promise<Job> {
     const existingJob = await this.getJobById(jobId, tradieId);
     
-    this.validateStatusTransition(existingJob.status, status);
+    if (!JobUtils.canTransitionStatus(existingJob.status, status)) {
+      throw new JobValidationError('Invalid status transition', [{
+        field: 'status',
+        message: `Cannot transition from ${existingJob.status} to ${status}`,
+        code: JOB_CONSTANTS.ERROR_CODES.INVALID_JOB_STATUS
+      }]);
+    }
     
     return await this.updateJob(jobId, tradieId, { status });
   }
@@ -204,11 +324,19 @@ export class JobService {
       }]);
     }
 
-    const validationErrors: ValidationError[] = [];
+    const validationErrors: any[] = [];
     
     materials.forEach((material, index) => {
-      const materialErrors = this.validateMaterialData(material, `materials[${index}]`);
-      validationErrors.push(...materialErrors);
+      const materialErrors = MaterialUtils.validateMaterialData(material);
+      if (materialErrors.length > 0) {
+        materialErrors.forEach(error => {
+          validationErrors.push({
+            field: `materials[${index}]`,
+            message: error,
+            code: JOB_CONSTANTS.ERROR_CODES.MATERIAL_NOT_FOUND
+          });
+        });
+      }
     });
 
     if (validationErrors.length > 0) {
@@ -218,37 +346,59 @@ export class JobService {
     const createdMaterials: Material[] = [];
     
     for (const materialData of materials) {
-      const material = await materialRepository.create(jobId, materialData);
+      const formattedMaterial = {
+        ...materialData,
+        name: MaterialUtils.formatMaterialName(materialData.name),
+        totalCost: MaterialUtils.calculateTotalCost(materialData.quantity, materialData.unitCost)
+      };
+
+      const material = await materialRepository.create(jobId, formattedMaterial);
       createdMaterials.push(material);
     }
+
+    const totalCost = MaterialUtils.calculateMaterialsTotal(createdMaterials);
 
     await this.publishJobEvent({
       type: JobEventType.MATERIAL_ADDED,
       jobId,
       tradieId,
-      data: { materialCount: materials.length },
+      data: { 
+        materialCount: materials.length,
+        totalCost,
+        formattedTotalCost: MaterialUtils.formatCurrency(totalCost)
+      },
       timestamp: new Date()
     });
 
     logger.info('Materials added to job', {
       jobId,
       tradieId,
-      materialCount: materials.length
+      materialCount: materials.length,
+      totalCost
     });
 
     return createdMaterials;
   }
-
-  async updateJobMaterial(materialId: number, jobId: number, tradieId: number, data: UpdateMaterialData): Promise<Material> {
+  
+    async updateJobMaterial(materialId: number, jobId: number, tradieId: number, data: UpdateMaterialData): Promise<Material> {
     await this.getJobById(jobId, tradieId);
     
-    const validationErrors = this.validateMaterialData(data, 'material');
-    
+    const validationErrors = MaterialUtils.validateMaterialData(data);
     if (validationErrors.length > 0) {
-      throw new MaterialValidationError('Material validation failed', validationErrors);
+      throw new MaterialValidationError('Material validation failed', validationErrors.map(error => ({
+        field: 'material',
+        message: error,
+        code: JOB_CONSTANTS.ERROR_CODES.MATERIAL_NOT_FOUND
+      })));
     }
 
-    const updatedMaterial = await materialRepository.update(materialId, data);
+    const formattedData = { ...data };
+    if (data.name) formattedData.name = MaterialUtils.formatMaterialName(data.name);
+    if (data.quantity !== undefined && data.unitCost !== undefined) {
+      formattedData.totalCost = MaterialUtils.calculateTotalCost(data.quantity, data.unitCost);
+    }
+
+    const updatedMaterial = await materialRepository.update(materialId, formattedData);
     
     if (!updatedMaterial) {
       throw new JobNotFoundError(`Material with ID ${materialId} not found`);
@@ -258,7 +408,12 @@ export class JobService {
       type: JobEventType.MATERIAL_UPDATED,
       jobId,
       tradieId,
-      data: { materialId, updatedFields: Object.keys(data) },
+      data: { 
+        materialId, 
+        updatedFields: Object.keys(data),
+        newTotalCost: updatedMaterial.totalCost,
+        formattedCost: MaterialUtils.formatCurrency(updatedMaterial.totalCost)
+      },
       timestamp: new Date()
     });
 
@@ -268,6 +423,11 @@ export class JobService {
   async removeJobMaterial(materialId: number, jobId: number, tradieId: number): Promise<boolean> {
     await this.getJobById(jobId, tradieId);
     
+    const material = await materialRepository.findById(materialId);
+    if (!material) {
+      return false;
+    }
+
     const deleted = await materialRepository.delete(materialId);
     
     if (deleted) {
@@ -275,7 +435,11 @@ export class JobService {
         type: JobEventType.MATERIAL_REMOVED,
         jobId,
         tradieId,
-        data: { materialId },
+        data: { 
+          materialId,
+          materialName: material.name,
+          costRemoved: material.totalCost
+        },
         timestamp: new Date()
       });
     }
@@ -303,7 +467,9 @@ export class JobService {
       data: { 
         attachmentId: attachment.id,
         filename: attachment.filename,
-        fileSize: attachment.fileSize
+        fileSize: attachment.fileSize,
+        formattedSize: `${Math.round(attachment.fileSize / 1024)} KB`,
+        mimeType: attachment.mimeType
       },
       timestamp: new Date()
     });
@@ -312,7 +478,8 @@ export class JobService {
       jobId,
       tradieId,
       attachmentId: attachment.id,
-      filename: attachment.filename
+      filename: attachment.filename,
+      fileSize: attachment.fileSize
     });
 
     return attachment;
@@ -324,7 +491,7 @@ export class JobService {
     const attachment = await attachmentRepository.findById(attachmentId);
     
     if (!attachment) {
-      throw new JobNotFoundError(`Attachment with ID ${attachmentId} not found`);
+      return false;
     }
 
     const deleted = await attachmentRepository.delete(attachmentId);
@@ -334,7 +501,11 @@ export class JobService {
         type: JobEventType.ATTACHMENT_REMOVED,
         jobId,
         tradieId,
-        data: { attachmentId },
+        data: { 
+          attachmentId,
+          filename: attachment.filename,
+          fileSize: attachment.fileSize
+        },
         timestamp: new Date()
       });
     }
@@ -347,232 +518,30 @@ export class JobService {
     
     return await attachmentRepository.findByJobId(jobId);
   }
-  
-    private async validateCreateJobData(data: CreateJobData): Promise<void> {
-    const errors: ValidationError[] = [];
 
-    if (!data.title || data.title.trim().length < JOB_CONSTANTS.VALIDATION.TITLE_MIN_LENGTH) {
-      errors.push({
-        field: 'title',
-        message: `Title must be at least ${JOB_CONSTANTS.VALIDATION.TITLE_MIN_LENGTH} characters long`,
-        code: JOB_CONSTANTS.ERROR_CODES.INVALID_JOB_STATUS
-      });
-    }
-
-    if (data.title && data.title.length > JOB_CONSTANTS.VALIDATION.TITLE_MAX_LENGTH) {
-      errors.push({
-        field: 'title',
-        message: `Title cannot exceed ${JOB_CONSTANTS.VALIDATION.TITLE_MAX_LENGTH} characters`,
-        code: JOB_CONSTANTS.ERROR_CODES.INVALID_JOB_STATUS
-      });
-    }
-
-    if (!data.description || data.description.trim().length === 0) {
-      errors.push({
-        field: 'description',
-        message: 'Description is required',
-        code: JOB_CONSTANTS.ERROR_CODES.INVALID_JOB_STATUS
-      });
-    }
-
-    if (data.description && data.description.length > JOB_CONSTANTS.VALIDATION.DESCRIPTION_MAX_LENGTH) {
-      errors.push({
-        field: 'description',
-        message: `Description cannot exceed ${JOB_CONSTANTS.VALIDATION.DESCRIPTION_MAX_LENGTH} characters`,
-        code: JOB_CONSTANTS.ERROR_CODES.INVALID_JOB_STATUS
-      });
-    }
-
-    if (!Object.values(JOB_CONSTANTS.TYPES).includes(data.jobType)) {
-      errors.push({
-        field: 'jobType',
-        message: 'Invalid job type',
-        code: JOB_CONSTANTS.ERROR_CODES.INVALID_JOB_TYPE
-      });
-    }
-
-    if (!Object.values(JOB_CONSTANTS.PRIORITY).includes(data.priority)) {
-      errors.push({
-        field: 'priority',
-        message: 'Invalid priority level',
-        code: JOB_CONSTANTS.ERROR_CODES.INVALID_PRIORITY
-      });
-    }
-
-    if (!data.clientName || data.clientName.trim().length === 0) {
-      errors.push({
-        field: 'clientName',
-        message: 'Client name is required',
-        code: JOB_CONSTANTS.ERROR_CODES.INVALID_JOB_STATUS
-      });
-    }
-
-    if (!data.clientEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.clientEmail)) {
-      errors.push({
-        field: 'clientEmail',
-        message: 'Valid client email is required',
-        code: JOB_CONSTANTS.ERROR_CODES.INVALID_JOB_STATUS
-      });
-    }
-
-    if (!data.clientPhone || data.clientPhone.trim().length === 0) {
-      errors.push({
-        field: 'clientPhone',
-        message: 'Client phone is required',
-        code: JOB_CONSTANTS.ERROR_CODES.INVALID_JOB_STATUS
-      });
-    }
-
-    if (!data.siteAddress || data.siteAddress.trim().length === 0) {
-      errors.push({
-        field: 'siteAddress',
-        message: 'Site address is required',
-        code: JOB_CONSTANTS.ERROR_CODES.INVALID_JOB_STATUS
-      });
-    }
-
-    if (data.startDate >= data.dueDate) {
-      errors.push({
-        field: 'dueDate',
-        message: 'Due date must be after start date',
-        code: JOB_CONSTANTS.ERROR_CODES.INVALID_DATE_RANGE
-      });
-    }
-
-    if (data.estimatedDuration < JOB_CONSTANTS.VALIDATION.MIN_ESTIMATED_DURATION || 
-        data.estimatedDuration > JOB_CONSTANTS.VALIDATION.MAX_ESTIMATED_DURATION) {
-      errors.push({
-        field: 'estimatedDuration',
-        message: `Estimated duration must be between ${JOB_CONSTANTS.VALIDATION.MIN_ESTIMATED_DURATION} and ${JOB_CONSTANTS.VALIDATION.MAX_ESTIMATED_DURATION} hours`,
-        code: JOB_CONSTANTS.ERROR_CODES.INVALID_JOB_STATUS
-      });
-    }
-
-    if (errors.length > 0) {
-      throw new JobValidationError('Job validation failed', errors);
-    }
-  }
-
-  private async validateUpdateJobData(data: UpdateJobData, existingJob: Job): Promise<void> {
-    const errors: ValidationError[] = [];
-
-    if (data.title !== undefined) {
-      if (data.title.trim().length < JOB_CONSTANTS.VALIDATION.TITLE_MIN_LENGTH) {
-        errors.push({
-          field: 'title',
-          message: `Title must be at least ${JOB_CONSTANTS.VALIDATION.TITLE_MIN_LENGTH} characters long`,
-          code: JOB_CONSTANTS.ERROR_CODES.INVALID_JOB_STATUS
-        });
+  private calculateMonthlyStats(jobs: Job[]): Record<string, any> {
+    const monthlyData: Record<string, { count: number; revenue: number; completed: number }> = {};
+    
+    jobs.forEach(job => {
+      const monthKey = `${job.createdAt.getFullYear()}-${String(job.createdAt.getMonth() + 1).padStart(2, '0')}`;
+      
+      if (!monthlyData[monthKey]) {
+        monthlyData[monthKey] = { count: 0, revenue: 0, completed: 0 };
       }
-
-      if (data.title.length > JOB_CONSTANTS.VALIDATION.TITLE_MAX_LENGTH) {
-        errors.push({
-          field: 'title',
-          message: `Title cannot exceed ${JOB_CONSTANTS.VALIDATION.TITLE_MAX_LENGTH} characters`,
-          code: JOB_CONSTANTS.ERROR_CODES.INVALID_JOB_STATUS
-        });
+      
+      monthlyData[monthKey].count++;
+      monthlyData[monthKey].revenue += job.totalCost || 0;
+      
+      if (job.status === JobStatus.COMPLETED) {
+        monthlyData[monthKey].completed++;
       }
-    }
+    });
 
-    if (data.status !== undefined && !Object.values(JOB_CONSTANTS.STATUS).includes(data.status)) {
-      errors.push({
-        field: 'status',
-        message: 'Invalid job status',
-        code: JOB_CONSTANTS.ERROR_CODES.INVALID_JOB_STATUS
-      });
-    }
-
-    if (data.priority !== undefined && !Object.values(JOB_CONSTANTS.PRIORITY).includes(data.priority)) {
-      errors.push({
-        field: 'priority',
-        message: 'Invalid priority level',
-        code: JOB_CONSTANTS.ERROR_CODES.INVALID_PRIORITY
-      });
-    }
-
-    if (data.hoursWorked !== undefined) {
-      if (data.hoursWorked < JOB_CONSTANTS.VALIDATION.MIN_HOURS_WORKED || 
-          data.hoursWorked > JOB_CONSTANTS.VALIDATION.MAX_HOURS_WORKED) {
-        errors.push({
-          field: 'hoursWorked',
-          message: `Hours worked must be between ${JOB_CONSTANTS.VALIDATION.MIN_HOURS_WORKED} and ${JOB_CONSTANTS.VALIDATION.MAX_HOURS_WORKED}`,
-          code: JOB_CONSTANTS.ERROR_CODES.INVALID_JOB_STATUS
-        });
-      }
-    }
-
-    if (data.startDate && data.dueDate && data.startDate >= data.dueDate) {
-      errors.push({
-        field: 'dueDate',
-        message: 'Due date must be after start date',
-        code: JOB_CONSTANTS.ERROR_CODES.INVALID_DATE_RANGE
-      });
-    }
-
-    if (errors.length > 0) {
-      throw new JobValidationError('Job validation failed', errors);
-    }
-  }
-
-  private validateMaterialData(data: CreateMaterialData | UpdateMaterialData, fieldPrefix: string = ''): ValidationError[] {
-    const errors: ValidationError[] = [];
-    const prefix = fieldPrefix ? `${fieldPrefix}.` : '';
-
-    if ('name' in data && data.name !== undefined) {
-      if (!data.name || data.name.trim().length < MATERIAL_CONSTANTS.VALIDATION.NAME_MIN_LENGTH) {
-        errors.push({
-          field: `${prefix}name`,
-          message: `Material name must be at least ${MATERIAL_CONSTANTS.VALIDATION.NAME_MIN_LENGTH} characters long`,
-          code: JOB_CONSTANTS.ERROR_CODES.INVALID_JOB_STATUS
-        });
-      }
-
-      if (data.name.length > MATERIAL_CONSTANTS.VALIDATION.NAME_MAX_LENGTH) {
-        errors.push({
-          field: `${prefix}name`,
-          message: `Material name cannot exceed ${MATERIAL_CONSTANTS.VALIDATION.NAME_MAX_LENGTH} characters`,
-          code: JOB_CONSTANTS.ERROR_CODES.INVALID_JOB_STATUS
-        });
-      }
-    }
-
-    if ('quantity' in data && data.quantity !== undefined) {
-      if (data.quantity < MATERIAL_CONSTANTS.VALIDATION.MIN_QUANTITY || 
-          data.quantity > MATERIAL_CONSTANTS.VALIDATION.MAX_QUANTITY) {
-        errors.push({
-          field: `${prefix}quantity`,
-          message: `Quantity must be between ${MATERIAL_CONSTANTS.VALIDATION.MIN_QUANTITY} and ${MATERIAL_CONSTANTS.VALIDATION.MAX_QUANTITY}`,
-          code: JOB_CONSTANTS.ERROR_CODES.INVALID_JOB_STATUS
-        });
-      }
-    }
-
-    if ('unitCost' in data && data.unitCost !== undefined) {
-      if (data.unitCost < MATERIAL_CONSTANTS.VALIDATION.MIN_UNIT_COST || 
-          data.unitCost > MATERIAL_CONSTANTS.VALIDATION.MAX_UNIT_COST) {
-        errors.push({
-          field: `${prefix}unitCost`,
-          message: `Unit cost must be between ${MATERIAL_CONSTANTS.VALIDATION.MIN_UNIT_COST} and ${MATERIAL_CONSTANTS.VALIDATION.MAX_UNIT_COST}`,
-          code: JOB_CONSTANTS.ERROR_CODES.INVALID_JOB_STATUS
-        });
-      }
-    }
-
-    if ('unit' in data && data.unit !== undefined) {
-      if (!Object.values(JOB_CONSTANTS.MATERIAL_UNITS).includes(data.unit)) {
-        errors.push({
-          field: `${prefix}unit`,
-          message: 'Invalid material unit',
-          code: JOB_CONSTANTS.ERROR_CODES.INVALID_MATERIAL_UNIT
-        });
-      }
-    }
-
-    return errors;
+    return monthlyData;
   }
 
   private validateAttachmentData(data: CreateAttachmentData): void {
-    const errors: ValidationError[] = [];
+    const errors: any[] = [];
 
     if (!data.filename || data.filename.trim().length === 0) {
       errors.push({
@@ -590,7 +559,7 @@ export class JobService {
       });
     }
 
-    if (!data.mimeType || !JOB_CONSTANTS.FILE_TYPES.ALLOWED_MIME_TYPES.includes(data.mimeType)) {
+    if (!data.mimeType || !JOB_CONSTANTS.FILE_TYPES.ALLOWED_MIME_TYPES.includes(data.mimeType as any)) {
       errors.push({
         field: 'mimeType',
         message: 'Invalid file type',
@@ -611,31 +580,17 @@ export class JobService {
     }
   }
 
-  private validateStatusTransition(currentStatus: JobStatus, newStatus: JobStatus): void {
-    const validTransitions: Record<JobStatus, JobStatus[]> = {
-      [JobStatus.PENDING]: [JobStatus.ACTIVE, JobStatus.CANCELLED],
-      [JobStatus.ACTIVE]: [JobStatus.COMPLETED, JobStatus.ON_HOLD, JobStatus.CANCELLED],
-      [JobStatus.ON_HOLD]: [JobStatus.ACTIVE, JobStatus.CANCELLED],
-      [JobStatus.COMPLETED]: [],
-      [JobStatus.CANCELLED]: []
-    };
-
-    if (!validTransitions[currentStatus].includes(newStatus)) {
-      throw new JobValidationError('Invalid status transition', [{
-        field: 'status',
-        message: `Cannot change status from ${currentStatus} to ${newStatus}`,
-        code: JOB_CONSTANTS.ERROR_CODES.INVALID_JOB_STATUS
-      }]);
-    }
-  }
-
   private async publishJobEvent(event: JobEvent): Promise<void> {
     try {
-      const redisClient = database.getRedisClient();
-      await redisClient.publish(JOB_CONSTANTS.EVENTS.JOB_CREATED, JSON.stringify(event));
+      logger.info('Job event published', {
+        type: event.type,
+        jobId: event.jobId,
+        tradieId: event.tradieId,
+        timestamp: event.timestamp
+      });
     } catch (error: any) {
       logger.error('Failed to publish job event', {
-        eventType: event.type,
+        event: event.type,
         jobId: event.jobId,
         error: error.message
       });
@@ -643,30 +598,45 @@ export class JobService {
   }
 }
 
-  export class ClientService {
+export class ClientService {
   async createClient(tradieId: number, data: CreateClientData): Promise<Client> {
-    await this.validateCreateClientData(data);
-    
-    const existingClient = await clientRepository.findByEmail(tradieId, data.email);
-    
-    if (existingClient) {
-      throw new JobValidationError('Client already exists', [{
-        field: 'email',
-        message: 'A client with this email already exists',
-        code: JOB_CONSTANTS.ERROR_CODES.DUPLICATE_CLIENT_EMAIL
-      }]);
+    const validationErrors = ClientUtils.validateClientData(data);
+    if (validationErrors.length > 0) {
+      throw new ClientNotFoundError('Client validation failed');
     }
 
-    const client = await clientRepository.create(tradieId, data);
-    
-    logger.info('Client created successfully', {
-      clientId: client.id,
-      tradieId,
-      name: client.name,
-      email: client.email
-    });
+    try {
+      const formattedData = {
+        ...data,
+        name: ClientUtils.formatClientName(data.name),
+        phone: ClientUtils.formatPhoneNumber(data.phone),
+        email: data.email.toLowerCase().trim()
+      };
 
-    return client;
+      if (!ClientUtils.validateEmail(formattedData.email)) {
+        throw new ClientNotFoundError('Invalid email format');
+      }
+
+      const client = await clientRepository.create(tradieId, formattedData);
+
+      logger.info('Client created successfully', {
+        clientId: client.id,
+        tradieId,
+        name: client.name,
+        email: client.email,
+        reference: ClientUtils.generateClientReference(client.id)
+      });
+
+      return client;
+    } catch (error: any) {
+      logger.error('Failed to create client', {
+        tradieId,
+        name: data.name,
+        email: data.email,
+        error: error.message
+      });
+      throw error;
+    }
   }
 
   async getClientById(clientId: number, tradieId: number): Promise<Client> {
@@ -683,6 +653,10 @@ export class JobService {
     return client;
   }
 
+  async getAllClientsByTradieId(tradieId: number): Promise<Client[]> {
+    return await clientRepository.findAllByTradieId(tradieId);
+  }
+
   async getClientsByTradieId(tradieId: number, options?: ClientListOptions): Promise<{
     clients: Client[];
     total: number;
@@ -690,12 +664,22 @@ export class JobService {
     limit: number;
     totalPages: number;
   }> {
-    const clients = await clientRepository.findByTradieId(tradieId, options);
+    let clients = await clientRepository.findByTradieId(tradieId, options);
     const total = await clientRepository.count(tradieId, options?.filter);
     
     const page = options?.page || JOB_CONSTANTS.PAGINATION.DEFAULT_PAGE;
     const limit = options?.limit || JOB_CONSTANTS.PAGINATION.DEFAULT_LIMIT;
     const totalPages = Math.ceil(total / limit);
+
+    if (options?.filter?.search) {
+      clients = ClientUtils.searchClients(clients, options.filter.search);
+    }
+
+    if (options?.filter?.tags && options.filter.tags.length > 0) {
+      clients = clients.filter(client => 
+        options.filter.tags!.some(tag => client.tags?.includes(tag as ClientTag))
+      );
+    }
 
     return {
       clients,
@@ -707,11 +691,24 @@ export class JobService {
   }
 
   async updateClient(clientId: number, tradieId: number, data: UpdateClientData): Promise<Client> {
-    await this.getClientById(clientId, tradieId);
+    const existingClient = await this.getClientById(clientId, tradieId);
     
-    await this.validateUpdateClientData(data);
-    
-    const updatedClient = await clientRepository.update(clientId, data);
+    const validationErrors = ClientUtils.validateClientData(data);
+    if (validationErrors.length > 0) {
+      throw new ClientNotFoundError('Client validation failed');
+    }
+
+    const formattedData = { ...data };
+    if (data.name) formattedData.name = ClientUtils.formatClientName(data.name);
+    if (data.phone) formattedData.phone = ClientUtils.formatPhoneNumber(data.phone);
+    if (data.email) {
+      formattedData.email = data.email.toLowerCase().trim();
+      if (!ClientUtils.validateEmail(formattedData.email)) {
+        throw new ClientNotFoundError('Invalid email format');
+      }
+    }
+
+    const updatedClient = await clientRepository.update(clientId, formattedData);
     
     if (!updatedClient) {
       throw new ClientNotFoundError(`Client with ID ${clientId} not found`);
@@ -720,7 +717,8 @@ export class JobService {
     logger.info('Client updated successfully', {
       clientId,
       tradieId,
-      updatedFields: Object.keys(data)
+      updatedFields: Object.keys(data),
+      name: updatedClient.name
     });
 
     return updatedClient;
@@ -729,6 +727,11 @@ export class JobService {
   async deleteClient(clientId: number, tradieId: number): Promise<boolean> {
     await this.getClientById(clientId, tradieId);
     
+    const hasActiveJobs = await jobRepository.hasActiveJobsForClient(clientId);
+    if (hasActiveJobs) {
+      throw new ClientNotFoundError('Cannot delete client with active jobs');
+    }
+
     const deleted = await clientRepository.delete(clientId);
     
     if (deleted) {
@@ -740,216 +743,51 @@ export class JobService {
 
     return deleted;
   }
-
-  private async validateCreateClientData(data: CreateClientData): Promise<void> {
-    const errors: ValidationError[] = [];
-
-    if (!data.name || data.name.trim().length < CLIENT_CONSTANTS.VALIDATION.NAME_MIN_LENGTH) {
-      errors.push({
-        field: 'name',
-        message: `Name must be at least ${CLIENT_CONSTANTS.VALIDATION.NAME_MIN_LENGTH} characters long`,
-        code: JOB_CONSTANTS.ERROR_CODES.CLIENT_NOT_FOUND
-      });
-    }
-
-    if (data.name && data.name.length > CLIENT_CONSTANTS.VALIDATION.NAME_MAX_LENGTH) {
-      errors.push({
-        field: 'name',
-        message: `Name cannot exceed ${CLIENT_CONSTANTS.VALIDATION.NAME_MAX_LENGTH} characters`,
-        code: JOB_CONSTANTS.ERROR_CODES.CLIENT_NOT_FOUND
-      });
-    }
-
-    if (!data.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
-      errors.push({
-        field: 'email',
-        message: 'Valid email is required',
-        code: JOB_CONSTANTS.ERROR_CODES.CLIENT_NOT_FOUND
-      });
-    }
-
-    if (data.email && data.email.length > CLIENT_CONSTANTS.VALIDATION.EMAIL_MAX_LENGTH) {
-      errors.push({
-        field: 'email',
-        message: `Email cannot exceed ${CLIENT_CONSTANTS.VALIDATION.EMAIL_MAX_LENGTH} characters`,
-        code: JOB_CONSTANTS.ERROR_CODES.CLIENT_NOT_FOUND
-      });
-    }
-
-    if (!data.phone || data.phone.trim().length < CLIENT_CONSTANTS.VALIDATION.PHONE_MIN_LENGTH) {
-      errors.push({
-        field: 'phone',
-        message: `Phone must be at least ${CLIENT_CONSTANTS.VALIDATION.PHONE_MIN_LENGTH} characters long`,
-        code: JOB_CONSTANTS.ERROR_CODES.CLIENT_NOT_FOUND
-      });
-    }
-
-    if (data.phone && data.phone.length > CLIENT_CONSTANTS.VALIDATION.PHONE_MAX_LENGTH) {
-      errors.push({
-        field: 'phone',
-        message: `Phone cannot exceed ${CLIENT_CONSTANTS.VALIDATION.PHONE_MAX_LENGTH} characters`,
-        code: JOB_CONSTANTS.ERROR_CODES.CLIENT_NOT_FOUND
-      });
-    }
-
-    if (data.company && data.company.length > CLIENT_CONSTANTS.VALIDATION.COMPANY_MAX_LENGTH) {
-      errors.push({
-        field: 'company',
-        message: `Company name cannot exceed ${CLIENT_CONSTANTS.VALIDATION.COMPANY_MAX_LENGTH} characters`,
-        code: JOB_CONSTANTS.ERROR_CODES.CLIENT_NOT_FOUND
-      });
-    }
-
-    if (data.address && data.address.length > CLIENT_CONSTANTS.VALIDATION.ADDRESS_MAX_LENGTH) {
-      errors.push({
-        field: 'address',
-        message: `Address cannot exceed ${CLIENT_CONSTANTS.VALIDATION.ADDRESS_MAX_LENGTH} characters`,
-        code: JOB_CONSTANTS.ERROR_CODES.CLIENT_NOT_FOUND
-      });
-    }
-
-    if (data.notes && data.notes.length > CLIENT_CONSTANTS.VALIDATION.NOTES_MAX_LENGTH) {
-      errors.push({
-        field: 'notes',
-        message: `Notes cannot exceed ${CLIENT_CONSTANTS.VALIDATION.NOTES_MAX_LENGTH} characters`,
-        code: JOB_CONSTANTS.ERROR_CODES.CLIENT_NOT_FOUND
-      });
-    }
-
-    if (data.tags && data.tags.length > CLIENT_CONSTANTS.VALIDATION.MAX_TAGS) {
-      errors.push({
-        field: 'tags',
-        message: `Maximum ${CLIENT_CONSTANTS.VALIDATION.MAX_TAGS} tags allowed`,
-        code: JOB_CONSTANTS.ERROR_CODES.CLIENT_NOT_FOUND
-      });
-    }
-
-    if (errors.length > 0) {
-      throw new JobValidationError('Client validation failed', errors);
-    }
-  }
-
-  private async validateUpdateClientData(data: UpdateClientData): Promise<void> {
-    const errors: ValidationError[] = [];
-
-    if (data.name !== undefined) {
-      if (data.name.trim().length < CLIENT_CONSTANTS.VALIDATION.NAME_MIN_LENGTH) {
-        errors.push({
-          field: 'name',
-          message: `Name must be at least ${CLIENT_CONSTANTS.VALIDATION.NAME_MIN_LENGTH} characters long`,
-          code: JOB_CONSTANTS.ERROR_CODES.CLIENT_NOT_FOUND
-        });
-      }
-
-      if (data.name.length > CLIENT_CONSTANTS.VALIDATION.NAME_MAX_LENGTH) {
-        errors.push({
-          field: 'name',
-          message: `Name cannot exceed ${CLIENT_CONSTANTS.VALIDATION.NAME_MAX_LENGTH} characters`,
-          code: JOB_CONSTANTS.ERROR_CODES.CLIENT_NOT_FOUND
-        });
-      }
-    }
-
-    if (data.email !== undefined) {
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
-        errors.push({
-          field: 'email',
-          message: 'Valid email is required',
-          code: JOB_CONSTANTS.ERROR_CODES.CLIENT_NOT_FOUND
-        });
-      }
-
-      if (data.email.length > CLIENT_CONSTANTS.VALIDATION.EMAIL_MAX_LENGTH) {
-        errors.push({
-          field: 'email',
-          message: `Email cannot exceed ${CLIENT_CONSTANTS.VALIDATION.EMAIL_MAX_LENGTH} characters`,
-          code: JOB_CONSTANTS.ERROR_CODES.CLIENT_NOT_FOUND
-        });
-      }
-    }
-
-    if (data.phone !== undefined) {
-      if (data.phone.trim().length < CLIENT_CONSTANTS.VALIDATION.PHONE_MIN_LENGTH) {
-        errors.push({
-          field: 'phone',
-          message: `Phone must be at least ${CLIENT_CONSTANTS.VALIDATION.PHONE_MIN_LENGTH} characters long`,
-          code: JOB_CONSTANTS.ERROR_CODES.CLIENT_NOT_FOUND
-        });
-      }
-
-      if (data.phone.length > CLIENT_CONSTANTS.VALIDATION.PHONE_MAX_LENGTH) {
-        errors.push({
-          field: 'phone',
-          message: `Phone cannot exceed ${CLIENT_CONSTANTS.VALIDATION.PHONE_MAX_LENGTH} characters`,
-          code: JOB_CONSTANTS.ERROR_CODES.CLIENT_NOT_FOUND
-        });
-      }
-    }
-
-    if (errors.length > 0) {
-      throw new JobValidationError('Client validation failed', errors);
-    }
-  }
 }
 
 export class MaterialService {
-  async getMaterialsByJobId(jobId: number, tradieId: number): Promise<Material[]> {
-    const jobService = new JobService();
-    await jobService.getJobById(jobId, tradieId);
+  async getMaterialById(materialId: number): Promise<Material> {
+    const material = await materialRepository.findById(materialId);
     
-    return await materialRepository.findByJobId(jobId);
+    if (!material) {
+      throw new JobNotFoundError(`Material with ID ${materialId} not found`);
+    }
+
+    return material;
   }
 
-  async updateMaterial(materialId: number, jobId: number, tradieId: number, data: UpdateMaterialData): Promise<Material> {
-    const jobService = new JobService();
-    await jobService.getJobById(jobId, tradieId);
-    
-    const updatedMaterial = await materialRepository.update(materialId, data);
+  async updateMaterial(materialId: number, data: UpdateMaterialData): Promise<Material> {
+    const validationErrors = MaterialUtils.validateMaterialData(data);
+    if (validationErrors.length > 0) {
+      throw new MaterialValidationError('Material validation failed', validationErrors.map(error => ({
+        field: 'material',
+        message: error,
+        code: JOB_CONSTANTS.ERROR_CODES.MATERIAL_NOT_FOUND
+      })));
+    }
+
+    const formattedData = { ...data };
+    if (data.name) formattedData.name = MaterialUtils.formatMaterialName(data.name);
+    if (data.quantity !== undefined && data.unitCost !== undefined) {
+      formattedData.totalCost = MaterialUtils.calculateTotalCost(data.quantity, data.unitCost);
+    }
+
+    const updatedMaterial = await materialRepository.update(materialId, formattedData);
     
     if (!updatedMaterial) {
       throw new JobNotFoundError(`Material with ID ${materialId} not found`);
     }
 
-    logger.info('Material updated successfully', {
-      materialId,
-      jobId,
-      tradieId,
-      updatedFields: Object.keys(data)
-    });
-
     return updatedMaterial;
   }
 
-  async deleteMaterial(materialId: number, jobId: number, tradieId: number): Promise<boolean> {
-    const jobService = new JobService();
-    await jobService.getJobById(jobId, tradieId);
-    
-    const deleted = await materialRepository.delete(materialId);
-    
-    if (deleted) {
-      logger.info('Material deleted successfully', {
-        materialId,
-        jobId,
-        tradieId
-      });
-    }
-
-    return deleted;
+  async deleteMaterial(materialId: number): Promise<boolean> {
+    return await materialRepository.delete(materialId);
   }
 }
 
 export class AttachmentService {
-  async getAttachmentsByJobId(jobId: number, tradieId: number): Promise<JobAttachment[]> {
-    const jobService = new JobService();
-    await jobService.getJobById(jobId, tradieId);
-    
-    return await attachmentRepository.findByJobId(jobId);
-  }
-
-  async getAttachmentById(attachmentId: number, jobId: number, tradieId: number): Promise<JobAttachment> {
-    const jobService = new JobService();
-    await jobService.getJobById(jobId, tradieId);
-    
+  async getAttachmentById(attachmentId: number): Promise<JobAttachment> {
     const attachment = await attachmentRepository.findById(attachmentId);
     
     if (!attachment) {
@@ -959,21 +797,8 @@ export class AttachmentService {
     return attachment;
   }
 
-  async deleteAttachment(attachmentId: number, jobId: number, tradieId: number): Promise<boolean> {
-    const jobService = new JobService();
-    await jobService.getJobById(jobId, tradieId);
-    
-    const deleted = await attachmentRepository.delete(attachmentId);
-    
-    if (deleted) {
-      logger.info('Attachment deleted successfully', {
-        attachmentId,
-        jobId,
-        tradieId
-      });
-    }
-
-    return deleted;
+  async deleteAttachment(attachmentId: number): Promise<boolean> {
+    return await attachmentRepository.delete(attachmentId);
   }
 }
 
@@ -982,5 +807,5 @@ export const clientService = new ClientService();
 export const materialService = new MaterialService();
 export const attachmentService = new AttachmentService();
 
-
+export { JobService, ClientService, MaterialService, AttachmentService };
 

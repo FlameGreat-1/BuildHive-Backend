@@ -27,7 +27,7 @@ import {
   ClientSortField,
   SortOrder
 } from '../types';
-import { JOB_DATABASE_CONFIG } from '../../config/jobs';
+import { JOB_CONSTANTS } from '../../config/jobs';
 
 export class JobModel {
   async create(tradieId: number, data: CreateJobData): Promise<Job> {
@@ -52,12 +52,12 @@ export class JobModel {
       }
 
       const jobQuery = `
-        INSERT INTO ${JOB_DATABASE_CONFIG.TABLES.JOBS} (
+        INSERT INTO jobs (
           tradie_id, client_id, title, description, job_type, priority,
           client_name, client_email, client_phone, client_company,
           site_address, site_city, site_state, site_postcode, site_access_instructions,
-          start_date, due_date, estimated_duration, notes
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+          start_date, due_date, estimated_duration, notes, status
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
         RETURNING *
       `;
 
@@ -80,7 +80,8 @@ export class JobModel {
         data.startDate,
         data.dueDate,
         data.estimatedDuration,
-        data.notes || []
+        data.notes || [],
+        'pending'
       ]);
 
       const jobId = jobResult.rows[0].id;
@@ -125,14 +126,18 @@ export class JobModel {
                  'filename', a.filename,
                  'originalName', a.original_name,
                  'filePath', a.file_path,
+                 'path', a.file_path,
                  'fileSize', a.file_size,
+                 'size', a.file_size,
                  'mimeType', a.mime_type,
-                 'uploadedAt', a.uploaded_at
+                 'uploadedAt', a.uploaded_at,
+                 'createdAt', a.uploaded_at,
+                 'updatedAt', a.updated_at
                )
              ) FILTER (WHERE a.id IS NOT NULL), '[]') as attachments
-      FROM ${JOB_DATABASE_CONFIG.TABLES.JOBS} j
-      LEFT JOIN ${JOB_DATABASE_CONFIG.TABLES.MATERIALS} m ON j.id = m.job_id
-      LEFT JOIN ${JOB_DATABASE_CONFIG.TABLES.JOB_ATTACHMENTS} a ON j.id = a.job_id
+      FROM jobs j
+      LEFT JOIN materials m ON j.id = m.job_id
+      LEFT JOIN job_attachments a ON j.id = a.job_id
       WHERE j.id = $1
       GROUP BY j.id
     `;
@@ -144,6 +149,107 @@ export class JobModel {
     }
 
     return this.mapRowToJob(result.rows[0]);
+  }
+
+  async findAllByTradieId(tradieId: number): Promise<Job[]> {
+    const query = `
+      SELECT j.*, 
+             COALESCE(json_agg(
+               DISTINCT jsonb_build_object(
+                 'id', m.id,
+                 'jobId', m.job_id,
+                 'name', m.name,
+                 'quantity', m.quantity,
+                 'unit', m.unit,
+                 'unitCost', m.unit_cost,
+                 'totalCost', m.total_cost,
+                 'supplier', m.supplier,
+                 'createdAt', m.created_at,
+                 'updatedAt', m.updated_at
+               )
+             ) FILTER (WHERE m.id IS NOT NULL), '[]') as materials,
+             COALESCE(json_agg(
+               DISTINCT jsonb_build_object(
+                 'id', a.id,
+                 'jobId', a.job_id,
+                 'filename', a.filename,
+                 'originalName', a.original_name,
+                 'filePath', a.file_path,
+                 'path', a.file_path,
+                 'fileSize', a.file_size,
+                 'size', a.file_size,
+                 'mimeType', a.mime_type,
+                 'uploadedAt', a.uploaded_at,
+                 'createdAt', a.uploaded_at,
+                 'updatedAt', a.updated_at
+               )
+             ) FILTER (WHERE a.id IS NOT NULL), '[]') as attachments
+      FROM jobs j
+      LEFT JOIN materials m ON j.id = m.job_id
+      LEFT JOIN job_attachments a ON j.id = a.job_id
+      WHERE j.tradie_id = $1
+      GROUP BY j.id
+      ORDER BY j.created_at DESC
+    `;
+
+    const result = await database.query(query, [tradieId]);
+    return result.rows.map(row => this.mapRowToJob(row));
+  }
+
+  async findByClientId(clientId: number, tradieId: number): Promise<Job[]> {
+    const query = `
+      SELECT j.*, 
+             COALESCE(json_agg(
+               DISTINCT jsonb_build_object(
+                 'id', m.id,
+                 'jobId', m.job_id,
+                 'name', m.name,
+                 'quantity', m.quantity,
+                 'unit', m.unit,
+                 'unitCost', m.unit_cost,
+                 'totalCost', m.total_cost,
+                 'supplier', m.supplier,
+                 'createdAt', m.created_at,
+                 'updatedAt', m.updated_at
+               )
+             ) FILTER (WHERE m.id IS NOT NULL), '[]') as materials,
+             COALESCE(json_agg(
+               DISTINCT jsonb_build_object(
+                 'id', a.id,
+                 'jobId', a.job_id,
+                 'filename', a.filename,
+                 'originalName', a.original_name,
+                 'filePath', a.file_path,
+                 'path', a.file_path,
+                 'fileSize', a.file_size,
+                 'size', a.file_size,
+                 'mimeType', a.mime_type,
+                 'uploadedAt', a.uploaded_at,
+                 'createdAt', a.uploaded_at,
+                 'updatedAt', a.updated_at
+               )
+             ) FILTER (WHERE a.id IS NOT NULL), '[]') as attachments
+      FROM jobs j
+      LEFT JOIN materials m ON j.id = m.job_id
+      LEFT JOIN job_attachments a ON j.id = a.job_id
+      WHERE j.client_id = $1 AND j.tradie_id = $2
+      GROUP BY j.id
+      ORDER BY j.created_at DESC
+    `;
+
+    const result = await database.query(query, [clientId, tradieId]);
+    return result.rows.map(row => this.mapRowToJob(row));
+  }
+
+  async hasActiveJobsForClient(clientId: number): Promise<boolean> {
+    const query = `
+      SELECT COUNT(*) as count 
+      FROM jobs 
+      WHERE client_id = $1 AND status IN ('pending', 'active', 'on_hold')
+    `;
+
+    const result = await database.query(query, [clientId]);
+    return parseInt(result.rows[0].count) > 0;
   }
 
   async findByTradieId(tradieId: number, options?: JobListOptions): Promise<Job[]> {
@@ -233,14 +339,18 @@ export class JobModel {
                  'filename', a.filename,
                  'originalName', a.original_name,
                  'filePath', a.file_path,
+                 'path', a.file_path,
                  'fileSize', a.file_size,
+                 'size', a.file_size,
                  'mimeType', a.mime_type,
-                 'uploadedAt', a.uploaded_at
+                 'uploadedAt', a.uploaded_at,
+                 'createdAt', a.uploaded_at,
+                 'updatedAt', a.updated_at
                )
              ) FILTER (WHERE a.id IS NOT NULL), '[]') as attachments
-      FROM ${JOB_DATABASE_CONFIG.TABLES.JOBS} j
-      LEFT JOIN ${JOB_DATABASE_CONFIG.TABLES.MATERIALS} m ON j.id = m.job_id
-      LEFT JOIN ${JOB_DATABASE_CONFIG.TABLES.JOB_ATTACHMENTS} a ON j.id = a.job_id
+      FROM jobs j
+      LEFT JOIN materials m ON j.id = m.job_id
+      LEFT JOIN job_attachments a ON j.id = a.job_id
       ${whereClause}
       GROUP BY j.id
       ${orderClause}
@@ -275,7 +385,7 @@ export class JobModel {
     values.push(id);
 
     const query = `
-      UPDATE ${JOB_DATABASE_CONFIG.TABLES.JOBS}
+      UPDATE jobs
       SET ${fields.join(', ')}
       WHERE id = $${paramIndex}
       RETURNING *
@@ -294,10 +404,10 @@ export class JobModel {
     const transaction = await database.transaction();
     
     try {
-      await transaction.query(`DELETE FROM ${JOB_DATABASE_CONFIG.TABLES.JOB_ATTACHMENTS} WHERE job_id = $1`, [id]);
-      await transaction.query(`DELETE FROM ${JOB_DATABASE_CONFIG.TABLES.MATERIALS} WHERE job_id = $1`, [id]);
+      await transaction.query(`DELETE FROM job_attachments WHERE job_id = $1`, [id]);
+      await transaction.query(`DELETE FROM materials WHERE job_id = $1`, [id]);
       
-      const result = await transaction.query(`DELETE FROM ${JOB_DATABASE_CONFIG.TABLES.JOBS} WHERE id = $1`, [id]);
+      const result = await transaction.query(`DELETE FROM jobs WHERE id = $1`, [id]);
       
       await transaction.commit();
       return result.rowCount > 0;
@@ -332,7 +442,7 @@ export class JobModel {
       }
     }
 
-    const query = `SELECT COUNT(*) as count FROM ${JOB_DATABASE_CONFIG.TABLES.JOBS} ${whereClause}`;
+    const query = `SELECT COUNT(*) as count FROM jobs ${whereClause}`;
     const result = await database.query(query, params);
     
     return parseInt(result.rows[0].count);
@@ -341,19 +451,21 @@ export class JobModel {
   async getSummary(tradieId: number): Promise<JobSummary> {
     const query = `
       SELECT 
-        COUNT(*) as total,
-        COUNT(*) FILTER (WHERE status = 'pending') as pending,
-        COUNT(*) FILTER (WHERE status = 'active') as active,
-        COUNT(*) FILTER (WHERE status = 'completed') as completed,
-        COUNT(*) FILTER (WHERE status = 'cancelled') as cancelled,
-        COUNT(*) FILTER (WHERE status = 'on_hold') as on_hold,
+        COUNT(*) as total_jobs,
+        COUNT(*) FILTER (WHERE status = 'pending') as pending_jobs,
+        COUNT(*) FILTER (WHERE status = 'active') as active_jobs,
+        COUNT(*) FILTER (WHERE status = 'completed') as completed_jobs,
+        COUNT(*) FILTER (WHERE status = 'cancelled') as cancelled_jobs,
+        COUNT(*) FILTER (WHERE status = 'on_hold') as on_hold_jobs,
         COALESCE(SUM(
           CASE WHEN status = 'completed' THEN 
-            (SELECT COALESCE(SUM(total_cost), 0) FROM ${JOB_DATABASE_CONFIG.TABLES.MATERIALS} WHERE job_id = j.id)
+            (SELECT COALESCE(SUM(total_cost), 0) FROM materials WHERE job_id = j.id)
           ELSE 0 END
         ), 0) as total_revenue,
-        COALESCE(AVG(hours_worked) FILTER (WHERE hours_worked > 0), 0) as average_hours
-      FROM ${JOB_DATABASE_CONFIG.TABLES.JOBS} j
+        COALESCE(AVG(hours_worked) FILTER (WHERE hours_worked > 0), 0) as average_hours,
+        COUNT(*) FILTER (WHERE due_date < NOW() AND status NOT IN ('completed', 'cancelled')) as overdue_count,
+        COUNT(*) FILTER (WHERE start_date <= NOW() + INTERVAL '7 days' AND status = 'pending') as upcoming_count
+      FROM jobs j
       WHERE tradie_id = $1
     `;
 
@@ -361,14 +473,16 @@ export class JobModel {
     const row = result.rows[0];
 
     return {
-      total: parseInt(row.total),
-      pending: parseInt(row.pending),
-      active: parseInt(row.active),
-      completed: parseInt(row.completed),
-      cancelled: parseInt(row.cancelled),
-      onHold: parseInt(row.on_hold),
+      totalJobs: parseInt(row.total_jobs),
+      pendingJobs: parseInt(row.pending_jobs),
+      activeJobs: parseInt(row.active_jobs),
+      completedJobs: parseInt(row.completed_jobs),
+      cancelledJobs: parseInt(row.cancelled_jobs),
+      onHoldJobs: parseInt(row.on_hold_jobs),
       totalRevenue: parseFloat(row.total_revenue),
-      averageHours: parseFloat(row.average_hours)
+      averageHours: parseFloat(row.average_hours),
+      overdueCount: parseInt(row.overdue_count),
+      upcomingCount: parseInt(row.upcoming_count)
     };
   }
 
@@ -379,16 +493,24 @@ export class JobModel {
         COUNT(*) FILTER (WHERE status = 'completed') as completed_jobs,
         COUNT(*) FILTER (WHERE status = 'active') as active_jobs,
         COUNT(*) FILTER (WHERE status = 'pending') as pending_jobs,
+        COUNT(*) FILTER (WHERE status = 'cancelled') as cancelled_jobs,
+        COUNT(*) FILTER (WHERE status = 'on_hold') as on_hold_jobs,
         COALESCE(SUM(hours_worked), 0) as total_hours,
         COALESCE(AVG(estimated_duration), 0) as average_job_duration,
         COUNT(DISTINCT client_id) as client_count,
         COALESCE((
           SELECT SUM(total_cost) 
-          FROM ${JOB_DATABASE_CONFIG.TABLES.MATERIALS} m 
-          JOIN ${JOB_DATABASE_CONFIG.TABLES.JOBS} j2 ON m.job_id = j2.id 
+          FROM materials m 
+          JOIN jobs j2 ON m.job_id = j2.id 
           WHERE j2.tradie_id = $1
-        ), 0) as material_costs
-      FROM ${JOB_DATABASE_CONFIG.TABLES.JOBS} j
+        ), 0) as material_costs,
+        COALESCE((
+          SELECT SUM(total_cost) 
+          FROM materials m 
+          JOIN jobs j2 ON m.job_id = j2.id 
+          WHERE j2.tradie_id = $1 AND j2.status = 'completed'
+        ), 0) as total_revenue
+      FROM jobs j
       WHERE tradie_id = $1
     `;
 
@@ -403,7 +525,9 @@ export class JobModel {
       completedJobs,
       activeJobs: parseInt(row.active_jobs),
       pendingJobs: parseInt(row.pending_jobs),
-      totalRevenue: parseFloat(row.material_costs),
+      cancelledJobs: parseInt(row.cancelled_jobs),
+      onHoldJobs: parseInt(row.on_hold_jobs),
+      totalRevenue: parseFloat(row.total_revenue),
       totalHours: parseFloat(row.total_hours),
       averageJobDuration: parseFloat(row.average_job_duration),
       completionRate: totalJobs > 0 ? (completedJobs / totalJobs) * 100 : 0,
@@ -416,7 +540,7 @@ export class JobModel {
     const dbConnection = transaction || database;
     
     const query = `
-      INSERT INTO ${JOB_DATABASE_CONFIG.TABLES.CLIENTS} (
+      INSERT INTO clients (
         tradie_id, name, email, phone, company, address, city, state, postcode, notes, tags
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
       RETURNING *
@@ -443,7 +567,7 @@ export class JobModel {
     const dbConnection = transaction || database;
     
     const query = `
-      SELECT * FROM ${JOB_DATABASE_CONFIG.TABLES.CLIENTS}
+      SELECT * FROM clients
       WHERE tradie_id = $1 AND email = $2
     `;
 
@@ -461,7 +585,7 @@ export class JobModel {
     const totalCost = data.quantity * data.unitCost;
     
     const query = `
-      INSERT INTO ${JOB_DATABASE_CONFIG.TABLES.MATERIALS} (
+      INSERT INTO materials (
         job_id, name, quantity, unit, unit_cost, total_cost, supplier
       ) VALUES ($1, $2, $3, $4, $5, $6, $7)
       RETURNING *
@@ -484,20 +608,20 @@ export class JobModel {
     const dbConnection = transaction || database;
     
     const query = `
-      UPDATE ${JOB_DATABASE_CONFIG.TABLES.CLIENTS}
+      UPDATE clients
       SET 
         total_jobs = (
-          SELECT COUNT(*) FROM ${JOB_DATABASE_CONFIG.TABLES.JOBS} 
+          SELECT COUNT(*) FROM jobs 
           WHERE client_id = $1
         ),
         total_revenue = (
           SELECT COALESCE(SUM(m.total_cost), 0)
-          FROM ${JOB_DATABASE_CONFIG.TABLES.JOBS} j
-          LEFT JOIN ${JOB_DATABASE_CONFIG.TABLES.MATERIALS} m ON j.id = m.job_id
+          FROM jobs j
+          LEFT JOIN materials m ON j.id = m.job_id
           WHERE j.client_id = $1 AND j.status = 'completed'
         ),
         last_job_date = (
-          SELECT MAX(created_at) FROM ${JOB_DATABASE_CONFIG.TABLES.JOBS}
+          SELECT MAX(created_at) FROM jobs
           WHERE client_id = $1
         ),
         updated_at = NOW()
@@ -529,7 +653,8 @@ export class JobModel {
       startDate: new Date(row.start_date),
       dueDate: new Date(row.due_date),
       estimatedDuration: row.estimated_duration,
-      hoursWorked: parseFloat(row.hours_worked),
+      hoursWorked: parseFloat(row.hours_worked || 0),
+      totalCost: parseFloat(row.total_cost || 0),
       notes: row.notes || [],
       tags: row.tags || [],
       materials: row.materials || [],
@@ -553,9 +678,9 @@ export class JobModel {
       postcode: row.postcode,
       notes: row.notes,
       tags: row.tags || [],
-      totalJobs: row.total_jobs,
-      totalRevenue: parseFloat(row.total_revenue),
-      lastJobDate: row.last_job_date ? new Date(row.last_job_date) : undefined,
+      totalJobs: row.total_jobs || 0,
+      totalRevenue: parseFloat(row.total_revenue || 0),
+      lastJobDate: row.last_job_date ? new Date(row.last_job_date) : null,
       createdAt: new Date(row.created_at),
       updatedAt: new Date(row.updated_at)
     };

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { attachmentController } from '../controllers';
+import { jobController } from '../controllers';
 import {
   requireTradieRole,
   validateJobId,
@@ -12,33 +12,41 @@ import {
 
 const router = Router();
 
-// Apply general middleware to all attachment routes
 router.use(requireTradieRole);
 router.use(requestLogger);
 router.use(generalJobRateLimit);
 
-// Attachment Operations (nested under jobs)
 router.get(
   '/jobs/:jobId/attachments',
   validateJobId,
   auditLogger('get_attachments_by_job'),
-  asyncErrorHandler(attachmentController.getAttachmentsByJobId.bind(attachmentController))
+  asyncErrorHandler(jobController.getJobAttachments.bind(jobController))
 );
 
 router.get(
-  '/jobs/:jobId/attachments/:id',
+  '/jobs/:jobId/attachments/:attachmentId',
   validateJobId,
   validateAttachmentId,
   auditLogger('get_attachment'),
-  asyncErrorHandler(attachmentController.getAttachmentById.bind(attachmentController))
+  asyncErrorHandler(async (req, res, next) => {
+    const attachments = await jobController.getJobAttachments(req, res, next);
+    if (attachments && Array.isArray(attachments)) {
+      const attachment = attachments.find(att => att.id === parseInt(req.params.attachmentId));
+      if (attachment) {
+        res.json({ success: true, data: attachment });
+      } else {
+        res.status(404).json({ success: false, message: 'Attachment not found' });
+      }
+    }
+  })
 );
 
 router.delete(
-  '/jobs/:jobId/attachments/:id',
+  '/jobs/:jobId/attachments/:attachmentId',
   validateJobId,
   validateAttachmentId,
   auditLogger('delete_attachment'),
-  asyncErrorHandler(attachmentController.deleteAttachment.bind(attachmentController))
+  asyncErrorHandler(jobController.removeJobAttachment.bind(jobController))
 );
 
 export default router;

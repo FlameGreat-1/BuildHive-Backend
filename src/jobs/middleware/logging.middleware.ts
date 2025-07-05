@@ -4,9 +4,10 @@ import { logger } from '../../shared/utils';
 export interface LoggingRequest extends Request {
   startTime?: number;
   user?: {
-    id: number;
+    id: string;
     email: string;
     role: string;
+    emailVerified: boolean;
   };
 }
 

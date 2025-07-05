@@ -18,7 +18,25 @@ export const CLIENT_CONSTANTS = {
     COMPANY_MAX_LENGTH: 100,
     ADDRESS_MAX_LENGTH: 500,
     NOTES_MAX_LENGTH: 2000,
-    MAX_TAGS: 10
+    MAX_TAGS: 10,
+    CITY_MAX_LENGTH: 100,
+    STATE_MAX_LENGTH: 50,
+    POSTCODE_MAX_LENGTH: 20
+  },
+
+  VIP_THRESHOLDS: {
+    REVENUE: 10000,
+    JOB_COUNT: 10
+  },
+
+  SORT_FIELDS: {
+    NAME: 'name',
+    EMAIL: 'email',
+    CREATED_AT: 'created_at',
+    UPDATED_AT: 'updated_at',
+    TOTAL_REVENUE: 'total_revenue',
+    TOTAL_JOBS: 'total_jobs',
+    LAST_JOB_DATE: 'last_job_date'
   }
 } as const;
 
@@ -30,15 +48,28 @@ export const MATERIAL_CONSTANTS = {
     MAX_QUANTITY: 99999.99,
     MIN_UNIT_COST: 0,
     MAX_UNIT_COST: 999999.99,
-    SUPPLIER_MAX_LENGTH: 100
+    SUPPLIER_MAX_LENGTH: 200
   },
   
   CALCULATION: {
     DECIMAL_PLACES: 2,
-    TAX_RATE: 0.10
+    TAX_RATE: 0.10,
+    MARKUP_PERCENTAGE: 0.20
+  },
+
+  UNITS: {
+    PIECE: 'piece',
+    METER: 'meter',
+    SQUARE_METER: 'square_meter',
+    CUBIC_METER: 'cubic_meter',
+    KILOGRAM: 'kilogram',
+    LITER: 'liter',
+    HOUR: 'hour',
+    DAY: 'day',
+    SET: 'set',
+    BOX: 'box'
   }
 } as const;
-
 
 export const JOB_CONSTANTS = {
   STATUS: {
@@ -84,7 +115,10 @@ export const JOB_CONSTANTS = {
     REPEAT_CLIENT: 'repeat_client',
     EMERGENCY: 'emergency',
     WARRANTY: 'warranty',
-    FOLLOW_UP: 'follow_up'
+    FOLLOW_UP: 'follow_up',
+    RUSH_JOB: 'rush_job',
+    QUOTE_REQUIRED: 'quote_required',
+    MATERIALS_ORDERED: 'materials_ordered'
   },
   
   MATERIAL_UNITS: {
@@ -97,7 +131,11 @@ export const JOB_CONSTANTS = {
     HOUR: 'hour',
     DAY: 'day',
     SET: 'set',
-    BOX: 'box'
+    BOX: 'box',
+    ROLL: 'roll',
+    SHEET: 'sheet',
+    TUBE: 'tube',
+    BAG: 'bag'
   },
   
   VALIDATION: {
@@ -107,14 +145,14 @@ export const JOB_CONSTANTS = {
     CLIENT_NAME_MAX_LENGTH: 100,
     COMPANY_NAME_MAX_LENGTH: 100,
     ADDRESS_MAX_LENGTH: 500,
-    CITY_MAX_LENGTH: 50,
+    CITY_MAX_LENGTH: 100,
     STATE_MAX_LENGTH: 50,
-    POSTCODE_MAX_LENGTH: 10,
+    POSTCODE_MAX_LENGTH: 20,
     PHONE_MAX_LENGTH: 20,
     EMAIL_MAX_LENGTH: 255,
     MATERIAL_NAME_MAX_LENGTH: 200,
-    SUPPLIER_NAME_MAX_LENGTH: 100,
-    NOTES_MAX_LENGTH: 1000,
+    SUPPLIER_NAME_MAX_LENGTH: 200,
+    NOTES_MAX_LENGTH: 2000,
     MAX_MATERIALS_PER_JOB: 100,
     MAX_ATTACHMENTS_PER_JOB: 20,
     MAX_FILES_PER_JOB: 20,
@@ -139,7 +177,7 @@ export const JOB_CONSTANTS = {
       'application/msword',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       'text/plain'
-    ],
+    ] as const,
     ALLOWED_EXTENSIONS: [
       '.jpg',
       '.jpeg',
@@ -150,7 +188,7 @@ export const JOB_CONSTANTS = {
       '.doc',
       '.docx',
       '.txt'
-    ]
+    ] as const
   },
 
   FILE_UPLOAD: {
@@ -165,7 +203,7 @@ export const JOB_CONSTANTS = {
       'application/msword',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       'text/plain'
-    ]
+    ] as const
   },
 
   RATE_LIMITS: {
@@ -190,7 +228,8 @@ export const JOB_CONSTANTS = {
   CALCULATIONS: {
     DEFAULT_HOURLY_RATE: 75,
     OVERHEAD_PERCENTAGE: 0.15,
-    TAX_RATE: 0.10
+    TAX_RATE: 0.10,
+    PROFIT_MARGIN: 0.25
   },
   
   PAGINATION: {
@@ -209,7 +248,8 @@ export const JOB_CONSTANTS = {
     JOB_LIST_TTL: 300,
     JOB_DETAILS_TTL: 600,
     CLIENT_LIST_TTL: 300,
-    MATERIAL_LIST_TTL: 300
+    MATERIAL_LIST_TTL: 300,
+    STATISTICS_TTL: 900
   },
   
   REDIS_KEYS: {
@@ -218,7 +258,8 @@ export const JOB_CONSTANTS = {
     MATERIAL_PREFIX: 'material:',
     JOB_LIST_PREFIX: 'job_list:',
     CLIENT_LIST_PREFIX: 'client_list:',
-    JOB_STATS_PREFIX: 'job_stats:'
+    JOB_STATS_PREFIX: 'job_stats:',
+    ATTACHMENT_PREFIX: 'attachment:'
   },
   
   EVENTS: {
@@ -228,8 +269,12 @@ export const JOB_CONSTANTS = {
     JOB_STATUS_CHANGED: 'job.status_changed',
     CLIENT_CREATED: 'client.created',
     CLIENT_UPDATED: 'client.updated',
+    CLIENT_DELETED: 'client.deleted',
     MATERIAL_ADDED: 'material.added',
     MATERIAL_UPDATED: 'material.updated',
+    MATERIAL_REMOVED: 'material.removed',
+    ATTACHMENT_ADDED: 'attachment.added',
+    ATTACHMENT_REMOVED: 'attachment.removed',
     FILE_UPLOADED: 'file.uploaded'
   },
   
@@ -237,6 +282,7 @@ export const JOB_CONSTANTS = {
     JOB_NOT_FOUND: 'JOB_NOT_FOUND',
     CLIENT_NOT_FOUND: 'CLIENT_NOT_FOUND',
     MATERIAL_NOT_FOUND: 'MATERIAL_NOT_FOUND',
+    ATTACHMENT_NOT_FOUND: 'ATTACHMENT_NOT_FOUND',
     UNAUTHORIZED_JOB_ACCESS: 'UNAUTHORIZED_JOB_ACCESS',
     INVALID_JOB_STATUS: 'INVALID_JOB_STATUS',
     INVALID_JOB_TYPE: 'INVALID_JOB_TYPE',
@@ -248,13 +294,16 @@ export const JOB_CONSTANTS = {
     DUPLICATE_CLIENT_EMAIL: 'DUPLICATE_CLIENT_EMAIL',
     INVALID_DATE_RANGE: 'INVALID_DATE_RANGE',
     MATERIALS_LIMIT_EXCEEDED: 'MATERIALS_LIMIT_EXCEEDED',
-    ATTACHMENTS_LIMIT_EXCEEDED: 'ATTACHMENTS_LIMIT_EXCEEDED'
+    ATTACHMENTS_LIMIT_EXCEEDED: 'ATTACHMENTS_LIMIT_EXCEEDED',
+    INSUFFICIENT_PERMISSIONS: 'INSUFFICIENT_PERMISSIONS',
+    VALIDATION_FAILED: 'VALIDATION_FAILED'
   },
   
   PERMISSIONS: {
     ROLES: {
       TRADIE: 'tradie',
-      ENTERPRISE: 'enterprise'
+      ENTERPRISE: 'enterprise',
+      ADMIN: 'admin'
     },
     ACTIONS: {
       CREATE_JOB: 'create_job',
@@ -262,54 +311,42 @@ export const JOB_CONSTANTS = {
       UPDATE_JOB: 'update_job',
       DELETE_JOB: 'delete_job',
       MANAGE_CLIENTS: 'manage_clients',
-      UPLOAD_FILES: 'upload_files'
+      UPLOAD_FILES: 'upload_files',
+      VIEW_STATISTICS: 'view_statistics',
+      EXPORT_DATA: 'export_data'
     }
+  },
+
+  SORT_FIELDS: {
+    CREATED_AT: 'created_at',
+    UPDATED_AT: 'updated_at',
+    TITLE: 'title',
+    STATUS: 'status',
+    PRIORITY: 'priority',
+    DUE_DATE: 'due_date',
+    START_DATE: 'start_date',
+    CLIENT_NAME: 'client_name',
+    TOTAL_COST: 'total_cost'
+  },
+
+  SORT_ORDERS: {
+    ASC: 'asc',
+    DESC: 'desc'
+  },
+
+  NOTIFICATION_TYPES: {
+    JOB_DUE_SOON: 'job_due_soon',
+    JOB_OVERDUE: 'job_overdue',
+    STATUS_CHANGED: 'status_changed',
+    CLIENT_MESSAGE: 'client_message',
+    PAYMENT_RECEIVED: 'payment_received'
   }
 } as const;
 
-export const CLIENT_CONSTANTS = {
-  TAGS: {
-    VIP: 'vip',
-    REPEAT_CUSTOMER: 'repeat_customer',
-    HIGH_VALUE: 'high_value',
-    DIFFICULT: 'difficult',
-    PREFERRED: 'preferred',
-    CORPORATE: 'corporate',
-    RESIDENTIAL: 'residential'
-  },
-  
-  VALIDATION: {
-    NAME_MIN_LENGTH: 2,
-    NAME_MAX_LENGTH: 100,
-    EMAIL_MAX_LENGTH: 255,
-    PHONE_MIN_LENGTH: 8,
-    PHONE_MAX_LENGTH: 20,
-    COMPANY_MAX_LENGTH: 100,
-    ADDRESS_MAX_LENGTH: 500,
-    NOTES_MAX_LENGTH: 2000,
-    MAX_TAGS: 10
-  },
-
-  VIP_THRESHOLDS: {
-    REVENUE: 10000,
-    JOB_COUNT: 10
-  }
-} as const;
-
-export const MATERIAL_CONSTANTS = {
-  VALIDATION: {
-    NAME_MIN_LENGTH: 2,
-    NAME_MAX_LENGTH: 200,
-    MIN_QUANTITY: 0.01,
-    MAX_QUANTITY: 99999.99,
-    MIN_UNIT_COST: 0,
-    MAX_UNIT_COST: 999999.99,
-    SUPPLIER_MAX_LENGTH: 100
-  },
-  
-  CALCULATION: {
-    DECIMAL_PLACES: 2,
-    TAX_RATE: 0.10
-  }
-} as const;
-
+export type JobStatus = typeof JOB_CONSTANTS.STATUS[keyof typeof JOB_CONSTANTS.STATUS];
+export type JobType = typeof JOB_CONSTANTS.TYPES[keyof typeof JOB_CONSTANTS.TYPES];
+export type JobPriority = typeof JOB_CONSTANTS.PRIORITY[keyof typeof JOB_CONSTANTS.PRIORITY];
+export type JobTag = typeof JOB_CONSTANTS.TAGS[keyof typeof JOB_CONSTANTS.TAGS];
+export type ClientTag = typeof CLIENT_CONSTANTS.TAGS[keyof typeof CLIENT_CONSTANTS.TAGS];
+export type MaterialUnit = typeof JOB_CONSTANTS.MATERIAL_UNITS[keyof typeof JOB_CONSTANTS.MATERIAL_UNITS];
+export type SortOrder = typeof JOB_CONSTANTS.SORT_ORDERS[keyof typeof JOB_CONSTANTS.SORT_ORDERS];

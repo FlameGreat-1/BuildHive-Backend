@@ -1,8 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 import { body, validationResult } from 'express-validator';
 import { JOB_CONSTANTS, CLIENT_CONSTANTS, MATERIAL_CONSTANTS } from '../../config/jobs';
-import { ValidationError, sendValidationError } from '../../shared/utils';
+import { ValidationAppError, sendValidationError } from '../../shared/utils';
 import { logger } from '../../shared/utils';
+import { AuthenticatedRequest } from '../middleware/auth.middleware';
 
 export const createJobValidationRules = () => {
   return [
@@ -38,8 +39,10 @@ export const createJobValidationRules = () => {
       .trim()
       .notEmpty()
       .withMessage('Client name is required')
-      .isLength({ max: JOB_CONSTANTS.VALIDATION.CLIENT_NAME_MAX_LENGTH })
-      .withMessage(`Client name cannot exceed ${JOB_CONSTANTS.VALIDATION.CLIENT_NAME_MAX_LENGTH} characters`),
+      .isLength({ min: CLIENT_CONSTANTS.VALIDATION.NAME_MIN_LENGTH })
+      .withMessage(`Client name must be at least ${CLIENT_CONSTANTS.VALIDATION.NAME_MIN_LENGTH} characters`)
+      .isLength({ max: CLIENT_CONSTANTS.VALIDATION.NAME_MAX_LENGTH })
+      .withMessage(`Client name cannot exceed ${CLIENT_CONSTANTS.VALIDATION.NAME_MAX_LENGTH} characters`),
 
     body('clientEmail')
       .trim()
@@ -47,60 +50,62 @@ export const createJobValidationRules = () => {
       .withMessage('Client email is required')
       .isEmail()
       .withMessage('Valid client email is required')
-      .isLength({ max: JOB_CONSTANTS.VALIDATION.EMAIL_MAX_LENGTH })
-      .withMessage(`Client email cannot exceed ${JOB_CONSTANTS.VALIDATION.EMAIL_MAX_LENGTH} characters`)
+      .isLength({ max: CLIENT_CONSTANTS.VALIDATION.EMAIL_MAX_LENGTH })
+      .withMessage(`Client email cannot exceed ${CLIENT_CONSTANTS.VALIDATION.EMAIL_MAX_LENGTH} characters`)
       .normalizeEmail(),
 
     body('clientPhone')
       .trim()
       .notEmpty()
       .withMessage('Client phone is required')
-      .isLength({ max: JOB_CONSTANTS.VALIDATION.PHONE_MAX_LENGTH })
-      .withMessage(`Client phone cannot exceed ${JOB_CONSTANTS.VALIDATION.PHONE_MAX_LENGTH} characters`)
+      .isLength({ min: CLIENT_CONSTANTS.VALIDATION.PHONE_MIN_LENGTH })
+      .withMessage(`Client phone must be at least ${CLIENT_CONSTANTS.VALIDATION.PHONE_MIN_LENGTH} characters`)
+      .isLength({ max: CLIENT_CONSTANTS.VALIDATION.PHONE_MAX_LENGTH })
+      .withMessage(`Client phone cannot exceed ${CLIENT_CONSTANTS.VALIDATION.PHONE_MAX_LENGTH} characters`)
       .matches(/^[\d\s\-\+\(\)]+$/)
       .withMessage('Invalid phone number format'),
 
     body('clientCompany')
       .optional()
       .trim()
-      .isLength({ max: JOB_CONSTANTS.VALIDATION.COMPANY_NAME_MAX_LENGTH })
-      .withMessage(`Client company cannot exceed ${JOB_CONSTANTS.VALIDATION.COMPANY_NAME_MAX_LENGTH} characters`),
+      .isLength({ max: CLIENT_CONSTANTS.VALIDATION.COMPANY_MAX_LENGTH })
+      .withMessage(`Client company cannot exceed ${CLIENT_CONSTANTS.VALIDATION.COMPANY_MAX_LENGTH} characters`),
 
     body('siteAddress')
       .trim()
       .notEmpty()
       .withMessage('Site address is required')
-      .isLength({ max: JOB_CONSTANTS.VALIDATION.ADDRESS_MAX_LENGTH })
-      .withMessage(`Site address cannot exceed ${JOB_CONSTANTS.VALIDATION.ADDRESS_MAX_LENGTH} characters`),
+      .isLength({ max: CLIENT_CONSTANTS.VALIDATION.ADDRESS_MAX_LENGTH })
+      .withMessage(`Site address cannot exceed ${CLIENT_CONSTANTS.VALIDATION.ADDRESS_MAX_LENGTH} characters`),
 
     body('siteCity')
       .trim()
       .notEmpty()
       .withMessage('Site city is required')
-      .isLength({ max: JOB_CONSTANTS.VALIDATION.CITY_MAX_LENGTH })
-      .withMessage(`Site city cannot exceed ${JOB_CONSTANTS.VALIDATION.CITY_MAX_LENGTH} characters`),
+      .isLength({ max: 100 })
+      .withMessage('Site city cannot exceed 100 characters'),
 
     body('siteState')
       .trim()
       .notEmpty()
       .withMessage('Site state is required')
-      .isLength({ max: JOB_CONSTANTS.VALIDATION.STATE_MAX_LENGTH })
-      .withMessage(`Site state cannot exceed ${JOB_CONSTANTS.VALIDATION.STATE_MAX_LENGTH} characters`),
+      .isLength({ max: 50 })
+      .withMessage('Site state cannot exceed 50 characters'),
 
     body('sitePostcode')
       .trim()
       .notEmpty()
       .withMessage('Site postcode is required')
-      .isLength({ max: JOB_CONSTANTS.VALIDATION.POSTCODE_MAX_LENGTH })
-      .withMessage(`Site postcode cannot exceed ${JOB_CONSTANTS.VALIDATION.POSTCODE_MAX_LENGTH} characters`)
+      .isLength({ max: 20 })
+      .withMessage('Site postcode cannot exceed 20 characters')
       .matches(/^[A-Za-z0-9\s\-]+$/)
       .withMessage('Invalid postcode format'),
 
     body('siteAccessInstructions')
       .optional()
       .trim()
-      .isLength({ max: JOB_CONSTANTS.VALIDATION.NOTES_MAX_LENGTH })
-      .withMessage(`Site access instructions cannot exceed ${JOB_CONSTANTS.VALIDATION.NOTES_MAX_LENGTH} characters`),
+      .isLength({ max: CLIENT_CONSTANTS.VALIDATION.NOTES_MAX_LENGTH })
+      .withMessage(`Site access instructions cannot exceed ${CLIENT_CONSTANTS.VALIDATION.NOTES_MAX_LENGTH} characters`),
 
     body('startDate')
       .notEmpty()
@@ -194,8 +199,8 @@ export const createJobValidationRules = () => {
     body('materials.*.supplier')
       .optional()
       .trim()
-      .isLength({ max: MATERIAL_CONSTANTS.VALIDATION.SUPPLIER_MAX_LENGTH })
-      .withMessage(`Material supplier cannot exceed ${MATERIAL_CONSTANTS.VALIDATION.SUPPLIER_MAX_LENGTH} characters`),
+      .isLength({ max: 200 })
+      .withMessage('Material supplier cannot exceed 200 characters'),
 
     body('notes')
       .optional()
@@ -205,17 +210,17 @@ export const createJobValidationRules = () => {
     body('notes.*')
       .if(body('notes').exists())
       .trim()
-      .isLength({ max: JOB_CONSTANTS.VALIDATION.NOTES_MAX_LENGTH })
-      .withMessage(`Each note cannot exceed ${JOB_CONSTANTS.VALIDATION.NOTES_MAX_LENGTH} characters`)
+      .isLength({ max: CLIENT_CONSTANTS.VALIDATION.NOTES_MAX_LENGTH })
+      .withMessage(`Each note cannot exceed ${CLIENT_CONSTANTS.VALIDATION.NOTES_MAX_LENGTH} characters`)
   ];
 };
 
-export const validateCreateJob = (req: Request, res: Response, next: NextFunction): void => {
+export const validateCreateJob = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
   const errors = validationResult(req);
   
   if (!errors.isEmpty()) {
-    const validationErrors: ValidationError[] = errors.array().map(error => ({
-      field: error.param || error.type || 'unknown',
+    const validationErrors = errors.array().map(error => ({
+      field: error.type === 'field' ? (error as any).path : 'unknown',
       message: error.msg,
       code: JOB_CONSTANTS.ERROR_CODES.INVALID_JOB_STATUS
     }));
@@ -223,7 +228,11 @@ export const validateCreateJob = (req: Request, res: Response, next: NextFunctio
     logger.warn('Job creation validation failed', {
       tradieId: req.user?.id,
       errors: validationErrors,
-      requestBody: req.body
+      requestBody: {
+        title: req.body.title,
+        jobType: req.body.jobType,
+        clientEmail: req.body.clientEmail
+      }
     });
 
     sendValidationError(res, 'Job validation failed', validationErrors);
@@ -232,7 +241,8 @@ export const validateCreateJob = (req: Request, res: Response, next: NextFunctio
 
   logger.info('Job creation validation passed', {
     tradieId: req.user?.id,
-    title: req.body.title
+    title: req.body.title,
+    jobType: req.body.jobType
   });
 
   next();

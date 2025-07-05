@@ -18,13 +18,15 @@ const storage = multer.diskStorage({
 });
 
 const fileFilter = (req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
-  if (JOB_CONSTANTS.FILE_TYPES.ALLOWED_MIME_TYPES.includes(file.mimetype)) {
+  const allowedTypes = JOB_CONSTANTS.FILE_TYPES.ALLOWED_MIME_TYPES as readonly string[];
+  
+  if (allowedTypes.includes(file.mimetype as any)) {
     cb(null, true);
   } else {
     logger.warn('File upload rejected - invalid type', {
       filename: file.originalname,
       mimetype: file.mimetype,
-      allowedTypes: JOB_CONSTANTS.FILE_TYPES.ALLOWED_MIME_TYPES,
+      allowedTypes: allowedTypes,
       tradieId: (req as any).user?.id
     });
 

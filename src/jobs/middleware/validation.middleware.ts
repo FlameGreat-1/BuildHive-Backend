@@ -1,16 +1,16 @@
 import { Request, Response, NextFunction } from 'express';
 import { validationResult } from 'express-validator';
 import { JOB_CONSTANTS } from '../../config/jobs';
-import { sendValidationError, ValidationError, logger } from '../../shared/utils';
+import { sendValidationError, ValidationAppError, logger } from '../../shared/utils';
 
 export const handleValidationErrors = (req: Request, res: Response, next: NextFunction): void => {
   const errors = validationResult(req);
   
   if (!errors.isEmpty()) {
-    const validationErrors: ValidationError[] = errors.array().map(error => ({
-      field: error.param || error.type || 'unknown',
+    const validationErrors = errors.array().map(error => ({
+      field: error.type === 'field' ? (error as any).path : 'unknown',
       message: error.msg,
-      code: JOB_CONSTANTS.ERROR_CODES.INVALID_JOB_STATUS
+      code: JOB_CONSTANTS.ERROR_CODES.VALIDATION_FAILED
     }));
 
     logger.warn('Validation failed', {
@@ -80,7 +80,7 @@ export const validateAttachmentId = (req: Request, res: Response, next: NextFunc
     sendValidationError(res, 'Invalid attachment ID', [{
       field: 'attachmentId',
       message: 'Attachment ID must be a valid positive number',
-      code: JOB_CONSTANTS.ERROR_CODES.JOB_NOT_FOUND
+      code: JOB_CONSTANTS.ERROR_CODES.ATTACHMENT_NOT_FOUND
     }]);
     return;
   }
@@ -89,7 +89,7 @@ export const validateAttachmentId = (req: Request, res: Response, next: NextFunc
 };
 
 export const validatePaginationParams = (req: Request, res: Response, next: NextFunction): void => {
-  const errors: ValidationError[] = [];
+  const errors: any[] = [];
 
   if (req.query.page) {
     const page = parseInt(req.query.page as string);
@@ -97,7 +97,7 @@ export const validatePaginationParams = (req: Request, res: Response, next: Next
       errors.push({
         field: 'page',
         message: 'Page must be a positive number',
-        code: JOB_CONSTANTS.ERROR_CODES.INVALID_JOB_STATUS
+        code: JOB_CONSTANTS.ERROR_CODES.VALIDATION_FAILED
       });
     }
   }
@@ -108,7 +108,7 @@ export const validatePaginationParams = (req: Request, res: Response, next: Next
       errors.push({
         field: 'limit',
         message: `Limit must be between 1 and ${JOB_CONSTANTS.PAGINATION.MAX_LIMIT}`,
-        code: JOB_CONSTANTS.ERROR_CODES.INVALID_JOB_STATUS
+        code: JOB_CONSTANTS.ERROR_CODES.VALIDATION_FAILED
       });
     }
   }
