@@ -259,7 +259,6 @@ export class JobService {
     return {
       ...summary,
       cancelled: summary.cancelled || 0,
-      upcomingCount: upcomingJobs.length,
       averageProgress: allJobs.length > 0 
         ? Math.round(allJobs.reduce((sum, job) => sum + JobUtils.calculateJobProgress(job), 0) / allJobs.length)
         : 0
@@ -295,13 +294,10 @@ export class JobService {
       jobsByStatus,
       jobsByType,
       jobsByPriority,
-      monthlyStats,
-      healthScoreAverage: allJobs.length > 0 
-        ? Math.round(allJobs.reduce((sum, job) => sum + JobUtils.getJobHealthScore(job), 0) / allJobs.length)
-        : 0
+      monthlyStats
     };
   }
-
+  
   async updateJobStatus(jobId: number, tradieId: number, status: JobStatus): Promise<Job> {
     const existingJob = await this.getJobById(jobId, tradieId);
     

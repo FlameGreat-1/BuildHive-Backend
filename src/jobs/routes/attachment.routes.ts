@@ -23,9 +23,7 @@ router.get(
   '/jobs/:jobId/attachments',
   validateJobId,
   auditLogger('get_attachments_by_job'),
-  asyncErrorHandler(async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
-    return await jobController.getJobAttachments(req, res, next);
-  })
+  asyncErrorHandler(jobController.getJobAttachments as any)
 );
 
 // Delete attachment
@@ -34,9 +32,7 @@ router.delete(
   validateJobId,
   validateAttachmentId,
   auditLogger('delete_attachment'),
-  asyncErrorHandler(async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
-    return await jobController.removeJobAttachment(req, res, next);
-  })
+  asyncErrorHandler(jobController.removeJobAttachment as any)
 );
 
 export default router;

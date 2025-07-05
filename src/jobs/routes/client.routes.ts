@@ -173,9 +173,7 @@ router.post(
   createClientValidationRules(),
   handleValidationErrors,
   auditLogger('create_client'),
-  asyncErrorHandler(async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
-    return await clientController.createClient(req, res, next);
-  })
+  asyncErrorHandler(clientController.createClient as any)
 );
 
 // Get clients with pagination
@@ -183,36 +181,28 @@ router.get(
   '/',
   validatePaginationParams,
   auditLogger('list_clients'),
-  asyncErrorHandler(async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
-    return await clientController.getClients(req, res, next);
-  })
+  asyncErrorHandler(clientController.getClients as any)
 );
 
 // Get VIP clients
 router.get(
   '/vip',
   auditLogger('get_vip_clients'),
-  asyncErrorHandler(async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
-    return await clientController.getVIPClients(req, res, next);
-  })
+  asyncErrorHandler(clientController.getVIPClients as any)
 );
 
 // Get recent clients
 router.get(
   '/recent',
   auditLogger('get_recent_clients'),
-  asyncErrorHandler(async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
-    return await clientController.getRecentClients(req, res, next);
-  })
+  asyncErrorHandler(clientController.getRecentClients as any)
 );
 
 // Get inactive clients
 router.get(
   '/inactive',
   auditLogger('get_inactive_clients'),
-  asyncErrorHandler(async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
-    return await clientController.getInactiveClients(req, res, next);
-  })
+  asyncErrorHandler(clientController.getInactiveClients as any)
 );
 
 // Get client by ID
@@ -220,9 +210,7 @@ router.get(
   '/:id',
   validateClientId,
   auditLogger('get_client'),
-  asyncErrorHandler(async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
-    return await clientController.getClientById(req, res, next);
-  })
+  asyncErrorHandler(clientController.getClientById as any)
 );
 
 // Update client
@@ -232,9 +220,7 @@ router.put(
   updateClientValidationRules(),
   handleValidationErrors,
   auditLogger('update_client'),
-  asyncErrorHandler(async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
-    return await clientController.updateClient(req, res, next);
-  })
+  asyncErrorHandler(clientController.updateClient as any)
 );
 
 // Delete client
@@ -242,9 +228,7 @@ router.delete(
   '/:id',
   validateClientId,
   auditLogger('delete_client'),
-  asyncErrorHandler(async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
-    return await clientController.deleteClient(req, res, next);
-  })
+  asyncErrorHandler(clientController.deleteClient as any)
 );
 
 export default router;

@@ -782,11 +782,11 @@ export class ClientController {
         jobCount: ClientUtils.getClientJobCount(client)
       }));
 
-      let sortedClients = enrichedClients;
+      let sortedClients: EnrichedClient[] = enrichedClients;
       if (req.query.sortByValue === 'true') {
-        sortedClients = ClientUtils.sortClientsByValue(enrichedClients);
+        sortedClients = ClientUtils.sortClientsByValue(enrichedClients) as EnrichedClient[];
       } else if (req.query.sortByJobCount === 'true') {
-        sortedClients = ClientUtils.sortClientsByJobCount(enrichedClients);
+        sortedClients = ClientUtils.sortClientsByJobCount(enrichedClients) as EnrichedClient[];
       }
 
       sendSuccessResponse(res, 'Clients retrieved successfully', {
@@ -797,7 +797,8 @@ export class ClientController {
       next(error);
     }
   }
-
+}
+  
   async updateClient(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const tradieId = parseInt(req.user!.id);

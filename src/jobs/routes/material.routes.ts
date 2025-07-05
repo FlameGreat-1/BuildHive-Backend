@@ -65,9 +65,7 @@ router.get(
   '/jobs/:jobId/materials',
   validateJobId,
   auditLogger('get_materials_by_job'),
-  asyncErrorHandler(async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
-    return await jobController.getJobMaterials(req, res, next);
-  })
+  asyncErrorHandler(jobController.getJobMaterials as any)
 );
 
 // Update material
@@ -78,7 +76,7 @@ router.put(
   updateMaterialValidationRules(),
   handleValidationErrors,
   auditLogger('update_material'),
-  asyncErrorHandler(async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  asyncErrorHandler(async (req: any, res: Response, next: NextFunction) => {
     // Set the materialId parameter for the controller
     req.params.materialId = req.params.id;
     return await jobController.updateJobMaterial(req, res, next);
@@ -91,7 +89,7 @@ router.delete(
   validateJobId,
   validateMaterialId,
   auditLogger('delete_material'),
-  asyncErrorHandler(async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  asyncErrorHandler(async (req: any, res: Response, next: NextFunction) => {
     // Set the materialId parameter for the controller
     req.params.materialId = req.params.id;
     return await jobController.removeJobMaterial(req, res, next);
