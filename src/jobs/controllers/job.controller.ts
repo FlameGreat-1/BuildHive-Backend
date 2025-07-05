@@ -797,7 +797,6 @@ export class ClientController {
       next(error);
     }
   }
-}
   
   async updateClient(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
     try {
