@@ -960,7 +960,6 @@ export class ClientController {
       next(error);
     }
   }
-}  
 
   async searchClients(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
     try {
