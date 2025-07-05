@@ -132,7 +132,7 @@ export class JobService {
     const limit = options?.limit || JOB_CONSTANTS.PAGINATION.DEFAULT_LIMIT;
     const totalPages = Math.ceil(total / limit);
 
-    if (options?.filter?.overdue) {
+    if (options?.filter?.isOverdue) {
       jobs = JobUtils.getOverdueJobs(jobs);
     }
 
@@ -252,6 +252,7 @@ export class JobService {
     
     return {
       ...summary,
+      cancelled: summary.cancelled || 0,
       overdueCount: overdueJobs.length,
       upcomingCount: upcomingJobs.length,
       averageProgress: allJobs.length > 0 
@@ -265,11 +266,11 @@ export class JobService {
     const allJobs = await this.getAllJobsByTradieId(tradieId);
     
     const jobsByStatus = {
-      pending: JobUtils.getJobsByStatus(allJobs, JobStatus.PENDING).length,
-      active: JobUtils.getJobsByStatus(allJobs, JobStatus.ACTIVE).length,
-      completed: JobUtils.getJobsByStatus(allJobs, JobStatus.COMPLETED).length,
-      cancelled: JobUtils.getJobsByStatus(allJobs, JobStatus.CANCELLED).length,
-      onHold: JobUtils.getJobsByStatus(allJobs, JobStatus.ON_HOLD).length
+      [JobStatus.PENDING]: JobUtils.getJobsByStatus(allJobs, JobStatus.PENDING).length,
+      [JobStatus.ACTIVE]: JobUtils.getJobsByStatus(allJobs, JobStatus.ACTIVE).length,
+      [JobStatus.COMPLETED]: JobUtils.getJobsByStatus(allJobs, JobStatus.COMPLETED).length,
+      [JobStatus.CANCELLED]: JobUtils.getJobsByStatus(allJobs, JobStatus.CANCELLED).length,
+      [JobStatus.ON_HOLD]: JobUtils.getJobsByStatus(allJobs, JobStatus.ON_HOLD).length
     };
 
     const jobsByType = allJobs.reduce((acc, job) => {
@@ -380,7 +381,7 @@ export class JobService {
     return createdMaterials;
   }
   
-    async updateJobMaterial(materialId: number, jobId: number, tradieId: number, data: UpdateMaterialData): Promise<Material> {
+  async updateJobMaterial(materialId: number, jobId: number, tradieId: number, data: UpdateMaterialData): Promise<Material> {
     await this.getJobById(jobId, tradieId);
     
     const validationErrors = MaterialUtils.validateMaterialData(data);
@@ -394,9 +395,6 @@ export class JobService {
 
     const formattedData = { ...data };
     if (data.name) formattedData.name = MaterialUtils.formatMaterialName(data.name);
-    if (data.quantity !== undefined && data.unitCost !== undefined) {
-      formattedData.totalCost = MaterialUtils.calculateTotalCost(data.quantity, data.unitCost);
-    }
 
     const updatedMaterial = await materialRepository.update(materialId, formattedData);
     
@@ -420,6 +418,7 @@ export class JobService {
     return updatedMaterial;
   }
 
+export class JobService {
   async removeJobMaterial(materialId: number, jobId: number, tradieId: number): Promise<boolean> {
     await this.getJobById(jobId, tradieId);
     
@@ -519,7 +518,7 @@ export class JobService {
     return await attachmentRepository.findByJobId(jobId);
   }
 
-  private calculateMonthlyStats(jobs: Job[]): Record<string, any> {
+  private calculateMonthlyStats(jobs: Job[]): { month: string; jobsCompleted: number; revenue: number; }[] {
     const monthlyData: Record<string, { count: number; revenue: number; completed: number }> = {};
     
     jobs.forEach(job => {
@@ -537,7 +536,11 @@ export class JobService {
       }
     });
 
-    return monthlyData;
+    return Object.entries(monthlyData).map(([month, data]) => ({
+      month,
+      jobsCompleted: data.completed,
+      revenue: data.revenue
+    }));
   }
 
   private validateAttachmentData(data: CreateAttachmentData): void {
@@ -671,14 +674,16 @@ export class ClientService {
     const limit = options?.limit || JOB_CONSTANTS.PAGINATION.DEFAULT_LIMIT;
     const totalPages = Math.ceil(total / limit);
 
-    if (options?.filter?.search) {
-      clients = ClientUtils.searchClients(clients, options.filter.search);
-    }
+    if (options?.filter) {
+      if (options.filter.search) {
+        clients = ClientUtils.searchClients(clients, options.filter.search);
+      }
 
-    if (options?.filter?.tags && options.filter.tags.length > 0) {
-      clients = clients.filter(client => 
-        options.filter.tags!.some(tag => client.tags?.includes(tag as ClientTag))
-      );
+      if (options.filter.tags && options.filter.tags.length > 0) {
+        clients = clients.filter(client => 
+          options.filter!.tags!.some(tag => client.tags?.includes(tag as ClientTag))
+        );
+      }
     }
 
     return {
@@ -768,9 +773,6 @@ export class MaterialService {
 
     const formattedData = { ...data };
     if (data.name) formattedData.name = MaterialUtils.formatMaterialName(data.name);
-    if (data.quantity !== undefined && data.unitCost !== undefined) {
-      formattedData.totalCost = MaterialUtils.calculateTotalCost(data.quantity, data.unitCost);
-    }
 
     const updatedMaterial = await materialRepository.update(materialId, formattedData);
     
@@ -786,7 +788,6 @@ export class MaterialService {
   }
 }
 
-export class AttachmentService {
   async getAttachmentById(attachmentId: number): Promise<JobAttachment> {
     const attachment = await attachmentRepository.findById(attachmentId);
     
@@ -808,4 +809,3 @@ export const materialService = new MaterialService();
 export const attachmentService = new AttachmentService();
 
 export { JobService, ClientService, MaterialService, AttachmentService };
-

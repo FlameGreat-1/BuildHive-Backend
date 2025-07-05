@@ -25,7 +25,7 @@ import { JobModel } from '../models';
 import { logger } from '../../shared/utils';
 import { database } from '../../shared/database';
 
-export class JobRepositoryImpl implements JobRepository {
+class JobRepositoryImplementation implements JobRepository {
   private jobModel: JobModel;
 
   constructor() {
@@ -258,7 +258,7 @@ export class JobRepositoryImpl implements JobRepository {
   }
 }
 
-export class ClientRepositoryImpl implements ClientRepository {
+class ClientRepositoryImplementation implements ClientRepository {
   private jobModel: JobModel;
 
   constructor() {
@@ -446,8 +446,9 @@ export class ClientRepositoryImpl implements ClientRepository {
       throw error;
     }
   }
-  
-    async update(id: number, data: UpdateClientData): Promise<Client | null> {
+
+class ClientRepositoryImplementation {
+  async update(id: number, data: UpdateClientData): Promise<Client | null> {
     try {
       const fields: string[] = [];
       const values: any[] = [];
@@ -621,7 +622,7 @@ export class ClientRepositoryImpl implements ClientRepository {
   }
 }
 
-export class MaterialRepositoryImpl implements MaterialRepository {
+class MaterialRepositoryImplementation implements MaterialRepository {
   private jobModel: JobModel;
 
   constructor() {
@@ -851,7 +852,7 @@ export class MaterialRepositoryImpl implements MaterialRepository {
   }
 }
 
-export class AttachmentRepositoryImpl implements AttachmentRepository {
+class AttachmentRepositoryImplementation implements AttachmentRepository {
   private jobModel: JobModel;
 
   constructor() {
@@ -943,7 +944,7 @@ export class AttachmentRepositoryImpl implements AttachmentRepository {
     }
   }
   
-    async delete(id: number): Promise<boolean> {
+  async delete(id: number): Promise<boolean> {
     try {
       const query = `DELETE FROM job_attachments WHERE id = $1`;
       const result = await database.query(query, [id]);
@@ -1081,9 +1082,7 @@ export class AttachmentRepositoryImpl implements AttachmentRepository {
       jobId: row.job_id,
       filename: row.filename,
       originalName: row.original_name,
-      path: row.file_path,
       filePath: row.file_path,
-      size: row.file_size,
       fileSize: row.file_size,
       mimeType: row.mime_type,
       uploadedAt: new Date(row.uploaded_at),
@@ -1093,16 +1092,14 @@ export class AttachmentRepositoryImpl implements AttachmentRepository {
   }
 }
 
-export const jobRepository = new JobRepositoryImpl();
-export const clientRepository = new ClientRepositoryImpl();
-export const materialRepository = new MaterialRepositoryImpl();
-export const attachmentRepository = new AttachmentRepositoryImpl();
+export const jobRepository = new JobRepositoryImplementation();
+export const clientRepository = new ClientRepositoryImplementation();
+export const materialRepository = new MaterialRepositoryImplementation();
+export const attachmentRepository = new AttachmentRepositoryImplementation();
 
 export {
-  JobRepositoryImpl,
-  ClientRepositoryImpl,
-  MaterialRepositoryImpl,
-  AttachmentRepositoryImpl
+  JobRepositoryImplementation as JobRepositoryImpl,
+  ClientRepositoryImplementation as ClientRepositoryImpl,
+  MaterialRepositoryImplementation as MaterialRepositoryImpl,
+  AttachmentRepositoryImplementation as AttachmentRepositoryImpl
 };
-
-

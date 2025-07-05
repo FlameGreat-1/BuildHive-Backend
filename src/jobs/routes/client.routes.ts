@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { clientController } from '../controllers';
 import {
   requireTradieRole,
@@ -10,16 +10,18 @@ import {
   asyncErrorHandler,
   handleValidationErrors
 } from '../middleware';
-import { body } from 'express-validator';
+import { body, ValidationChain } from 'express-validator';
 import { CLIENT_CONSTANTS } from '../../config/jobs';
 
 const router = Router();
 
+// Global middleware
 router.use(requireTradieRole);
 router.use(requestLogger);
 router.use(generalJobRateLimit);
 
-const createClientValidationRules = () => [
+// Client validation rules
+const createClientValidationRules = (): ValidationChain[] => [
   body('name')
     .trim()
     .isLength({ min: CLIENT_CONSTANTS.VALIDATION.NAME_MIN_LENGTH })
@@ -82,7 +84,7 @@ const createClientValidationRules = () => [
     .optional()
     .isArray()
     .withMessage('Tags must be an array')
-    .custom((tags) => {
+    .custom((tags: any[]) => {
       if (tags && tags.length > CLIENT_CONSTANTS.VALIDATION.MAX_TAGS) {
         throw new Error(`Maximum ${CLIENT_CONSTANTS.VALIDATION.MAX_TAGS} tags allowed`);
       }
@@ -90,7 +92,7 @@ const createClientValidationRules = () => [
     })
 ];
 
-const updateClientValidationRules = () => [
+const updateClientValidationRules = (): ValidationChain[] => [
   body('name')
     .optional()
     .trim()
@@ -156,7 +158,7 @@ const updateClientValidationRules = () => [
     .optional()
     .isArray()
     .withMessage('Tags must be an array')
-    .custom((tags) => {
+    .custom((tags: any[]) => {
       if (tags && tags.length > CLIENT_CONSTANTS.VALIDATION.MAX_TAGS) {
         throw new Error(`Maximum ${CLIENT_CONSTANTS.VALIDATION.MAX_TAGS} tags allowed`);
       }
@@ -164,73 +166,103 @@ const updateClientValidationRules = () => [
     })
 ];
 
+// Create client
 router.post(
   '/',
   createClientValidationRules(),
   handleValidationErrors,
   auditLogger('create_client'),
-  asyncErrorHandler(clientController.createClient.bind(clientController))
+  asyncErrorHandler(async (req: Request, res: Response, next: NextFunction) => {
+    return await clientController.createClient(req, res, next);
+  })
 );
 
+// Get clients with pagination
 router.get(
   '/',
   validatePaginationParams,
   auditLogger('list_clients'),
-  asyncErrorHandler(clientController.getClients.bind(clientController))
+  asyncErrorHandler(async (req: Request, res: Response, next: NextFunction) => {
+    return await clientController.getClients(req, res, next);
+  })
 );
 
+// Get VIP clients
 router.get(
   '/vip',
   auditLogger('get_vip_clients'),
-  asyncErrorHandler(clientController.getVIPClients.bind(clientController))
+  asyncErrorHandler(async (req: Request, res: Response, next: NextFunction) => {
+    return await clientController.getVIPClients(req, res, next);
+  })
 );
 
+// Get recent clients
 router.get(
   '/recent',
   auditLogger('get_recent_clients'),
-  asyncErrorHandler(clientController.getRecentClients.bind(clientController))
+  asyncErrorHandler(async (req: Request, res: Response, next: NextFunction) => {
+    return await clientController.getRecentClients(req, res, next);
+  })
 );
 
+// Get inactive clients
 router.get(
   '/inactive',
   auditLogger('get_inactive_clients'),
-  asyncErrorHandler(clientController.getInactiveClients.bind(clientController))
+  asyncErrorHandler(async (req: Request, res: Response, next: NextFunction) => {
+    return await clientController.getInactiveClients(req, res, next);
+  })
 );
 
+// Search clients
 router.get(
   '/search',
   auditLogger('search_clients'),
-  asyncErrorHandler(clientController.searchClients.bind(clientController))
+  asyncErrorHandler(async (req: Request, res: Response, next: NextFunction) => {
+    return await clientController.searchClients(req, res, next);
+  })
 );
 
+// Get client by ID
 router.get(
   '/:id',
   validateClientId,
   auditLogger('get_client'),
-  asyncErrorHandler(clientController.getClientById.bind(clientController))
+  asyncErrorHandler(async (req: Request, res: Response, next: NextFunction) => {
+    return await clientController.getClientById(req, res, next);
+  })
 );
 
+// Get client jobs
 router.get(
   '/:id/jobs',
   validateClientId,
   auditLogger('get_client_jobs'),
-  asyncErrorHandler(clientController.getClientJobs.bind(clientController))
+  asyncErrorHandler(async (req: Request, res: Response, next: NextFunction) => {
+    return await clientController.getClientJobs(req, res, next);
+  })
 );
 
+// Update client
 router.put(
   '/:id',
   validateClientId,
   updateClientValidationRules(),
   handleValidationErrors,
   auditLogger('update_client'),
-  asyncErrorHandler(clientController.updateClient.bind(clientController))
+  asyncErrorHandler(async (req: Request, res: Response, next: NextFunction) => {
+    return await clientController.updateClient(req, res, next);
+  })
 );
 
+// Delete client
 router.delete(
   '/:id',
   validateClientId,
   auditLogger('delete_client'),
-  asyncErrorHandler(clientController.deleteClient.bind(clientController))
+  asyncErrorHandler(async (req: Request, res: Response, next: NextFunction) => {
+    return await clientController.deleteClient(req, res, next);
+  })
 );
 
 export default router;

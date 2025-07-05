@@ -22,7 +22,10 @@ import {
   CreateMaterialData,
   UpdateMaterialData,
   CreateAttachmentData,
-  JobStatus
+  JobStatus,
+  Job,
+  Material,
+  Client
 } from '../types';
 import { JOB_CONSTANTS } from '../../config/jobs';
 import { 
@@ -170,7 +173,7 @@ export class JobController {
       }
 
       if (req.query.overdue === 'true') {
-        filter.overdue = true;
+        filter.isOverdue = true;
       }
 
       const sort: JobSortOptions = {
@@ -337,7 +340,7 @@ export class JobController {
     }
   }
   
-    async getJobSummary(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+  async getJobSummary(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const tradieId = parseInt(req.user!.id);
       
@@ -360,7 +363,7 @@ export class JobController {
       next(error);
     }
   }
-  
+
   async addJobMaterials(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const tradieId = parseInt(req.user!.id);
@@ -447,10 +450,6 @@ export class JobController {
       if (req.body.unit !== undefined) updateData.unit = req.body.unit;
       if (req.body.unitCost !== undefined) updateData.unitCost = req.body.unitCost;
       if (req.body.supplier !== undefined) updateData.supplier = req.body.supplier;
-
-      if (updateData.quantity !== undefined && updateData.unitCost !== undefined) {
-        updateData.totalCost = MaterialUtils.calculateTotalCost(updateData.quantity, updateData.unitCost);
-      }
 
       const validationErrors = MaterialUtils.validateMaterialData(updateData);
       if (validationErrors.length > 0) {
@@ -649,7 +648,6 @@ export class JobController {
   }
 }
 
-export class ClientController {
   async createClient(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const tradieId = parseInt(req.user!.id);
@@ -663,7 +661,10 @@ export class ClientController {
         state: req.body.state,
         postcode: req.body.postcode,
         notes: req.body.notes,
-        tags: req.body.tags
+        tags: req.body.tags,
+        reference: req.body.reference || ClientUtils.generateClientReference(Date.now()),
+        isVIP: req.body.isVIP || false,
+        value: req.body.value || 0
       };
 
       const validationErrors = ClientUtils.validateClientData(clientData);
@@ -721,7 +722,7 @@ export class ClientController {
     }
   }
   
-    async getClients(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+  async getClients(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const tradieId = parseInt(req.user!.id);
       
@@ -819,6 +820,9 @@ export class ClientController {
       if (req.body.postcode !== undefined) updateData.postcode = req.body.postcode;
       if (req.body.notes !== undefined) updateData.notes = req.body.notes;
       if (req.body.tags !== undefined) updateData.tags = req.body.tags;
+      if (req.body.reference !== undefined) updateData.reference = req.body.reference;
+      if (req.body.isVIP !== undefined) updateData.isVIP = req.body.isVIP;
+      if (req.body.value !== undefined) updateData.value = req.body.value;
 
       const validationErrors = ClientUtils.validateClientData(updateData);
       if (validationErrors.length > 0) {
@@ -1023,5 +1027,21 @@ export class ClientController {
 
 export const jobController = new JobController();
 export const clientController = new ClientController();
+export const materialController = jobController;
+export const attachmentController = jobController;
 
-
+export const handleJobErrors = (error: any, req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  if (error instanceof JobNotFoundError) {
+    sendNotFoundResponse(res, error.message);
+  } else if (error instanceof UnauthorizedJobAccessError) {
+    sendErrorResponse(res, error.message, 403);
+  } else if (error instanceof ClientNotFoundError) {
+    sendNotFoundResponse(res, error.message);
+  } else if (error instanceof JobValidationError || error instanceof MaterialValidationError) {
+    sendValidationError(res, error.message, error.errors || []);
+  } else if (error instanceof FileUploadError) {
+    sendErrorResponse(res, error.message, 400);
+  } else {
+    next(error);
+  }
+};

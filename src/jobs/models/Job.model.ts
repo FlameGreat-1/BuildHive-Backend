@@ -126,9 +126,7 @@ export class JobModel {
                  'filename', a.filename,
                  'originalName', a.original_name,
                  'filePath', a.file_path,
-                 'path', a.file_path,
                  'fileSize', a.file_size,
-                 'size', a.file_size,
                  'mimeType', a.mime_type,
                  'uploadedAt', a.uploaded_at,
                  'createdAt', a.uploaded_at,
@@ -175,9 +173,7 @@ export class JobModel {
                  'filename', a.filename,
                  'originalName', a.original_name,
                  'filePath', a.file_path,
-                 'path', a.file_path,
                  'fileSize', a.file_size,
-                 'size', a.file_size,
                  'mimeType', a.mime_type,
                  'uploadedAt', a.uploaded_at,
                  'createdAt', a.uploaded_at,
@@ -220,9 +216,7 @@ export class JobModel {
                  'filename', a.filename,
                  'originalName', a.original_name,
                  'filePath', a.file_path,
-                 'path', a.file_path,
                  'fileSize', a.file_size,
-                 'size', a.file_size,
                  'mimeType', a.mime_type,
                  'uploadedAt', a.uploaded_at,
                  'createdAt', a.uploaded_at,
@@ -339,9 +333,7 @@ export class JobModel {
                  'filename', a.filename,
                  'originalName', a.original_name,
                  'filePath', a.file_path,
-                 'path', a.file_path,
                  'fileSize', a.file_size,
-                 'size', a.file_size,
                  'mimeType', a.mime_type,
                  'uploadedAt', a.uploaded_at,
                  'createdAt', a.uploaded_at,
@@ -362,8 +354,8 @@ export class JobModel {
     
     return result.rows.map(row => this.mapRowToJob(row));
   }
-  
-    async update(id: number, data: UpdateJobData): Promise<Job | null> {
+
+  async update(id: number, data: UpdateJobData): Promise<Job | null> {
     const fields: string[] = [];
     const values: any[] = [];
     let paramIndex = 1;
@@ -477,6 +469,7 @@ export class JobModel {
       pendingJobs: parseInt(row.pending_jobs),
       activeJobs: parseInt(row.active_jobs),
       completedJobs: parseInt(row.completed_jobs),
+      cancelled: parseInt(row.cancelled_jobs),
       cancelledJobs: parseInt(row.cancelled_jobs),
       onHoldJobs: parseInt(row.on_hold_jobs),
       totalRevenue: parseFloat(row.total_revenue),
@@ -532,7 +525,13 @@ export class JobModel {
       averageJobDuration: parseFloat(row.average_job_duration),
       completionRate: totalJobs > 0 ? (completedJobs / totalJobs) * 100 : 0,
       clientCount: parseInt(row.client_count),
-      materialCosts: parseFloat(row.material_costs)
+      materialCosts: parseFloat(row.material_costs),
+      jobsByStatus: {},
+      jobsByType: {},
+      jobsByPriority: {},
+      monthlyStats: [],
+      averageEfficiency: 0,
+      healthScoreAverage: 0
     };
   }
 
@@ -705,4 +704,3 @@ export class JobModel {
     return str.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
   }
 }
-

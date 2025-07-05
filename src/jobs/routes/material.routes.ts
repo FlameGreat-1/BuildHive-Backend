@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { jobController } from '../controllers';
 import {
   requireTradieRole,
@@ -15,10 +15,12 @@ import { MATERIAL_CONSTANTS, JOB_CONSTANTS } from '../../config/jobs';
 
 const router = Router();
 
+// Global middleware
 router.use(requireTradieRole);
 router.use(requestLogger);
 router.use(generalJobRateLimit);
 
+// Material validation rules
 const updateMaterialValidationRules = () => [
   body('name')
     .optional()
@@ -57,31 +59,38 @@ const updateMaterialValidationRules = () => [
     .withMessage('Supplier cannot exceed 200 characters')
 ];
 
+// Get all materials for a job
 router.get(
   '/jobs/:jobId/materials',
   validateJobId,
   auditLogger('get_materials_by_job'),
-  asyncErrorHandler(jobController.getJobMaterials.bind(jobController))
+  asyncErrorHandler(async (req: Request, res: Response, next: NextFunction) => {
+    return await jobController.getJobMaterials(req, res, next);
+  })
 );
 
+// Get specific material by ID
 router.get(
   '/jobs/:jobId/materials/:id',
   validateJobId,
   validateMaterialId,
   auditLogger('get_material'),
-  asyncErrorHandler(async (req, res, next) => {
-    const materials = await jobController.getJobMaterials(req, res, next);
-    if (materials && Array.isArray(materials)) {
-      const material = materials.find(mat => mat.id === parseInt(req.params.id));
-      if (material) {
-        res.json({ success: true, data: material });
-      } else {
-        res.status(404).json({ success: false, message: 'Material not found' });
-      }
+  asyncErrorHandler(async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      // Set the materialId parameter for the controller
+      req.params.materialId = req.params.id;
+      return await jobController.getJobMaterialById(req, res, next);
+    } catch (error) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Material not found',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
     }
   })
 );
 
+// Update material
 router.put(
   '/jobs/:jobId/materials/:id',
   validateJobId,
@@ -89,32 +98,33 @@ router.put(
   updateMaterialValidationRules(),
   handleValidationErrors,
   auditLogger('update_material'),
-  asyncErrorHandler(jobController.updateJobMaterial.bind(jobController))
+  asyncErrorHandler(async (req: Request, res: Response, next: NextFunction) => {
+    // Set the materialId parameter for the controller
+    req.params.materialId = req.params.id;
+    return await jobController.updateJobMaterial(req, res, next);
+  })
 );
 
+// Delete material
 router.delete(
   '/jobs/:jobId/materials/:id',
   validateJobId,
   validateMaterialId,
   auditLogger('delete_material'),
-  asyncErrorHandler(jobController.removeJobMaterial.bind(jobController))
+  asyncErrorHandler(async (req: Request, res: Response, next: NextFunction) => {
+    // Set the materialId parameter for the controller
+    req.params.materialId = req.params.id;
+    return await jobController.removeJobMaterial(req, res, next);
+  })
 );
 
+// Get material summary for a job
 router.get(
   '/summary/:jobId',
   validateJobId,
   auditLogger('get_material_summary'),
-  asyncErrorHandler(async (req, res, next) => {
-    const materials = await jobController.getJobMaterials(req, res, next);
-    if (materials && Array.isArray(materials)) {
-      const summary = {
-        totalMaterials: materials.length,
-        totalCost: materials.reduce((sum, mat) => sum + (mat.totalCost || 0), 0),
-        averageCost: materials.length > 0 ? materials.reduce((sum, mat) => sum + (mat.totalCost || 0), 0) / materials.length : 0,
-        suppliers: [...new Set(materials.map(mat => mat.supplier).filter(Boolean))]
-      };
-      res.json({ success: true, data: summary });
-    }
+  asyncErrorHandler(async (req: Request, res: Response, next: NextFunction) => {
+    return await jobController.getJobMaterialsSummary(req, res, next);
   })
 );
 

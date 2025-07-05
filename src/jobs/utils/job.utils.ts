@@ -116,7 +116,7 @@ export class JobUtils {
       [JobType.RENOVATION]: 'REN',
       [JobType.INSTALLATION]: 'INS',
       [JobType.REPAIR]: 'REP',
-      [JobType.INSPECTION]: 'INS',
+      [JobType.INSPECTION]: 'ISP',
       [JobType.OTHER]: 'OTH'
     };
 
