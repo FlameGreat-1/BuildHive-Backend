@@ -64,7 +64,7 @@ export class JobService {
         clientPhone: ClientUtils.formatPhoneNumber(data.clientPhone)
       };
 
-      const job = await jobRepository.create(tradieId, formattedData);
+      const job = await jobRepository.create(tradieId, formattedData as any);
       
       if (materials && materials.length > 0) {
         await this.addJobMaterials(job.id, tradieId, materials);
