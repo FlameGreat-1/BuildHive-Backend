@@ -11,7 +11,7 @@ import { jobRepository, clientRepository } from '../repositories';
 import { Job, Client } from '../types';
 
 export interface AuthenticatedRequest extends Request {
-  user: {
+  user?: {
     id: string;
     email: string;
     role: string;
@@ -23,6 +23,11 @@ export interface AuthenticatedRequest extends Request {
 
 export const requireJobOwnership = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
+    if (!req.user) {
+      sendErrorResponse(res, 'Authentication required', 401);
+      return;
+    }
+
     const tradieId = parseInt(req.user.id);
     const jobId = parseInt(req.params.id || req.params.jobId);
 
@@ -66,6 +71,11 @@ export const requireJobOwnership = async (req: AuthenticatedRequest, res: Respon
 
 export const requireClientOwnership = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
+    if (!req.user) {
+      sendErrorResponse(res, 'Authentication required', 401);
+      return;
+    }
+
     const tradieId = parseInt(req.user.id);
     const clientId = parseInt(req.params.id || req.params.clientId);
 
