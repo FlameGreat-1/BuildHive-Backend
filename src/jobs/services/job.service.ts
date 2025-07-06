@@ -57,7 +57,7 @@ export class JobService {
     try {
       const { materials, ...jobData } = data;
       
-      const formattedData: Omit<CreateJobData, 'materials'> = {
+      const formattedData = {
         ...jobData,
         title: JobUtils.formatJobTitle(data.title),
         clientName: ClientUtils.formatClientName(data.clientName),
