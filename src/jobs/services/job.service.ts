@@ -259,9 +259,6 @@ export class JobService {
     return {
       ...summary,
       cancelled: summary.cancelled || 0,
-      averageProgress: allJobs.length > 0 
-        ? Math.round(allJobs.reduce((sum, job) => sum + JobUtils.calculateJobProgress(job), 0) / allJobs.length)
-        : 0
     };
   }
 
