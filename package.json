@@ -102,7 +102,7 @@
     "passport-jwt": "^4.0.1",
     "pg": "^8.11.3",
     "redis": "^4.6.0",
-    "swagger-autogen": "^1.16.3",
+    "swagger-autogen": "^2.23.2",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.0",
     "uuid": "^9.0.1",
