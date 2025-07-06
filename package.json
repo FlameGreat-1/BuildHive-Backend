@@ -37,7 +37,7 @@
   },
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "tsc --noEmit false && tsc-alias",
+    "build": "node generate-swagger.js && tsc --noEmit false && tsc-alias",
     "start": "node dist/server.js",
     "start:prod": "NODE_ENV=production node dist/server.js",
     "lint": "eslint src --ext .ts",
@@ -102,6 +102,7 @@
     "passport-jwt": "^4.0.1",
     "pg": "^8.11.3",
     "redis": "^4.6.0",
+    "swagger-autogen": "^1.16.7",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.0",
     "uuid": "^9.0.1",

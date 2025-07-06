@@ -1,4 +1,6 @@
 import express, { Application, Request, Response, NextFunction } from 'express';
+import swaggerUi from 'swagger-ui-express';
+import swaggerDocument from './swagger-output.json';
 import { initializeDatabase } from './shared/database';
 import { logger } from './shared/utils';
 import { 
@@ -32,6 +34,13 @@ export async function createApp(): Promise<Application> {
 
     app.use(requestLogger);
 
+    // 🚀 SWAGGER UI DOCUMENTATION
+    app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument, {
+      explorer: true,
+      customCss: '.swagger-ui .topbar { display: none }',
+      customSiteTitle: 'BuildHive API Documentation'
+    }));
+
     app.get('/health', (req: Request, res: Response) => {
       res.json({
         success: true,
@@ -52,6 +61,10 @@ export async function createApp(): Promise<Application> {
         version: '1.0.0',
         environment: environment.NODE_ENV,
         timestamp: new Date().toISOString(),
+        documentation: {
+          swagger: '/api-docs',
+          description: 'Interactive API Documentation'
+        },
         endpoints: {
           health: '/health',
           auth: '/api/v1/auth',
@@ -185,10 +198,12 @@ export async function createApp(): Promise<Application> {
         'validation',
         'security',
         'rate-limiting',
-        'audit-logging'
+        'audit-logging',
+        'swagger-documentation'
       ],
       totalEndpoints: 44,
-      version: '1.0.0'
+      version: '1.0.0',
+      documentation: '/api-docs'
     });
     
     return app;
