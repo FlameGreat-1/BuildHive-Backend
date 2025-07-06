@@ -57,11 +57,23 @@ export class JobService {
     try {
       const { materials, ...jobData } = data;
       
-      const formattedData = {
-        ...jobData,
+      const formattedData: Partial<Job> = {
         title: JobUtils.formatJobTitle(data.title),
         clientName: ClientUtils.formatClientName(data.clientName),
-        clientPhone: ClientUtils.formatPhoneNumber(data.clientPhone)
+        clientPhone: ClientUtils.formatPhoneNumber(data.clientPhone),
+        description: jobData.description,
+        jobType: jobData.jobType,
+        priority: jobData.priority,
+        status: jobData.status,
+        estimatedStartDate: jobData.estimatedStartDate,
+        estimatedEndDate: jobData.estimatedEndDate,
+        clientEmail: jobData.clientEmail,
+        address: jobData.address,
+        city: jobData.city,
+        state: jobData.state,
+        postcode: jobData.postcode,
+        notes: jobData.notes,
+        tags: jobData.tags
       };
 
       const job = await jobRepository.create(tradieId, formattedData);
