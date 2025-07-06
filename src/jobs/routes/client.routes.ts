@@ -1,5 +1,6 @@
 import { Router, Response, NextFunction } from 'express';
 import { AuthenticatedRequest } from '../middleware/auth.middleware';
+import { authenticate } from '../../auth/middleware'; 
 import { clientController } from '../controllers';
 import {
   requireTradieRole,
@@ -17,6 +18,7 @@ import { CLIENT_CONSTANTS } from '../../config/jobs';
 const router = Router();
 
 // Global middleware
+router.use(authenticate);
 router.use(requireTradieRole);
 router.use(requestLogger);
 router.use(generalJobRateLimit);
