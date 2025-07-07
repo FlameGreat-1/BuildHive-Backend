@@ -1,3 +1,4 @@
+// updated
 import { 
   Job, 
   CreateJobData, 
@@ -785,7 +786,7 @@ class MaterialRepositoryImplementation implements MaterialRepository {
       throw error;
     }
   }
-
+  
   async delete(id: number): Promise<boolean> {
     try {
       const query = `DELETE FROM materials WHERE id = $1`;
