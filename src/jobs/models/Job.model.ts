@@ -169,8 +169,7 @@ export class JobModel {
                  'fileSize', a.file_size,
                  'mimeType', a.mime_type,
                  'uploadedAt', a.uploaded_at,
-                 'createdAt', a.uploaded_at,
-                 'updatedAt', a.updated_at
+                 'createdAt', a.uploaded_at
                )
              ) FILTER (WHERE a.id IS NOT NULL), '[]') as attachments
       FROM jobs j
@@ -216,8 +215,7 @@ export class JobModel {
                  'fileSize', a.file_size,
                  'mimeType', a.mime_type,
                  'uploadedAt', a.uploaded_at,
-                 'createdAt', a.uploaded_at,
-                 'updatedAt', a.updated_at
+                 'createdAt', a.uploaded_at
                )
              ) FILTER (WHERE a.id IS NOT NULL), '[]') as attachments
       FROM jobs j
@@ -259,8 +257,7 @@ export class JobModel {
                  'fileSize', a.file_size,
                  'mimeType', a.mime_type,
                  'uploadedAt', a.uploaded_at,
-                 'createdAt', a.uploaded_at,
-                 'updatedAt', a.updated_at
+                 'createdAt', a.uploaded_at
                )
              ) FILTER (WHERE a.id IS NOT NULL), '[]') as attachments
       FROM jobs j
@@ -375,9 +372,7 @@ export class JobModel {
                  'filePath', a.file_path,
                  'fileSize', a.file_size,
                  'mimeType', a.mime_type,
-                 'uploadedAt', a.uploaded_at,
-                 'createdAt', a.uploaded_at,
-                 'updatedAt', a.updated_at
+                 'uploadedAt', a.uploaded_at
                )
              ) FILTER (WHERE a.id IS NOT NULL), '[]') as attachments
       FROM jobs j
