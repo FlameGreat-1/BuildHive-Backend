@@ -68,6 +68,14 @@ class DatabaseConnection implements DatabaseClient {
   async transaction(): Promise<DatabaseTransaction> {
     const client = await this.pool.connect();
     await client.query('BEGIN');
+    let isReleased = false;
+
+    const releaseClient = () => {
+      if (!isReleased) {
+        client.release();
+        isReleased = true;
+      }
+    };
 
     return {
       query: async <T = any>(text: string, params?: any[]): Promise<CustomQueryResult<T>> => {
@@ -82,18 +90,18 @@ class DatabaseConnection implements DatabaseClient {
         try {
           await client.query('COMMIT');
         } finally {
-          client.release();
+          releaseClient();
         }
       },
       rollback: async (): Promise<void> => {
         try {
           await client.query('ROLLBACK');
         } finally {
-          client.release();
+          releaseClient();
         }
       }
     };
-  }
+  }    
 
   async testConnection(): Promise<boolean> {
     try {

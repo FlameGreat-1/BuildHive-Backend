@@ -93,9 +93,50 @@ export class JobModel {
       }
 
       await this.updateClientStats(clientId, transaction);
-      await transaction.commit();
 
-      return await this.findById(jobId) as Job;
+      const completeJobQuery = `
+        SELECT j.*, 
+               COALESCE(json_agg(
+                 DISTINCT jsonb_build_object(
+                   'id', m.id,
+                   'jobId', m.job_id,
+                   'name', m.name,
+                   'quantity', m.quantity,
+                   'unit', m.unit,
+                   'unitCost', m.unit_cost,
+                   'totalCost', m.total_cost,
+                   'supplier', m.supplier,
+                   'createdAt', m.created_at,
+                   'updatedAt', m.updated_at
+                 )
+               ) FILTER (WHERE m.id IS NOT NULL), '[]') as materials,
+               COALESCE(json_agg(
+                 DISTINCT jsonb_build_object(
+                   'id', a.id,
+                   'jobId', a.job_id,
+                   'filename', a.filename,
+                   'originalName', a.original_name,
+                   'filePath', a.file_path,
+                   'fileSize', a.file_size,
+                   'mimeType', a.mime_type,
+                   'uploadedAt', a.uploaded_at,
+                   'createdAt', a.uploaded_at,
+                   'updatedAt', a.updated_at
+                 )
+               ) FILTER (WHERE a.id IS NOT NULL), '[]') as attachments
+        FROM jobs j
+        LEFT JOIN materials m ON j.id = m.job_id
+        LEFT JOIN job_attachments a ON j.id = a.job_id
+        WHERE j.id = $1
+        GROUP BY j.id
+      `;
+      
+      const completeJobResult = await transaction.query(completeJobQuery, [jobId]);
+      const jobData = this.mapRowToJob(completeJobResult.rows[0]);
+      
+      await transaction.commit();
+      return jobData;
+      
     } catch (error) {
       await transaction.rollback();
       throw error;
