@@ -54,6 +54,10 @@ RUN mkdir -p logs storage tmp && \
     chown -R buildhive:nodejs logs storage tmp && \
     chmod 755 logs storage tmp
 
+RUN mkdir -p uploads uploads/jobs uploads/temp && \
+    chown -R buildhive:nodejs uploads && \
+    chmod 755 uploads uploads/jobs uploads/temp
+
 USER buildhive
 
 EXPOSE 3000
