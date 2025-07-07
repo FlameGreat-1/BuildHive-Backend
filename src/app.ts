@@ -24,6 +24,23 @@ export async function createApp(): Promise<Application> {
     await initializeDatabase();
     logger.info('Database connected successfully');
 
+    // Create upload directories
+    const fs = require('fs');
+    const path = require('path');
+    
+    const uploadDirs = [
+      '/app/uploads',
+      '/app/uploads/jobs',
+      '/app/uploads/temp'
+    ];
+
+    uploadDirs.forEach(dir => {
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+        logger.info(`Created upload directory: ${dir}`);
+      }
+    });
+
     app.use(securityHeaders);
     app.use(addSecurityHeaders);
     app.use(validateOrigin);
