@@ -736,9 +736,7 @@ class MaterialRepositoryImplementation implements MaterialRepository {
       }
 
       if (data.quantity !== undefined || data.unitCost !== undefined) {
-        const currentQuery = `SELECT * FROM materials WHERE id = $${paramIndex}`;
-        values.push(id);
-        const currentResult = await database.query(currentQuery, [id]);
+        const currentResult = await database.query(`SELECT * FROM materials WHERE id = $1`, [id]);
         
         if (currentResult.rows.length === 0) {
           return null;
@@ -749,7 +747,7 @@ class MaterialRepositoryImplementation implements MaterialRepository {
         const unitCost = data.unitCost !== undefined ? data.unitCost : current.unit_cost;
         const totalCost = quantity * unitCost;
 
-        fields.push(`total_cost = $${paramIndex + 1}`);
+        fields.push(`total_cost = $${paramIndex}`);
         values.push(totalCost);
         paramIndex++;
       }
