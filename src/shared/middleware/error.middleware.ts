@@ -228,3 +228,140 @@ export const fileUploadErrorHandler = (
 
   return errorHandler(error, req, res, next);
 };
+
+export const quoteErrorHandler = (
+  error: Error,
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Response | void => {
+  const requestId = res.locals.requestId || 'unknown';
+  const userId = req.user?.id;
+
+  if (error.message.includes('Quote not found')) {
+    logger.warn('Quote not found error', {
+      requestId,
+      userId,
+      path: req.path,
+      method: req.method,
+      quoteId: req.params.quoteId
+    });
+
+    const quoteError = new AppError(
+      'Quote not found',
+      HTTP_STATUS_CODES.NOT_FOUND,
+      'QUOTE_NOT_FOUND',
+      true,
+      requestId
+    );
+
+    const errorResponse = createErrorResponse(quoteError, requestId);
+    return res.status(HTTP_STATUS_CODES.NOT_FOUND).json(errorResponse);
+  }
+
+  if (error.message.includes('Unauthorized quote access')) {
+    logger.warn('Unauthorized quote access attempt', {
+      requestId,
+      userId,
+      path: req.path,
+      method: req.method,
+      quoteId: req.params.quoteId
+    });
+
+    const authError = new AppError(
+      'Unauthorized access to quote',
+      HTTP_STATUS_CODES.FORBIDDEN,
+      'UNAUTHORIZED_QUOTE_ACCESS',
+      true,
+      requestId
+    );
+
+    const errorResponse = createErrorResponse(authError, requestId);
+    return res.status(HTTP_STATUS_CODES.FORBIDDEN).json(errorResponse);
+  }
+
+  if (error.message.includes('Quote expired')) {
+    logger.warn('Quote expired error', {
+      requestId,
+      userId,
+      path: req.path,
+      method: req.method,
+      quoteId: req.params.quoteId
+    });
+
+    const expiredError = new AppError(
+      'Quote has expired',
+      HTTP_STATUS_CODES.BAD_REQUEST,
+      'QUOTE_EXPIRED',
+      true,
+      requestId
+    );
+
+    const errorResponse = createErrorResponse(expiredError, requestId);
+    return res.status(HTTP_STATUS_CODES.BAD_REQUEST).json(errorResponse);
+  }
+
+  if (error.message.includes('Invalid quote status')) {
+    logger.warn('Invalid quote status transition', {
+      requestId,
+      userId,
+      path: req.path,
+      method: req.method,
+      quoteId: req.params.quoteId
+    });
+
+    const statusError = new AppError(
+      'Invalid quote status transition',
+      HTTP_STATUS_CODES.BAD_REQUEST,
+      'INVALID_QUOTE_STATUS',
+      true,
+      requestId
+    );
+
+    const errorResponse = createErrorResponse(statusError, requestId);
+    return res.status(HTTP_STATUS_CODES.BAD_REQUEST).json(errorResponse);
+  }
+
+  if (error.message.includes('AI pricing unavailable')) {
+    logger.warn('AI pricing service error', {
+      requestId,
+      userId,
+      path: req.path,
+      method: req.method
+    });
+
+    const aiError = new AppError(
+      'AI pricing service unavailable',
+      HTTP_STATUS_CODES.SERVICE_UNAVAILABLE,
+      'AI_PRICING_ERROR',
+      true,
+      requestId
+    );
+
+    const errorResponse = createErrorResponse(aiError, requestId);
+    return res.status(HTTP_STATUS_CODES.SERVICE_UNAVAILABLE).json(errorResponse);
+  }
+
+  if (error.message.includes('Quote delivery failed')) {
+    logger.warn('Quote delivery error', {
+      requestId,
+      userId,
+      path: req.path,
+      method: req.method,
+      quoteId: req.params.quoteId
+    });
+
+    const deliveryError = new AppError(
+      'Quote delivery failed',
+      HTTP_STATUS_CODES.BAD_REQUEST,
+      'QUOTE_DELIVERY_ERROR',
+      true,
+      requestId
+    );
+
+    const errorResponse = createErrorResponse(deliveryError, requestId);
+    return res.status(HTTP_STATUS_CODES.BAD_REQUEST).json(errorResponse);
+  }
+
+  return errorHandler(error, req, res, next);
+};

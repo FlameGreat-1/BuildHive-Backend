@@ -100,6 +100,48 @@ export class FileUploadError extends AppError {
   }
 }
 
+export class QuoteNotFoundError extends AppError {
+  constructor(message: string = 'Quote not found', requestId?: string) {
+    super(message, HTTP_STATUS_CODES.NOT_FOUND, 'QUOTE_NOT_FOUND', true, requestId);
+  }
+}
+
+export class UnauthorizedQuoteAccessError extends AppError {
+  constructor(message: string = 'Unauthorized access to quote', requestId?: string) {
+    super(message, HTTP_STATUS_CODES.FORBIDDEN, 'UNAUTHORIZED_QUOTE_ACCESS', true, requestId);
+  }
+}
+
+export class QuoteValidationError extends ValidationAppError {
+  constructor(message: string, errors: ValidationError[], requestId?: string) {
+    super(message, errors, requestId);
+  }
+}
+
+export class QuoteExpiredError extends AppError {
+  constructor(message: string = 'Quote has expired', requestId?: string) {
+    super(message, HTTP_STATUS_CODES.BAD_REQUEST, 'QUOTE_EXPIRED', true, requestId);
+  }
+}
+
+export class QuoteStatusError extends AppError {
+  constructor(message: string = 'Invalid quote status transition', requestId?: string) {
+    super(message, HTTP_STATUS_CODES.BAD_REQUEST, 'INVALID_QUOTE_STATUS', true, requestId);
+  }
+}
+
+export class AIPricingError extends AppError {
+  constructor(message: string = 'AI pricing service unavailable', requestId?: string) {
+    super(message, HTTP_STATUS_CODES.SERVICE_UNAVAILABLE, 'AI_PRICING_ERROR', true, requestId);
+  }
+}
+
+export class QuoteDeliveryError extends AppError {
+  constructor(message: string = 'Quote delivery failed', requestId?: string) {
+    super(message, HTTP_STATUS_CODES.BAD_REQUEST, 'QUOTE_DELIVERY_ERROR', true, requestId);
+  }
+}
+
 export const createErrorResponse = (
   error: AppError,
   requestId: string

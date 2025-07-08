@@ -228,3 +228,191 @@ export const logJobError = (
     timestamp: new Date().toISOString()
   });
 };
+
+export const logQuoteCreation = (
+  tradieId: number,
+  quoteId: number,
+  quoteNumber: string,
+  clientId: number,
+  totalAmount: number,
+  success: boolean,
+  requestId: string
+): void => {
+  logger.info('Quote creation attempt', {
+    tradieId,
+    quoteId,
+    quoteNumber,
+    clientId,
+    totalAmount,
+    success,
+    requestId,
+    timestamp: new Date().toISOString()
+  });
+};
+
+export const logQuoteUpdate = (
+  tradieId: number,
+  quoteId: number,
+  quoteNumber: string,
+  updateFields: string[],
+  success: boolean,
+  requestId: string
+): void => {
+  logger.info('Quote update attempt', {
+    tradieId,
+    quoteId,
+    quoteNumber,
+    updateFields,
+    success,
+    requestId,
+    timestamp: new Date().toISOString()
+  });
+};
+
+export const logQuoteStatusChange = (
+  tradieId: number,
+  quoteId: number,
+  quoteNumber: string,
+  fromStatus: string,
+  toStatus: string,
+  requestId: string
+): void => {
+  logger.info('Quote status change', {
+    tradieId,
+    quoteId,
+    quoteNumber,
+    fromStatus,
+    toStatus,
+    requestId,
+    timestamp: new Date().toISOString()
+  });
+};
+
+export const logQuoteSent = (
+  tradieId: number,
+  quoteId: number,
+  quoteNumber: string,
+  clientId: number,
+  deliveryMethods: string[],
+  success: boolean,
+  requestId: string
+): void => {
+  logger.info('Quote sent attempt', {
+    tradieId,
+    quoteId,
+    quoteNumber,
+    clientId,
+    deliveryMethods,
+    success,
+    requestId,
+    timestamp: new Date().toISOString()
+  });
+};
+
+export const logQuoteViewed = (
+  quoteId: number,
+  quoteNumber: string,
+  clientId: number,
+  viewedAt: string,
+  requestId: string
+): void => {
+  logger.info('Quote viewed', {
+    quoteId,
+    quoteNumber,
+    clientId,
+    viewedAt,
+    requestId,
+    timestamp: new Date().toISOString()
+  });
+};
+
+export const logQuoteAccepted = (
+  tradieId: number,
+  quoteId: number,
+  quoteNumber: string,
+  clientId: number,
+  totalAmount: number,
+  requestId: string
+): void => {
+  logger.info('Quote accepted', {
+    tradieId,
+    quoteId,
+    quoteNumber,
+    clientId,
+    totalAmount,
+    requestId,
+    timestamp: new Date().toISOString()
+  });
+};
+
+export const logQuoteRejected = (
+  tradieId: number,
+  quoteId: number,
+  quoteNumber: string,
+  clientId: number,
+  reason: string,
+  requestId: string
+): void => {
+  logger.info('Quote rejected', {
+    tradieId,
+    quoteId,
+    quoteNumber,
+    clientId,
+    reason,
+    requestId,
+    timestamp: new Date().toISOString()
+  });
+};
+
+export const logQuoteDeletion = (
+  tradieId: number,
+  quoteId: number,
+  quoteNumber: string,
+  success: boolean,
+  requestId: string
+): void => {
+  logger.info('Quote deletion attempt', {
+    tradieId,
+    quoteId,
+    quoteNumber,
+    success,
+    requestId,
+    timestamp: new Date().toISOString()
+  });
+};
+
+export const logAIPricingRequest = (
+  tradieId: number,
+  jobType: string,
+  estimatedDuration: number,
+  suggestedTotal: number,
+  confidence: number,
+  requestId: string
+): void => {
+  logger.info('AI pricing request', {
+    tradieId,
+    jobType,
+    estimatedDuration,
+    suggestedTotal,
+    confidence,
+    requestId,
+    timestamp: new Date().toISOString()
+  });
+};
+
+export const logQuoteError = (
+  tradieId: number,
+  quoteId: number | null,
+  operation: string,
+  error: string,
+  requestId: string
+): void => {
+  logger.error('Quote operation failed', {
+    tradieId,
+    quoteId,
+    operation,
+    error,
+    requestId,
+    timestamp: new Date().toISOString()
+  });
+};

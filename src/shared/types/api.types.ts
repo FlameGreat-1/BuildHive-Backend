@@ -292,3 +292,143 @@ export interface JobFilterRequest {
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
 }
+
+// Quote API request/response types
+export interface CreateQuoteRequest {
+  clientId?: number;
+  jobId?: number;
+  title: string;
+  description?: string;
+  items: CreateQuoteItemRequest[];
+  gstEnabled: boolean;
+  validUntil: string;
+  termsConditions?: string;
+  notes?: string;
+}
+
+export interface CreateQuoteItemRequest {
+  itemType: string;
+  description: string;
+  quantity: number;
+  unit: string;
+  unitPrice: number;
+}
+
+export interface UpdateQuoteRequest {
+  title?: string;
+  description?: string;
+  items?: UpdateQuoteItemRequest[];
+  gstEnabled?: boolean;
+  validUntil?: string;
+  termsConditions?: string;
+  notes?: string;
+}
+
+export interface UpdateQuoteItemRequest {
+  id?: number;
+  itemType?: string;
+  description?: string;
+  quantity?: number;
+  unit?: string;
+  unitPrice?: number;
+  sortOrder?: number;
+}
+
+export interface QuoteResponse {
+  id: number;
+  tradieId: number;
+  clientId: number;
+  jobId?: number;
+  quoteNumber: string;
+  title: string;
+  description?: string;
+  status: string;
+  subtotal: number;
+  gstAmount: number;
+  totalAmount: number;
+  gstEnabled: boolean;
+  validUntil: string;
+  termsConditions?: string;
+  notes?: string;
+  items: QuoteItemResponse[];
+  sentAt?: string;
+  viewedAt?: string;
+  acceptedAt?: string;
+  rejectedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface QuoteItemResponse {
+  id: number;
+  itemType: string;
+  description: string;
+  quantity: number;
+  unit: string;
+  unitPrice: number;
+  totalPrice: number;
+  sortOrder: number;
+}
+
+export interface QuoteListResponse {
+  quotes: QuoteResponse[];
+  summary: {
+    total: number;
+    draft: number;
+    sent: number;
+    accepted: number;
+    rejected: number;
+    expired: number;
+  };
+}
+
+export interface QuoteFilterRequest {
+  status?: string;
+  clientId?: number;
+  jobId?: number;
+  startDate?: string;
+  endDate?: string;
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+}
+
+export interface AIPricingRequest {
+  jobDescription: string;
+  jobType: string;
+  tradieHourlyRate: number;
+  estimatedDuration?: number;
+  location?: string;
+}
+
+export interface AIPricingResponse {
+  suggestedTotal: number;
+  complexityFactor: number;
+  breakdown: {
+    labour: number;
+    materials: number;
+    markup: number;
+  };
+  reasoning: string;
+  confidence: number;
+}
+
+export interface SendQuoteRequest {
+  quoteId: number;
+  deliveryMethod: string[];
+  recipientEmail?: string;
+  recipientPhone?: string;
+  customMessage?: string;
+}
+
+export interface SendQuoteResponse {
+  success: boolean;
+  deliveryStatus: {
+    email?: boolean;
+    sms?: boolean;
+    pdf?: boolean;
+  };
+  trackingId: string;
+}
+

@@ -1,0 +1,244 @@
+import { QuoteItemCreateData, QuoteCalculation, QuoteItemData } from '../types';
+import { QUOTE_CONSTANTS, GST_CONSTANTS, QUOTE_STATUS } from '../../config/quotes';
+import { QuoteStatus } from '../../shared/types';
+
+export const calculateQuoteTotal = (
+  items: QuoteItemCreateData[] | QuoteItemData[],
+  gstEnabled: boolean = true
+): QuoteCalculation => {
+  const subtotal = items.reduce((total, item) => {
+    const itemTotal = item.quantity * item.unitPrice;
+    return total + itemTotal;
+  }, 0);
+
+  const gstAmount = gstEnabled ? subtotal * GST_CONSTANTS.GST_RATE : 0;
+  const totalAmount = subtotal + gstAmount;
+
+  const itemTotals = items.reduce((totals, item, index) => {
+    totals[index] = item.quantity * item.unitPrice;
+    return totals;
+  }, {} as { [key: number]: number });
+
+  return {
+    subtotal: parseFloat(subtotal.toFixed(GST_CONSTANTS.GST_DECIMAL_PLACES)),
+    gstAmount: parseFloat(gstAmount.toFixed(GST_CONSTANTS.GST_DECIMAL_PLACES)),
+    totalAmount: parseFloat(totalAmount.toFixed(GST_CONSTANTS.GST_DECIMAL_PLACES)),
+    itemTotals
+  };
+};
+
+export const generateQuoteNumber = (): string => {
+  const timestamp = Date.now().toString();
+  const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+  const suffix = timestamp.slice(-4) + random;
+  return `${QUOTE_CONSTANTS.QUOTE_NUMBER_PREFIX}${suffix}`;
+};
+
+export const isQuoteExpired = (validUntil: Date): boolean => {
+  return new Date() > new Date(validUntil);
+};
+
+export const isQuoteExpiringSoon = (validUntil: Date, warningDays: number = 3): boolean => {
+  const warningDate = new Date();
+  warningDate.setDate(warningDate.getDate() + warningDays);
+  return new Date(validUntil) <= warningDate && !isQuoteExpired(validUntil);
+};
+
+export const getDaysUntilExpiry = (validUntil: Date): number => {
+  const now = new Date();
+  const expiry = new Date(validUntil);
+  const diffTime = expiry.getTime() - now.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  return Math.max(0, diffDays);
+};
+
+export const getQuoteValidUntilDate = (days: number = QUOTE_CONSTANTS.DEFAULT_VALID_DAYS): Date => {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return date;
+};
+
+export const validateQuoteStatusTransition = (currentStatus: QuoteStatus, newStatus: QuoteStatus): boolean => {
+  const allowedTransitions = {
+    [QUOTE_STATUS.DRAFT]: [QUOTE_STATUS.SENT, QUOTE_STATUS.CANCELLED],
+    [QUOTE_STATUS.SENT]: [QUOTE_STATUS.VIEWED, QUOTE_STATUS.ACCEPTED, QUOTE_STATUS.REJECTED, QUOTE_STATUS.EXPIRED, QUOTE_STATUS.CANCELLED],
+    [QUOTE_STATUS.VIEWED]: [QUOTE_STATUS.ACCEPTED, QUOTE_STATUS.REJECTED, QUOTE_STATUS.EXPIRED, QUOTE_STATUS.CANCELLED],
+    [QUOTE_STATUS.ACCEPTED]: [],
+    [QUOTE_STATUS.REJECTED]: [],
+    [QUOTE_STATUS.EXPIRED]: [],
+    [QUOTE_STATUS.CANCELLED]: []
+  };
+
+  return allowedTransitions[currentStatus]?.includes(newStatus) || false;
+};
+
+export const formatQuoteAmount = (amount: number): string => {
+  return new Intl.NumberFormat('en-AU', {
+    style: 'currency',
+    currency: 'AUD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(amount);
+};
+
+export const formatQuoteNumber = (quoteNumber: string): string => {
+  return quoteNumber.toUpperCase();
+};
+
+export const sanitizeQuoteInput = (input: string): string => {
+  return input
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replace(/javascript:/gi, '')
+    .replace(/on\w+\s*=/gi, '')
+    .trim();
+};
+
+export const validateQuoteItems = (items: QuoteItemCreateData[]): string[] => {
+  const errors: string[] = [];
+
+  if (!items || items.length === 0) {
+    errors.push('At least one quote item is required');
+    return errors;
+  }
+
+  if (items.length > QUOTE_CONSTANTS.MAX_ITEMS_PER_QUOTE) {
+    errors.push(`Maximum ${QUOTE_CONSTANTS.MAX_ITEMS_PER_QUOTE} items allowed per quote`);
+  }
+
+  items.forEach((item, index) => {
+    if (!item.description || item.description.trim().length === 0) {
+      errors.push(`Item ${index + 1}: Description is required`);
+    }
+
+    if (item.description && item.description.length > QUOTE_CONSTANTS.MAX_ITEM_DESCRIPTION_LENGTH) {
+      errors.push(`Item ${index + 1}: Description cannot exceed ${QUOTE_CONSTANTS.MAX_ITEM_DESCRIPTION_LENGTH} characters`);
+    }
+
+    if (!item.quantity || item.quantity <= 0) {
+      errors.push(`Item ${index + 1}: Quantity must be greater than 0`);
+    }
+
+    if (!item.unitPrice || item.unitPrice < 0) {
+      errors.push(`Item ${index + 1}: Unit price must be 0 or greater`);
+    }
+
+    if (!item.unit || item.unit.trim().length === 0) {
+      errors.push(`Item ${index + 1}: Unit is required`);
+    }
+
+    if (!item.itemType || item.itemType.trim().length === 0) {
+      errors.push(`Item ${index + 1}: Item type is required`);
+    }
+  });
+
+  return errors;
+};
+
+export const calculateQuoteAcceptanceRate = (totalQuotes: number, acceptedQuotes: number): number => {
+  if (totalQuotes === 0) return 0;
+  return parseFloat(((acceptedQuotes / totalQuotes) * 100).toFixed(2));
+};
+
+export const getQuoteStatusColor = (status: QuoteStatus): string => {
+  const statusColors = {
+    [QUOTE_STATUS.DRAFT]: '#6B7280',
+    [QUOTE_STATUS.SENT]: '#3B82F6',
+    [QUOTE_STATUS.VIEWED]: '#F59E0B',
+    [QUOTE_STATUS.ACCEPTED]: '#10B981',
+    [QUOTE_STATUS.REJECTED]: '#EF4444',
+    [QUOTE_STATUS.EXPIRED]: '#9CA3AF',
+    [QUOTE_STATUS.CANCELLED]: '#6B7280'
+  };
+
+  return statusColors[status] || '#6B7280';
+};
+
+export const getQuoteStatusLabel = (status: QuoteStatus): string => {
+  const statusLabels = {
+    [QUOTE_STATUS.DRAFT]: 'Draft',
+    [QUOTE_STATUS.SENT]: 'Sent',
+    [QUOTE_STATUS.VIEWED]: 'Viewed',
+    [QUOTE_STATUS.ACCEPTED]: 'Accepted',
+    [QUOTE_STATUS.REJECTED]: 'Rejected',
+    [QUOTE_STATUS.EXPIRED]: 'Expired',
+    [QUOTE_STATUS.CANCELLED]: 'Cancelled'
+  };
+
+  return statusLabels[status] || 'Unknown';
+};
+
+export const sortQuoteItems = (items: QuoteItemData[]): QuoteItemData[] => {
+  return [...items].sort((a, b) => {
+    if (a.sortOrder !== b.sortOrder) {
+      return a.sortOrder - b.sortOrder;
+    }
+    return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+  });
+};
+
+export const generateQuoteItemSortOrder = (existingItems: QuoteItemData[]): number => {
+  if (existingItems.length === 0) return 1;
+  const maxOrder = Math.max(...existingItems.map(item => item.sortOrder));
+  return maxOrder + 1;
+};
+
+export const isQuoteEditable = (status: QuoteStatus): boolean => {
+  return status === QUOTE_STATUS.DRAFT;
+};
+
+export const isQuoteCancellable = (status: QuoteStatus): boolean => {
+  return [QUOTE_STATUS.DRAFT, QUOTE_STATUS.SENT, QUOTE_STATUS.VIEWED].includes(status);
+};
+
+export const getQuoteExpiryWarningMessage = (validUntil: Date): string => {
+  const daysLeft = getDaysUntilExpiry(validUntil);
+  
+  if (daysLeft === 0) {
+    return 'Quote expires today';
+  } else if (daysLeft === 1) {
+    return 'Quote expires tomorrow';
+  } else if (daysLeft <= 3) {
+    return `Quote expires in ${daysLeft} days`;
+  }
+  
+  return '';
+};
+
+export const buildQuoteSearchQuery = (searchTerm: string): string => {
+  return `%${searchTerm.toLowerCase().trim()}%`;
+};
+
+export const parseQuoteFilters = (filters: any): any => {
+  const parsed: any = {};
+
+  if (filters.status) {
+    parsed.status = filters.status;
+  }
+
+  if (filters.clientId) {
+    parsed.clientId = parseInt(filters.clientId);
+  }
+
+  if (filters.jobId) {
+    parsed.jobId = parseInt(filters.jobId);
+  }
+
+  if (filters.startDate) {
+    parsed.startDate = new Date(filters.startDate);
+  }
+
+  if (filters.endDate) {
+    parsed.endDate = new Date(filters.endDate);
+  }
+
+  if (filters.searchTerm) {
+    parsed.searchTerm = filters.searchTerm.trim();
+  }
+
+  parsed.page = parseInt(filters.page) || QUOTE_CONSTANTS.DEFAULT_PAGE;
+  parsed.limit = Math.min(parseInt(filters.limit) || QUOTE_CONSTANTS.DEFAULT_LIMIT, QUOTE_CONSTANTS.MAX_LIMIT);
+  parsed.sortBy = filters.sortBy || 'created_at';
+  parsed.sortOrder = filters.sortOrder === 'asc' ? 'asc' : 'desc';
+
+  return parsed;
+};

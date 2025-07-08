@@ -169,3 +169,71 @@ export interface ClientDatabaseRecord {
   created_at: Date;
   updated_at: Date;
 }
+
+// Quote-specific enums
+export enum QuoteStatus {
+  DRAFT = 'draft',
+  SENT = 'sent', 
+  VIEWED = 'viewed',
+  ACCEPTED = 'accepted',
+  REJECTED = 'rejected',
+  EXPIRED = 'expired',
+  CANCELLED = 'cancelled'
+}
+
+export enum QuoteItemType {
+  LABOUR = 'labour',
+  MATERIAL = 'material', 
+  EQUIPMENT = 'equipment',
+  SUBCONTRACTOR = 'subcontractor',
+  PERMIT = 'permit',
+  TRAVEL = 'travel',
+  MARKUP = 'markup',
+  DISCOUNT = 'discount'
+}
+
+export enum DeliveryMethod {
+  EMAIL = 'email',
+  SMS = 'sms', 
+  PDF = 'pdf',
+  PORTAL = 'portal'
+}
+
+// Database record interfaces
+export interface QuoteDatabaseRecord {
+  id: number;
+  tradie_id: number;
+  client_id: number;
+  job_id?: number;
+  quote_number: string;
+  title: string;
+  description?: string;
+  status: QuoteStatus;
+  subtotal: number;
+  gst_amount: number;
+  total_amount: number;
+  gst_enabled: boolean;
+  valid_until: Date;
+  terms_conditions?: string;
+  notes?: string;
+  sent_at?: Date;
+  viewed_at?: Date;
+  accepted_at?: Date;
+  rejected_at?: Date;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface QuoteItemDatabaseRecord {
+  id: number;
+  quote_id: number;
+  item_type: QuoteItemType;
+  description: string;
+  quantity: number;
+  unit: MaterialUnit;
+  unit_price: number;
+  total_price: number;
+  sort_order: number;
+  created_at: Date;
+  updated_at: Date;
+}

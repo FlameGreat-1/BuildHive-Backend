@@ -125,6 +125,8 @@ class DatabaseConnection implements DatabaseClient {
         `ALTER TABLE users ADD COLUMN IF NOT EXISTS login_attempts INTEGER DEFAULT 0;`,
         `ALTER TABLE users ADD COLUMN IF NOT EXISTS locked_until TIMESTAMP;`,
         `ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMP;`
+         ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_customer_id VARCHAR(255);
+
       ];
 
       for (const query of alterQueries) {
@@ -308,6 +310,95 @@ class DatabaseConnection implements DatabaseClient {
         );
       `;
 
+      const createQuotesTable = `
+        CREATE TABLE IF NOT EXISTS quotes (
+          id SERIAL PRIMARY KEY,
+          tradie_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+          client_id INTEGER REFERENCES clients(id) ON DELETE CASCADE,
+          job_id INTEGER REFERENCES jobs(id) ON DELETE SET NULL,
+          quote_number VARCHAR(50) UNIQUE NOT NULL,
+          title VARCHAR(200) NOT NULL,
+          description TEXT,
+          status VARCHAR(20) NOT NULL DEFAULT 'draft',
+          subtotal DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+          gst_amount DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+          total_amount DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+          gst_enabled BOOLEAN DEFAULT TRUE,
+          valid_until TIMESTAMP NOT NULL,
+          terms_conditions TEXT,
+          notes TEXT,
+          sent_at TIMESTAMP,
+          viewed_at TIMESTAMP,
+          accepted_at TIMESTAMP,
+          rejected_at TIMESTAMP,
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW()
+        );
+      `;
+      
+      -- Payment tables needed for Stripe integration
+CREATE TABLE IF NOT EXISTS quote_payments (
+  id SERIAL PRIMARY KEY,
+  quote_id INTEGER REFERENCES quotes(id) ON DELETE CASCADE,
+  payment_intent_id VARCHAR(255) UNIQUE,
+  payment_id VARCHAR(255),
+  amount DECIMAL(12,2) NOT NULL,
+  currency VARCHAR(3) NOT NULL DEFAULT 'AUD',
+  status VARCHAR(20) NOT NULL DEFAULT 'pending',
+  payment_method_type VARCHAR(50),
+  stripe_customer_id VARCHAR(255),
+  refund_id VARCHAR(255),
+  refund_status VARCHAR(20),
+  invoice_id VARCHAR(255),
+  invoice_number VARCHAR(50),
+  failure_reason TEXT,
+  paid_at TIMESTAMP,
+  refunded_at TIMESTAMP,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS user_payment_methods (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  payment_method_id VARCHAR(255) NOT NULL,
+  type VARCHAR(50) NOT NULL,
+  card_brand VARCHAR(20),
+  card_last4 VARCHAR(4),
+  card_expiry_month INTEGER,
+  card_expiry_year INTEGER,
+  is_default BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE(user_id, payment_method_id)
+);
+
+CREATE TABLE IF NOT EXISTS payment_webhooks (
+  id SERIAL PRIMARY KEY,
+  stripe_event_id VARCHAR(255) UNIQUE NOT NULL,
+  event_type VARCHAR(100) NOT NULL,
+  processed BOOLEAN DEFAULT FALSE,
+  payload JSONB NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW(),
+  processed_at TIMESTAMP
+);
+
+      const createQuoteItemsTable = `
+        CREATE TABLE IF NOT EXISTS quote_items (
+          id SERIAL PRIMARY KEY,
+          quote_id INTEGER REFERENCES quotes(id) ON DELETE CASCADE,
+          item_type VARCHAR(30) NOT NULL,
+          description TEXT NOT NULL,
+          quantity DECIMAL(10,2) NOT NULL,
+          unit VARCHAR(20) NOT NULL,
+          unit_price DECIMAL(10,2) NOT NULL,
+          total_price DECIMAL(12,2) NOT NULL,
+          sort_order INTEGER DEFAULT 0,
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW()
+        );
+      `;
+
       await this.query(createClientsTable);
       logger.info('Clients table created/verified');
 
@@ -319,6 +410,12 @@ class DatabaseConnection implements DatabaseClient {
 
       await this.query(createJobAttachmentsTable);
       logger.info('Job attachments table created/verified');
+
+      await this.query(createQuotesTable);
+      logger.info('Quotes table created/verified');
+
+      await this.query(createQuoteItemsTable);
+      logger.info('Quote items table created/verified');
 
       await this.createJobIndexes();
 
@@ -345,7 +442,24 @@ class DatabaseConnection implements DatabaseClient {
         'CREATE INDEX IF NOT EXISTS idx_clients_tradie_id ON clients(tradie_id);',
         'CREATE INDEX IF NOT EXISTS idx_clients_email ON clients(email);',
         'CREATE INDEX IF NOT EXISTS idx_materials_job_id ON materials(job_id);',
-        'CREATE INDEX IF NOT EXISTS idx_job_attachments_job_id ON job_attachments(job_id);'
+        'CREATE INDEX IF NOT EXISTS idx_job_attachments_job_id ON job_attachments(job_id);',
+        'CREATE INDEX IF NOT EXISTS idx_quotes_tradie_id ON quotes(tradie_id);',
+        'CREATE INDEX IF NOT EXISTS idx_quotes_client_id ON quotes(client_id);',
+        'CREATE INDEX IF NOT EXISTS idx_quotes_job_id ON quotes(job_id);',
+        'CREATE INDEX IF NOT EXISTS idx_quotes_status ON quotes(status);',
+        'CREATE INDEX IF NOT EXISTS idx_quotes_quote_number ON quotes(quote_number);',
+        'CREATE INDEX IF NOT EXISTS idx_quotes_valid_until ON quotes(valid_until);',
+        'CREATE INDEX IF NOT EXISTS idx_quotes_created_at ON quotes(created_at);',
+        'CREATE INDEX IF NOT EXISTS idx_quote_items_quote_id ON quote_items(quote_id);',
+        'CREATE INDEX IF NOT EXISTS idx_quote_items_sort_order ON quote_items(sort_order);'
+ 
+CREATE INDEX IF NOT EXISTS idx_quote_payments_quote_id ON quote_payments(quote_id);
+CREATE INDEX IF NOT EXISTS idx_quote_payments_payment_intent_id ON quote_payments(payment_intent_id);
+CREATE INDEX IF NOT EXISTS idx_quote_payments_status ON quote_payments(status);
+CREATE INDEX IF NOT EXISTS idx_user_payment_methods_user_id ON user_payment_methods(user_id);
+CREATE INDEX IF NOT EXISTS idx_payment_webhooks_stripe_event_id ON payment_webhooks(stripe_event_id);
+CREATE INDEX IF NOT EXISTS idx_payment_webhooks_processed ON payment_webhooks(processed);
+
       ];
 
       for (const indexQuery of indexes) {
@@ -367,6 +481,8 @@ class DatabaseConnection implements DatabaseClient {
     try {
       logger.info('Recreating database tables...');
 
+      await this.query('DROP TABLE IF EXISTS quote_items CASCADE');
+      await this.query('DROP TABLE IF EXISTS quotes CASCADE');
       await this.query('DROP TABLE IF EXISTS job_attachments CASCADE');
       await this.query('DROP TABLE IF EXISTS materials CASCADE');
       await this.query('DROP TABLE IF EXISTS jobs CASCADE');
@@ -374,6 +490,10 @@ class DatabaseConnection implements DatabaseClient {
       await this.query('DROP TABLE IF EXISTS sessions CASCADE');
       await this.query('DROP TABLE IF EXISTS profiles CASCADE');
       await this.query('DROP TABLE IF EXISTS users CASCADE');
+      await this.query('DROP TABLE IF EXISTS payment_webhooks CASCADE');
+      await this.query('DROP TABLE IF EXISTS user_payment_methods CASCADE');
+      await this.query('DROP TABLE IF EXISTS quote_payments CASCADE');
+
 
       await this.createTables();
       

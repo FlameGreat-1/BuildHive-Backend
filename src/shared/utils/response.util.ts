@@ -175,3 +175,104 @@ export const sendNotFoundResponse = (
 ): Response => {
   return sendError(res, message, HTTP_STATUS_CODES.NOT_FOUND);
 };
+
+export const sendQuoteSuccess = <T = any>(
+  res: Response,
+  message: string,
+  data?: T,
+  statusCode: number = HTTP_STATUS_CODES.OK
+): Response => {
+  return sendSuccess(res, message, data, statusCode);
+};
+
+export const sendQuoteCreated = <T = any>(
+  res: Response,
+  message: string,
+  data?: T
+): Response => {
+  return sendCreated(res, message, data);
+};
+
+export const sendQuoteNotFound = (
+  res: Response,
+  message: string = 'Quote not found'
+): Response => {
+  return sendError(res, message, HTTP_STATUS_CODES.NOT_FOUND);
+};
+
+export const sendUnauthorizedQuoteAccess = (
+  res: Response,
+  message: string = 'Unauthorized access to quote'
+): Response => {
+  return sendError(res, message, HTTP_STATUS_CODES.FORBIDDEN);
+};
+
+export const sendQuoteValidationError = (
+  res: Response,
+  message: string,
+  errors: ValidationError[]
+): Response => {
+  return sendValidationError(res, message, errors);
+};
+
+export const sendQuoteExpiredError = (
+  res: Response,
+  message: string = 'Quote has expired'
+): Response => {
+  return sendError(res, message, HTTP_STATUS_CODES.BAD_REQUEST);
+};
+
+export const sendQuoteStatusError = (
+  res: Response,
+  message: string = 'Invalid quote status transition'
+): Response => {
+  return sendError(res, message, HTTP_STATUS_CODES.BAD_REQUEST);
+};
+
+export const sendAIPricingError = (
+  res: Response,
+  message: string = 'AI pricing service unavailable'
+): Response => {
+  return sendError(res, message, HTTP_STATUS_CODES.SERVICE_UNAVAILABLE);
+};
+
+export const sendQuoteDeliveryError = (
+  res: Response,
+  message: string = 'Quote delivery failed'
+): Response => {
+  return sendError(res, message, HTTP_STATUS_CODES.BAD_REQUEST);
+};
+
+export const sendQuoteListResponse = <T = any>(
+  res: Response,
+  message: string,
+  quotes: T[],
+  summary: any
+): Response => {
+  return sendSuccess(res, message, { quotes, summary });
+};
+
+export const sendPaginatedQuoteResponse = <T = any>(
+  res: Response,
+  message: string,
+  quotes: T[],
+  meta: any
+): Response => {
+  return sendSuccess(res, message, { quotes, meta });
+};
+
+export const sendAIPricingResponse = <T = any>(
+  res: Response,
+  message: string,
+  data?: T
+): Response => {
+  return sendSuccess(res, message, data);
+};
+
+export const sendQuoteDeliveryResponse = <T = any>(
+  res: Response,
+  message: string,
+  data?: T
+): Response => {
+  return sendSuccess(res, message, data);
+};

@@ -75,6 +75,25 @@ export const sensitiveDataFilter = (
       }));
     }
 
+    if (filteredBody.items) {
+      filteredBody.items = filteredBody.items.map((item: any) => ({
+        ...item,
+        unitPrice: item.unitPrice ? '[FILTERED]' : item.unitPrice
+      }));
+    }
+
+    if (filteredBody.totalAmount) {
+      filteredBody.totalAmount = '[FILTERED]';
+    }
+
+    if (filteredBody.subtotal) {
+      filteredBody.subtotal = '[FILTERED]';
+    }
+
+    if (filteredBody.gstAmount) {
+      filteredBody.gstAmount = '[FILTERED]';
+    }
+
     req.body = filteredBody;
   }
 
@@ -219,6 +238,145 @@ export const jobStatusChangeLogger = (
       userId,
       jobId,
       newStatus: req.body.status,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  next();
+};
+
+export const quoteOperationLogger = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const requestId = res.locals.requestId || 'unknown';
+  const userId = req.user?.id;
+  const quoteId = req.params.quoteId;
+
+  if (req.path.includes('/quotes')) {
+    const operation = req.method === 'POST' ? 'create' : 
+                     req.method === 'PUT' ? 'update' : 
+                     req.method === 'DELETE' ? 'delete' : 'read';
+
+    logger.info('Quote operation initiated', {
+      requestId,
+      userId,
+      quoteId,
+      operation,
+      method: req.method,
+      path: req.path,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  next();
+};
+
+export const quoteStatusChangeLogger = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const requestId = res.locals.requestId || 'unknown';
+  const userId = req.user?.id;
+  const quoteId = req.params.quoteId;
+
+  if (req.body.status && req.method === 'PUT' && req.path.includes('/quotes')) {
+    logger.info('Quote status change initiated', {
+      requestId,
+      userId,
+      quoteId,
+      newStatus: req.body.status,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  next();
+};
+
+export const quoteItemsLogger = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const requestId = res.locals.requestId || 'unknown';
+  const userId = req.user?.id;
+  const quoteId = req.params.quoteId;
+
+  if (req.body.items && Array.isArray(req.body.items) && req.path.includes('/quotes')) {
+    logger.info('Quote items operation initiated', {
+      requestId,
+      userId,
+      quoteId,
+      itemCount: req.body.items.length,
+      operation: req.method === 'POST' ? 'add' : 'update',
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  next();
+};
+
+export const quoteSendLogger = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const requestId = res.locals.requestId || 'unknown';
+  const userId = req.user?.id;
+  const quoteId = req.params.quoteId;
+
+  if (req.path.includes('/quotes') && req.path.includes('/send')) {
+    logger.info('Quote send operation initiated', {
+      requestId,
+      userId,
+      quoteId,
+      deliveryMethods: req.body.deliveryMethod,
+      recipientEmail: req.body.recipientEmail ? '[FILTERED]' : undefined,
+      recipientPhone: req.body.recipientPhone ? '[FILTERED]' : undefined,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  next();
+};
+
+export const aiPricingLogger = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const requestId = res.locals.requestId || 'unknown';
+  const userId = req.user?.id;
+
+  if (req.path.includes('/ai-pricing')) {
+    logger.info('AI pricing request initiated', {
+      requestId,
+      userId,
+      jobType: req.body.jobType,
+      estimatedDuration: req.body.estimatedDuration,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  next();
+};
+
+export const quoteViewLogger = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const requestId = res.locals.requestId || 'unknown';
+  const quoteId = req.params.quoteId;
+
+  if (req.path.includes('/quotes') && req.path.includes('/view') && req.method === 'GET') {
+    logger.info('Quote view initiated', {
+      requestId,
+      quoteId,
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
       timestamp: new Date().toISOString()
     });
   }

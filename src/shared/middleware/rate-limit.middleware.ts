@@ -253,3 +253,193 @@ export const jobSearchRateLimit = rateLimit({
     return userId ? `job-search-${userId}` : req.ip || 'unknown';
   }
 });
+
+export const quoteCreationRateLimit = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 25,
+  message: 'Too many quote creation attempts, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: createRateLimitHandler('Too many quote creation attempts, please try again after 10 minutes'),
+  keyGenerator: (req: Request): string => {
+    const userId = req.user?.id;
+    return userId ? `quote-create-${userId}` : req.ip || 'unknown';
+  }
+});
+
+export const quoteUpdateRateLimit = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  max: 40,
+  message: 'Too many quote update attempts, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: createRateLimitHandler('Too many quote update attempts, please try again after 5 minutes'),
+  keyGenerator: (req: Request): string => {
+    const userId = req.user?.id;
+    return userId ? `quote-update-${userId}` : req.ip || 'unknown';
+  }
+});
+
+export const quoteSendRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 15,
+  message: 'Too many quote send attempts, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: createRateLimitHandler('Too many quote send attempts, please try again after 15 minutes'),
+  keyGenerator: (req: Request): string => {
+    const userId = req.user?.id;
+    return userId ? `quote-send-${userId}` : req.ip || 'unknown';
+  }
+});
+
+export const aiPricingRateLimit = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  max: 10,
+  message: 'Too many AI pricing requests, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: createRateLimitHandler('Too many AI pricing requests, please try again after 5 minutes'),
+  keyGenerator: (req: Request): string => {
+    const userId = req.user?.id;
+    return userId ? `ai-pricing-${userId}` : req.ip || 'unknown';
+  }
+});
+
+export const quoteViewRateLimit = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 50,
+  message: 'Too many quote view requests, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: createRateLimitHandler('Too many quote view requests, please try again after 1 minute'),
+  keyGenerator: (req: Request): string => {
+    return req.ip || 'unknown';
+  }
+});
+
+export const quoteSearchRateLimit = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 30,
+  message: 'Too many quote search requests, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: createRateLimitHandler('Too many quote search requests, please try again after 1 minute'),
+  keyGenerator: (req: Request): string => {
+    const userId = req.user?.id;
+    return userId ? `quote-search-${userId}` : req.ip || 'unknown';
+  }
+});
+
+export const quoteStatusChangeRateLimit = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  max: 30,
+  message: 'Too many quote status changes, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: createRateLimitHandler('Too many quote status changes, please try again after 5 minutes'),
+  keyGenerator: (req: Request): string => {
+    const userId = req.user?.id;
+    return userId ? `quote-status-${userId}` : req.ip || 'unknown';
+  }
+});
+
+export const quoteOperationRateLimit = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 50,
+  message: 'Too many quote operations, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: createRateLimitHandler('Too many quote operations, please try again after 10 minutes'),
+  keyGenerator: (req: Request): string => {
+    const userId = req.user?.id;
+    return userId ? `quote-ops-${userId}` : req.ip || 'unknown';
+  }
+});
+
+export const paymentIntentRateLimit = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  max: 20,
+  message: 'Too many payment intent requests, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: createRateLimitHandler('Too many payment intent requests, please try again after 5 minutes'),
+  keyGenerator: (req: Request): string => {
+    const userId = req.user?.id;
+    return userId ? `payment-intent-${userId}` : req.ip || 'unknown';
+  }
+});
+
+export const paymentProcessingRateLimit = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 15,
+  message: 'Too many payment processing attempts, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: createRateLimitHandler('Too many payment processing attempts, please try again after 10 minutes'),
+  keyGenerator: (req: Request): string => {
+    const userId = req.user?.id;
+    return userId ? `payment-process-${userId}` : req.ip || 'unknown';
+  }
+});
+
+export const refundProcessingRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: 'Too many refund requests, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: createRateLimitHandler('Too many refund requests, please try again after 15 minutes'),
+  keyGenerator: (req: Request): string => {
+    const userId = req.user?.id;
+    return userId ? `refund-process-${userId}` : req.ip || 'unknown';
+  }
+});
+
+export const invoiceGenerationRateLimit = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 30,
+  message: 'Too many invoice generation requests, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: createRateLimitHandler('Too many invoice generation requests, please try again after 10 minutes'),
+  keyGenerator: (req: Request): string => {
+    const userId = req.user?.id;
+    return userId ? `invoice-gen-${userId}` : req.ip || 'unknown';
+  }
+});
+
+export const paymentWebhookRateLimit = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 100,
+  message: 'Too many webhook requests, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: createRateLimitHandler('Too many webhook requests, please try again after 1 minute'),
+  keyGenerator: (req: Request): string => {
+    return req.ip || 'unknown';
+  }
+});
+
+export const rateLimitMiddleware = (config: {
+  windowMs: number;
+  max: number;
+  message: string;
+  keyGenerator?: (req: Request) => string;
+}) => {
+  return rateLimit({
+    windowMs: config.windowMs,
+    max: config.max,
+    message: config.message,
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: createRateLimitHandler(config.message),
+    keyGenerator: config.keyGenerator || ((req: Request): string => {
+      const userId = req.user?.id;
+      return userId ? `user-${userId}` : req.ip || 'unknown';
+    }),
+    skip: (req: Request): boolean => {
+      return req.ip === '127.0.0.1' || req.ip === '::1';
+    }
+  });
+};
