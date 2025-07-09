@@ -174,3 +174,75 @@ export const asyncErrorHandler = (fn: Function) => {
     Promise.resolve(fn(req, res, next)).catch(next);
   };
 };
+
+export class PaymentNotFoundError extends AppError {
+  constructor(message: string = 'Payment not found', requestId?: string) {
+    super(message, HTTP_STATUS_CODES.NOT_FOUND, 'PAYMENT_NOT_FOUND', true, requestId);
+  }
+}
+
+export class PaymentValidationError extends ValidationAppError {
+  constructor(message: string, errors: ValidationError[], requestId?: string) {
+    super(message, errors, requestId);
+  }
+}
+
+export class PaymentProcessingError extends AppError {
+  constructor(message: string = 'Payment processing failed', requestId?: string) {
+    super(message, HTTP_STATUS_CODES.BAD_REQUEST, 'PAYMENT_PROCESSING_ERROR', true, requestId);
+  }
+}
+
+export class InsufficientCreditsError extends AppError {
+  constructor(message: string = 'Insufficient credits', requestId?: string) {
+    super(message, HTTP_STATUS_CODES.BAD_REQUEST, 'INSUFFICIENT_CREDITS', true, requestId);
+  }
+}
+
+export class StripeError extends AppError {
+  constructor(message: string = 'Stripe service error', requestId?: string) {
+    super(message, HTTP_STATUS_CODES.BAD_REQUEST, 'STRIPE_ERROR', true, requestId);
+  }
+}
+
+export class WebhookValidationError extends AppError {
+  constructor(message: string = 'Webhook validation failed', requestId?: string) {
+    super(message, HTTP_STATUS_CODES.BAD_REQUEST, 'WEBHOOK_VALIDATION_ERROR', true, requestId);
+  }
+}
+
+export class SubscriptionNotFoundError extends AppError {
+  constructor(message: string = 'Subscription not found', requestId?: string) {
+    super(message, HTTP_STATUS_CODES.NOT_FOUND, 'SUBSCRIPTION_NOT_FOUND', true, requestId);
+  }
+}
+
+export class InvoiceNotFoundError extends AppError {
+  constructor(message: string = 'Invoice not found', requestId?: string) {
+    super(message, HTTP_STATUS_CODES.NOT_FOUND, 'INVOICE_NOT_FOUND', true, requestId);
+  }
+}
+
+export class RefundNotFoundError extends AppError {
+  constructor(message: string = 'Refund not found', requestId?: string) {
+    super(message, HTTP_STATUS_CODES.NOT_FOUND, 'REFUND_NOT_FOUND', true, requestId);
+  }
+}
+
+export class PaymentMethodNotFoundError extends AppError {
+  constructor(message: string = 'Payment method not found', requestId?: string) {
+    super(message, HTTP_STATUS_CODES.NOT_FOUND, 'PAYMENT_METHOD_NOT_FOUND', true, requestId);
+  }
+}
+
+export class RefundProcessingError extends AppError {
+  constructor(message: string = 'Refund processing failed', requestId?: string) {
+    super(message, HTTP_STATUS_CODES.BAD_REQUEST, 'REFUND_PROCESSING_ERROR', true, requestId);
+  }
+}
+
+export class SubscriptionStatusError extends AppError {
+  constructor(message: string = 'Invalid subscription status', requestId?: string) {
+    super(message, HTTP_STATUS_CODES.BAD_REQUEST, 'INVALID_SUBSCRIPTION_STATUS', true, requestId);
+  }
+}

@@ -276,3 +276,139 @@ export const sendQuoteDeliveryResponse = <T = any>(
 ): Response => {
   return sendSuccess(res, message, data);
 };
+
+export const sendPaymentSuccess = <T = any>(
+  res: Response,
+  message: string,
+  data?: T,
+  statusCode: number = HTTP_STATUS_CODES.OK
+): Response => {
+  return sendSuccess(res, message, data, statusCode);
+};
+
+export const sendPaymentCreated = <T = any>(
+  res: Response,
+  message: string,
+  data?: T
+): Response => {
+  return sendCreated(res, message, data);
+};
+
+export const sendPaymentNotFound = (
+  res: Response,
+  message: string = 'Payment not found'
+): Response => {
+  return sendError(res, message, HTTP_STATUS_CODES.NOT_FOUND);
+};
+
+export const sendPaymentValidationError = (
+  res: Response,
+  message: string,
+  errors: ValidationError[]
+): Response => {
+  return sendValidationError(res, message, errors);
+};
+
+export const sendPaymentProcessingError = (
+  res: Response,
+  message: string = 'Payment processing failed'
+): Response => {
+  return sendError(res, message, HTTP_STATUS_CODES.BAD_REQUEST);
+};
+
+export const sendInsufficientCreditsError = (
+  res: Response,
+  message: string = 'Insufficient credits'
+): Response => {
+  return sendError(res, message, HTTP_STATUS_CODES.BAD_REQUEST);
+};
+
+export const sendStripeError = (
+  res: Response,
+  message: string = 'Stripe service error'
+): Response => {
+  return sendError(res, message, HTTP_STATUS_CODES.BAD_REQUEST);
+};
+
+export const sendWebhookValidationError = (
+  res: Response,
+  message: string = 'Webhook validation failed'
+): Response => {
+  return sendError(res, message, HTTP_STATUS_CODES.BAD_REQUEST);
+};
+
+export const sendSubscriptionNotFound = (
+  res: Response,
+  message: string = 'Subscription not found'
+): Response => {
+  return sendError(res, message, HTTP_STATUS_CODES.NOT_FOUND);
+};
+
+export const sendInvoiceNotFound = (
+  res: Response,
+  message: string = 'Invoice not found'
+): Response => {
+  return sendError(res, message, HTTP_STATUS_CODES.NOT_FOUND);
+};
+
+export const sendRefundNotFound = (
+  res: Response,
+  message: string = 'Refund not found'
+): Response => {
+  return sendError(res, message, HTTP_STATUS_CODES.NOT_FOUND);
+};
+
+export const sendPaymentMethodNotFound = (
+  res: Response,
+  message: string = 'Payment method not found'
+): Response => {
+  return sendError(res, message, HTTP_STATUS_CODES.NOT_FOUND);
+};
+
+export const sendRefundProcessingError = (
+  res: Response,
+  message: string = 'Refund processing failed'
+): Response => {
+  return sendError(res, message, HTTP_STATUS_CODES.BAD_REQUEST);
+};
+
+export const sendSubscriptionStatusError = (
+  res: Response,
+  message: string = 'Invalid subscription status'
+): Response => {
+  return sendError(res, message, HTTP_STATUS_CODES.BAD_REQUEST);
+};
+
+export const sendPaymentListResponse = <T = any>(
+  res: Response,
+  message: string,
+  payments: T[],
+  summary: any
+): Response => {
+  return sendSuccess(res, message, { payments, summary });
+};
+
+export const sendPaginatedPaymentResponse = <T = any>(
+  res: Response,
+  message: string,
+  payments: T[],
+  meta: any
+): Response => {
+  return sendSuccess(res, message, { payments, meta });
+};
+
+export const sendCreditBalanceResponse = <T = any>(
+  res: Response,
+  message: string,
+  data?: T
+): Response => {
+  return sendSuccess(res, message, data);
+};
+
+export const sendPaymentLinkResponse = <T = any>(
+  res: Response,
+  message: string,
+  data?: T
+): Response => {
+  return sendSuccess(res, message, data);
+};

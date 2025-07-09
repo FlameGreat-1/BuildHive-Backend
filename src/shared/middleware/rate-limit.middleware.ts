@@ -421,6 +421,71 @@ export const paymentWebhookRateLimit = rateLimit({
   }
 });
 
+export const creditPurchaseRateLimit = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 20,
+  message: 'Too many credit purchase attempts, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: createRateLimitHandler('Too many credit purchase attempts, please try again after 10 minutes'),
+  keyGenerator: (req: Request): string => {
+    const userId = req.user?.id;
+    return userId ? `credit-purchase-${userId}` : req.ip || 'unknown';
+  }
+});
+
+export const subscriptionRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: 'Too many subscription requests, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: createRateLimitHandler('Too many subscription requests, please try again after 15 minutes'),
+  keyGenerator: (req: Request): string => {
+    const userId = req.user?.id;
+    return userId ? `subscription-${userId}` : req.ip || 'unknown';
+  }
+});
+
+export const paymentMethodRateLimit = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 25,
+  message: 'Too many payment method operations, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: createRateLimitHandler('Too many payment method operations, please try again after 10 minutes'),
+  keyGenerator: (req: Request): string => {
+    const userId = req.user?.id;
+    return userId ? `payment-method-${userId}` : req.ip || 'unknown';
+  }
+});
+
+export const applePayRateLimit = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  max: 15,
+  message: 'Too many Apple Pay requests, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: createRateLimitHandler('Too many Apple Pay requests, please try again after 5 minutes'),
+  keyGenerator: (req: Request): string => {
+    const userId = req.user?.id;
+    return userId ? `apple-pay-${userId}` : req.ip || 'unknown';
+  }
+});
+
+export const googlePayRateLimit = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  max: 15,
+  message: 'Too many Google Pay requests, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: createRateLimitHandler('Too many Google Pay requests, please try again after 5 minutes'),
+  keyGenerator: (req: Request): string => {
+    const userId = req.user?.id;
+    return userId ? `google-pay-${userId}` : req.ip || 'unknown';
+  }
+});
+
 export const rateLimitMiddleware = (config: {
   windowMs: number;
   max: number;

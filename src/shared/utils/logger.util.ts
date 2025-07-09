@@ -416,3 +416,172 @@ export const logQuoteError = (
     timestamp: new Date().toISOString()
   });
 };
+
+export const logPaymentAttempt = (
+  userId: number,
+  paymentId: number,
+  amount: number,
+  currency: string,
+  paymentMethod: string,
+  paymentType: string,
+  success: boolean,
+  requestId: string
+): void => {
+  logger.info('Payment attempt', {
+    userId,
+    paymentId,
+    amount,
+    currency,
+    paymentMethod,
+    paymentType,
+    success,
+    requestId,
+    timestamp: new Date().toISOString()
+  });
+};
+
+export const logPaymentStatusChange = (
+  userId: number,
+  paymentId: number,
+  fromStatus: string,
+  toStatus: string,
+  requestId: string
+): void => {
+  logger.info('Payment status change', {
+    userId,
+    paymentId,
+    fromStatus,
+    toStatus,
+    requestId,
+    timestamp: new Date().toISOString()
+  });
+};
+
+export const logStripeWebhook = (
+  eventId: string,
+  eventType: string,
+  processed: boolean,
+  requestId: string
+): void => {
+  logger.info('Stripe webhook received', {
+    eventId,
+    eventType,
+    processed,
+    requestId,
+    timestamp: new Date().toISOString()
+  });
+};
+
+export const logCreditTransaction = (
+  userId: number,
+  credits: number,
+  transactionType: string,
+  paymentId: number | null,
+  requestId: string
+): void => {
+  logger.info('Credit transaction', {
+    userId,
+    credits,
+    transactionType,
+    paymentId,
+    requestId,
+    timestamp: new Date().toISOString()
+  });
+};
+
+export const logSubscriptionChange = (
+  userId: number,
+  subscriptionId: number,
+  plan: string,
+  fromStatus: string,
+  toStatus: string,
+  requestId: string
+): void => {
+  logger.info('Subscription status change', {
+    userId,
+    subscriptionId,
+    plan,
+    fromStatus,
+    toStatus,
+    requestId,
+    timestamp: new Date().toISOString()
+  });
+};
+
+export const logRefundRequest = (
+  userId: number,
+  paymentId: number,
+  refundId: number,
+  amount: number,
+  reason: string,
+  success: boolean,
+  requestId: string
+): void => {
+  logger.info('Refund request', {
+    userId,
+    paymentId,
+    refundId,
+    amount,
+    reason,
+    success,
+    requestId,
+    timestamp: new Date().toISOString()
+  });
+};
+
+export const logInvoiceCreation = (
+  userId: number,
+  invoiceId: number,
+  invoiceNumber: string,
+  amount: number,
+  quoteId: number | null,
+  success: boolean,
+  requestId: string
+): void => {
+  logger.info('Invoice creation attempt', {
+    userId,
+    invoiceId,
+    invoiceNumber,
+    amount,
+    quoteId,
+    success,
+    requestId,
+    timestamp: new Date().toISOString()
+  });
+};
+
+export const logPaymentMethodAdded = (
+  userId: number,
+  paymentMethodId: number,
+  type: string,
+  isDefault: boolean,
+  success: boolean,
+  requestId: string
+): void => {
+  logger.info('Payment method added', {
+    userId,
+    paymentMethodId,
+    type,
+    isDefault,
+    success,
+    requestId,
+    timestamp: new Date().toISOString()
+  });
+};
+
+export const logPaymentError = (
+  userId: number,
+  paymentId: number | null,
+  operation: string,
+  error: string,
+  requestId: string
+): void => {
+  logger.error('Payment operation failed', {
+    userId,
+    paymentId,
+    operation,
+    error,
+    requestId,
+    timestamp: new Date().toISOString()
+  });
+};

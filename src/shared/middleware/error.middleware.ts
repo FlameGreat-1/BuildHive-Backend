@@ -365,3 +365,291 @@ export const quoteErrorHandler = (
 
   return errorHandler(error, req, res, next);
 };
+
+export const paymentErrorHandler = (
+  error: Error,
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Response | void => {
+  const requestId = res.locals.requestId || 'unknown';
+  const userId = req.user?.id;
+
+  if (error.message.includes('Payment not found')) {
+    logger.warn('Payment not found error', {
+      requestId,
+      userId,
+      path: req.path,
+      method: req.method,
+      paymentId: req.params.paymentId
+    });
+
+    const paymentError = new AppError(
+      'Payment not found',
+      HTTP_STATUS_CODES.NOT_FOUND,
+      'PAYMENT_NOT_FOUND',
+      true,
+      requestId
+    );
+
+    const errorResponse = createErrorResponse(paymentError, requestId);
+    return res.status(HTTP_STATUS_CODES.NOT_FOUND).json(errorResponse);
+  }
+
+  if (error.message.includes('Payment processing failed')) {
+    logger.warn('Payment processing error', {
+      requestId,
+      userId,
+      path: req.path,
+      method: req.method,
+      paymentId: req.params.paymentId
+    });
+
+    const processingError = new AppError(
+      'Payment processing failed',
+      HTTP_STATUS_CODES.BAD_REQUEST,
+      'PAYMENT_PROCESSING_ERROR',
+      true,
+      requestId
+    );
+
+    const errorResponse = createErrorResponse(processingError, requestId);
+    return res.status(HTTP_STATUS_CODES.BAD_REQUEST).json(errorResponse);
+  }
+
+  if (error.message.includes('Insufficient credits')) {
+    logger.warn('Insufficient credits error', {
+      requestId,
+      userId,
+      path: req.path,
+      method: req.method
+    });
+
+    const creditsError = new AppError(
+      'Insufficient credits',
+      HTTP_STATUS_CODES.BAD_REQUEST,
+      'INSUFFICIENT_CREDITS',
+      true,
+      requestId
+    );
+
+    const errorResponse = createErrorResponse(creditsError, requestId);
+    return res.status(HTTP_STATUS_CODES.BAD_REQUEST).json(errorResponse);
+  }
+
+  if (error.message.includes('Stripe service error')) {
+    logger.warn('Stripe service error', {
+      requestId,
+      userId,
+      path: req.path,
+      method: req.method
+    });
+
+    const stripeError = new AppError(
+      'Stripe service error',
+      HTTP_STATUS_CODES.BAD_REQUEST,
+      'STRIPE_ERROR',
+      true,
+      requestId
+    );
+
+    const errorResponse = createErrorResponse(stripeError, requestId);
+    return res.status(HTTP_STATUS_CODES.BAD_REQUEST).json(errorResponse);
+  }
+
+  if (error.message.includes('Webhook validation failed')) {
+    logger.warn('Webhook validation error', {
+      requestId,
+      userId,
+      path: req.path,
+      method: req.method
+    });
+
+    const webhookError = new AppError(
+      'Webhook validation failed',
+      HTTP_STATUS_CODES.BAD_REQUEST,
+      'WEBHOOK_VALIDATION_ERROR',
+      true,
+      requestId
+    );
+
+    const errorResponse = createErrorResponse(webhookError, requestId);
+    return res.status(HTTP_STATUS_CODES.BAD_REQUEST).json(errorResponse);
+  }
+
+  return errorHandler(error, req, res, next);
+};
+
+export const subscriptionErrorHandler = (
+  error: Error,
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Response | void => {
+  const requestId = res.locals.requestId || 'unknown';
+  const userId = req.user?.id;
+
+  if (error.message.includes('Subscription not found')) {
+    logger.warn('Subscription not found error', {
+      requestId,
+      userId,
+      path: req.path,
+      method: req.method,
+      subscriptionId: req.params.subscriptionId
+    });
+
+    const subscriptionError = new AppError(
+      'Subscription not found',
+      HTTP_STATUS_CODES.NOT_FOUND,
+      'SUBSCRIPTION_NOT_FOUND',
+      true,
+      requestId
+    );
+
+    const errorResponse = createErrorResponse(subscriptionError, requestId);
+    return res.status(HTTP_STATUS_CODES.NOT_FOUND).json(errorResponse);
+  }
+
+  if (error.message.includes('Invalid subscription status')) {
+    logger.warn('Invalid subscription status error', {
+      requestId,
+      userId,
+      path: req.path,
+      method: req.method,
+      subscriptionId: req.params.subscriptionId
+    });
+
+    const statusError = new AppError(
+      'Invalid subscription status',
+      HTTP_STATUS_CODES.BAD_REQUEST,
+      'INVALID_SUBSCRIPTION_STATUS',
+      true,
+      requestId
+    );
+
+    const errorResponse = createErrorResponse(statusError, requestId);
+    return res.status(HTTP_STATUS_CODES.BAD_REQUEST).json(errorResponse);
+  }
+
+  return errorHandler(error, req, res, next);
+};
+
+export const invoiceErrorHandler = (
+  error: Error,
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Response | void => {
+  const requestId = res.locals.requestId || 'unknown';
+  const userId = req.user?.id;
+
+  if (error.message.includes('Invoice not found')) {
+    logger.warn('Invoice not found error', {
+      requestId,
+      userId,
+      path: req.path,
+      method: req.method,
+      invoiceId: req.params.invoiceId
+    });
+
+    const invoiceError = new AppError(
+      'Invoice not found',
+      HTTP_STATUS_CODES.NOT_FOUND,
+      'INVOICE_NOT_FOUND',
+      true,
+      requestId
+    );
+
+    const errorResponse = createErrorResponse(invoiceError, requestId);
+    return res.status(HTTP_STATUS_CODES.NOT_FOUND).json(errorResponse);
+  }
+
+  return errorHandler(error, req, res, next);
+};
+
+export const refundErrorHandler = (
+  error: Error,
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Response | void => {
+  const requestId = res.locals.requestId || 'unknown';
+  const userId = req.user?.id;
+
+  if (error.message.includes('Refund not found')) {
+    logger.warn('Refund not found error', {
+      requestId,
+      userId,
+      path: req.path,
+      method: req.method,
+      refundId: req.params.refundId
+    });
+
+    const refundError = new AppError(
+      'Refund not found',
+      HTTP_STATUS_CODES.NOT_FOUND,
+      'REFUND_NOT_FOUND',
+      true,
+      requestId
+    );
+
+    const errorResponse = createErrorResponse(refundError, requestId);
+    return res.status(HTTP_STATUS_CODES.NOT_FOUND).json(errorResponse);
+  }
+
+  if (error.message.includes('Refund processing failed')) {
+    logger.warn('Refund processing error', {
+      requestId,
+      userId,
+      path: req.path,
+      method: req.method,
+      refundId: req.params.refundId
+    });
+
+    const processingError = new AppError(
+      'Refund processing failed',
+      HTTP_STATUS_CODES.BAD_REQUEST,
+      'REFUND_PROCESSING_ERROR',
+      true,
+      requestId
+    );
+
+    const errorResponse = createErrorResponse(processingError, requestId);
+    return res.status(HTTP_STATUS_CODES.BAD_REQUEST).json(errorResponse);
+  }
+
+  return errorHandler(error, req, res, next);
+};
+
+export const paymentMethodErrorHandler = (
+  error: Error,
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Response | void => {
+  const requestId = res.locals.requestId || 'unknown';
+  const userId = req.user?.id;
+
+  if (error.message.includes('Payment method not found')) {
+    logger.warn('Payment method not found error', {
+      requestId,
+      userId,
+      path: req.path,
+      method: req.method,
+      paymentMethodId: req.params.paymentMethodId
+    });
+
+    const paymentMethodError = new AppError(
+      'Payment method not found',
+      HTTP_STATUS_CODES.NOT_FOUND,
+      'PAYMENT_METHOD_NOT_FOUND',
+      true,
+      requestId
+    );
+
+    const errorResponse = createErrorResponse(paymentMethodError, requestId);
+    return res.status(HTTP_STATUS_CODES.NOT_FOUND).json(errorResponse);
+  }
+
+  return errorHandler(error, req, res, next);
+};

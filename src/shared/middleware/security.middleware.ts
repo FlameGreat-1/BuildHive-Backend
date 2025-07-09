@@ -579,3 +579,294 @@ export const validateAIPricingRequest = (
 
   next();
 };
+
+export const validatePaymentAccess = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const userId = req.user?.id;
+  const userRole = req.user?.role;
+
+  if (!userId) {
+    res.status(401).json({
+      success: false,
+      message: 'Authentication required',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  if (userRole !== 'tradie' && userRole !== 'enterprise' && userRole !== 'client') {
+    res.status(403).json({
+      success: false,
+      message: 'Insufficient permissions for payment operations',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  next();
+};
+
+export const validatePaymentData = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const { amount, currency, paymentMethod } = req.body;
+
+  if (!amount || typeof amount !== 'number' || amount <= 0) {
+    res.status(400).json({
+      success: false,
+      message: 'Valid payment amount is required',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  if (amount > 100000) {
+    res.status(400).json({
+      success: false,
+      message: 'Payment amount exceeds maximum limit',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  if (!currency || typeof currency !== 'string' || !['AUD', 'USD'].includes(currency)) {
+    res.status(400).json({
+      success: false,
+      message: 'Valid currency is required',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  const validPaymentMethods = ['stripe_card', 'apple_pay', 'google_pay'];
+  if (!paymentMethod || !validPaymentMethods.includes(paymentMethod)) {
+    res.status(400).json({
+      success: false,
+      message: 'Valid payment method is required',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  next();
+};
+
+export const sanitizePaymentInput = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  if (req.body) {
+    const sanitizeString = (str: string): string => {
+      return str.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+                .replace(/javascript:/gi, '')
+                .replace(/on\w+\s*=/gi, '');
+    };
+
+    if (req.body.description && typeof req.body.description === 'string') {
+      req.body.description = sanitizeString(req.body.description.trim());
+    }
+
+    if (req.body.reason && typeof req.body.reason === 'string') {
+      req.body.reason = sanitizeString(req.body.reason.trim());
+    }
+
+    if (req.body.metadata && typeof req.body.metadata === 'object') {
+      Object.keys(req.body.metadata).forEach(key => {
+        if (typeof req.body.metadata[key] === 'string') {
+          req.body.metadata[key] = sanitizeString(req.body.metadata[key]);
+        }
+      });
+    }
+  }
+
+  next();
+};
+
+export const validateWebhookSignature = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const signature = req.headers['stripe-signature'];
+
+  if (!signature) {
+    res.status(400).json({
+      success: false,
+      message: 'Missing webhook signature',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  next();
+};
+
+export const validateSubscriptionData = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const { plan } = req.body;
+  const validPlans = ['basic', 'pro', 'enterprise'];
+
+  if (!plan || !validPlans.includes(plan)) {
+    res.status(400).json({
+      success: false,
+      message: 'Valid subscription plan is required',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  next();
+};
+
+export const validateCreditPurchase = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const { credits } = req.body;
+
+  if (!credits || typeof credits !== 'number' || credits <= 0) {
+    res.status(400).json({
+      success: false,
+      message: 'Valid credit amount is required',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  if (credits > 1000) {
+    res.status(400).json({
+      success: false,
+      message: 'Credit purchase exceeds maximum limit',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  next();
+};
+
+export const validateRefundData = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const { paymentId, amount } = req.body;
+
+  if (!paymentId || typeof paymentId !== 'number') {
+    res.status(400).json({
+      success: false,
+      message: 'Valid payment ID is required',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  if (amount && (typeof amount !== 'number' || amount <= 0)) {
+    res.status(400).json({
+      success: false,
+      message: 'Refund amount must be a positive number',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  next();
+};
+
+export const validateInvoiceData = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const { amount, currency, dueDate } = req.body;
+
+  if (!amount || typeof amount !== 'number' || amount <= 0) {
+    res.status(400).json({
+      success: false,
+      message: 'Valid invoice amount is required',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  if (!currency || typeof currency !== 'string' || !['AUD', 'USD'].includes(currency)) {
+    res.status(400).json({
+      success: false,
+      message: 'Valid currency is required',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  if (dueDate && typeof dueDate === 'string') {
+    const dueDateObj = new Date(dueDate);
+    const now = new Date();
+    
+    if (isNaN(dueDateObj.getTime()) || dueDateObj <= now) {
+      res.status(400).json({
+        success: false,
+        message: 'Invoice due date must be a future date',
+        timestamp: new Date().toISOString(),
+        requestId: res.locals.requestId || 'unknown'
+      });
+      return;
+    }
+  }
+
+  next();
+};
+
+export const validatePaymentMethodData = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const { stripePaymentMethodId, type } = req.body;
+  const validTypes = ['stripe_card', 'apple_pay', 'google_pay'];
+
+  if (!stripePaymentMethodId || typeof stripePaymentMethodId !== 'string') {
+    res.status(400).json({
+      success: false,
+      message: 'Valid Stripe payment method ID is required',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  if (!type || !validTypes.includes(type)) {
+    res.status(400).json({
+      success: false,
+      message: 'Valid payment method type is required',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  next();
+};

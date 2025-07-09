@@ -124,9 +124,11 @@ class DatabaseConnection implements DatabaseClient {
         `ALTER TABLE users ADD COLUMN IF NOT EXISTS password_reset_expires TIMESTAMP;`,
         `ALTER TABLE users ADD COLUMN IF NOT EXISTS login_attempts INTEGER DEFAULT 0;`,
         `ALTER TABLE users ADD COLUMN IF NOT EXISTS locked_until TIMESTAMP;`,
-        `ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMP;`
-         ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_customer_id VARCHAR(255);
-
+        `ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMP;`,
+        `ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_customer_id VARCHAR(255);`,
+        `ALTER TABLE users ADD COLUMN IF NOT EXISTS credit_balance INTEGER DEFAULT 0;`,
+        `ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_id INTEGER;`,
+        `ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_status VARCHAR(20);`
       ];
 
       for (const query of alterQueries) {
@@ -167,6 +169,10 @@ class DatabaseConnection implements DatabaseClient {
           login_attempts INTEGER DEFAULT 0,
           locked_until TIMESTAMP,
           last_login_at TIMESTAMP,
+          stripe_customer_id VARCHAR(255),
+          credit_balance INTEGER DEFAULT 0,
+          subscription_id INTEGER,
+          subscription_status VARCHAR(20),
           created_at TIMESTAMP DEFAULT NOW(),
           updated_at TIMESTAMP DEFAULT NOW()
         );
@@ -217,10 +223,205 @@ class DatabaseConnection implements DatabaseClient {
       logger.info('Sessions table created/verified');
 
       await this.createJobTables();
+      await this.createPaymentTables();
       
       logger.info('Database tables created successfully');
     } catch (error) {
       logger.error('Failed to create database tables:', error);
+      throw error;
+    }
+  }
+
+  async createPaymentTables(): Promise<void> {
+    try {
+      logger.info('Creating payment tables...');
+
+      const createPaymentsTable = `
+        CREATE TABLE IF NOT EXISTS payments (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+          stripe_payment_intent_id VARCHAR(255) UNIQUE,
+          amount DECIMAL(12,2) NOT NULL,
+          currency VARCHAR(3) NOT NULL DEFAULT 'AUD',
+          payment_method VARCHAR(50) NOT NULL,
+          payment_type VARCHAR(50) NOT NULL,
+          status VARCHAR(20) NOT NULL DEFAULT 'pending',
+          description TEXT,
+          metadata JSONB DEFAULT '{}',
+          invoice_id INTEGER,
+          subscription_id INTEGER,
+          credits_purchased INTEGER,
+          stripe_fee DECIMAL(10,2),
+          platform_fee DECIMAL(10,2),
+          net_amount DECIMAL(12,2),
+          processed_at TIMESTAMP,
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW()
+        );
+      `;
+
+      const createPaymentMethodsTable = `
+        CREATE TABLE IF NOT EXISTS payment_methods (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+          stripe_payment_method_id VARCHAR(255) NOT NULL,
+          type VARCHAR(50) NOT NULL,
+          card_last_four VARCHAR(4),
+          card_brand VARCHAR(20),
+          card_exp_month INTEGER,
+          card_exp_year INTEGER,
+          is_default BOOLEAN DEFAULT FALSE,
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW(),
+          UNIQUE(user_id, stripe_payment_method_id)
+        );
+      `;
+
+      const createInvoicesTable = `
+        CREATE TABLE IF NOT EXISTS invoices (
+          id SERIAL PRIMARY KEY,
+          quote_id INTEGER REFERENCES quotes(id) ON DELETE SET NULL,
+          user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+          invoice_number VARCHAR(50) UNIQUE NOT NULL,
+          amount DECIMAL(12,2) NOT NULL,
+          currency VARCHAR(3) NOT NULL DEFAULT 'AUD',
+          status VARCHAR(20) NOT NULL DEFAULT 'draft',
+          due_date TIMESTAMP NOT NULL,
+          payment_link TEXT,
+          stripe_invoice_id VARCHAR(255),
+          paid_at TIMESTAMP,
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW()
+        );
+      `;
+
+      const createRefundsTable = `
+        CREATE TABLE IF NOT EXISTS refunds (
+          id SERIAL PRIMARY KEY,
+          payment_id INTEGER REFERENCES payments(id) ON DELETE CASCADE,
+          user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+          amount DECIMAL(12,2) NOT NULL,
+          reason TEXT,
+          status VARCHAR(20) NOT NULL DEFAULT 'pending',
+          stripe_refund_id VARCHAR(255),
+          processed_at TIMESTAMP,
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW()
+        );
+      `;
+
+      const createSubscriptionsTable = `
+        CREATE TABLE IF NOT EXISTS subscriptions (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+          stripe_subscription_id VARCHAR(255) UNIQUE NOT NULL,
+          plan VARCHAR(50) NOT NULL,
+          status VARCHAR(20) NOT NULL,
+          current_period_start TIMESTAMP NOT NULL,
+          current_period_end TIMESTAMP NOT NULL,
+          credits_included INTEGER NOT NULL,
+          price DECIMAL(10,2) NOT NULL,
+          currency VARCHAR(3) NOT NULL DEFAULT 'AUD',
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW()
+        );
+      `;
+
+      const createCreditTransactionsTable = `
+        CREATE TABLE IF NOT EXISTS credit_transactions (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+          payment_id INTEGER REFERENCES payments(id) ON DELETE SET NULL,
+          credits INTEGER NOT NULL,
+          transaction_type VARCHAR(20) NOT NULL,
+          description TEXT,
+          job_application_id INTEGER,
+          created_at TIMESTAMP DEFAULT NOW()
+        );
+      `;
+
+      const createWebhookEventsTable = `
+        CREATE TABLE IF NOT EXISTS webhook_events (
+          id SERIAL PRIMARY KEY,
+          stripe_event_id VARCHAR(255) UNIQUE NOT NULL,
+          event_type VARCHAR(100) NOT NULL,
+          processed BOOLEAN DEFAULT FALSE,
+          data JSONB NOT NULL,
+          created_at TIMESTAMP DEFAULT NOW(),
+          processed_at TIMESTAMP
+        );
+      `;
+
+      await this.query(createPaymentsTable);
+      logger.info('Payments table created/verified');
+
+      await this.query(createPaymentMethodsTable);
+      logger.info('Payment methods table created/verified');
+
+      await this.query(createInvoicesTable);
+      logger.info('Invoices table created/verified');
+
+      await this.query(createRefundsTable);
+      logger.info('Refunds table created/verified');
+
+      await this.query(createSubscriptionsTable);
+      logger.info('Subscriptions table created/verified');
+
+      await this.query(createCreditTransactionsTable);
+      logger.info('Credit transactions table created/verified');
+
+      await this.query(createWebhookEventsTable);
+      logger.info('Webhook events table created/verified');
+
+      await this.createPaymentIndexes();
+
+      logger.info('Payment tables created successfully');
+    } catch (error) {
+      logger.error('Failed to create payment tables:', error);
+      throw error;
+    }
+  }
+
+  async createPaymentIndexes(): Promise<void> {
+    try {
+      logger.info('Creating payment indexes...');
+
+      const paymentIndexes = [
+        'CREATE INDEX IF NOT EXISTS idx_payments_user_id ON payments(user_id);',
+        'CREATE INDEX IF NOT EXISTS idx_payments_stripe_payment_intent_id ON payments(stripe_payment_intent_id);',
+        'CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(status);',
+        'CREATE INDEX IF NOT EXISTS idx_payments_payment_type ON payments(payment_type);',
+        'CREATE INDEX IF NOT EXISTS idx_payments_created_at ON payments(created_at);',
+        'CREATE INDEX IF NOT EXISTS idx_payment_methods_user_id ON payment_methods(user_id);',
+        'CREATE INDEX IF NOT EXISTS idx_payment_methods_is_default ON payment_methods(is_default);',
+        'CREATE INDEX IF NOT EXISTS idx_invoices_user_id ON invoices(user_id);',
+        'CREATE INDEX IF NOT EXISTS idx_invoices_quote_id ON invoices(quote_id);',
+        'CREATE INDEX IF NOT EXISTS idx_invoices_status ON invoices(status);',
+        'CREATE INDEX IF NOT EXISTS idx_invoices_due_date ON invoices(due_date);',
+        'CREATE INDEX IF NOT EXISTS idx_refunds_payment_id ON refunds(payment_id);',
+        'CREATE INDEX IF NOT EXISTS idx_refunds_user_id ON refunds(user_id);',
+        'CREATE INDEX IF NOT EXISTS idx_refunds_status ON refunds(status);',
+        'CREATE INDEX IF NOT EXISTS idx_subscriptions_user_id ON subscriptions(user_id);',
+        'CREATE INDEX IF NOT EXISTS idx_subscriptions_status ON subscriptions(status);',
+        'CREATE INDEX IF NOT EXISTS idx_credit_transactions_user_id ON credit_transactions(user_id);',
+        'CREATE INDEX IF NOT EXISTS idx_credit_transactions_payment_id ON credit_transactions(payment_id);',
+        'CREATE INDEX IF NOT EXISTS idx_credit_transactions_type ON credit_transactions(transaction_type);',
+        'CREATE INDEX IF NOT EXISTS idx_webhook_events_stripe_event_id ON webhook_events(stripe_event_id);',
+        'CREATE INDEX IF NOT EXISTS idx_webhook_events_processed ON webhook_events(processed);',
+        'CREATE INDEX IF NOT EXISTS idx_webhook_events_event_type ON webhook_events(event_type);'
+      ];
+
+      for (const indexQuery of paymentIndexes) {
+        try {
+          await this.query(indexQuery);
+        } catch (error: any) {
+          logger.warn(`Index might already exist: ${error.message}`);
+        }
+      }
+
+      logger.info('Payment indexes created successfully');
+    } catch (error) {
+      logger.error('Failed to create payment indexes:', error);
       throw error;
     }
   }
@@ -335,53 +536,58 @@ class DatabaseConnection implements DatabaseClient {
           updated_at TIMESTAMP DEFAULT NOW()
         );
       `;
-      
-      -- Payment tables needed for Stripe integration
-CREATE TABLE IF NOT EXISTS quote_payments (
-  id SERIAL PRIMARY KEY,
-  quote_id INTEGER REFERENCES quotes(id) ON DELETE CASCADE,
-  payment_intent_id VARCHAR(255) UNIQUE,
-  payment_id VARCHAR(255),
-  amount DECIMAL(12,2) NOT NULL,
-  currency VARCHAR(3) NOT NULL DEFAULT 'AUD',
-  status VARCHAR(20) NOT NULL DEFAULT 'pending',
-  payment_method_type VARCHAR(50),
-  stripe_customer_id VARCHAR(255),
-  refund_id VARCHAR(255),
-  refund_status VARCHAR(20),
-  invoice_id VARCHAR(255),
-  invoice_number VARCHAR(50),
-  failure_reason TEXT,
-  paid_at TIMESTAMP,
-  refunded_at TIMESTAMP,
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
-);
 
-CREATE TABLE IF NOT EXISTS user_payment_methods (
-  id SERIAL PRIMARY KEY,
-  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-  payment_method_id VARCHAR(255) NOT NULL,
-  type VARCHAR(50) NOT NULL,
-  card_brand VARCHAR(20),
-  card_last4 VARCHAR(4),
-  card_expiry_month INTEGER,
-  card_expiry_year INTEGER,
-  is_default BOOLEAN DEFAULT FALSE,
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW(),
-  UNIQUE(user_id, payment_method_id)
-);
+      const createQuotePaymentsTable = `
+        CREATE TABLE IF NOT EXISTS quote_payments (
+          id SERIAL PRIMARY KEY,
+          quote_id INTEGER REFERENCES quotes(id) ON DELETE CASCADE,
+          payment_intent_id VARCHAR(255) UNIQUE,
+          payment_id VARCHAR(255),
+          amount DECIMAL(12,2) NOT NULL,
+          currency VARCHAR(3) NOT NULL DEFAULT 'AUD',
+          status VARCHAR(20) NOT NULL DEFAULT 'pending',
+          payment_method_type VARCHAR(50),
+          stripe_customer_id VARCHAR(255),
+          refund_id VARCHAR(255),
+          refund_status VARCHAR(20),
+          invoice_id VARCHAR(255),
+          invoice_number VARCHAR(50),
+          failure_reason TEXT,
+          paid_at TIMESTAMP,
+          refunded_at TIMESTAMP,
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW()
+        );
+      `;
 
-CREATE TABLE IF NOT EXISTS payment_webhooks (
-  id SERIAL PRIMARY KEY,
-  stripe_event_id VARCHAR(255) UNIQUE NOT NULL,
-  event_type VARCHAR(100) NOT NULL,
-  processed BOOLEAN DEFAULT FALSE,
-  payload JSONB NOT NULL,
-  created_at TIMESTAMP DEFAULT NOW(),
-  processed_at TIMESTAMP
-);
+      const createUserPaymentMethodsTable = `
+        CREATE TABLE IF NOT EXISTS user_payment_methods (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+          payment_method_id VARCHAR(255) NOT NULL,
+          type VARCHAR(50) NOT NULL,
+          card_brand VARCHAR(20),
+          card_last4 VARCHAR(4),
+          card_expiry_month INTEGER,
+          card_expiry_year INTEGER,
+          is_default BOOLEAN DEFAULT FALSE,
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW(),
+          UNIQUE(user_id, payment_method_id)
+        );
+      `;
+
+      const createPaymentWebhooksTable = `
+        CREATE TABLE IF NOT EXISTS payment_webhooks (
+          id SERIAL PRIMARY KEY,
+          stripe_event_id VARCHAR(255) UNIQUE NOT NULL,
+          event_type VARCHAR(100) NOT NULL,
+          processed BOOLEAN DEFAULT FALSE,
+          payload JSONB NOT NULL,
+          created_at TIMESTAMP DEFAULT NOW(),
+          processed_at TIMESTAMP
+        );
+      `;
 
       const createQuoteItemsTable = `
         CREATE TABLE IF NOT EXISTS quote_items (
@@ -413,6 +619,15 @@ CREATE TABLE IF NOT EXISTS payment_webhooks (
 
       await this.query(createQuotesTable);
       logger.info('Quotes table created/verified');
+
+      await this.query(createQuotePaymentsTable);
+      logger.info('Quote payments table created/verified');
+
+      await this.query(createUserPaymentMethodsTable);
+      logger.info('User payment methods table created/verified');
+
+      await this.query(createPaymentWebhooksTable);
+      logger.info('Payment webhooks table created/verified');
 
       await this.query(createQuoteItemsTable);
       logger.info('Quote items table created/verified');
@@ -451,15 +666,13 @@ CREATE TABLE IF NOT EXISTS payment_webhooks (
         'CREATE INDEX IF NOT EXISTS idx_quotes_valid_until ON quotes(valid_until);',
         'CREATE INDEX IF NOT EXISTS idx_quotes_created_at ON quotes(created_at);',
         'CREATE INDEX IF NOT EXISTS idx_quote_items_quote_id ON quote_items(quote_id);',
-        'CREATE INDEX IF NOT EXISTS idx_quote_items_sort_order ON quote_items(sort_order);'
- 
-CREATE INDEX IF NOT EXISTS idx_quote_payments_quote_id ON quote_payments(quote_id);
-CREATE INDEX IF NOT EXISTS idx_quote_payments_payment_intent_id ON quote_payments(payment_intent_id);
-CREATE INDEX IF NOT EXISTS idx_quote_payments_status ON quote_payments(status);
-CREATE INDEX IF NOT EXISTS idx_user_payment_methods_user_id ON user_payment_methods(user_id);
-CREATE INDEX IF NOT EXISTS idx_payment_webhooks_stripe_event_id ON payment_webhooks(stripe_event_id);
-CREATE INDEX IF NOT EXISTS idx_payment_webhooks_processed ON payment_webhooks(processed);
-
+        'CREATE INDEX IF NOT EXISTS idx_quote_items_sort_order ON quote_items(sort_order);',
+        'CREATE INDEX IF NOT EXISTS idx_quote_payments_quote_id ON quote_payments(quote_id);',
+        'CREATE INDEX IF NOT EXISTS idx_quote_payments_payment_intent_id ON quote_payments(payment_intent_id);',
+        'CREATE INDEX IF NOT EXISTS idx_quote_payments_status ON quote_payments(status);',
+        'CREATE INDEX IF NOT EXISTS idx_user_payment_methods_user_id ON user_payment_methods(user_id);',
+        'CREATE INDEX IF NOT EXISTS idx_payment_webhooks_stripe_event_id ON payment_webhooks(stripe_event_id);',
+        'CREATE INDEX IF NOT EXISTS idx_payment_webhooks_processed ON payment_webhooks(processed);'
       ];
 
       for (const indexQuery of indexes) {
@@ -481,6 +694,13 @@ CREATE INDEX IF NOT EXISTS idx_payment_webhooks_processed ON payment_webhooks(pr
     try {
       logger.info('Recreating database tables...');
 
+      await this.query('DROP TABLE IF EXISTS webhook_events CASCADE');
+      await this.query('DROP TABLE IF EXISTS credit_transactions CASCADE');
+      await this.query('DROP TABLE IF EXISTS subscriptions CASCADE');
+      await this.query('DROP TABLE IF EXISTS refunds CASCADE');
+      await this.query('DROP TABLE IF EXISTS invoices CASCADE');
+      await this.query('DROP TABLE IF EXISTS payment_methods CASCADE');
+      await this.query('DROP TABLE IF EXISTS payments CASCADE');
       await this.query('DROP TABLE IF EXISTS quote_items CASCADE');
       await this.query('DROP TABLE IF EXISTS quotes CASCADE');
       await this.query('DROP TABLE IF EXISTS job_attachments CASCADE');
@@ -493,7 +713,6 @@ CREATE INDEX IF NOT EXISTS idx_payment_webhooks_processed ON payment_webhooks(pr
       await this.query('DROP TABLE IF EXISTS payment_webhooks CASCADE');
       await this.query('DROP TABLE IF EXISTS user_payment_methods CASCADE');
       await this.query('DROP TABLE IF EXISTS quote_payments CASCADE');
-
 
       await this.createTables();
       

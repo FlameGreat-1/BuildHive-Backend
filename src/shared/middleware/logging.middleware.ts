@@ -383,3 +383,276 @@ export const quoteViewLogger = (
 
   next();
 };
+
+export const paymentOperationLogger = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const requestId = res.locals.requestId || 'unknown';
+  const userId = req.user?.id;
+  const paymentId = req.params.paymentId;
+
+  if (req.path.includes('/payments')) {
+    const operation = req.method === 'POST' ? 'create' : 
+                     req.method === 'PUT' ? 'update' : 
+                     req.method === 'DELETE' ? 'delete' : 'read';
+
+    logger.info('Payment operation initiated', {
+      requestId,
+      userId,
+      paymentId,
+      operation,
+      method: req.method,
+      path: req.path,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  next();
+};
+
+export const paymentSensitiveDataFilter = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const originalBody = req.body;
+  
+  if (originalBody) {
+    const filteredBody = { ...originalBody };
+    
+    if (filteredBody.amount) {
+      filteredBody.amount = '[FILTERED]';
+    }
+    
+    if (filteredBody.stripePaymentMethodId) {
+      filteredBody.stripePaymentMethodId = '[FILTERED]';
+    }
+    
+    if (filteredBody.paymentToken) {
+      filteredBody.paymentToken = '[FILTERED]';
+    }
+
+    if (filteredBody.cardNumber) {
+      filteredBody.cardNumber = '[FILTERED]';
+    }
+
+    if (filteredBody.cvv) {
+      filteredBody.cvv = '[FILTERED]';
+    }
+
+    if (filteredBody.stripeCustomerId) {
+      filteredBody.stripeCustomerId = '[FILTERED]';
+    }
+
+    if (filteredBody.clientSecret) {
+      filteredBody.clientSecret = '[FILTERED]';
+    }
+
+    req.body = filteredBody;
+  }
+
+  next();
+};
+
+export const webhookLogger = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const requestId = res.locals.requestId || 'unknown';
+
+  if (req.path.includes('/webhook')) {
+    logger.info('Webhook received', {
+      requestId,
+      eventType: req.body?.type,
+      eventId: req.body?.id,
+      ip: req.ip,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  next();
+};
+
+export const creditTransactionLogger = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const requestId = res.locals.requestId || 'unknown';
+  const userId = req.user?.id;
+
+  if (req.path.includes('/credits')) {
+    logger.info('Credit transaction initiated', {
+      requestId,
+      userId,
+      credits: req.body.credits,
+      transactionType: req.body.transactionType || 'purchase',
+      method: req.method,
+      path: req.path,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  next();
+};
+
+export const subscriptionOperationLogger = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const requestId = res.locals.requestId || 'unknown';
+  const userId = req.user?.id;
+  const subscriptionId = req.params.subscriptionId;
+
+  if (req.path.includes('/subscriptions')) {
+    const operation = req.method === 'POST' ? 'create' : 
+                     req.method === 'PUT' ? 'update' : 
+                     req.method === 'DELETE' ? 'cancel' : 'read';
+
+    logger.info('Subscription operation initiated', {
+      requestId,
+      userId,
+      subscriptionId,
+      operation,
+      plan: req.body.plan,
+      method: req.method,
+      path: req.path,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  next();
+};
+
+export const invoiceOperationLogger = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const requestId = res.locals.requestId || 'unknown';
+  const userId = req.user?.id;
+  const invoiceId = req.params.invoiceId;
+
+  if (req.path.includes('/invoices')) {
+    const operation = req.method === 'POST' ? 'create' : 
+                     req.method === 'PUT' ? 'update' : 
+                     req.method === 'DELETE' ? 'delete' : 'read';
+
+    logger.info('Invoice operation initiated', {
+      requestId,
+      userId,
+      invoiceId,
+      operation,
+      method: req.method,
+      path: req.path,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  next();
+};
+
+export const refundOperationLogger = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const requestId = res.locals.requestId || 'unknown';
+  const userId = req.user?.id;
+  const refundId = req.params.refundId;
+
+  if (req.path.includes('/refunds')) {
+    const operation = req.method === 'POST' ? 'create' : 
+                     req.method === 'PUT' ? 'update' : 'read';
+
+    logger.info('Refund operation initiated', {
+      requestId,
+      userId,
+      refundId,
+      operation,
+      paymentId: req.body.paymentId,
+      method: req.method,
+      path: req.path,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  next();
+};
+
+export const paymentMethodLogger = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const requestId = res.locals.requestId || 'unknown';
+  const userId = req.user?.id;
+  const paymentMethodId = req.params.paymentMethodId;
+
+  if (req.path.includes('/payment-methods')) {
+    const operation = req.method === 'POST' ? 'add' : 
+                     req.method === 'PUT' ? 'update' : 
+                     req.method === 'DELETE' ? 'remove' : 'read';
+
+    logger.info('Payment method operation initiated', {
+      requestId,
+      userId,
+      paymentMethodId,
+      operation,
+      type: req.body.type,
+      method: req.method,
+      path: req.path,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  next();
+};
+
+export const applePayLogger = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const requestId = res.locals.requestId || 'unknown';
+  const userId = req.user?.id;
+
+  if (req.path.includes('/apple-pay')) {
+    logger.info('Apple Pay operation initiated', {
+      requestId,
+      userId,
+      operation: req.path.includes('/session') ? 'session' : 'payment',
+      method: req.method,
+      path: req.path,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  next();
+};
+
+export const googlePayLogger = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const requestId = res.locals.requestId || 'unknown';
+  const userId = req.user?.id;
+
+  if (req.path.includes('/google-pay')) {
+    logger.info('Google Pay operation initiated', {
+      requestId,
+      userId,
+      operation: 'payment',
+      method: req.method,
+      path: req.path,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  next();
+};

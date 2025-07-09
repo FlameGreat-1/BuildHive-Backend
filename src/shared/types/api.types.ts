@@ -432,3 +432,222 @@ export interface SendQuoteResponse {
   trackingId: string;
 }
 
+// Payment API request/response types
+export interface CreatePaymentRequest {
+  amount: number;
+  currency: string;
+  paymentMethod: string;
+  paymentType: string;
+  description?: string;
+  metadata?: Record<string, any>;
+  invoiceId?: number;
+  creditsToPurchase?: number;
+  subscriptionPlan?: string;
+}
+
+export interface CreatePaymentResponse {
+  paymentId: number;
+  stripePaymentIntentId?: string;
+  clientSecret?: string;
+  status: string;
+  amount: number;
+  currency: string;
+  paymentMethod: string;
+  requiresAction?: boolean;
+  nextAction?: {
+    type: string;
+    redirectUrl?: string;
+  };
+}
+
+export interface PaymentStatusRequest {
+  paymentId: number;
+}
+
+export interface PaymentStatusResponse {
+  paymentId: number;
+  status: string;
+  amount: number;
+  currency: string;
+  paymentMethod: string;
+  processedAt?: string;
+  failureReason?: string;
+  creditsAwarded?: number;
+}
+
+export interface CreatePaymentMethodRequest {
+  stripePaymentMethodId: string;
+  type: string;
+  setAsDefault?: boolean;
+}
+
+export interface PaymentMethodResponse {
+  id: number;
+  type: string;
+  cardLastFour?: string;
+  cardBrand?: string;
+  cardExpMonth?: number;
+  cardExpYear?: number;
+  isDefault: boolean;
+  createdAt: string;
+}
+
+export interface CreateInvoiceRequest {
+  quoteId?: number;
+  amount: number;
+  currency: string;
+  dueDate: string;
+  description?: string;
+}
+
+export interface InvoiceResponse {
+  id: number;
+  invoiceNumber: string;
+  amount: number;
+  currency: string;
+  status: string;
+  dueDate: string;
+  paymentLink?: string;
+  stripeInvoiceId?: string;
+  paidAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateRefundRequest {
+  paymentId: number;
+  amount?: number;
+  reason?: string;
+}
+
+export interface RefundResponse {
+  id: number;
+  paymentId: number;
+  amount: number;
+  status: string;
+  reason?: string;
+  stripeRefundId?: string;
+  processedAt?: string;
+  createdAt: string;
+}
+
+export interface SubscriptionRequest {
+  plan: string;
+  paymentMethodId?: string;
+}
+
+export interface SubscriptionResponse {
+  id: number;
+  plan: string;
+  status: string;
+  currentPeriodStart: string;
+  currentPeriodEnd: string;
+  creditsIncluded: number;
+  price: number;
+  currency: string;
+  stripeSubscriptionId: string;
+}
+
+export interface CreditPurchaseRequest {
+  credits: number;
+  paymentMethodId?: string;
+}
+
+export interface CreditBalanceResponse {
+  userId: number;
+  currentBalance: number;
+  totalPurchased: number;
+  totalUsed: number;
+  lastTransaction?: {
+    credits: number;
+    type: string;
+    description?: string;
+    createdAt: string;
+  };
+}
+
+export interface CreditTransactionResponse {
+  id: number;
+  credits: number;
+  transactionType: string;
+  description?: string;
+  createdAt: string;
+}
+
+export interface PaymentLinkRequest {
+  amount: number;
+  currency: string;
+  description?: string;
+  expiresAt?: string;
+  metadata?: Record<string, any>;
+}
+
+export interface PaymentLinkResponse {
+  id: string;
+  url: string;
+  amount: number;
+  currency: string;
+  status: string;
+  expiresAt?: string;
+  createdAt: string;
+}
+
+export interface ApplePaySessionRequest {
+  validationUrl: string;
+  displayName: string;
+}
+
+export interface ApplePaySessionResponse {
+  merchantSession: any;
+}
+
+export interface GooglePayTokenRequest {
+  paymentToken: string;
+  amount: number;
+  currency: string;
+}
+
+export interface WebhookEventRequest {
+  stripeEventId: string;
+  eventType: string;
+  data: Record<string, any>;
+}
+
+export interface PaymentFilterRequest {
+  status?: string;
+  paymentMethod?: string;
+  paymentType?: string;
+  startDate?: string;
+  endDate?: string;
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+}
+
+export interface PaymentListResponse {
+  payments: PaymentResponse[];
+  summary: {
+    total: number;
+    completed: number;
+    pending: number;
+    failed: number;
+    totalAmount: number;
+  };
+}
+
+export interface PaymentResponse {
+  id: number;
+  amount: number;
+  currency: string;
+  paymentMethod: string;
+  paymentType: string;
+  status: string;
+  description?: string;
+  creditsAwarded?: number;
+  stripeFee?: number;
+  platformFee?: number;
+  netAmount?: number;
+  processedAt?: string;
+  createdAt: string;
+}
