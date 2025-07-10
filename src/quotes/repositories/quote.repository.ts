@@ -451,6 +451,52 @@ export class QuoteRepositoryImpl implements QuoteRepository {
     }
   }
 
+  async updatePaymentStatus(quoteId: number, paymentStatus: string, paymentId?: string): Promise<QuoteData> {
+    try {
+      const result = await this.pool.query(quoteQueries.UPDATE_PAYMENT_STATUS, [
+        quoteId, 
+        paymentStatus, 
+        paymentId
+      ]);
+
+      if (result.rows.length === 0) {
+        throw new AppError(
+          'Quote not found',
+          HTTP_STATUS_CODES.NOT_FOUND,
+          'QUOTE_NOT_FOUND'
+        );
+      }
+
+      const quote = QuoteModel.fromRecord(result.rows[0]);
+      quote.items = await this.getQuoteItems(quoteId);
+
+      logger.info('Quote payment status updated successfully', {
+        quoteId,
+        paymentStatus,
+        paymentId
+      });
+
+      return quote;
+
+    } catch (error) {
+      logger.error('Failed to update quote payment status', {
+        quoteId,
+        paymentStatus,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+
+      if (error instanceof AppError) {
+        throw error;
+      }
+
+      throw new AppError(
+        'Failed to update quote payment status',
+        HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR,
+        'QUOTE_PAYMENT_UPDATE_ERROR'
+      );
+    }
+  }
+
   async delete(id: number, tradieId: number): Promise<void> {
     const client = await this.pool.connect();
     

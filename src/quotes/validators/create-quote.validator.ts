@@ -264,6 +264,40 @@ export const quoteDeliverySchema = Joi.object({
   'custom.phoneRequired': 'Recipient phone is required for SMS delivery'
 });
 
+export const paymentMethodSchema = Joi.object({
+  paymentMethodId: Joi.string()
+    .trim()
+    .min(1)
+    .required()
+    .messages({
+      'string.empty': 'Payment method ID is required',
+      'any.required': 'Payment method ID is required'
+    })
+});
+
+export const refundRequestSchema = Joi.object({
+  amount: Joi.number()
+    .positive()
+    .max(999999.99)
+    .precision(2)
+    .required()
+    .messages({
+      'number.positive': 'Refund amount must be greater than 0',
+      'number.max': 'Refund amount cannot exceed $999,999.99',
+      'any.required': 'Refund amount is required'
+    }),
+  reason: Joi.string()
+    .trim()
+    .min(1)
+    .max(500)
+    .required()
+    .messages({
+      'string.empty': 'Refund reason is required',
+      'string.max': 'Refund reason cannot exceed 500 characters',
+      'any.required': 'Refund reason is required'
+    })
+});
+
 export const aiPricingRequestSchema = Joi.object({
   jobDescription: Joi.string()
     .trim()

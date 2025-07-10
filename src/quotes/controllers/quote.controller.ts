@@ -9,10 +9,7 @@ import {
   QuoteStatusUpdateData,
   QuoteDeliveryData,
   AIPricingRequest,
-  QuoteFilterOptions,
-  QuotePaymentData,
-  QuoteRefundData,
-  QuoteInvoiceData
+  QuoteFilterOptions
 } from '../types';
 import { parseQuoteFilters } from '../utils';
 import { QUOTE_RATE_LIMITS } from '../../config/quotes';
@@ -509,429 +506,6 @@ export class QuoteController {
     }
   }
 
-  async calculateQuoteWithFees(req: Request, res: Response, next: NextFunction): Promise<void> {
-    const requestId = res.locals.requestId || 'unknown';
-    
-    try {
-      const { items, gstEnabled } = req.body;
-
-      if (!items || !Array.isArray(items) || items.length === 0) {
-        throw new AppError(
-          'Quote items are required for calculation',
-          HTTP_STATUS_CODES.BAD_REQUEST,
-          'QUOTE_VALIDATION_ERROR'
-        );
-      }
-
-      const calculation = this.quoteService.calculateQuoteWithFees(items, gstEnabled);
-
-      logger.info('Quote calculated with fees via API', {
-        requestId,
-        itemCount: items.length,
-        gstEnabled,
-        totalAmount: calculation.totalAmount,
-        finalAmount: calculation.finalAmount
-      });
-
-      sendSuccessResponse(res, {
-        message: 'Quote calculated with fees successfully',
-        data: calculation
-      });
-
-    } catch (error) {
-      logger.error('Quote calculation with fees failed via API', {
-        requestId,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
-
-      next(error);
-    }
-  }
-
-  async createPaymentIntent(req: Request, res: Response, next: NextFunction): Promise<void> {
-    const requestId = res.locals.requestId || 'unknown';
-    
-    try {
-      const quoteNumber = req.params.quoteNumber;
-      const clientId = req.user?.id;
-
-      if (!clientId) {
-        throw new AppError(
-          'Authentication required',
-          HTTP_STATUS_CODES.UNAUTHORIZED,
-          'AUTHENTICATION_REQUIRED'
-        );
-      }
-
-      const result = await this.quoteService.createPaymentIntent(quoteNumber, clientId);
-
-      logger.info('Payment intent created via API', {
-        requestId,
-        quoteNumber,
-        clientId,
-        paymentIntentId: result.paymentIntent.paymentIntentId,
-        amount: result.quote.totalAmount
-      });
-
-      sendSuccessResponse(res, {
-        message: 'Payment intent created successfully',
-        data: result
-      });
-
-    } catch (error) {
-      logger.error('Payment intent creation failed via API', {
-        requestId,
-        quoteNumber: req.params.quoteNumber,
-        clientId: req.user?.id,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
-
-      next(error);
-    }
-  }
-
-  async acceptQuoteWithPayment(req: Request, res: Response, next: NextFunction): Promise<void> {
-    const requestId = res.locals.requestId || 'unknown';
-    
-    try {
-      const quoteNumber = req.params.quoteNumber;
-      const clientId = req.user?.id;
-      const { paymentMethodId } = req.body;
-
-      if (!clientId) {
-        throw new AppError(
-          'Authentication required',
-          HTTP_STATUS_CODES.UNAUTHORIZED,
-          'AUTHENTICATION_REQUIRED'
-        );
-      }
-
-      if (!paymentMethodId) {
-        throw new AppError(
-          'Payment method is required',
-          HTTP_STATUS_CODES.BAD_REQUEST,
-          'PAYMENT_METHOD_REQUIRED'
-        );
-      }
-
-      const result = await this.quoteService.acceptQuoteWithPayment(quoteNumber, clientId, paymentMethodId);
-
-      logger.info('Quote accepted with payment via API', {
-        requestId,
-        quoteNumber,
-        clientId,
-        paymentId: result.paymentResult.paymentId,
-        amount: result.paymentResult.amount
-      });
-
-      sendSuccessResponse(res, {
-        message: 'Quote accepted and payment processed successfully',
-        data: result
-      });
-
-    } catch (error) {
-      logger.error('Quote acceptance with payment failed via API', {
-        requestId,
-        quoteNumber: req.params.quoteNumber,
-        clientId: req.user?.id,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
-
-      next(error);
-    }
-  }
-
-  async processQuotePayment(req: Request, res: Response, next: NextFunction): Promise<void> {
-    const requestId = res.locals.requestId || 'unknown';
-    
-    try {
-      const quoteId = parseInt(req.params.quoteId);
-      const clientId = req.user?.id;
-
-      if (!clientId) {
-        throw new AppError(
-          'Authentication required',
-          HTTP_STATUS_CODES.UNAUTHORIZED,
-          'AUTHENTICATION_REQUIRED'
-        );
-      }
-
-      const quote = await this.quoteService.getQuote(quoteId, clientId, 'client');
-      
-      const paymentData: QuotePaymentData = {
-        quoteId,
-        quoteNumber: quote.quoteNumber,
-        paymentMethodId: req.body.paymentMethodId,
-        clientId,
-        tradieId: quote.tradieId,
-        amount: quote.totalAmount,
-        currency: 'AUD',
-        clientEmail: quote.clientEmail,
-        tradieEmail: quote.tradieEmail,
-        description: `Payment for Quote #${quote.quoteNumber}`
-      };
-
-      const result = await this.quoteService.processQuotePayment(paymentData);
-
-      logger.info('Quote payment processed via API', {
-        requestId,
-        quoteId,
-        clientId,
-        paymentId: result.paymentResult.paymentId,
-        amount: result.paymentResult.amount
-      });
-
-      sendSuccessResponse(res, {
-        message: 'Payment processed successfully',
-        data: result
-      });
-
-    } catch (error) {
-      logger.error('Quote payment processing failed via API', {
-        requestId,
-        quoteId: req.params.quoteId,
-        clientId: req.user?.id,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
-
-      next(error);
-    }
-  }
-
-  async refundQuotePayment(req: Request, res: Response, next: NextFunction): Promise<void> {
-    const requestId = res.locals.requestId || 'unknown';
-    
-    try {
-      const quoteId = parseInt(req.params.quoteId);
-      const tradieId = req.user?.id;
-
-      if (!tradieId) {
-        throw new AppError(
-          'Authentication required',
-          HTTP_STATUS_CODES.UNAUTHORIZED,
-          'AUTHENTICATION_REQUIRED'
-        );
-      }
-
-      const quote = await this.quoteService.getQuote(quoteId, tradieId, 'tradie');
-
-      if (!quote.paymentId) {
-        throw new AppError(
-          'No payment found for this quote',
-          HTTP_STATUS_CODES.BAD_REQUEST,
-          'NO_PAYMENT_FOUND'
-        );
-      }
-
-      const refundData: QuoteRefundData = {
-        quoteId,
-        quoteNumber: quote.quoteNumber,
-        paymentId: quote.paymentId,
-        amount: req.body.amount,
-        reason: req.body.reason || 'Refund requested by tradie',
-        tradieId,
-        clientId: quote.clientId
-      };
-
-      const result = await this.quoteService.refundQuotePayment(refundData);
-
-      logger.info('Quote payment refunded via API', {
-        requestId,
-        quoteId,
-        tradieId,
-        refundId: result.refundResult.refundId,
-        amount: result.refundResult.amount
-      });
-
-      sendSuccessResponse(res, {
-        message: 'Payment refunded successfully',
-        data: result
-      });
-
-    } catch (error) {
-      logger.error('Quote payment refund failed via API', {
-        requestId,
-        quoteId: req.params.quoteId,
-        tradieId: req.user?.id,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
-
-      next(error);
-    }
-  }
-
-  async generateQuoteInvoice(req: Request, res: Response, next: NextFunction): Promise<void> {
-    const requestId = res.locals.requestId || 'unknown';
-    
-    try {
-      const quoteId = parseInt(req.params.quoteId);
-      const tradieId = req.user?.id;
-
-      if (!tradieId) {
-        throw new AppError(
-          'Authentication required',
-          HTTP_STATUS_CODES.UNAUTHORIZED,
-          'AUTHENTICATION_REQUIRED'
-        );
-      }
-
-      const quote = await this.quoteService.getQuote(quoteId, tradieId, 'tradie');
-
-      if (!quote.paymentId) {
-        throw new AppError(
-          'No payment found for this quote',
-          HTTP_STATUS_CODES.BAD_REQUEST,
-          'NO_PAYMENT_FOUND'
-        );
-      }
-
-      const invoiceData: QuoteInvoiceData = {
-        quoteId,
-        quoteNumber: quote.quoteNumber,
-        paymentId: quote.paymentId,
-        clientId: quote.clientId,
-        tradieId,
-        jobId: quote.jobId
-      };
-
-      const result = await this.quoteService.generateQuoteInvoice(invoiceData);
-
-      logger.info('Quote invoice generated via API', {
-        requestId,
-        quoteId,
-        tradieId,
-        invoiceId: result.invoiceResult.invoiceId,
-        invoiceNumber: result.invoiceResult.invoiceNumber
-      });
-
-      sendSuccessResponse(res, {
-        message: 'Invoice generated successfully',
-        data: result
-      });
-
-    } catch (error) {
-      logger.error('Quote invoice generation failed via API', {
-        requestId,
-        quoteId: req.params.quoteId,
-        tradieId: req.user?.id,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
-
-      next(error);
-    }
-  }
-  
-    async getQuotePaymentSummary(req: Request, res: Response, next: NextFunction): Promise<void> {
-    const requestId = res.locals.requestId || 'unknown';
-    
-    try {
-      const quoteId = parseInt(req.params.quoteId);
-      const userId = req.user?.id;
-      const userRole = req.user?.role || 'tradie';
-
-      if (!userId) {
-        throw new AppError(
-          'Authentication required',
-          HTTP_STATUS_CODES.UNAUTHORIZED,
-          'AUTHENTICATION_REQUIRED'
-        );
-      }
-
-      await this.quoteService.getQuote(quoteId, userId, userRole);
-      const summary = await this.quoteService.getQuotePaymentSummary(quoteId);
-
-      logger.info('Quote payment summary retrieved via API', {
-        requestId,
-        quoteId,
-        userId,
-        paymentStatus: summary.paymentStatus
-      });
-
-      sendSuccessResponse(res, {
-        message: 'Payment summary retrieved successfully',
-        data: summary
-      });
-
-    } catch (error) {
-      logger.error('Quote payment summary retrieval failed via API', {
-        requestId,
-        quoteId: req.params.quoteId,
-        userId: req.user?.id,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
-
-      next(error);
-    }
-  }
-
-  async getQuoteWithPaymentDetails(req: Request, res: Response, next: NextFunction): Promise<void> {
-    const requestId = res.locals.requestId || 'unknown';
-    
-    try {
-      const quoteNumber = req.params.quoteNumber;
-      const quote = await this.quoteService.getQuoteWithPaymentDetails(quoteNumber);
-
-      logger.info('Quote with payment details retrieved via API', {
-        requestId,
-        quoteNumber,
-        quoteId: quote.id,
-        paymentStatus: quote.paymentStatus
-      });
-
-      sendSuccessResponse(res, {
-        message: 'Quote with payment details retrieved successfully',
-        data: quote
-      });
-
-    } catch (error) {
-      logger.error('Quote with payment details retrieval failed via API', {
-        requestId,
-        quoteNumber: req.params.quoteNumber,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
-
-      next(error);
-    }
-  }
-
-  async handlePaymentWebhook(req: Request, res: Response, next: NextFunction): Promise<void> {
-    const requestId = res.locals.requestId || 'unknown';
-    
-    try {
-      const { quoteId, paymentStatus, paymentId } = req.body;
-
-      if (!quoteId || !paymentStatus) {
-        throw new AppError(
-          'Quote ID and payment status are required',
-          HTTP_STATUS_CODES.BAD_REQUEST,
-          'WEBHOOK_VALIDATION_ERROR'
-        );
-      }
-
-      await this.quoteService.handlePaymentWebhook(quoteId, paymentStatus, paymentId);
-
-      logger.info('Payment webhook processed via API', {
-        requestId,
-        quoteId,
-        paymentStatus,
-        paymentId
-      });
-
-      sendSuccessResponse(res, {
-        message: 'Webhook processed successfully'
-      });
-
-    } catch (error) {
-      logger.error('Payment webhook processing failed via API', {
-        requestId,
-        quoteId: req.body.quoteId,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
-
-      next(error);
-    }
-  }
-
   async getAIPricing(req: Request, res: Response, next: NextFunction): Promise<void> {
     const requestId = res.locals.requestId || 'unknown';
     
@@ -1162,9 +736,202 @@ export class QuoteController {
   }
 }
 
+  async acceptQuoteWithPayment(req: Request, res: Response, next: NextFunction): Promise<void> {
+    const requestId = res.locals.requestId || 'unknown';
+    
+    try {
+      const quoteNumber = req.params.quoteNumber;
+      const clientId = req.user?.id;
+      const { paymentMethodId } = req.body;
+
+      if (!clientId) {
+        throw new AppError(
+          'Authentication required',
+          HTTP_STATUS_CODES.UNAUTHORIZED,
+          'AUTHENTICATION_REQUIRED'
+        );
+      }
+
+      if (!paymentMethodId) {
+        throw new AppError(
+          'Payment method is required',
+          HTTP_STATUS_CODES.BAD_REQUEST,
+          'PAYMENT_METHOD_REQUIRED'
+        );
+      }
+
+      const result = await this.quoteService.acceptQuoteWithPayment(quoteNumber, clientId, paymentMethodId, requestId);
+
+      logger.info('Quote accepted with payment via API', {
+        requestId,
+        quoteNumber,
+        clientId,
+        paymentIntentId: result.paymentResult.paymentIntentId,
+        amount: result.quote.totalAmount
+      });
+
+      sendSuccessResponse(res, {
+        message: 'Quote accepted and payment processed successfully',
+        data: result
+      });
+
+    } catch (error) {
+      logger.error('Quote acceptance with payment failed via API', {
+        requestId,
+        quoteNumber: req.params.quoteNumber,
+        clientId: req.user?.id,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+
+      next(error);
+    }
+  }
+
+  async createPaymentIntent(req: Request, res: Response, next: NextFunction): Promise<void> {
+    const requestId = res.locals.requestId || 'unknown';
+    
+    try {
+      const quoteNumber = req.params.quoteNumber;
+      const clientId = req.user?.id;
+
+      if (!clientId) {
+        throw new AppError(
+          'Authentication required',
+          HTTP_STATUS_CODES.UNAUTHORIZED,
+          'AUTHENTICATION_REQUIRED'
+        );
+      }
+
+      const result = await this.quoteService.createPaymentIntent(quoteNumber, clientId, requestId);
+
+      logger.info('Payment intent created via API', {
+        requestId,
+        quoteNumber,
+        clientId,
+        paymentIntentId: result.paymentIntent.paymentIntentId,
+        amount: result.quote.totalAmount
+      });
+
+      sendSuccessResponse(res, {
+        message: 'Payment intent created successfully',
+        data: result
+      });
+
+    } catch (error) {
+      logger.error('Payment intent creation failed via API', {
+        requestId,
+        quoteNumber: req.params.quoteNumber,
+        clientId: req.user?.id,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+
+      next(error);
+    }
+  }
+
+  async generateQuoteInvoice(req: Request, res: Response, next: NextFunction): Promise<void> {
+    const requestId = res.locals.requestId || 'unknown';
+    
+    try {
+      const quoteId = parseInt(req.params.quoteId);
+      const tradieId = req.user?.id;
+
+      if (!tradieId) {
+        throw new AppError(
+          'Authentication required',
+          HTTP_STATUS_CODES.UNAUTHORIZED,
+          'AUTHENTICATION_REQUIRED'
+        );
+      }
+
+      const result = await this.quoteService.generateQuoteInvoice(quoteId, tradieId, requestId);
+
+      logger.info('Quote invoice generated via API', {
+        requestId,
+        quoteId,
+        tradieId,
+        invoiceId: result.invoiceResult.id
+      });
+
+      sendSuccessResponse(res, {
+        message: 'Invoice generated successfully',
+        data: result
+      });
+
+    } catch (error) {
+      logger.error('Quote invoice generation failed via API', {
+        requestId,
+        quoteId: req.params.quoteId,
+        tradieId: req.user?.id,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+
+      next(error);
+    }
+  }
+
+  async refundQuotePayment(req: Request, res: Response, next: NextFunction): Promise<void> {
+    const requestId = res.locals.requestId || 'unknown';
+    
+    try {
+      const quoteId = parseInt(req.params.quoteId);
+      const tradieId = req.user?.id;
+      const { amount, reason } = req.body;
+
+      if (!tradieId) {
+        throw new AppError(
+          'Authentication required',
+          HTTP_STATUS_CODES.UNAUTHORIZED,
+          'AUTHENTICATION_REQUIRED'
+        );
+      }
+
+      if (!amount || amount <= 0) {
+        throw new AppError(
+          'Valid refund amount is required',
+          HTTP_STATUS_CODES.BAD_REQUEST,
+          'INVALID_REFUND_AMOUNT'
+        );
+      }
+
+      if (!reason) {
+        throw new AppError(
+          'Refund reason is required',
+          HTTP_STATUS_CODES.BAD_REQUEST,
+          'REFUND_REASON_REQUIRED'
+        );
+      }
+
+      const result = await this.quoteService.refundQuotePayment(quoteId, tradieId, amount, reason, requestId);
+
+      logger.info('Quote payment refunded via API', {
+        requestId,
+        quoteId,
+        tradieId,
+        refundId: result.refundResult.id,
+        amount: result.refundResult.amount
+      });
+
+      sendSuccessResponse(res, {
+        message: 'Payment refunded successfully',
+        data: result
+      });
+
+    } catch (error) {
+      logger.error('Quote payment refund failed via API', {
+        requestId,
+        quoteId: req.params.quoteId,
+        tradieId: req.user?.id,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+
+      next(error);
+    }
+  }
+}
+
 export const quoteController = new QuoteController(
   {} as JobService,
   {} as UserService
 );
-
 

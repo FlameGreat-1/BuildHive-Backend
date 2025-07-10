@@ -24,6 +24,10 @@ export interface QuoteRecord extends DatabaseRecord {
   viewed_at?: Date;
   accepted_at?: Date;
   rejected_at?: Date;
+  payment_status?: string;
+  payment_id?: string;
+  invoice_id?: string;
+  paid_at?: Date;
   created_at: Date;
   updated_at: Date;
 }
@@ -65,6 +69,10 @@ export class QuoteModel {
       viewedAt: record.viewed_at,
       acceptedAt: record.accepted_at,
       rejectedAt: record.rejected_at,
+      paymentStatus: record.payment_status,
+      paymentId: record.payment_id,
+      invoiceId: record.invoice_id,
+      paidAt: record.paid_at,
       createdAt: record.created_at,
       updatedAt: record.updated_at
     };
@@ -216,6 +224,10 @@ export class QuoteModel {
       'viewed_at',
       'accepted_at',
       'rejected_at',
+      'payment_status',
+      'payment_id',
+      'invoice_id',
+      'paid_at',
       'created_at',
       'updated_at'
     ];
@@ -259,7 +271,11 @@ export class QuoteModel {
       'sent_at',
       'viewed_at',
       'accepted_at',
-      'rejected_at'
+      'rejected_at',
+      'payment_status',
+      'payment_id',
+      'invoice_id',
+      'paid_at'
     ];
   }
 }

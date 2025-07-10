@@ -28,12 +28,6 @@ export const quoteTableNames = {
   JOBS: 'jobs'
 };
 
-export const paymentTableNames = {
-  QUOTE_PAYMENTS: 'quote_payments',
-  USER_PAYMENT_METHODS: 'user_payment_methods',
-  PAYMENT_WEBHOOKS: 'payment_webhooks'
-};
-
 export const quoteIndexNames = {
   QUOTES_TRADIE_ID: 'idx_quotes_tradie_id',
   QUOTES_CLIENT_ID: 'idx_quotes_client_id',
@@ -44,15 +38,6 @@ export const quoteIndexNames = {
   QUOTES_CREATED_AT: 'idx_quotes_created_at',
   QUOTE_ITEMS_QUOTE_ID: 'idx_quote_items_quote_id',
   QUOTE_ITEMS_SORT_ORDER: 'idx_quote_items_sort_order'
-};
-
-export const paymentIndexNames = {
-  QUOTE_PAYMENTS_QUOTE_ID: 'idx_quote_payments_quote_id',
-  QUOTE_PAYMENTS_PAYMENT_INTENT_ID: 'idx_quote_payments_payment_intent_id',
-  QUOTE_PAYMENTS_STATUS: 'idx_quote_payments_status',
-  USER_PAYMENT_METHODS_USER_ID: 'idx_user_payment_methods_user_id',
-  PAYMENT_WEBHOOKS_STRIPE_EVENT_ID: 'idx_payment_webhooks_stripe_event_id',
-  PAYMENT_WEBHOOKS_PROCESSED: 'idx_payment_webhooks_processed'
 };
 
 export const quoteColumnNames = {
@@ -76,6 +61,10 @@ export const quoteColumnNames = {
     VIEWED_AT: 'viewed_at',
     ACCEPTED_AT: 'accepted_at',
     REJECTED_AT: 'rejected_at',
+    PAYMENT_STATUS: 'payment_status',
+    PAYMENT_ID: 'payment_id',
+    INVOICE_ID: 'invoice_id',
+    PAID_AT: 'paid_at',
     CREATED_AT: 'created_at',
     UPDATED_AT: 'updated_at'
   },
@@ -91,51 +80,6 @@ export const quoteColumnNames = {
     SORT_ORDER: 'sort_order',
     CREATED_AT: 'created_at',
     UPDATED_AT: 'updated_at'
-  }
-};
-
-export const paymentColumnNames = {
-  QUOTE_PAYMENTS: {
-    ID: 'id',
-    QUOTE_ID: 'quote_id',
-    PAYMENT_INTENT_ID: 'payment_intent_id',
-    PAYMENT_ID: 'payment_id',
-    AMOUNT: 'amount',
-    CURRENCY: 'currency',
-    STATUS: 'status',
-    PAYMENT_METHOD_TYPE: 'payment_method_type',
-    STRIPE_CUSTOMER_ID: 'stripe_customer_id',
-    REFUND_ID: 'refund_id',
-    REFUND_STATUS: 'refund_status',
-    INVOICE_ID: 'invoice_id',
-    INVOICE_NUMBER: 'invoice_number',
-    FAILURE_REASON: 'failure_reason',
-    PAID_AT: 'paid_at',
-    REFUNDED_AT: 'refunded_at',
-    CREATED_AT: 'created_at',
-    UPDATED_AT: 'updated_at'
-  },
-  USER_PAYMENT_METHODS: {
-    ID: 'id',
-    USER_ID: 'user_id',
-    PAYMENT_METHOD_ID: 'payment_method_id',
-    TYPE: 'type',
-    CARD_BRAND: 'card_brand',
-    CARD_LAST4: 'card_last4',
-    CARD_EXPIRY_MONTH: 'card_expiry_month',
-    CARD_EXPIRY_YEAR: 'card_expiry_year',
-    IS_DEFAULT: 'is_default',
-    CREATED_AT: 'created_at',
-    UPDATED_AT: 'updated_at'
-  },
-  PAYMENT_WEBHOOKS: {
-    ID: 'id',
-    STRIPE_EVENT_ID: 'stripe_event_id',
-    EVENT_TYPE: 'event_type',
-    PROCESSED: 'processed',
-    PAYLOAD: 'payload',
-    CREATED_AT: 'created_at',
-    PROCESSED_AT: 'processed_at'
   }
 };
 
@@ -227,6 +171,16 @@ export const quoteQueries = {
     WHERE id = $1
     RETURNING *
   `,
+
+  UPDATE_PAYMENT_STATUS: `
+    UPDATE quotes SET
+      payment_status = $2,
+      payment_id = COALESCE($3, payment_id),
+      paid_at = CASE WHEN $2 = 'succeeded' AND paid_at IS NULL THEN NOW() ELSE paid_at END,
+      updated_at = NOW()
+    WHERE id = $1
+    RETURNING *
+  `,
   
   DELETE_QUOTE: `
     DELETE FROM quotes WHERE id = $1 AND tradie_id = $2
@@ -245,8 +199,7 @@ export const quoteQueries = {
     FROM quotes
     WHERE tradie_id = $1
     GROUP BY status
-  `
-};
+  `,
 
   GET_EXPIRING_QUOTES: `
     SELECT q.*, c.name as client_name, c.email as client_email, c.phone as client_phone,
@@ -285,167 +238,41 @@ export const quoteQueries = {
     AND ($5::timestamp IS NULL OR q.created_at >= $5)
     AND ($6::timestamp IS NULL OR q.created_at <= $6)
     AND ($7::text IS NULL OR q.title ILIKE '%' || $7 || '%' OR q.description ILIKE '%' || $7 || '%')
+    AND ($8::text IS NULL OR q.payment_status = $8)
     ORDER BY
-      CASE WHEN $8 = 'created_at' AND $9 = 'desc' THEN q.created_at END DESC,
-      CASE WHEN $8 = 'created_at' AND $9 = 'asc' THEN q.created_at END ASC,
-      CASE WHEN $8 = 'total_amount' AND $9 = 'desc' THEN q.total_amount END DESC,
-      CASE WHEN $8 = 'total_amount' AND $9 = 'asc' THEN q.total_amount END ASC,
-      CASE WHEN $8 = 'valid_until' AND $9 = 'desc' THEN q.valid_until END DESC,
-      CASE WHEN $8 = 'valid_until' AND $9 = 'asc' THEN q.valid_until END ASC,
+      CASE WHEN $9 = 'created_at' AND $10 = 'desc' THEN q.created_at END DESC,
+      CASE WHEN $9 = 'created_at' AND $10 = 'asc' THEN q.created_at END ASC,
+      CASE WHEN $9 = 'total_amount' AND $10 = 'desc' THEN q.total_amount END DESC,
+      CASE WHEN $9 = 'total_amount' AND $10 = 'asc' THEN q.total_amount END ASC,
+      CASE WHEN $9 = 'valid_until' AND $10 = 'desc' THEN q.valid_until END DESC,
+      CASE WHEN $9 = 'valid_until' AND $10 = 'asc' THEN q.valid_until END ASC,
       q.created_at DESC
-    LIMIT $10 OFFSET $11
-  `
-};
+    LIMIT $11 OFFSET $12
+  `,
 
-export const paymentQueries = {
-  CREATE_PAYMENT_INTENT: `
-    INSERT INTO quote_payments (
-      quote_id, payment_intent_id, amount, currency, status, created_at, updated_at
-    ) VALUES ($1, $2, $3, $4, 'pending', NOW(), NOW())
-    RETURNING *
-  `,
-  
-  UPDATE_PAYMENT_STATUS: `
-    UPDATE quote_payments SET
-      status = $2,
-      payment_id = COALESCE($3, payment_id),
-      payment_method_type = COALESCE($4, payment_method_type),
-      failure_reason = COALESCE($5, failure_reason),
-      paid_at = CASE WHEN $2 = 'succeeded' AND paid_at IS NULL THEN NOW() ELSE paid_at END,
-      updated_at = NOW()
-    WHERE quote_id = $1
-    RETURNING *
-  `,
-  
-  UPDATE_REFUND_STATUS: `
-    UPDATE quote_payments SET
-      refund_id = $2,
-      refund_status = $3,
-      refunded_at = CASE WHEN $3 = 'succeeded' AND refunded_at IS NULL THEN NOW() ELSE refunded_at END,
-      updated_at = NOW()
-    WHERE quote_id = $1
-    RETURNING *
-  `,
-  
-  SAVE_INVOICE_RECORD: `
-    UPDATE quote_payments SET
-      invoice_id = $2,
-      invoice_number = $3,
-      updated_at = NOW()
-    WHERE quote_id = $1
-    RETURNING *
-  `,
-  
-  GET_PAYMENT_BY_QUOTE_ID: `
-    SELECT * FROM quote_payments WHERE quote_id = $1
-  `,
-  
-  GET_PAYMENT_BY_INTENT_ID: `
-    SELECT * FROM quote_payments WHERE payment_intent_id = $1
-  `,
-  
-  GET_PAYMENT_HISTORY_BY_USER: `
-    SELECT p.*, q.quote_number, q.title as quote_title
-    FROM quote_payments p
-    JOIN quotes q ON p.quote_id = q.id
-    WHERE (q.tradie_id = $1 AND $2 = 'tradie') OR (q.client_id = $1 AND $2 = 'client')
-    ORDER BY p.created_at DESC
-    LIMIT $3 OFFSET $4
-  `,
-  
-  GET_PAYMENT_ANALYTICS: `
+  GET_QUOTE_ANALYTICS: `
     SELECT 
-      COUNT(*) as total_payments,
-      SUM(amount) as total_amount,
-      COUNT(CASE WHEN status = 'succeeded' THEN 1 END) as successful_payments,
-      COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed_payments,
-      COUNT(CASE WHEN refund_status = 'succeeded' THEN 1 END) as refunded_payments,
-      AVG(amount) as average_payment_amount,
-      payment_method_type,
-      COUNT(*) as method_count
-    FROM quote_payments p
-    JOIN quotes q ON p.quote_id = q.id
-    WHERE q.tradie_id = $1 AND p.created_at BETWEEN $2 AND $3
-    GROUP BY payment_method_type
+      COUNT(*) as total_quotes,
+      COUNT(CASE WHEN status = 'accepted' THEN 1 END) as accepted_quotes,
+      COUNT(CASE WHEN payment_status = 'succeeded' THEN 1 END) as paid_quotes,
+      SUM(CASE WHEN status = 'accepted' THEN total_amount ELSE 0 END) as total_revenue,
+      SUM(CASE WHEN payment_status = 'succeeded' THEN total_amount ELSE 0 END) as paid_revenue,
+      AVG(total_amount) as average_quote_value,
+      AVG(EXTRACT(EPOCH FROM (accepted_at - created_at))/3600) as avg_response_time_hours
+    FROM quotes
+    WHERE tradie_id = $1 AND created_at BETWEEN $2 AND $3
   `,
-  
-  GET_MONTHLY_PAYMENT_TRENDS: `
+
+  GET_MONTHLY_QUOTE_TRENDS: `
     SELECT 
-      DATE_TRUNC('month', p.created_at) as month,
-      COUNT(*) as payments_count,
-      SUM(amount) as total_amount,
-      (COUNT(CASE WHEN status = 'succeeded' THEN 1 END) * 100.0 / COUNT(*)) as success_rate
-    FROM quote_payments p
-    JOIN quotes q ON p.quote_id = q.id
-    WHERE q.tradie_id = $1 AND p.created_at BETWEEN $2 AND $3
-    GROUP BY DATE_TRUNC('month', p.created_at)
+      DATE_TRUNC('month', created_at) as month,
+      COUNT(*) as quotes_created,
+      COUNT(CASE WHEN status = 'accepted' THEN 1 END) as quotes_accepted,
+      SUM(CASE WHEN status = 'accepted' THEN total_amount ELSE 0 END) as total_value
+    FROM quotes
+    WHERE tradie_id = $1 AND created_at BETWEEN $2 AND $3
+    GROUP BY DATE_TRUNC('month', created_at)
     ORDER BY month
-  `,
-  
-  SAVE_PAYMENT_METHOD: `
-    INSERT INTO user_payment_methods (
-      user_id, payment_method_id, type, card_brand, card_last4,
-      card_expiry_month, card_expiry_year, is_default, created_at, updated_at
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
-    ON CONFLICT (user_id, payment_method_id) DO UPDATE SET
-      type = EXCLUDED.type,
-      card_brand = EXCLUDED.card_brand,
-      card_last4 = EXCLUDED.card_last4,
-      card_expiry_month = EXCLUDED.card_expiry_month,
-      card_expiry_year = EXCLUDED.card_expiry_year,
-      is_default = EXCLUDED.is_default,
-      updated_at = NOW()
-    RETURNING *
-  `,
-  
-  GET_USER_PAYMENT_METHODS: `
-    SELECT * FROM user_payment_methods
-    WHERE user_id = $1
-    ORDER BY is_default DESC, created_at DESC
-  `,
-  
-  DELETE_PAYMENT_METHOD: `
-    DELETE FROM user_payment_methods
-    WHERE user_id = $1 AND payment_method_id = $2
-    RETURNING *
-  `,
-  
-  SET_DEFAULT_PAYMENT_METHOD: `
-    UPDATE user_payment_methods SET
-      is_default = CASE WHEN payment_method_id = $2 THEN TRUE ELSE FALSE END,
-      updated_at = NOW()
-    WHERE user_id = $1
-    RETURNING *
-  `,
-  
-  SAVE_WEBHOOK_EVENT: `
-    INSERT INTO payment_webhooks (
-      stripe_event_id, event_type, payload, created_at
-    ) VALUES ($1, $2, $3, NOW())
-    ON CONFLICT (stripe_event_id) DO NOTHING
-    RETURNING *
-  `,
-  
-  MARK_WEBHOOK_PROCESSED: `
-    UPDATE payment_webhooks SET
-      processed = TRUE,
-      processed_at = NOW()
-    WHERE stripe_event_id = $1
-    RETURNING *
-  `,
-  
-  GET_UNPROCESSED_WEBHOOKS: `
-    SELECT * FROM payment_webhooks
-    WHERE processed = FALSE
-    ORDER BY created_at ASC
-    LIMIT $1
-  `,
-  
-  CLEANUP_OLD_WEBHOOKS: `
-    DELETE FROM payment_webhooks
-    WHERE created_at < NOW() - INTERVAL '30 days'
-    AND processed = TRUE
-    RETURNING COUNT(*)
   `
 };
 
@@ -457,14 +284,6 @@ export const quoteCacheConfig = {
   EXPIRY_CHECK_TTL: 1800
 };
 
-export const paymentCacheConfig = {
-  PAYMENT_INTENT_TTL: 1800,
-  PAYMENT_METHOD_TTL: 3600,
-  PAYMENT_ANALYTICS_TTL: 300,
-  WEBHOOK_CACHE_TTL: 86400,
-  PAYMENT_HISTORY_TTL: 600
-};
-
 export const quoteConnectionPool = {
   min: 2,
   max: 10,
@@ -474,15 +293,4 @@ export const quoteConnectionPool = {
   idleTimeoutMillis: 30000,
   reapIntervalMillis: 1000,
   createRetryIntervalMillis: 200
-};
-
-export const paymentConnectionPool = {
-  min: 1,
-  max: 5,
-  acquireTimeoutMillis: 15000,
-  createTimeoutMillis: 15000,
-  destroyTimeoutMillis: 3000,
-  idleTimeoutMillis: 15000,
-  reapIntervalMillis: 500,
-  createRetryIntervalMillis: 100
 };

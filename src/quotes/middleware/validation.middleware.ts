@@ -491,6 +491,97 @@ export const validateQuoteId = (
   next();
 };
 
+export const validatePaymentMethodId = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const requestId = res.locals.requestId || 'unknown';
+  const errors: ValidationError[] = [];
+  const { paymentMethodId } = req.body;
+
+  if (!paymentMethodId || typeof paymentMethodId !== 'string' || paymentMethodId.trim().length === 0) {
+    errors.push({
+      field: 'paymentMethodId',
+      message: 'Payment method ID is required',
+      code: 'REQUIRED_FIELD'
+    });
+  }
+
+  if (errors.length > 0) {
+    logger.warn('Payment method validation failed', {
+      requestId,
+      userId: req.user?.id,
+      errors: errors.length,
+      timestamp: new Date().toISOString()
+    });
+
+    return sendQuoteValidationError(res, 'Payment method validation failed', errors);
+  }
+
+  next();
+};
+
+export const validateRefundRequest = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const requestId = res.locals.requestId || 'unknown';
+  const errors: ValidationError[] = [];
+  const { amount, reason } = req.body;
+
+  if (!amount || typeof amount !== 'number' || amount <= 0) {
+    errors.push({
+      field: 'amount',
+      message: 'Valid refund amount is required',
+      code: 'INVALID_VALUE'
+    });
+  }
+
+  if (amount && amount > 999999.99) {
+    errors.push({
+      field: 'amount',
+      message: 'Refund amount cannot exceed $999,999.99',
+      code: 'FIELD_TOO_LARGE'
+    });
+  }
+
+  if (!reason || typeof reason !== 'string' || reason.trim().length === 0) {
+    errors.push({
+      field: 'reason',
+      message: 'Refund reason is required',
+      code: 'REQUIRED_FIELD'
+    });
+  }
+
+  if (reason && reason.length > 500) {
+    errors.push({
+      field: 'reason',
+      message: 'Refund reason cannot exceed 500 characters',
+      code: 'FIELD_TOO_LONG'
+    });
+  }
+
+  if (errors.length > 0) {
+    logger.warn('Refund request validation failed', {
+      requestId,
+      userId: req.user?.id,
+      quoteId: req.params.quoteId,
+      errors: errors.length,
+      timestamp: new Date().toISOString()
+    });
+
+    return sendQuoteValidationError(res, 'Refund request validation failed', errors);
+  }
+
+  if (reason) {
+    req.body.reason = sanitizeQuoteInput(reason);
+  }
+
+  next();
+};
+
 export const validateQuoteNumber = (
   req: Request,
   res: Response,

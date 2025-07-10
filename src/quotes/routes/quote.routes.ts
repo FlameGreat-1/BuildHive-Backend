@@ -10,11 +10,7 @@ import {
   validateQuoteDelivery,
   validateAIPricingRequest,
   validateQuoteId,
-  validateQuoteNumber,
-  validatePaymentMethod,
-  validateRefundRequest,
-  validateInvoiceRequest,
-  validatePaymentWebhook
+  validateQuoteNumber
 } from '../middleware';
 import { 
   createQuoteSchema,
@@ -22,11 +18,7 @@ import {
   quoteStatusUpdateSchema,
   quoteDeliverySchema,
   aiPricingRequestSchema,
-  quoteFilterSchema,
-  paymentMethodSchema,
-  refundRequestSchema,
-  invoiceRequestSchema,
-  paymentWebhookSchema
+  quoteFilterSchema
 } from '../validators';
 import { rateLimitMiddleware } from '../../shared/middleware';
 import { errorMiddleware } from '../../shared/middleware';
@@ -88,15 +80,6 @@ router.post(
 );
 
 router.post(
-  '/calculate-with-fees',
-  authMiddleware,
-  rateLimitMiddleware(QUOTE_RATE_LIMITS.OPERATIONS),
-  async (req, res, next) => {
-    await quoteController.calculateQuoteWithFees(req, res, next);
-  }
-);
-
-router.post(
   '/ai-pricing',
   authMiddleware,
   rateLimitMiddleware(QUOTE_RATE_LIMITS.AI_PRICING),
@@ -112,15 +95,6 @@ router.get(
   rateLimitMiddleware(QUOTE_RATE_LIMITS.VIEW),
   async (req, res, next) => {
     await quoteController.getClientQuotes(req, res, next);
-  }
-);
-
-router.post(
-  '/payment-webhook',
-  rateLimitMiddleware(QUOTE_RATE_LIMITS.WEBHOOK),
-  validatePaymentWebhook,
-  async (req, res, next) => {
-    await quoteController.handlePaymentWebhook(req, res, next);
   }
 );
 
@@ -159,36 +133,6 @@ router.post(
   rateLimitMiddleware(QUOTE_RATE_LIMITS.STATUS_CHANGE),
   async (req, res, next) => {
     await quoteController.rejectQuote(req, res, next);
-  }
-);
-
-router.post(
-  '/:quoteNumber/payment-intent',
-  authMiddleware,
-  validateQuoteNumber,
-  rateLimitMiddleware(QUOTE_RATE_LIMITS.PAYMENT),
-  async (req, res, next) => {
-    await quoteController.createPaymentIntent(req, res, next);
-  }
-);
-
-router.post(
-  '/:quoteNumber/accept-with-payment',
-  authMiddleware,
-  validateQuoteNumber,
-  rateLimitMiddleware(QUOTE_RATE_LIMITS.PAYMENT),
-  validatePaymentMethod,
-  async (req, res, next) => {
-    await quoteController.acceptQuoteWithPayment(req, res, next);
-  }
-);
-
-router.get(
-  '/:quoteNumber/payment-details',
-  validateQuoteNumber,
-  rateLimitMiddleware(QUOTE_RATE_LIMITS.VIEW),
-  async (req, res, next) => {
-    await quoteController.getQuoteWithPaymentDetails(req, res, next);
   }
 );
 
@@ -256,13 +200,33 @@ router.post(
 );
 
 router.post(
-  '/:quoteId/process-payment',
+  '/:quoteNumber/accept-with-payment',
+  authMiddleware,
+  validateQuoteNumber,
+  validatePaymentMethodId,
+  rateLimitMiddleware(QUOTE_RATE_LIMITS.STATUS_CHANGE),
+  async (req, res, next) => {
+    await quoteController.acceptQuoteWithPayment(req, res, next);
+  }
+);
+
+router.post(
+  '/:quoteNumber/payment-intent',
+  authMiddleware,
+  validateQuoteNumber,
+  rateLimitMiddleware(QUOTE_RATE_LIMITS.OPERATIONS),
+  async (req, res, next) => {
+    await quoteController.createPaymentIntent(req, res, next);
+  }
+);
+
+router.post(
+  '/:quoteId/generate-invoice',
   authMiddleware,
   validateQuoteId,
-  rateLimitMiddleware(QUOTE_RATE_LIMITS.PAYMENT),
-  validatePaymentMethod,
+  rateLimitMiddleware(QUOTE_RATE_LIMITS.OPERATIONS),
   async (req, res, next) => {
-    await quoteController.processQuotePayment(req, res, next);
+    await quoteController.generateQuoteInvoice(req, res, next);
   }
 );
 
@@ -270,31 +234,10 @@ router.post(
   '/:quoteId/refund',
   authMiddleware,
   validateQuoteId,
-  rateLimitMiddleware(QUOTE_RATE_LIMITS.REFUND),
   validateRefundRequest,
+  rateLimitMiddleware(QUOTE_RATE_LIMITS.OPERATIONS),
   async (req, res, next) => {
     await quoteController.refundQuotePayment(req, res, next);
-  }
-);
-
-router.post(
-  '/:quoteId/invoice',
-  authMiddleware,
-  validateQuoteId,
-  rateLimitMiddleware(QUOTE_RATE_LIMITS.OPERATIONS),
-  validateInvoiceRequest,
-  async (req, res, next) => {
-    await quoteController.generateQuoteInvoice(req, res, next);
-  }
-);
-
-router.get(
-  '/:quoteId/payment-summary',
-  authMiddleware,
-  validateQuoteId,
-  rateLimitMiddleware(QUOTE_RATE_LIMITS.VIEW),
-  async (req, res, next) => {
-    await quoteController.getQuotePaymentSummary(req, res, next);
   }
 );
 

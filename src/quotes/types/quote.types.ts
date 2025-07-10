@@ -4,17 +4,6 @@ import {
   DeliveryMethod, 
   MaterialUnit 
 } from '../../shared/types';
-import { 
-  PaymentStatus, 
-  PaymentResult, 
-  RefundData, 
-  RefundResult, 
-  InvoiceResult,
-  PaymentIntentResponse,
-  PaymentFeeCalculation,
-  PaymentHistoryItem,
-  PaymentMethodType
-} from './payment.types';
 
 export interface QuoteCreateData {
   clientId?: number;
@@ -79,16 +68,15 @@ export interface QuoteData {
   rejectedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
-  // Payment-related fields
   paymentIntentId?: string;
   paymentId?: string;
-  paymentStatus?: PaymentStatus;
+  paymentStatus?: string;
   paidAt?: Date;
   refundId?: string;
   refundedAt?: Date;
   invoiceId?: string;
   invoiceUrl?: string;
-  paymentMethodType?: PaymentMethodType;
+  paymentMethodType?: string;
 }
 
 export interface QuoteItemData {
@@ -113,13 +101,6 @@ export interface QuoteWithRelations extends QuoteData {
   tradieEmail: string;
 }
 
-export interface QuoteWithPayment extends QuoteWithRelations {
-  paymentFees?: PaymentFeeCalculation;
-  paymentHistory?: PaymentHistoryItem[];
-  canRefund?: boolean;
-  refundableAmount?: number;
-}
-
 export interface QuoteFilterOptions {
   status?: QuoteStatus;
   clientId?: number;
@@ -131,7 +112,7 @@ export interface QuoteFilterOptions {
   limit?: number;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
-  paymentStatus?: PaymentStatus;
+  paymentStatus?: string;
   hasPendingPayment?: boolean;
 }
 
@@ -144,7 +125,6 @@ export interface QuoteSummary {
   rejected: number;
   expired: number;
   cancelled: number;
-  // Payment-related summary
   paid: number;
   pendingPayment: number;
   refunded: number;
@@ -217,8 +197,6 @@ export interface QuoteCalculation {
   itemTotals: {
     [key: number]: number;
   };
-  paymentFees?: PaymentFeeCalculation;
-  finalAmount?: number;
 }
 
 export interface QuoteTemplate {
@@ -271,7 +249,6 @@ export interface QuoteAnalytics {
     quotesAccepted: number;
     totalValue: number;
   }[];
-  // Payment analytics
   paymentMetrics: {
     totalPaid: number;
     averagePaymentTime: number;
@@ -279,90 +256,6 @@ export interface QuoteAnalytics {
     refundRate: number;
     totalRefunded: number;
   };
-}
-
-// New Payment-Specific Interfaces for Quotes
-
-export interface QuotePaymentData {
-  quoteId: number;
-  quoteNumber: string;
-  paymentMethodId: string;
-  clientId: number;
-  tradieId: number;
-  amount: number;
-  currency: string;
-  clientEmail: string;
-  tradieEmail: string;
-  description: string;
-}
-
-export interface QuotePaymentResult {
-  quote: QuoteData;
-  paymentResult: PaymentResult;
-  invoiceUrl?: string;
-  receiptUrl?: string;
-}
-
-export interface QuotePaymentIntentData {
-  quoteId: number;
-  quoteNumber: string;
-  clientId: number;
-  tradieId: number;
-  amount: number;
-  currency: string;
-  clientEmail: string;
-  tradieEmail: string;
-  jobId?: number;
-}
-
-export interface QuotePaymentIntentResult {
-  quote: QuoteData;
-  paymentIntent: PaymentIntentResponse;
-  fees: PaymentFeeCalculation;
-}
-
-export interface QuoteRefundData {
-  quoteId: number;
-  quoteNumber: string;
-  paymentId: string;
-  amount?: number;
-  reason: string;
-  tradieId: number;
-  clientId: number;
-}
-
-export interface QuoteRefundResult {
-  quote: QuoteData;
-  refundResult: RefundResult;
-}
-
-export interface QuoteInvoiceData {
-  quoteId: number;
-  quoteNumber: string;
-  paymentId: string;
-  clientId: number;
-  tradieId: number;
-  jobId?: number;
-}
-
-export interface QuoteInvoiceResult {
-  quote: QuoteData;
-  invoiceResult: InvoiceResult;
-}
-
-export interface QuotePaymentSummary {
-  quoteId: number;
-  quoteNumber: string;
-  totalAmount: number;
-  paymentStatus: PaymentStatus;
-  paymentMethod?: PaymentMethodType;
-  paidAmount: number;
-  refundedAmount: number;
-  outstandingAmount: number;
-  paymentDate?: Date;
-  refundDate?: Date;
-  canRefund: boolean;
-  fees: PaymentFeeCalculation;
 }
 
 export interface QuoteRepository {
@@ -377,10 +270,8 @@ export interface QuoteRepository {
   findExpiring(hours: number): Promise<QuoteExpiryCheck[]>;
   expireQuotes(): Promise<number>;
   getAnalytics(tradieId: number, startDate: Date, endDate: Date): Promise<QuoteAnalytics>;
-  // Payment-related repository methods
-  updatePaymentStatus(quoteId: number, paymentStatus: PaymentStatus, paymentId?: string): Promise<QuoteData>;
-  findByPaymentStatus(paymentStatus: PaymentStatus, limit?: number): Promise<QuoteWithRelations[]>;
-  getPaymentSummary(quoteId: number): Promise<QuotePaymentSummary>;
+  updatePaymentStatus(quoteId: number, paymentStatus: string, paymentId?: string): Promise<QuoteData>;
+  findByPaymentStatus(paymentStatus: string, limit?: number): Promise<QuoteWithRelations[]>;
 }
 
 export interface QuoteService {
@@ -399,17 +290,10 @@ export interface QuoteService {
   generateQuoteNumber(): Promise<string>;
   checkExpiry(): Promise<void>;
   getAnalytics(tradieId: number, startDate: Date, endDate: Date): Promise<QuoteAnalytics>;
-  
-  // Payment integration methods
-  createPaymentIntent(quoteNumber: string, clientId: number): Promise<QuotePaymentIntentResult>;
-  acceptQuoteWithPayment(quoteNumber: string, clientId: number, paymentMethodId: string): Promise<QuotePaymentResult>;
-  processQuotePayment(paymentData: QuotePaymentData): Promise<QuotePaymentResult>;
-  refundQuotePayment(refundData: QuoteRefundData): Promise<QuoteRefundResult>;
-  generateQuoteInvoice(invoiceData: QuoteInvoiceData): Promise<QuoteInvoiceResult>;
-  getQuotePaymentSummary(quoteId: number): Promise<QuotePaymentSummary>;
-  calculateQuoteWithFees(items: QuoteItemCreateData[], gstEnabled: boolean): QuoteCalculation;
-  getQuoteWithPaymentDetails(quoteNumber: string): Promise<QuoteWithPayment>;
-  handlePaymentWebhook(quoteId: number, paymentStatus: PaymentStatus, paymentId?: string): Promise<void>;
+  acceptQuoteWithPayment(quoteNumber: string, clientId: number, paymentMethodId: string, requestId?: string): Promise<any>;
+  createPaymentIntent(quoteNumber: string, clientId: number, requestId?: string): Promise<any>;
+  generateQuoteInvoice(quoteId: number, tradieId: number, requestId?: string): Promise<any>;
+  refundQuotePayment(quoteId: number, tradieId: number, amount: number, reason: string, requestId?: string): Promise<any>;
 }
 
 export interface AIPricingService {

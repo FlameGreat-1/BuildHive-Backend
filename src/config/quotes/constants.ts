@@ -78,6 +78,14 @@ export const QUOTE_RATE_LIMITS = {
   OPERATIONS: {
     WINDOW_MS: 10 * 60 * 1000,
     MAX_ATTEMPTS: 50
+  },
+  PAYMENT: {
+    WINDOW_MS: 15 * 60 * 1000,
+    MAX_ATTEMPTS: 10
+  },
+  DELIVERY: {
+    WINDOW_MS: 15 * 60 * 1000,
+    MAX_ATTEMPTS: 15
   }
 } as const;
 
@@ -174,7 +182,12 @@ export const QUOTE_EVENTS = {
   QUOTE_EXPIRED: 'quote.expired',
   QUOTE_CANCELLED: 'quote.cancelled',
   AI_PRICING_REQUESTED: 'ai.pricing.requested',
-  AI_PRICING_COMPLETED: 'ai.pricing.completed'
+  AI_PRICING_COMPLETED: 'ai.pricing.completed',
+  QUOTE_PAYMENT_INITIATED: 'quote.payment.initiated',
+  QUOTE_PAYMENT_SUCCEEDED: 'quote.payment.succeeded',
+  QUOTE_PAYMENT_FAILED: 'quote.payment.failed',
+  QUOTE_INVOICE_GENERATED: 'quote.invoice.generated',
+  QUOTE_REFUND_PROCESSED: 'quote.refund.processed'
 } as const;
 
 export const QUOTE_ERROR_CODES = {
@@ -185,7 +198,8 @@ export const QUOTE_ERROR_CODES = {
   QUOTE_VALIDATION_ERROR: 'QUOTE_VALIDATION_ERROR',
   AI_PRICING_ERROR: 'AI_PRICING_ERROR',
   QUOTE_DELIVERY_ERROR: 'QUOTE_DELIVERY_ERROR',
-  QUOTE_GENERATION_ERROR: 'QUOTE_GENERATION_ERROR'
+  QUOTE_GENERATION_ERROR: 'QUOTE_GENERATION_ERROR',
+  QUOTE_PAYMENT_ERROR: 'QUOTE_PAYMENT_ERROR'
 } as const;
 
 export const MATERIAL_UNITS = {

@@ -4,6 +4,8 @@ import { environment } from '../config/auth';
 import healthRoutes from './health.routes';
 import { authRoutes, profileRoutes, validationRoutes } from '../auth/routes'; 
 import { jobRoutes, clientRoutes, materialRoutes, attachmentRoutes } from '../jobs/routes';
+import { quoteRoutes } from '../quotes/routes';
+import { paymentRoutes, paymentMethodRoutes, invoiceRoutes, refundRoutes, webhookRoutes } from '../payment/routes';
 import { generalApiRateLimit } from '../shared/middleware';
 
 const router = Router();
@@ -18,6 +20,12 @@ router.use('/api/v1/jobs', jobRoutes);
 router.use('/api/v1/clients', clientRoutes);
 router.use('/api/v1/materials', materialRoutes);
 router.use('/api/v1/attachments', attachmentRoutes);
+router.use('/api/v1/quotes', quoteRoutes);
+router.use('/api/v1/payments', paymentRoutes);
+router.use('/api/v1/payment-methods', paymentMethodRoutes);
+router.use('/api/v1/invoices', invoiceRoutes);
+router.use('/api/v1/refunds', refundRoutes);
+router.use('/api/v1/webhooks', webhookRoutes);
 
 router.get('/', (req, res) => {
   const routeData = {
@@ -34,7 +42,13 @@ router.get('/', (req, res) => {
       jobs: '/api/v1/jobs',
       clients: '/api/v1/clients',
       materials: '/api/v1/materials',
-      attachments: '/api/v1/attachments'
+      attachments: '/api/v1/attachments',
+      quotes: '/api/v1/quotes',
+      payments: '/api/v1/payments',
+      paymentMethods: '/api/v1/payment-methods',
+      invoices: '/api/v1/invoices',
+      refunds: '/api/v1/refunds',
+      webhooks: '/api/v1/webhooks'
     },
     endpoints: {
       authentication: [
@@ -112,6 +126,71 @@ router.get('/', (req, res) => {
       attachments: [
         'GET /api/v1/attachments/jobs/:jobId/attachments',
         'DELETE /api/v1/attachments/jobs/:jobId/attachments/:id'
+      ],
+      quotes: [
+        'POST /api/v1/quotes',
+        'GET /api/v1/quotes',
+        'GET /api/v1/quotes/analytics',
+        'GET /api/v1/quotes/generate-number',
+        'POST /api/v1/quotes/calculate',
+        'POST /api/v1/quotes/ai-pricing',
+        'GET /api/v1/quotes/client',
+        'GET /api/v1/quotes/number/:quoteNumber',
+        'GET /api/v1/quotes/view/:quoteNumber',
+        'POST /api/v1/quotes/accept/:quoteNumber',
+        'POST /api/v1/quotes/reject/:quoteNumber',
+        'POST /api/v1/quotes/:quoteNumber/accept-with-payment',
+        'POST /api/v1/quotes/:quoteNumber/payment-intent',
+        'GET /api/v1/quotes/:quoteId',
+        'PUT /api/v1/quotes/:quoteId',
+        'PATCH /api/v1/quotes/:quoteId/status',
+        'DELETE /api/v1/quotes/:quoteId',
+        'POST /api/v1/quotes/:quoteId/send',
+        'POST /api/v1/quotes/:quoteId/duplicate',
+        'POST /api/v1/quotes/:quoteId/generate-invoice',
+        'POST /api/v1/quotes/:quoteId/refund'
+      ],
+      payments: [
+        'POST /api/v1/payments/intent',
+        'POST /api/v1/payments/confirm',
+        'POST /api/v1/payments/links',
+        'GET /api/v1/payments/methods',
+        'GET /api/v1/payments/history',
+        'GET /api/v1/payments/:paymentId/status',
+        'POST /api/v1/payments/:paymentId/cancel'
+      ],
+      paymentMethods: [
+        'POST /api/v1/payment-methods',
+        'POST /api/v1/payment-methods/attach',
+        'POST /api/v1/payment-methods/:paymentMethodId/detach',
+        'POST /api/v1/payment-methods/:paymentMethodId/set-default',
+        'GET /api/v1/payment-methods',
+        'GET /api/v1/payment-methods/default',
+        'DELETE /api/v1/payment-methods/:paymentMethodId'
+      ],
+      invoices: [
+        'POST /api/v1/invoices',
+        'GET /api/v1/invoices',
+        'GET /api/v1/invoices/:invoiceId',
+        'PATCH /api/v1/invoices/:invoiceId/status',
+        'POST /api/v1/invoices/:invoiceId/send',
+        'POST /api/v1/invoices/:invoiceId/cancel',
+        'DELETE /api/v1/invoices/:invoiceId'
+      ],
+      refunds: [
+        'POST /api/v1/refunds',
+        'GET /api/v1/refunds',
+        'GET /api/v1/refunds/:refundId',
+        'GET /api/v1/refunds/payment/:paymentId',
+        'PATCH /api/v1/refunds/:refundId/status',
+        'POST /api/v1/refunds/:refundId/cancel'
+      ],
+      webhooks: [
+        'POST /api/v1/webhooks/stripe',
+        'POST /api/v1/webhooks/retry/:eventId',
+        'GET /api/v1/webhooks/health',
+        'GET /api/v1/webhooks/validate',
+        'GET /api/v1/webhooks/config'
       ]
     },
     features: {
@@ -126,7 +205,13 @@ router.get('/', (req, res) => {
       jobManagement: 'enabled',
       clientManagement: 'enabled',
       materialTracking: 'enabled',
-      fileAttachments: 'enabled'
+      fileAttachments: 'enabled',
+      quoteManagement: 'enabled',
+      aiPricing: 'enabled',
+      paymentProcessing: 'enabled',
+      invoiceManagement: 'enabled',
+      refundProcessing: 'enabled',
+      webhookHandling: 'enabled'
     },
     security: {
       rateLimiting: 'active',
@@ -136,7 +221,9 @@ router.get('/', (req, res) => {
       passwordComplexity: 'enforced',
       tokenSecurity: 'jwt-based',
       jobOwnershipValidation: 'enforced',
-      fileUploadSecurity: 'enforced'
+      fileUploadSecurity: 'enforced',
+      paymentSecurity: 'pci-compliant',
+      webhookSecurity: 'signature-verified'
     }
   };
 
@@ -144,12 +231,14 @@ router.get('/', (req, res) => {
 });
 
 logger.info('Main routes initialized', {
-  routes: ['health', 'auth', 'profile', 'validation', 'jobs', 'clients', 'materials', 'attachments'],
+  routes: ['health', 'auth', 'profile', 'validation', 'jobs', 'clients', 'materials', 'attachments', 'quotes', 'payments', 'payment-methods', 'invoices', 'refunds', 'webhooks'],
   environment: environment.NODE_ENV,
   authenticationEnabled: true,
   rateLimitingEnabled: true,
   jobManagementEnabled: true,
-  totalEndpoints: 43
+  quoteManagementEnabled: true,
+  paymentProcessingEnabled: true,
+  totalEndpoints: 99
 });
 
 export default router;

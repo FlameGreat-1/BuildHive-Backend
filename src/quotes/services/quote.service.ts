@@ -2,7 +2,6 @@ import {
   QuoteService,
   QuoteData,
   QuoteWithRelations,
-  QuoteWithPayment,
   QuoteCreateData,
   QuoteUpdateData,
   QuoteFilterOptions,
@@ -11,29 +10,17 @@ import {
   QuoteDeliveryData,
   QuoteDeliveryResult,
   QuoteCalculation,
-  QuoteAnalytics,
-  QuotePaymentData,
-  QuotePaymentResult,
-  QuotePaymentIntentData,
-  QuotePaymentIntentResult,
-  QuoteRefundData,
-  QuoteRefundResult,
-  QuoteInvoiceData,
-  QuoteInvoiceResult,
-  QuotePaymentSummary
+  QuoteAnalytics
 } from '../types';
-import { 
-  PaymentStatus,
-  PaymentResult,
-  RefundResult,
-  InvoiceResult,
-  PaymentFeeCalculation
-} from '../types/payment.types';
 import { QuoteRepositoryImpl } from '../repositories';
 import { AIPricingServiceImpl } from './ai-pricing.service';
-import { paymentIntegrationService, PaymentIntegrationService } from './payment-integration.service';
 import { JobService } from '../../jobs/services';
 import { UserService } from '../../auth/services';
+import { PaymentService, InvoiceService, RefundService } from '../../payment/services';
+import { 
+  CreatePaymentIntentRequest,
+  ConfirmPaymentRequest
+} from '../../payment/types';
 import { 
   calculateQuoteTotal, 
   generateQuoteNumber, 
@@ -43,7 +30,7 @@ import {
   isQuoteCancellable,
   parseQuoteFilters
 } from '../utils';
-import { QUOTE_STATUS, QUOTE_EVENTS, PAYMENT_CONSTANTS } from '../../config/quotes';
+import { QUOTE_STATUS, QUOTE_EVENTS } from '../../config/quotes';
 import { logger } from '../../shared/utils';
 import { AppError } from '../../shared/utils';
 import { HTTP_STATUS_CODES } from '../../config/auth';
@@ -52,7 +39,6 @@ import { sendSuccessResponse } from '../../shared/utils';
 export class QuoteServiceImpl implements QuoteService {
   private quoteRepository: QuoteRepositoryImpl;
   private aiPricingService: AIPricingServiceImpl;
-  private paymentService: PaymentIntegrationService;
   private jobService: JobService;
   private userService: UserService;
 
@@ -62,7 +48,6 @@ export class QuoteServiceImpl implements QuoteService {
   ) {
     this.quoteRepository = new QuoteRepositoryImpl();
     this.aiPricingService = new AIPricingServiceImpl();
-    this.paymentService = paymentIntegrationService;
     this.jobService = jobService;
     this.userService = userService;
   }
@@ -283,8 +268,8 @@ export class QuoteServiceImpl implements QuoteService {
       );
     }
   }
-
-  async updateQuoteStatus(id: number, tradieId: number, data: QuoteStatusUpdateData): Promise<QuoteData> {
+  
+    async updateQuoteStatus(id: number, tradieId: number, data: QuoteStatusUpdateData): Promise<QuoteData> {
     try {
       const existingQuote = await this.quoteRepository.findById(id);
 
@@ -401,7 +386,7 @@ export class QuoteServiceImpl implements QuoteService {
     }
   }
   
-    async sendQuote(id: number, tradieId: number, deliveryData: QuoteDeliveryData): Promise<QuoteDeliveryResult> {
+  async sendQuote(id: number, tradieId: number, deliveryData: QuoteDeliveryData): Promise<QuoteDeliveryResult> {
     try {
       const quote = await this.quoteRepository.findById(id);
 
@@ -593,550 +578,7 @@ export class QuoteServiceImpl implements QuoteService {
     }
   }
 
-  // NEW PAYMENT INTEGRATION METHODS
-
-  async createPaymentIntent(quoteNumber: string, clientId: number): Promise<QuotePaymentIntentResult> {
-    try {
-      const quote = await this.quoteRepository.findByNumber(quoteNumber);
-
-      if (!quote) {
-        throw new AppError(
-          'Quote not found',
-          HTTP_STATUS_CODES.NOT_FOUND,
-          'QUOTE_NOT_FOUND'
-        );
-      }
-
-      if (quote.clientId !== clientId) {
-        throw new AppError(
-          'Unauthorized to create payment for this quote',
-          HTTP_STATUS_CODES.FORBIDDEN,
-          'UNAUTHORIZED_QUOTE_ACCESS'
-        );
-      }
-
-      if (![QUOTE_STATUS.SENT, QUOTE_STATUS.VIEWED].includes(quote.status)) {
-        throw new AppError(
-          'Quote cannot be paid in current status',
-          HTTP_STATUS_CODES.BAD_REQUEST,
-          'INVALID_QUOTE_STATUS'
-        );
-      }
-
-      if (isQuoteExpired(quote.validUntil)) {
-        throw new AppError(
-          'Quote has expired',
-          HTTP_STATUS_CODES.BAD_REQUEST,
-          'QUOTE_EXPIRED'
-        );
-      }
-
-      const paymentIntentData: QuotePaymentIntentData = {
-        quoteId: quote.id,
-        quoteNumber: quote.quoteNumber,
-        clientId: quote.clientId,
-        tradieId: quote.tradieId,
-        amount: quote.totalAmount,
-        currency: 'AUD',
-        clientEmail: quote.clientEmail,
-        tradieEmail: quote.tradieEmail,
-        jobId: quote.jobId
-      };
-
-      const paymentIntent = await this.paymentService.createPaymentIntent({
-        quoteId: quote.id,
-        clientId: quote.clientId,
-        tradieId: quote.tradieId,
-        amount: quote.totalAmount,
-        currency: 'AUD',
-        description: `Payment for Quote #${quote.quoteNumber}`,
-        metadata: {
-          quoteNumber: quote.quoteNumber,
-          clientEmail: quote.clientEmail,
-          tradieEmail: quote.tradieEmail,
-          jobId: quote.jobId?.toString() || ''
-        }
-      });
-
-      const fees = this.paymentService.calculateFees(quote.totalAmount);
-
-      logger.info('Payment intent created for quote', {
-        quoteId: quote.id,
-        quoteNumber,
-        clientId,
-        paymentIntentId: paymentIntent.paymentIntentId,
-        amount: quote.totalAmount
-      });
-
-      return {
-        quote,
-        paymentIntent,
-        fees
-      };
-
-    } catch (error) {
-      logger.error('Failed to create payment intent for quote', {
-        quoteNumber,
-        clientId,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
-
-      if (error instanceof AppError) {
-        throw error;
-      }
-
-      throw new AppError(
-        'Failed to create payment intent',
-        HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR,
-        'PAYMENT_INTENT_ERROR'
-      );
-    }
-  }
-
-  async acceptQuoteWithPayment(quoteNumber: string, clientId: number, paymentMethodId: string): Promise<QuotePaymentResult> {
-    try {
-      const quote = await this.quoteRepository.findByNumber(quoteNumber);
-
-      if (!quote) {
-        throw new AppError(
-          'Quote not found',
-          HTTP_STATUS_CODES.NOT_FOUND,
-          'QUOTE_NOT_FOUND'
-        );
-      }
-
-      if (quote.clientId !== clientId) {
-        throw new AppError(
-          'Unauthorized to accept this quote',
-          HTTP_STATUS_CODES.FORBIDDEN,
-          'UNAUTHORIZED_QUOTE_ACCESS'
-        );
-      }
-
-      if (![QUOTE_STATUS.SENT, QUOTE_STATUS.VIEWED].includes(quote.status)) {
-        throw new AppError(
-          'Quote cannot be accepted in current status',
-          HTTP_STATUS_CODES.BAD_REQUEST,
-          'INVALID_QUOTE_STATUS'
-        );
-      }
-
-      if (isQuoteExpired(quote.validUntil)) {
-        throw new AppError(
-          'Quote has expired',
-          HTTP_STATUS_CODES.BAD_REQUEST,
-          'QUOTE_EXPIRED'
-        );
-      }
-
-      // Create payment intent first
-      const paymentIntentResult = await this.createPaymentIntent(quoteNumber, clientId);
-
-      // Confirm payment
-      const paymentResult = await this.paymentService.confirmPayment({
-        paymentIntentId: paymentIntentResult.paymentIntent.paymentIntentId,
-        paymentMethodId,
-        quoteId: quote.id,
-        clientId: quote.clientId,
-        tradieId: quote.tradieId,
-        amount: quote.totalAmount,
-        currency: 'AUD'
-      });
-
-      if (paymentResult.success) {
-        // Update quote status to accepted
-        const acceptedQuote = await this.quoteRepository.updateStatus(quote.id, quote.tradieId, { 
-          status: QUOTE_STATUS.ACCEPTED 
-        });
-
-        // Update payment status in quote
-        await this.quoteRepository.updatePaymentStatus(quote.id, 'succeeded', paymentResult.paymentId);
-
-        // Update job status if exists
-        if (quote.jobId) {
-          await this.jobService.updateJobStatus(quote.jobId, 'active');
-        }
-
-        logger.info('Quote accepted with payment successfully', {
-          quoteId: quote.id,
-          quoteNumber,
-          clientId,
-          paymentId: paymentResult.paymentId,
-          amount: paymentResult.amount
-        });
-
-        await this.publishQuoteEvent(QUOTE_EVENTS.QUOTE_ACCEPTED, acceptedQuote);
-        await this.publishPaymentEvent('PAYMENT_SUCCEEDED', acceptedQuote, paymentResult);
-
-        return {
-          quote: acceptedQuote,
-          paymentResult,
-          receiptUrl: paymentResult.receiptUrl
-        };
-      } else {
-        // Update payment status to failed
-        await this.quoteRepository.updatePaymentStatus(quote.id, 'failed');
-
-        throw new AppError(
-          paymentResult.failureReason || 'Payment failed',
-          HTTP_STATUS_CODES.PAYMENT_REQUIRED,
-          'PAYMENT_FAILED'
-        );
-      }
-
-    } catch (error) {
-      logger.error('Failed to accept quote with payment', {
-        quoteNumber,
-        clientId,
-        paymentMethodId,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
-
-      if (error instanceof AppError) {
-        throw error;
-      }
-
-      throw new AppError(
-        'Failed to accept quote with payment',
-        HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR,
-        'QUOTE_PAYMENT_ERROR'
-      );
-    }
-  }
-
-  async processQuotePayment(paymentData: QuotePaymentData): Promise<QuotePaymentResult> {
-    try {
-      const quote = await this.quoteRepository.findById(paymentData.quoteId);
-
-      if (!quote) {
-        throw new AppError(
-          'Quote not found',
-          HTTP_STATUS_CODES.NOT_FOUND,
-          'QUOTE_NOT_FOUND'
-        );
-      }
-
-      const paymentResult = await this.paymentService.confirmPayment({
-        paymentIntentId: '', // This should come from paymentData
-        paymentMethodId: paymentData.paymentMethodId,
-        quoteId: paymentData.quoteId,
-        clientId: paymentData.clientId,
-        tradieId: paymentData.tradieId,
-        amount: paymentData.amount,
-        currency: paymentData.currency
-      });
-
-      if (paymentResult.success) {
-        await this.quoteRepository.updatePaymentStatus(paymentData.quoteId, 'succeeded', paymentResult.paymentId);
-        
-        logger.info('Quote payment processed successfully', {
-          quoteId: paymentData.quoteId,
-          paymentId: paymentResult.paymentId,
-          amount: paymentResult.amount
-        });
-
-        await this.publishPaymentEvent('PAYMENT_SUCCEEDED', quote, paymentResult);
-      } else {
-        await this.quoteRepository.updatePaymentStatus(paymentData.quoteId, 'failed');
-      }
-
-      return {
-        quote,
-        paymentResult,
-        receiptUrl: paymentResult.receiptUrl
-      };
-
-    } catch (error) {
-      logger.error('Failed to process quote payment', {
-        quoteId: paymentData.quoteId,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
-
-      if (error instanceof AppError) {
-        throw error;
-      }
-
-      throw new AppError(
-        'Failed to process payment',
-        HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR,
-        'PAYMENT_PROCESSING_ERROR'
-      );
-    }
-  }
-  
-    async refundQuotePayment(refundData: QuoteRefundData): Promise<QuoteRefundResult> {
-    try {
-      const quote = await this.quoteRepository.findById(refundData.quoteId);
-
-      if (!quote) {
-        throw new AppError(
-          'Quote not found',
-          HTTP_STATUS_CODES.NOT_FOUND,
-          'QUOTE_NOT_FOUND'
-        );
-      }
-
-      if (quote.tradieId !== refundData.tradieId) {
-        throw new AppError(
-          'Unauthorized to refund this quote',
-          HTTP_STATUS_CODES.FORBIDDEN,
-          'UNAUTHORIZED_QUOTE_ACCESS'
-        );
-      }
-
-      if (!quote.paymentId) {
-        throw new AppError(
-          'No payment found for this quote',
-          HTTP_STATUS_CODES.BAD_REQUEST,
-          'NO_PAYMENT_FOUND'
-        );
-      }
-
-      const refundResult = await this.paymentService.processRefund({
-        paymentId: refundData.paymentId,
-        quoteId: refundData.quoteId,
-        clientId: refundData.clientId,
-        tradieId: refundData.tradieId,
-        amount: refundData.amount,
-        reason: refundData.reason
-      });
-
-      if (refundResult.success) {
-        await this.quoteRepository.updatePaymentStatus(refundData.quoteId, 'refunded');
-        
-        logger.info('Quote payment refunded successfully', {
-          quoteId: refundData.quoteId,
-          refundId: refundResult.refundId,
-          amount: refundResult.amount
-        });
-
-        await this.publishPaymentEvent('REFUND_PROCESSED', quote, refundResult);
-      }
-
-      return {
-        quote,
-        refundResult
-      };
-
-    } catch (error) {
-      logger.error('Failed to refund quote payment', {
-        quoteId: refundData.quoteId,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
-
-      if (error instanceof AppError) {
-        throw error;
-      }
-
-      throw new AppError(
-        'Failed to process refund',
-        HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR,
-        'REFUND_PROCESSING_ERROR'
-      );
-    }
-  }
-
-  async generateQuoteInvoice(invoiceData: QuoteInvoiceData): Promise<QuoteInvoiceResult> {
-    try {
-      const quote = await this.quoteRepository.findById(invoiceData.quoteId);
-
-      if (!quote) {
-        throw new AppError(
-          'Quote not found',
-          HTTP_STATUS_CODES.NOT_FOUND,
-          'QUOTE_NOT_FOUND'
-        );
-      }
-
-      if (quote.tradieId !== invoiceData.tradieId) {
-        throw new AppError(
-          'Unauthorized to generate invoice for this quote',
-          HTTP_STATUS_CODES.FORBIDDEN,
-          'UNAUTHORIZED_QUOTE_ACCESS'
-        );
-      }
-
-      const invoiceResult = await this.paymentService.generateInvoice({
-        quoteId: invoiceData.quoteId,
-        paymentId: invoiceData.paymentId,
-        clientId: invoiceData.clientId,
-        tradieId: invoiceData.tradieId,
-        amount: quote.totalAmount,
-        currency: 'AUD',
-        items: quote.items.map(item => ({
-          description: item.description,
-          quantity: item.quantity,
-          unitPrice: item.unitPrice
-        })),
-        metadata: {
-          quoteNumber: quote.quoteNumber,
-          jobId: invoiceData.jobId?.toString() || ''
-        }
-      });
-
-      logger.info('Quote invoice generated successfully', {
-        quoteId: invoiceData.quoteId,
-        invoiceId: invoiceResult.invoiceId,
-        invoiceNumber: invoiceResult.invoiceNumber
-      });
-
-      return {
-        quote,
-        invoiceResult
-      };
-
-    } catch (error) {
-      logger.error('Failed to generate quote invoice', {
-        quoteId: invoiceData.quoteId,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
-
-      if (error instanceof AppError) {
-        throw error;
-      }
-
-      throw new AppError(
-        'Failed to generate invoice',
-        HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR,
-        'INVOICE_GENERATION_ERROR'
-      );
-    }
-  }
-
-  async getQuotePaymentSummary(quoteId: number): Promise<QuotePaymentSummary> {
-    try {
-      const summary = await this.quoteRepository.getPaymentSummary(quoteId);
-
-      if (!summary) {
-        throw new AppError(
-          'Quote not found',
-          HTTP_STATUS_CODES.NOT_FOUND,
-          'QUOTE_NOT_FOUND'
-        );
-      }
-
-      return summary;
-
-    } catch (error) {
-      logger.error('Failed to get quote payment summary', {
-        quoteId,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
-
-      if (error instanceof AppError) {
-        throw error;
-      }
-
-      throw new AppError(
-        'Failed to retrieve payment summary',
-        HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR,
-        'PAYMENT_SUMMARY_ERROR'
-      );
-    }
-  }
-
-  calculateQuoteWithFees(items: any[], gstEnabled: boolean): QuoteCalculation {
-    try {
-      const baseCalculation = calculateQuoteTotal(items, gstEnabled);
-      const paymentFees = this.paymentService.calculateFees(baseCalculation.totalAmount);
-      
-      return {
-        ...baseCalculation,
-        paymentFees,
-        finalAmount: baseCalculation.totalAmount + paymentFees.totalFees
-      };
-
-    } catch (error) {
-      logger.error('Failed to calculate quote with fees', {
-        itemCount: items.length,
-        gstEnabled,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
-
-      throw new AppError(
-        'Failed to calculate quote totals with fees',
-        HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR,
-        'QUOTE_CALCULATION_ERROR'
-      );
-    }
-  }
-
-  async getQuoteWithPaymentDetails(quoteNumber: string): Promise<QuoteWithPayment> {
-    try {
-      const quote = await this.quoteRepository.findByNumber(quoteNumber);
-
-      if (!quote) {
-        throw new AppError(
-          'Quote not found',
-          HTTP_STATUS_CODES.NOT_FOUND,
-          'QUOTE_NOT_FOUND'
-        );
-      }
-
-      const paymentFees = this.paymentService.calculateFees(quote.totalAmount);
-      const paymentHistory = await this.paymentService.getPaymentHistory(quote.clientId, 'client');
-      
-      const canRefund = quote.paymentStatus === 'succeeded' && quote.paidAt && 
-        (new Date().getTime() - quote.paidAt.getTime()) < (90 * 24 * 60 * 60 * 1000); // 90 days
-
-      return {
-        ...quote,
-        paymentFees,
-        paymentHistory: paymentHistory.filter(p => p.quoteId === quote.id),
-        canRefund,
-        refundableAmount: canRefund ? quote.totalAmount : 0
-      };
-
-    } catch (error) {
-      logger.error('Failed to get quote with payment details', {
-        quoteNumber,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
-
-      if (error instanceof AppError) {
-        throw error;
-      }
-
-      throw new AppError(
-        'Failed to retrieve quote with payment details',
-        HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR,
-        'QUOTE_PAYMENT_DETAILS_ERROR'
-      );
-    }
-  }
-
-  async handlePaymentWebhook(quoteId: number, paymentStatus: PaymentStatus, paymentId?: string): Promise<void> {
-    try {
-      await this.quoteRepository.updatePaymentStatus(quoteId, paymentStatus, paymentId);
-
-      const quote = await this.quoteRepository.findById(quoteId);
-      if (quote) {
-        await this.publishPaymentEvent(`PAYMENT_${paymentStatus.toUpperCase()}`, quote, { paymentId, status: paymentStatus });
-      }
-
-      logger.info('Payment webhook processed for quote', {
-        quoteId,
-        paymentStatus,
-        paymentId
-      });
-
-    } catch (error) {
-      logger.error('Failed to handle payment webhook', {
-        quoteId,
-        paymentStatus,
-        paymentId,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
-
-      throw new AppError(
-        'Failed to process payment webhook',
-        HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR,
-        'WEBHOOK_PROCESSING_ERROR'
-      );
-    }
-  }
-  
-    async rejectQuote(quoteNumber: string, clientId: number, reason?: string): Promise<QuoteData> {
+  async rejectQuote(quoteNumber: string, clientId: number, reason?: string): Promise<QuoteData> {
     try {
       const quote = await this.quoteRepository.findByNumber(quoteNumber);
 
@@ -1290,6 +732,365 @@ export class QuoteServiceImpl implements QuoteService {
     }
   }
 
+  async acceptQuoteWithPayment(quoteNumber: string, clientId: number, paymentMethodId: string, requestId: string = 'unknown'): Promise<any> {
+    try {
+      const quote = await this.quoteRepository.findByNumber(quoteNumber);
+
+      if (!quote) {
+        throw new AppError(
+          'Quote not found',
+          HTTP_STATUS_CODES.NOT_FOUND,
+          'QUOTE_NOT_FOUND'
+        );
+      }
+
+      if (quote.clientId !== clientId) {
+        throw new AppError(
+          'Unauthorized to accept this quote',
+          HTTP_STATUS_CODES.FORBIDDEN,
+          'UNAUTHORIZED_QUOTE_ACCESS'
+        );
+      }
+
+      if (![QUOTE_STATUS.SENT, QUOTE_STATUS.VIEWED].includes(quote.status)) {
+        throw new AppError(
+          'Quote cannot be accepted in current status',
+          HTTP_STATUS_CODES.BAD_REQUEST,
+          'INVALID_QUOTE_STATUS'
+        );
+      }
+
+      if (isQuoteExpired(quote.validUntil)) {
+        throw new AppError(
+          'Quote has expired',
+          HTTP_STATUS_CODES.BAD_REQUEST,
+          'QUOTE_EXPIRED'
+        );
+      }
+
+      const paymentService = new PaymentService();
+
+      const paymentIntentRequest: CreatePaymentIntentRequest = {
+        amount: quote.totalAmount,
+        currency: 'AUD',
+        paymentMethod: 'card',
+        paymentType: 'one_time',
+        description: `Payment for Quote #${quote.quoteNumber}`,
+        metadata: {
+          quoteId: quote.id.toString(),
+          quoteNumber: quote.quoteNumber,
+          clientId: clientId.toString(),
+          tradieId: quote.tradieId.toString()
+        },
+        automaticPaymentMethods: true
+      };
+
+      const paymentIntent = await paymentService.createPaymentIntent(paymentIntentRequest, requestId);
+
+      const confirmRequest: ConfirmPaymentRequest = {
+        paymentIntentId: paymentIntent.paymentIntentId,
+        paymentMethodId: paymentMethodId
+      };
+
+      const confirmResult = await paymentService.confirmPayment(confirmRequest, requestId);
+
+      if (confirmResult.status === 'succeeded') {
+        const acceptedQuote = await this.quoteRepository.updateStatus(quote.id, quote.tradieId, { 
+          status: QUOTE_STATUS.ACCEPTED 
+        });
+
+        await this.quoteRepository.updatePaymentStatus(quote.id, 'succeeded', confirmResult.paymentIntentId);
+
+        if (quote.jobId) {
+          await this.jobService.updateJobStatus(quote.jobId, 'active');
+        }
+
+        logger.info('Quote accepted with payment successfully', {
+          quoteId: quote.id,
+          quoteNumber,
+          clientId,
+          paymentIntentId: confirmResult.paymentIntentId,
+          amount: quote.totalAmount
+        });
+
+        await this.publishQuoteEvent(QUOTE_EVENTS.QUOTE_ACCEPTED, acceptedQuote);
+
+        return {
+          quote: acceptedQuote,
+          paymentResult: confirmResult
+        };
+      } else {
+        await this.quoteRepository.updatePaymentStatus(quote.id, 'failed');
+
+        throw new AppError(
+          confirmResult.error?.message || 'Payment failed',
+          HTTP_STATUS_CODES.PAYMENT_REQUIRED,
+          'PAYMENT_FAILED'
+        );
+      }
+
+    } catch (error) {
+      logger.error('Failed to accept quote with payment', {
+        quoteNumber,
+        clientId,
+        paymentMethodId,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+
+      if (error instanceof AppError) {
+        throw error;
+      }
+
+      throw new AppError(
+        'Failed to accept quote with payment',
+        HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR,
+        'QUOTE_PAYMENT_ERROR'
+      );
+    }
+  }
+
+  async createPaymentIntent(quoteNumber: string, clientId: number, requestId: string = 'unknown'): Promise<any> {
+    try {
+      const quote = await this.quoteRepository.findByNumber(quoteNumber);
+
+      if (!quote) {
+        throw new AppError(
+          'Quote not found',
+          HTTP_STATUS_CODES.NOT_FOUND,
+          'QUOTE_NOT_FOUND'
+        );
+      }
+
+      if (quote.clientId !== clientId) {
+        throw new AppError(
+          'Unauthorized to create payment for this quote',
+          HTTP_STATUS_CODES.FORBIDDEN,
+          'UNAUTHORIZED_QUOTE_ACCESS'
+        );
+      }
+
+      if (![QUOTE_STATUS.SENT, QUOTE_STATUS.VIEWED].includes(quote.status)) {
+        throw new AppError(
+          'Quote cannot be paid in current status',
+          HTTP_STATUS_CODES.BAD_REQUEST,
+          'INVALID_QUOTE_STATUS'
+        );
+      }
+
+      if (isQuoteExpired(quote.validUntil)) {
+        throw new AppError(
+          'Quote has expired',
+          HTTP_STATUS_CODES.BAD_REQUEST,
+          'QUOTE_EXPIRED'
+        );
+      }
+
+      const paymentService = new PaymentService();
+
+      const paymentIntentRequest: CreatePaymentIntentRequest = {
+        amount: quote.totalAmount,
+        currency: 'AUD',
+        paymentMethod: 'card',
+        paymentType: 'one_time',
+        description: `Payment for Quote #${quote.quoteNumber}`,
+        metadata: {
+          quoteId: quote.id.toString(),
+          quoteNumber: quote.quoteNumber,
+          clientId: quote.clientId.toString(),
+          tradieId: quote.tradieId.toString(),
+          jobId: quote.jobId?.toString() || ''
+        },
+        automaticPaymentMethods: true
+      };
+
+      const paymentIntent = await paymentService.createPaymentIntent(paymentIntentRequest, requestId);
+
+      logger.info('Payment intent created for quote', {
+        quoteId: quote.id,
+        quoteNumber,
+        clientId,
+        paymentIntentId: paymentIntent.paymentIntentId,
+        amount: quote.totalAmount
+      });
+
+      return {
+        quote,
+        paymentIntent
+      };
+
+    } catch (error) {
+      logger.error('Failed to create payment intent for quote', {
+        quoteNumber,
+        clientId,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+
+      if (error instanceof AppError) {
+        throw error;
+      }
+
+      throw new AppError(
+        'Failed to create payment intent',
+        HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR,
+        'PAYMENT_INTENT_ERROR'
+      );
+    }
+  }
+
+  async generateQuoteInvoice(quoteId: number, tradieId: number, requestId: string = 'unknown'): Promise<any> {
+    try {
+      const quote = await this.quoteRepository.findById(quoteId);
+
+      if (!quote) {
+        throw new AppError(
+          'Quote not found',
+          HTTP_STATUS_CODES.NOT_FOUND,
+          'QUOTE_NOT_FOUND'
+        );
+      }
+
+      if (quote.tradieId !== tradieId) {
+        throw new AppError(
+          'Unauthorized to generate invoice for this quote',
+          HTTP_STATUS_CODES.FORBIDDEN,
+          'UNAUTHORIZED_QUOTE_ACCESS'
+        );
+      }
+
+      const invoiceService = new InvoiceService();
+
+      const invoiceRequest = {
+        amount: quote.totalAmount,
+        currency: 'AUD',
+        description: `Invoice for Quote #${quote.quoteNumber}`,
+        items: quote.items.map(item => ({
+          description: item.description,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          amount: item.totalPrice
+        })),
+        metadata: {
+          quoteId: quote.id.toString(),
+          quoteNumber: quote.quoteNumber,
+          tradieId: tradieId.toString(),
+          clientId: quote.clientId.toString(),
+          jobId: quote.jobId?.toString() || ''
+        }
+      };
+
+      const invoiceResult = await invoiceService.createInvoice(invoiceRequest, requestId);
+
+      await this.quoteRepository.updatePaymentStatus(quote.id, 'invoiced');
+
+      logger.info('Quote invoice generated successfully', {
+        quoteId,
+        tradieId,
+        invoiceId: invoiceResult.id
+      });
+
+      return {
+        quote,
+        invoiceResult
+      };
+
+    } catch (error) {
+      logger.error('Failed to generate quote invoice', {
+        quoteId,
+        tradieId,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+
+      if (error instanceof AppError) {
+        throw error;
+      }
+
+      throw new AppError(
+        'Failed to generate invoice',
+        HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR,
+        'INVOICE_GENERATION_ERROR'
+      );
+    }
+  }
+
+  async refundQuotePayment(quoteId: number, tradieId: number, amount: number, reason: string, requestId: string = 'unknown'): Promise<any> {
+    try {
+      const quote = await this.quoteRepository.findById(quoteId);
+
+      if (!quote) {
+        throw new AppError(
+          'Quote not found',
+          HTTP_STATUS_CODES.NOT_FOUND,
+          'QUOTE_NOT_FOUND'
+        );
+      }
+
+      if (quote.tradieId !== tradieId) {
+        throw new AppError(
+          'Unauthorized to refund this quote',
+          HTTP_STATUS_CODES.FORBIDDEN,
+          'UNAUTHORIZED_QUOTE_ACCESS'
+        );
+      }
+
+      if (!quote.paymentId) {
+        throw new AppError(
+          'No payment found for this quote',
+          HTTP_STATUS_CODES.BAD_REQUEST,
+          'NO_PAYMENT_FOUND'
+        );
+      }
+
+      const refundService = new RefundService();
+
+      const refundRequest = {
+        paymentId: quote.paymentId,
+        amount,
+        reason,
+        metadata: {
+          quoteId: quote.id.toString(),
+          quoteNumber: quote.quoteNumber,
+          tradieId: tradieId.toString(),
+          clientId: quote.clientId.toString()
+        }
+      };
+
+      const refundResult = await refundService.createRefund(refundRequest, requestId);
+
+      if (refundResult.status === 'succeeded') {
+        await this.quoteRepository.updatePaymentStatus(quote.id, 'refunded');
+        
+        logger.info('Quote payment refunded successfully', {
+          quoteId,
+          tradieId,
+          refundId: refundResult.id,
+          amount: refundResult.amount
+        });
+      }
+
+      return {
+        quote,
+        refundResult
+      };
+
+    } catch (error) {
+      logger.error('Failed to refund quote payment', {
+        quoteId,
+        tradieId,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+
+      if (error instanceof AppError) {
+        throw error;
+      }
+
+      throw new AppError(
+        'Failed to process refund',
+        HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR,
+        'REFUND_PROCESSING_ERROR'
+      );
+    }
+  }
+
   private async validateTradieExists(tradieId: number): Promise<void> {
     const tradie = await this.userService.findById(tradieId);
     if (!tradie) {
@@ -1439,29 +1240,10 @@ export class QuoteServiceImpl implements QuoteService {
       await this.publishQuoteEvent(eventType, quote);
     }
   }
-
-  private async publishPaymentEvent(eventType: string, quote: any, paymentData: any): Promise<void> {
-    try {
-      logger.info('Payment event published', {
-        eventType,
-        quoteId: quote.id,
-        quoteNumber: quote.quoteNumber,
-        paymentData
-      });
-    } catch (error) {
-      logger.error('Failed to publish payment event', {
-        eventType,
-        quoteId: quote.id,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
-    }
-  }
 }
 
 export const quoteService = new QuoteServiceImpl(
-  {} as JobService, // This should be properly injected
-  {} as UserService  // This should be properly injected
+  {} as JobService,
+  {} as UserService
 );
-
-
 
