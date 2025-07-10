@@ -1241,9 +1241,3 @@ export class QuoteServiceImpl implements QuoteService {
     }
   }
 }
-
-export const quoteService = new QuoteServiceImpl(
-  {} as JobService,
-  {} as UserService
-);
-

@@ -930,8 +930,4 @@ export class QuoteController {
   }
 }
 
-export const quoteController = new QuoteController(
-  {} as JobService,
-  {} as UserService
-);
 
