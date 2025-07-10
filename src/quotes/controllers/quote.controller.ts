@@ -734,7 +734,6 @@ export class QuoteController {
       next(error);
     }
   }
-}
 
   async acceptQuoteWithPayment(req: Request, res: Response, next: NextFunction): Promise<void> {
     const requestId = res.locals.requestId || 'unknown';
