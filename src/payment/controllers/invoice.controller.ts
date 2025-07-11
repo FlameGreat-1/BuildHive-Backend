@@ -1,20 +1,12 @@
 import { Request, Response } from 'express';
-import { logger, createSuccessResponse, createErrorResponse } from '../../shared/utils';
+import { logger, sendSuccessResponse, sendErrorResponse } from '../../shared/utils';
 import { InvoiceService } from '../services';
+import { AuthenticatedRequest } from '../../auth/middleware/auth.middleware';
 import { 
   CreateInvoiceRequest,
   UpdateInvoiceStatusRequest,
   InvoiceListRequest
 } from '../types';
-
-interface AuthenticatedRequest extends Request {
-  user?: {
-    id: number;
-    email: string;
-    role: string;
-  };
-  requestId?: string;
-}
 
 export class InvoiceController {
   private invoiceService: InvoiceService;
@@ -25,15 +17,11 @@ export class InvoiceController {
 
   async createInvoice(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      const userId = req.user?.id;
+      const userId = req.user ? parseInt(req.user.id) : undefined;
       const requestId = req.requestId || 'unknown';
 
       if (!userId) {
-        res.status(401).json(createErrorResponse(
-          'User authentication required',
-          'INVOICE_AUTH_REQUIRED'
-        ));
-        return;
+        return sendErrorResponse(res, 'User authentication required', 401, 'INVOICE_AUTH_REQUIRED');
       }
 
       const request: CreateInvoiceRequest = {
@@ -56,45 +44,39 @@ export class InvoiceController {
         requestId
       });
 
-      res.status(201).json(createSuccessResponse(
-        'Invoice created successfully',
-        invoice
-      ));
+      sendSuccessResponse(res, {
+        message: 'Invoice created successfully',
+        data: invoice
+      }, 201);
+
     } catch (error) {
       logger.error('Failed to create invoice', {
         error: error instanceof Error ? error.message : 'Unknown error',
-        userId: req.user?.id,
+        userId: req.user ? parseInt(req.user.id) : undefined,
         requestId: req.requestId
       });
 
       const statusCode = error instanceof Error && error.message.includes('Invalid') ? 400 : 500;
-      res.status(statusCode).json(createErrorResponse(
+      sendErrorResponse(res, 
         error instanceof Error ? error.message : 'Failed to create invoice',
+        statusCode,
         'INVOICE_CREATION_FAILED'
-      ));
+      );
     }
   }
 
   async updateInvoiceStatus(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      const userId = req.user?.id;
+      const userId = req.user ? parseInt(req.user.id) : undefined;
       const requestId = req.requestId || 'unknown';
       const invoiceId = parseInt(req.params.invoiceId);
 
       if (!userId) {
-        res.status(401).json(createErrorResponse(
-          'User authentication required',
-          'INVOICE_AUTH_REQUIRED'
-        ));
-        return;
+        return sendErrorResponse(res, 'User authentication required', 401, 'INVOICE_AUTH_REQUIRED');
       }
 
       if (isNaN(invoiceId)) {
-        res.status(400).json(createErrorResponse(
-          'Invalid invoice ID',
-          'INVALID_INVOICE_ID'
-        ));
-        return;
+        return sendErrorResponse(res, 'Invalid invoice ID', 400, 'INVALID_INVOICE_ID');
       }
 
       const request: UpdateInvoiceStatusRequest = {
@@ -111,46 +93,40 @@ export class InvoiceController {
         requestId
       });
 
-      res.status(200).json(createSuccessResponse(
-        'Invoice status updated successfully',
-        updateResult
-      ));
+      sendSuccessResponse(res, {
+        message: 'Invoice status updated successfully',
+        data: updateResult
+      });
+
     } catch (error) {
       logger.error('Failed to update invoice status', {
         invoiceId: req.params.invoiceId,
         error: error instanceof Error ? error.message : 'Unknown error',
-        userId: req.user?.id,
+        userId: req.user ? parseInt(req.user.id) : undefined,
         requestId: req.requestId
       });
 
       const statusCode = error instanceof Error && error.message.includes('not found') ? 404 : 500;
-      res.status(statusCode).json(createErrorResponse(
+      sendErrorResponse(res,
         error instanceof Error ? error.message : 'Failed to update invoice status',
+        statusCode,
         'INVOICE_STATUS_UPDATE_FAILED'
-      ));
+      );
     }
   }
 
   async getInvoice(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      const userId = req.user?.id;
+      const userId = req.user ? parseInt(req.user.id) : undefined;
       const requestId = req.requestId || 'unknown';
       const invoiceId = parseInt(req.params.invoiceId);
 
       if (!userId) {
-        res.status(401).json(createErrorResponse(
-          'User authentication required',
-          'INVOICE_AUTH_REQUIRED'
-        ));
-        return;
+        return sendErrorResponse(res, 'User authentication required', 401, 'INVOICE_AUTH_REQUIRED');
       }
 
       if (isNaN(invoiceId)) {
-        res.status(400).json(createErrorResponse(
-          'Invalid invoice ID',
-          'INVALID_INVOICE_ID'
-        ));
-        return;
+        return sendErrorResponse(res, 'Invalid invoice ID', 400, 'INVALID_INVOICE_ID');
       }
 
       const invoice = await this.invoiceService.getInvoice(invoiceId, requestId);
@@ -163,37 +139,35 @@ export class InvoiceController {
         requestId
       });
 
-      res.status(200).json(createSuccessResponse(
-        'Invoice retrieved successfully',
-        invoice
-      ));
+      sendSuccessResponse(res, {
+        message: 'Invoice retrieved successfully',
+        data: invoice
+      });
+
     } catch (error) {
       logger.error('Failed to get invoice', {
         invoiceId: req.params.invoiceId,
         error: error instanceof Error ? error.message : 'Unknown error',
-        userId: req.user?.id,
+        userId: req.user ? parseInt(req.user.id) : undefined,
         requestId: req.requestId
       });
 
       const statusCode = error instanceof Error && error.message.includes('not found') ? 404 : 500;
-      res.status(statusCode).json(createErrorResponse(
+      sendErrorResponse(res,
         error instanceof Error ? error.message : 'Failed to get invoice',
+        statusCode,
         'INVOICE_RETRIEVAL_FAILED'
-      ));
+      );
     }
   }
 
   async getUserInvoices(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      const userId = req.user?.id;
+      const userId = req.user ? parseInt(req.user.id) : undefined;
       const requestId = req.requestId || 'unknown';
 
       if (!userId) {
-        res.status(401).json(createErrorResponse(
-          'User authentication required',
-          'INVOICE_AUTH_REQUIRED'
-        ));
-        return;
+        return sendErrorResponse(res, 'User authentication required', 401, 'INVOICE_AUTH_REQUIRED');
       }
 
       const request: InvoiceListRequest = {
@@ -213,44 +187,38 @@ export class InvoiceController {
         requestId
       });
 
-      res.status(200).json(createSuccessResponse(
-        'Invoices retrieved successfully',
-        invoices
-      ));
+      sendSuccessResponse(res, {
+        message: 'Invoices retrieved successfully',
+        data: invoices
+      });
+
     } catch (error) {
       logger.error('Failed to get user invoices', {
         error: error instanceof Error ? error.message : 'Unknown error',
-        userId: req.user?.id,
+        userId: req.user ? parseInt(req.user.id) : undefined,
         requestId: req.requestId
       });
 
-      res.status(500).json(createErrorResponse(
+      sendErrorResponse(res,
         error instanceof Error ? error.message : 'Failed to get invoices',
+        500,
         'INVOICES_RETRIEVAL_FAILED'
-      ));
+      );
     }
   }
 
   async sendInvoice(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      const userId = req.user?.id;
+      const userId = req.user ? parseInt(req.user.id) : undefined;
       const requestId = req.requestId || 'unknown';
       const invoiceId = parseInt(req.params.invoiceId);
 
       if (!userId) {
-        res.status(401).json(createErrorResponse(
-          'User authentication required',
-          'INVOICE_AUTH_REQUIRED'
-        ));
-        return;
+        return sendErrorResponse(res, 'User authentication required', 401, 'INVOICE_AUTH_REQUIRED');
       }
 
       if (isNaN(invoiceId)) {
-        res.status(400).json(createErrorResponse(
-          'Invalid invoice ID',
-          'INVALID_INVOICE_ID'
-        ));
-        return;
+        return sendErrorResponse(res, 'Invalid invoice ID', 400, 'INVALID_INVOICE_ID');
       }
 
       await this.invoiceService.sendInvoice(invoiceId, requestId);
@@ -261,47 +229,41 @@ export class InvoiceController {
         requestId
       });
 
-      res.status(200).json(createSuccessResponse(
-        'Invoice sent successfully',
-        { invoiceId, status: 'sent' }
-      ));
+      sendSuccessResponse(res, {
+        message: 'Invoice sent successfully',
+        data: { invoiceId, status: 'sent' }
+      });
+
     } catch (error) {
       logger.error('Failed to send invoice', {
         invoiceId: req.params.invoiceId,
         error: error instanceof Error ? error.message : 'Unknown error',
-        userId: req.user?.id,
+        userId: req.user ? parseInt(req.user.id) : undefined,
         requestId: req.requestId
       });
 
       const statusCode = error instanceof Error && error.message.includes('not found') ? 404 :
                         error instanceof Error && error.message.includes('Only draft') ? 400 : 500;
-      res.status(statusCode).json(createErrorResponse(
+      sendErrorResponse(res,
         error instanceof Error ? error.message : 'Failed to send invoice',
+        statusCode,
         'INVOICE_SEND_FAILED'
-      ));
+      );
     }
   }
 
   async cancelInvoice(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      const userId = req.user?.id;
+      const userId = req.user ? parseInt(req.user.id) : undefined;
       const requestId = req.requestId || 'unknown';
       const invoiceId = parseInt(req.params.invoiceId);
 
       if (!userId) {
-        res.status(401).json(createErrorResponse(
-          'User authentication required',
-          'INVOICE_AUTH_REQUIRED'
-        ));
-        return;
+        return sendErrorResponse(res, 'User authentication required', 401, 'INVOICE_AUTH_REQUIRED');
       }
 
       if (isNaN(invoiceId)) {
-        res.status(400).json(createErrorResponse(
-          'Invalid invoice ID',
-          'INVALID_INVOICE_ID'
-        ));
-        return;
+        return sendErrorResponse(res, 'Invalid invoice ID', 400, 'INVALID_INVOICE_ID');
       }
 
       await this.invoiceService.cancelInvoice(invoiceId, requestId);
@@ -312,47 +274,41 @@ export class InvoiceController {
         requestId
       });
 
-      res.status(200).json(createSuccessResponse(
-        'Invoice cancelled successfully',
-        { invoiceId, status: 'cancelled' }
-      ));
+      sendSuccessResponse(res, {
+        message: 'Invoice cancelled successfully',
+        data: { invoiceId, status: 'cancelled' }
+      });
+
     } catch (error) {
       logger.error('Failed to cancel invoice', {
         invoiceId: req.params.invoiceId,
         error: error instanceof Error ? error.message : 'Unknown error',
-        userId: req.user?.id,
+        userId: req.user ? parseInt(req.user.id) : undefined,
         requestId: req.requestId
       });
 
       const statusCode = error instanceof Error && error.message.includes('not found') ? 404 :
                         error instanceof Error && error.message.includes('Cannot cancel') ? 400 : 500;
-      res.status(statusCode).json(createErrorResponse(
+      sendErrorResponse(res,
         error instanceof Error ? error.message : 'Failed to cancel invoice',
+        statusCode,
         'INVOICE_CANCELLATION_FAILED'
-      ));
+      );
     }
   }
 
   async deleteInvoice(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      const userId = req.user?.id;
+      const userId = req.user ? parseInt(req.user.id) : undefined;
       const requestId = req.requestId || 'unknown';
       const invoiceId = parseInt(req.params.invoiceId);
 
       if (!userId) {
-        res.status(401).json(createErrorResponse(
-          'User authentication required',
-          'INVOICE_AUTH_REQUIRED'
-        ));
-        return;
+        return sendErrorResponse(res, 'User authentication required', 401, 'INVOICE_AUTH_REQUIRED');
       }
 
       if (isNaN(invoiceId)) {
-        res.status(400).json(createErrorResponse(
-          'Invalid invoice ID',
-          'INVALID_INVOICE_ID'
-        ));
-        return;
+        return sendErrorResponse(res, 'Invalid invoice ID', 400, 'INVALID_INVOICE_ID');
       }
 
       await this.invoiceService.deleteInvoice(invoiceId, requestId);
@@ -363,24 +319,26 @@ export class InvoiceController {
         requestId
       });
 
-      res.status(200).json(createSuccessResponse(
-        'Invoice deleted successfully',
-        { invoiceId, deleted: true }
-      ));
+      sendSuccessResponse(res, {
+        message: 'Invoice deleted successfully',
+        data: { invoiceId, deleted: true }
+      });
+
     } catch (error) {
       logger.error('Failed to delete invoice', {
         invoiceId: req.params.invoiceId,
         error: error instanceof Error ? error.message : 'Unknown error',
-        userId: req.user?.id,
+        userId: req.user ? parseInt(req.user.id) : undefined,
         requestId: req.requestId
       });
 
       const statusCode = error instanceof Error && error.message.includes('not found') ? 404 :
                         error instanceof Error && error.message.includes('Cannot delete') ? 400 : 500;
-      res.status(statusCode).json(createErrorResponse(
+      sendErrorResponse(res,
         error instanceof Error ? error.message : 'Failed to delete invoice',
+        statusCode,
         'INVOICE_DELETION_FAILED'
-      ));
+      );
     }
   }
 }

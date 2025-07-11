@@ -1,7 +1,8 @@
 import { Request, Response } from 'express';
 import { PAYMENT_CONSTANTS } from '../../config/payment';
-import { logger, createSuccessResponse, createErrorResponse } from '../../shared/utils';
+import { logger, sendSuccessResponse, sendErrorResponse } from '../../shared/utils';
 import { PaymentService } from '../services';
+import { AuthenticatedRequest } from '../../auth/middleware/auth.middleware';
 import { 
   CreatePaymentIntentRequest,
   ConfirmPaymentRequest,
@@ -9,15 +10,6 @@ import {
   PaymentStatusRequest,
   PaymentHistoryRequest
 } from '../types';
-
-interface AuthenticatedRequest extends Request {
-  user?: {
-    id: number;
-    email: string;
-    role: string;
-  };
-  requestId?: string;
-}
 
 export class PaymentController {
   private paymentService: PaymentService;
@@ -28,15 +20,11 @@ export class PaymentController {
 
   async createPaymentIntent(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      const userId = req.user?.id;
+      const userId = req.user ? parseInt(req.user.id) : undefined;
       const requestId = req.requestId || 'unknown';
 
       if (!userId) {
-        res.status(401).json(createErrorResponse(
-          'User authentication required',
-          'PAYMENT_AUTH_REQUIRED'
-        ));
-        return;
+        return sendErrorResponse(res, 'User authentication required', 401, 'PAYMENT_AUTH_REQUIRED');
       }
 
       const request: CreatePaymentIntentRequest = {
@@ -58,36 +46,34 @@ export class PaymentController {
         requestId
       });
 
-      res.status(201).json(createSuccessResponse(
-        'Payment intent created successfully',
-        paymentIntent
-      ));
+      sendSuccessResponse(res, {
+        message: 'Payment intent created successfully',
+        data: paymentIntent
+      }, 201);
+
     } catch (error) {
       logger.error('Failed to create payment intent', {
         error: error instanceof Error ? error.message : 'Unknown error',
-        userId: req.user?.id,
+        userId: req.user ? parseInt(req.user.id) : undefined,
         requestId: req.requestId
       });
 
       const statusCode = error instanceof Error && error.message.includes('Invalid') ? 400 : 500;
-      res.status(statusCode).json(createErrorResponse(
+      sendErrorResponse(res,
         error instanceof Error ? error.message : 'Failed to create payment intent',
+        statusCode,
         'PAYMENT_INTENT_CREATION_FAILED'
-      ));
+      );
     }
   }
 
   async confirmPayment(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      const userId = req.user?.id;
+      const userId = req.user ? parseInt(req.user.id) : undefined;
       const requestId = req.requestId || 'unknown';
 
       if (!userId) {
-        res.status(401).json(createErrorResponse(
-          'User authentication required',
-          'PAYMENT_AUTH_REQUIRED'
-        ));
-        return;
+        return sendErrorResponse(res, 'User authentication required', 401, 'PAYMENT_AUTH_REQUIRED');
       }
 
       const request: ConfirmPaymentRequest = req.body;
@@ -100,37 +86,35 @@ export class PaymentController {
         requestId
       });
 
-      res.status(200).json(createSuccessResponse(
-        'Payment confirmed successfully',
-        confirmResult
-      ));
+      sendSuccessResponse(res, {
+        message: 'Payment confirmed successfully',
+        data: confirmResult
+      });
+
     } catch (error) {
       logger.error('Failed to confirm payment', {
         paymentIntentId: req.body.paymentIntentId,
         error: error instanceof Error ? error.message : 'Unknown error',
-        userId: req.user?.id,
+        userId: req.user ? parseInt(req.user.id) : undefined,
         requestId: req.requestId
       });
 
       const statusCode = error instanceof Error && error.message.includes('not found') ? 404 : 500;
-      res.status(statusCode).json(createErrorResponse(
+      sendErrorResponse(res,
         error instanceof Error ? error.message : 'Failed to confirm payment',
+        statusCode,
         'PAYMENT_CONFIRMATION_FAILED'
-      ));
+      );
     }
   }
 
   async createPaymentLink(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      const userId = req.user?.id;
+      const userId = req.user ? parseInt(req.user.id) : undefined;
       const requestId = req.requestId || 'unknown';
 
       if (!userId) {
-        res.status(401).json(createErrorResponse(
-          'User authentication required',
-          'PAYMENT_AUTH_REQUIRED'
-        ));
-        return;
+        return sendErrorResponse(res, 'User authentication required', 401, 'PAYMENT_AUTH_REQUIRED');
       }
 
       const request: PaymentLinkRequest = {
@@ -151,45 +135,39 @@ export class PaymentController {
         requestId
       });
 
-      res.status(201).json(createSuccessResponse(
-        'Payment link created successfully',
-        paymentLink
-      ));
+      sendSuccessResponse(res, {
+        message: 'Payment link created successfully',
+        data: paymentLink
+      }, 201);
+
     } catch (error) {
       logger.error('Failed to create payment link', {
         error: error instanceof Error ? error.message : 'Unknown error',
-        userId: req.user?.id,
+        userId: req.user ? parseInt(req.user.id) : undefined,
         requestId: req.requestId
       });
 
       const statusCode = error instanceof Error && error.message.includes('Invalid') ? 400 : 500;
-      res.status(statusCode).json(createErrorResponse(
+      sendErrorResponse(res,
         error instanceof Error ? error.message : 'Failed to create payment link',
+        statusCode,
         'PAYMENT_LINK_CREATION_FAILED'
-      ));
+      );
     }
   }
 
   async getPaymentStatus(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      const userId = req.user?.id;
+      const userId = req.user ? parseInt(req.user.id) : undefined;
       const requestId = req.requestId || 'unknown';
       const paymentId = parseInt(req.params.paymentId);
 
       if (!userId) {
-        res.status(401).json(createErrorResponse(
-          'User authentication required',
-          'PAYMENT_AUTH_REQUIRED'
-        ));
-        return;
+        return sendErrorResponse(res, 'User authentication required', 401, 'PAYMENT_AUTH_REQUIRED');
       }
 
       if (isNaN(paymentId)) {
-        res.status(400).json(createErrorResponse(
-          'Invalid payment ID',
-          'INVALID_PAYMENT_ID'
-        ));
-        return;
+        return sendErrorResponse(res, 'Invalid payment ID', 400, 'INVALID_PAYMENT_ID');
       }
 
       const request: PaymentStatusRequest = { paymentId };
@@ -202,37 +180,35 @@ export class PaymentController {
         requestId
       });
 
-      res.status(200).json(createSuccessResponse(
-        'Payment status retrieved successfully',
-        paymentStatus
-      ));
+      sendSuccessResponse(res, {
+        message: 'Payment status retrieved successfully',
+        data: paymentStatus
+      });
+
     } catch (error) {
       logger.error('Failed to get payment status', {
         paymentId: req.params.paymentId,
         error: error instanceof Error ? error.message : 'Unknown error',
-        userId: req.user?.id,
+        userId: req.user ? parseInt(req.user.id) : undefined,
         requestId: req.requestId
       });
 
       const statusCode = error instanceof Error && error.message.includes('not found') ? 404 : 500;
-      res.status(statusCode).json(createErrorResponse(
+      sendErrorResponse(res,
         error instanceof Error ? error.message : 'Failed to get payment status',
+        statusCode,
         'PAYMENT_STATUS_RETRIEVAL_FAILED'
-      ));
+      );
     }
   }
 
   async getPaymentHistory(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      const userId = req.user?.id;
+      const userId = req.user ? parseInt(req.user.id) : undefined;
       const requestId = req.requestId || 'unknown';
 
       if (!userId) {
-        res.status(401).json(createErrorResponse(
-          'User authentication required',
-          'PAYMENT_AUTH_REQUIRED'
-        ));
-        return;
+        return sendErrorResponse(res, 'User authentication required', 401, 'PAYMENT_AUTH_REQUIRED');
       }
 
       const request: PaymentHistoryRequest = {
@@ -250,44 +226,38 @@ export class PaymentController {
         requestId
       });
 
-      res.status(200).json(createSuccessResponse(
-        'Payment history retrieved successfully',
-        paymentHistory
-      ));
+      sendSuccessResponse(res, {
+        message: 'Payment history retrieved successfully',
+        data: paymentHistory
+      });
+
     } catch (error) {
       logger.error('Failed to get payment history', {
         error: error instanceof Error ? error.message : 'Unknown error',
-        userId: req.user?.id,
+        userId: req.user ? parseInt(req.user.id) : undefined,
         requestId: req.requestId
       });
 
-      res.status(500).json(createErrorResponse(
+      sendErrorResponse(res,
         error instanceof Error ? error.message : 'Failed to get payment history',
+        500,
         'PAYMENT_HISTORY_RETRIEVAL_FAILED'
-      ));
+      );
     }
   }
 
   async cancelPayment(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      const userId = req.user?.id;
+      const userId = req.user ? parseInt(req.user.id) : undefined;
       const requestId = req.requestId || 'unknown';
       const paymentId = parseInt(req.params.paymentId);
 
       if (!userId) {
-        res.status(401).json(createErrorResponse(
-          'User authentication required',
-          'PAYMENT_AUTH_REQUIRED'
-        ));
-        return;
+        return sendErrorResponse(res, 'User authentication required', 401, 'PAYMENT_AUTH_REQUIRED');
       }
 
       if (isNaN(paymentId)) {
-        res.status(400).json(createErrorResponse(
-          'Invalid payment ID',
-          'INVALID_PAYMENT_ID'
-        ));
-        return;
+        return sendErrorResponse(res, 'Invalid payment ID', 400, 'INVALID_PAYMENT_ID');
       }
 
       await this.paymentService.cancelPayment(paymentId, requestId);
@@ -298,24 +268,26 @@ export class PaymentController {
         requestId
       });
 
-      res.status(200).json(createSuccessResponse(
-        'Payment cancelled successfully',
-        { paymentId, status: 'cancelled' }
-      ));
+      sendSuccessResponse(res, {
+        message: 'Payment cancelled successfully',
+        data: { paymentId, status: 'cancelled' }
+      });
+
     } catch (error) {
       logger.error('Failed to cancel payment', {
         paymentId: req.params.paymentId,
         error: error instanceof Error ? error.message : 'Unknown error',
-        userId: req.user?.id,
+        userId: req.user ? parseInt(req.user.id) : undefined,
         requestId: req.requestId
       });
 
       const statusCode = error instanceof Error && error.message.includes('not found') ? 404 : 
                         error instanceof Error && error.message.includes('Cannot cancel') ? 400 : 500;
-      res.status(statusCode).json(createErrorResponse(
+      sendErrorResponse(res,
         error instanceof Error ? error.message : 'Failed to cancel payment',
+        statusCode,
         'PAYMENT_CANCELLATION_FAILED'
-      ));
+      );
     }
   }
 
@@ -345,20 +317,22 @@ export class PaymentController {
         requestId
       });
 
-      res.status(200).json(createSuccessResponse(
-        'Payment methods retrieved successfully',
-        supportedMethods
-      ));
+      sendSuccessResponse(res, {
+        message: 'Payment methods retrieved successfully',
+        data: supportedMethods
+      });
+
     } catch (error) {
       logger.error('Failed to get payment methods', {
         error: error instanceof Error ? error.message : 'Unknown error',
         requestId: req.requestId
       });
 
-      res.status(500).json(createErrorResponse(
+      sendErrorResponse(res,
         'Failed to get payment methods',
+        500,
         'PAYMENT_METHODS_RETRIEVAL_FAILED'
-      ));
+      );
     }
   }
 }

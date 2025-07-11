@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
-import { logger, createSuccessResponse, createErrorResponse } from '../../shared/utils';
+import { logger, sendSuccessResponse, sendErrorResponse } from '../../shared/utils';
 import { PaymentMethodService } from '../services';
+import { AuthenticatedRequest } from '../../auth/middleware/auth.middleware';
 import { 
   CreatePaymentMethodRequest,
   AttachPaymentMethodRequest,
@@ -8,15 +9,6 @@ import {
   SetDefaultPaymentMethodRequest,
   PaymentMethodListRequest
 } from '../types';
-
-interface AuthenticatedRequest extends Request {
-  user?: {
-    id: number;
-    email: string;
-    role: string;
-  };
-  requestId?: string;
-}
 
 export class PaymentMethodController {
   private paymentMethodService: PaymentMethodService;
@@ -27,15 +19,11 @@ export class PaymentMethodController {
 
   async createPaymentMethod(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      const userId = req.user?.id;
+      const userId = req.user ? parseInt(req.user.id) : undefined;
       const requestId = req.requestId || 'unknown';
 
       if (!userId) {
-        res.status(401).json(createErrorResponse(
-          'User authentication required',
-          'PAYMENT_METHOD_AUTH_REQUIRED'
-        ));
-        return;
+        return sendErrorResponse(res, 'User authentication required', 401, 'PAYMENT_METHOD_AUTH_REQUIRED');
       }
 
       const request: CreatePaymentMethodRequest = {
@@ -55,36 +43,34 @@ export class PaymentMethodController {
         requestId
       });
 
-      res.status(201).json(createSuccessResponse(
-        'Payment method created successfully',
-        paymentMethod
-      ));
+      sendSuccessResponse(res, {
+        message: 'Payment method created successfully',
+        data: paymentMethod
+      }, 201);
+
     } catch (error) {
       logger.error('Failed to create payment method', {
         error: error instanceof Error ? error.message : 'Unknown error',
-        userId: req.user?.id,
+        userId: req.user ? parseInt(req.user.id) : undefined,
         requestId: req.requestId
       });
 
       const statusCode = error instanceof Error && error.message.includes('Invalid') ? 400 : 500;
-      res.status(statusCode).json(createErrorResponse(
+      sendErrorResponse(res,
         error instanceof Error ? error.message : 'Failed to create payment method',
+        statusCode,
         'PAYMENT_METHOD_CREATION_FAILED'
-      ));
+      );
     }
   }
 
   async attachPaymentMethod(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      const userId = req.user?.id;
+      const userId = req.user ? parseInt(req.user.id) : undefined;
       const requestId = req.requestId || 'unknown';
 
       if (!userId) {
-        res.status(401).json(createErrorResponse(
-          'User authentication required',
-          'PAYMENT_METHOD_AUTH_REQUIRED'
-        ));
-        return;
+        return sendErrorResponse(res, 'User authentication required', 401, 'PAYMENT_METHOD_AUTH_REQUIRED');
       }
 
       const request: AttachPaymentMethodRequest = req.body;
@@ -97,46 +83,40 @@ export class PaymentMethodController {
         requestId
       });
 
-      res.status(200).json(createSuccessResponse(
-        'Payment method attached successfully',
-        attachResult
-      ));
+      sendSuccessResponse(res, {
+        message: 'Payment method attached successfully',
+        data: attachResult
+      });
+
     } catch (error) {
       logger.error('Failed to attach payment method', {
         paymentMethodId: req.body.paymentMethodId,
         error: error instanceof Error ? error.message : 'Unknown error',
-        userId: req.user?.id,
+        userId: req.user ? parseInt(req.user.id) : undefined,
         requestId: req.requestId
       });
 
       const statusCode = error instanceof Error && error.message.includes('not found') ? 404 : 500;
-      res.status(statusCode).json(createErrorResponse(
+      sendErrorResponse(res,
         error instanceof Error ? error.message : 'Failed to attach payment method',
+        statusCode,
         'PAYMENT_METHOD_ATTACH_FAILED'
-      ));
+      );
     }
   }
 
   async detachPaymentMethod(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      const userId = req.user?.id;
+      const userId = req.user ? parseInt(req.user.id) : undefined;
       const requestId = req.requestId || 'unknown';
       const paymentMethodId = req.params.paymentMethodId;
 
       if (!userId) {
-        res.status(401).json(createErrorResponse(
-          'User authentication required',
-          'PAYMENT_METHOD_AUTH_REQUIRED'
-        ));
-        return;
+        return sendErrorResponse(res, 'User authentication required', 401, 'PAYMENT_METHOD_AUTH_REQUIRED');
       }
 
       if (!paymentMethodId) {
-        res.status(400).json(createErrorResponse(
-          'Payment method ID is required',
-          'PAYMENT_METHOD_ID_REQUIRED'
-        ));
-        return;
+        return sendErrorResponse(res, 'Payment method ID is required', 400, 'PAYMENT_METHOD_ID_REQUIRED');
       }
 
       const request: DetachPaymentMethodRequest = { paymentMethodId };
@@ -148,47 +128,41 @@ export class PaymentMethodController {
         requestId
       });
 
-      res.status(200).json(createSuccessResponse(
-        'Payment method detached successfully',
-        detachResult
-      ));
+      sendSuccessResponse(res, {
+        message: 'Payment method detached successfully',
+        data: detachResult
+      });
+
     } catch (error) {
       logger.error('Failed to detach payment method', {
         paymentMethodId: req.params.paymentMethodId,
         error: error instanceof Error ? error.message : 'Unknown error',
-        userId: req.user?.id,
+        userId: req.user ? parseInt(req.user.id) : undefined,
         requestId: req.requestId
       });
 
       const statusCode = error instanceof Error && error.message.includes('not found') ? 404 :
                         error instanceof Error && error.message.includes('Cannot detach') ? 400 : 500;
-      res.status(statusCode).json(createErrorResponse(
+      sendErrorResponse(res,
         error instanceof Error ? error.message : 'Failed to detach payment method',
+        statusCode,
         'PAYMENT_METHOD_DETACH_FAILED'
-      ));
+      );
     }
   }
 
   async setDefaultPaymentMethod(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      const userId = req.user?.id;
+      const userId = req.user ? parseInt(req.user.id) : undefined;
       const requestId = req.requestId || 'unknown';
       const paymentMethodId = parseInt(req.params.paymentMethodId);
 
       if (!userId) {
-        res.status(401).json(createErrorResponse(
-          'User authentication required',
-          'PAYMENT_METHOD_AUTH_REQUIRED'
-        ));
-        return;
+        return sendErrorResponse(res, 'User authentication required', 401, 'PAYMENT_METHOD_AUTH_REQUIRED');
       }
 
       if (isNaN(paymentMethodId)) {
-        res.status(400).json(createErrorResponse(
-          'Invalid payment method ID',
-          'INVALID_PAYMENT_METHOD_ID'
-        ));
-        return;
+        return sendErrorResponse(res, 'Invalid payment method ID', 400, 'INVALID_PAYMENT_METHOD_ID');
       }
 
       const request: SetDefaultPaymentMethodRequest = {
@@ -204,38 +178,36 @@ export class PaymentMethodController {
         requestId
       });
 
-      res.status(200).json(createSuccessResponse(
-        'Default payment method set successfully',
-        defaultResult
-      ));
+      sendSuccessResponse(res, {
+        message: 'Default payment method set successfully',
+        data: defaultResult
+      });
+
     } catch (error) {
       logger.error('Failed to set default payment method', {
         paymentMethodId: req.params.paymentMethodId,
         error: error instanceof Error ? error.message : 'Unknown error',
-        userId: req.user?.id,
+        userId: req.user ? parseInt(req.user.id) : undefined,
         requestId: req.requestId
       });
 
       const statusCode = error instanceof Error && error.message.includes('not found') ? 404 :
                         error instanceof Error && error.message.includes('does not belong') ? 403 : 500;
-      res.status(statusCode).json(createErrorResponse(
+      sendErrorResponse(res,
         error instanceof Error ? error.message : 'Failed to set default payment method',
+        statusCode,
         'SET_DEFAULT_PAYMENT_METHOD_FAILED'
-      ));
+      );
     }
   }
 
   async getUserPaymentMethods(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      const userId = req.user?.id;
+      const userId = req.user ? parseInt(req.user.id) : undefined;
       const requestId = req.requestId || 'unknown';
 
       if (!userId) {
-        res.status(401).json(createErrorResponse(
-          'User authentication required',
-          'PAYMENT_METHOD_AUTH_REQUIRED'
-        ));
-        return;
+        return sendErrorResponse(res, 'User authentication required', 401, 'PAYMENT_METHOD_AUTH_REQUIRED');
       }
 
       const request: PaymentMethodListRequest = {
@@ -253,44 +225,38 @@ export class PaymentMethodController {
         requestId
       });
 
-      res.status(200).json(createSuccessResponse(
-        'Payment methods retrieved successfully',
-        paymentMethods
-      ));
+      sendSuccessResponse(res, {
+        message: 'Payment methods retrieved successfully',
+        data: paymentMethods
+      });
+
     } catch (error) {
       logger.error('Failed to get user payment methods', {
         error: error instanceof Error ? error.message : 'Unknown error',
-        userId: req.user?.id,
+        userId: req.user ? parseInt(req.user.id) : undefined,
         requestId: req.requestId
       });
 
-      res.status(500).json(createErrorResponse(
+      sendErrorResponse(res,
         error instanceof Error ? error.message : 'Failed to get payment methods',
+        500,
         'PAYMENT_METHODS_RETRIEVAL_FAILED'
-      ));
+      );
     }
   }
 
   async deletePaymentMethod(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      const userId = req.user?.id;
+      const userId = req.user ? parseInt(req.user.id) : undefined;
       const requestId = req.requestId || 'unknown';
       const paymentMethodId = parseInt(req.params.paymentMethodId);
 
       if (!userId) {
-        res.status(401).json(createErrorResponse(
-          'User authentication required',
-          'PAYMENT_METHOD_AUTH_REQUIRED'
-        ));
-        return;
+        return sendErrorResponse(res, 'User authentication required', 401, 'PAYMENT_METHOD_AUTH_REQUIRED');
       }
 
       if (isNaN(paymentMethodId)) {
-        res.status(400).json(createErrorResponse(
-          'Invalid payment method ID',
-          'INVALID_PAYMENT_METHOD_ID'
-        ));
-        return;
+        return sendErrorResponse(res, 'Invalid payment method ID', 400, 'INVALID_PAYMENT_METHOD_ID');
       }
 
       await this.paymentMethodService.deletePaymentMethod(paymentMethodId, userId, requestId);
@@ -301,49 +267,43 @@ export class PaymentMethodController {
         requestId
       });
 
-      res.status(200).json(createSuccessResponse(
-        'Payment method deleted successfully',
-        { paymentMethodId, deleted: true }
-      ));
+      sendSuccessResponse(res, {
+        message: 'Payment method deleted successfully',
+        data: { paymentMethodId, deleted: true }
+      });
+
     } catch (error) {
       logger.error('Failed to delete payment method', {
         paymentMethodId: req.params.paymentMethodId,
         error: error instanceof Error ? error.message : 'Unknown error',
-        userId: req.user?.id,
+        userId: req.user ? parseInt(req.user.id) : undefined,
         requestId: req.requestId
       });
 
       const statusCode = error instanceof Error && error.message.includes('not found') ? 404 :
                         error instanceof Error && error.message.includes('Cannot delete') ? 400 :
                         error instanceof Error && error.message.includes('does not belong') ? 403 : 500;
-      res.status(statusCode).json(createErrorResponse(
+      sendErrorResponse(res,
         error instanceof Error ? error.message : 'Failed to delete payment method',
+        statusCode,
         'PAYMENT_METHOD_DELETION_FAILED'
-      ));
+      );
     }
   }
 
   async getDefaultPaymentMethod(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      const userId = req.user?.id;
+      const userId = req.user ? parseInt(req.user.id) : undefined;
       const requestId = req.requestId || 'unknown';
 
       if (!userId) {
-        res.status(401).json(createErrorResponse(
-          'User authentication required',
-          'PAYMENT_METHOD_AUTH_REQUIRED'
-        ));
-        return;
+        return sendErrorResponse(res, 'User authentication required', 401, 'PAYMENT_METHOD_AUTH_REQUIRED');
       }
 
       const defaultPaymentMethod = await this.paymentMethodService.getDefaultPaymentMethod(userId, requestId);
 
       if (!defaultPaymentMethod) {
-        res.status(404).json(createErrorResponse(
-          'No default payment method found',
-          'DEFAULT_PAYMENT_METHOD_NOT_FOUND'
-        ));
-        return;
+        return sendErrorResponse(res, 'No default payment method found', 404, 'DEFAULT_PAYMENT_METHOD_NOT_FOUND');
       }
 
       logger.info('Default payment method retrieved successfully', {
@@ -352,21 +312,23 @@ export class PaymentMethodController {
         requestId
       });
 
-      res.status(200).json(createSuccessResponse(
-        'Default payment method retrieved successfully',
-        defaultPaymentMethod
-      ));
+      sendSuccessResponse(res, {
+        message: 'Default payment method retrieved successfully',
+        data: defaultPaymentMethod
+      });
+
     } catch (error) {
       logger.error('Failed to get default payment method', {
         error: error instanceof Error ? error.message : 'Unknown error',
-        userId: req.user?.id,
+        userId: req.user ? parseInt(req.user.id) : undefined,
         requestId: req.requestId
       });
 
-      res.status(500).json(createErrorResponse(
+      sendErrorResponse(res,
         error instanceof Error ? error.message : 'Failed to get default payment method',
+        500,
         'DEFAULT_PAYMENT_METHOD_RETRIEVAL_FAILED'
-      ));
+      );
     }
   }
 }

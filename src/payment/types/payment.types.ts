@@ -269,3 +269,66 @@ export interface PaymentCancelRequest {
 
 export type PaymentEntity = PaymentDatabaseRecord;
 export type PaymentMethodEntity = PaymentMethodDatabaseRecord;
+
+
+export interface CreateInvoiceRequest {
+  amount: number;
+  currency: string;
+  description: string;
+  dueDate?: Date;
+  userId?: number;
+  metadata?: Record<string, any>;
+}
+
+export interface UpdateInvoiceStatusRequest {
+  invoiceId: number;
+  status: string;
+  reason?: string;
+}
+
+export interface InvoiceListRequest {
+  userId: number;
+  status?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface CreateRefundRequest {
+  paymentId: string;
+  amount: number;
+  reason: string;
+  userId?: number;
+  metadata?: Record<string, any>;
+}
+
+export interface UpdateRefundStatusRequest {
+  refundId: number;
+  status: string;
+  reason?: string;
+}
+
+export interface RefundListRequest {
+  userId: number;
+  status?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface PaymentStatusRequest {
+  paymentId: number;
+}
+
+export interface PaymentHistoryRequest {
+  userId: number;
+  limit?: number;
+  offset?: number;
+  startDate?: Date;
+  endDate?: Date;
+}
+
+export interface PaymentMethodListRequest {
+  userId: number;
+  limit?: number;
+  offset?: number;
+  type?: string;
+}
