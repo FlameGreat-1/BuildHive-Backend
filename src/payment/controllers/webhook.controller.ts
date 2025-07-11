@@ -21,11 +21,11 @@ export class WebhookController {
       const payload = req.rawBody ? req.rawBody.toString() : JSON.stringify(req.body);
 
       if (!signature) {
-        return sendErrorResponse(res, 'Missing Stripe signature', 400, 'WEBHOOK_SIGNATURE_MISSING');
+        return sendErrorResponse(res, 'Missing Stripe signature', 400);
       }
 
       if (!payload) {
-        return sendErrorResponse(res, 'Missing webhook payload', 400, 'WEBHOOK_PAYLOAD_MISSING');
+        return sendErrorResponse(res, 'Missing webhook payload', 400);
       }
 
       const processingResult = await this.webhookService.processWebhookEvent(
@@ -41,7 +41,7 @@ export class WebhookController {
           requestId
         });
 
-        return sendErrorResponse(res, processingResult.message, 400, 'WEBHOOK_PROCESSING_FAILED');
+        return sendErrorResponse(res, processingResult.message, 400);
       }
 
       logger.info('Webhook processed successfully', {
@@ -51,12 +51,9 @@ export class WebhookController {
         requestId
       });
 
-      sendSuccessResponse(res, {
-        message: 'Webhook processed successfully',
-        data: {
-          eventId: processingResult.eventId,
-          processed: processingResult.processed
-        }
+      sendSuccessResponse(res, 'Webhook processed successfully', {
+        eventId: processingResult.eventId,
+        processed: processingResult.processed
       });
 
     } catch (error) {
@@ -65,7 +62,7 @@ export class WebhookController {
         requestId: req.requestId
       });
 
-      sendErrorResponse(res, 'Internal webhook processing error', 500, 'WEBHOOK_INTERNAL_ERROR');
+      sendErrorResponse(res, 'Internal webhook processing error', 500);
     }
   }
 
@@ -75,7 +72,7 @@ export class WebhookController {
       const eventId = parseInt(req.params.eventId);
 
       if (isNaN(eventId)) {
-        return sendErrorResponse(res, 'Invalid webhook event ID', 400, 'INVALID_WEBHOOK_EVENT_ID');
+        return sendErrorResponse(res, 'Invalid webhook event ID', 400);
       }
 
       const retryResult = await this.webhookService.retryFailedWebhookEvent(eventId, requestId);
@@ -90,7 +87,7 @@ export class WebhookController {
         const statusCode = retryResult.message.includes('not found') ? 404 :
                           retryResult.message.includes('Maximum retry') ? 429 : 400;
 
-        return sendErrorResponse(res, retryResult.message, statusCode, 'WEBHOOK_RETRY_FAILED');
+        return sendErrorResponse(res, retryResult.message, statusCode);
       }
 
       logger.info('Webhook retry processed successfully', {
@@ -100,13 +97,10 @@ export class WebhookController {
         requestId
       });
 
-      sendSuccessResponse(res, {
-        message: 'Webhook retry processed successfully',
-        data: {
-          eventId,
-          stripeEventId: retryResult.eventId,
-          processed: retryResult.processed
-        }
+      sendSuccessResponse(res, 'Webhook retry processed successfully', {
+        eventId,
+        stripeEventId: retryResult.eventId,
+        processed: retryResult.processed
       });
 
     } catch (error) {
@@ -116,7 +110,7 @@ export class WebhookController {
         requestId: req.requestId
       });
 
-      sendErrorResponse(res, 'Internal webhook retry error', 500, 'WEBHOOK_RETRY_INTERNAL_ERROR');
+      sendErrorResponse(res, 'Internal webhook retry error', 500);
     }
   }
 
@@ -140,10 +134,7 @@ export class WebhookController {
         requestId
       });
 
-      sendSuccessResponse(res, {
-        message: 'Webhook service is healthy',
-        data: healthStatus
-      });
+      sendSuccessResponse(res, 'Webhook service is healthy', healthStatus);
 
     } catch (error) {
       logger.error('Webhook health check error', {
@@ -151,7 +142,7 @@ export class WebhookController {
         requestId: req.requestId
       });
 
-      sendErrorResponse(res, 'Webhook health check failed', 500, 'WEBHOOK_HEALTH_CHECK_FAILED');
+      sendErrorResponse(res, 'Webhook health check failed', 500);
     }
   }
 
@@ -178,10 +169,7 @@ export class WebhookController {
         requestId
       });
 
-      sendSuccessResponse(res, {
-        message: 'Webhook endpoint validation successful',
-        data: validationResult
-      });
+      sendSuccessResponse(res, 'Webhook endpoint validation successful', validationResult);
 
     } catch (error) {
       logger.error('Webhook endpoint validation error', {
@@ -189,7 +177,7 @@ export class WebhookController {
         requestId: req.requestId
       });
 
-      sendErrorResponse(res, 'Webhook endpoint validation failed', 500, 'WEBHOOK_VALIDATION_FAILED');
+      sendErrorResponse(res, 'Webhook endpoint validation failed', 500);
     }
   }
 
@@ -222,10 +210,7 @@ export class WebhookController {
         requestId
       });
 
-      sendSuccessResponse(res, {
-        message: 'Webhook configuration retrieved successfully',
-        data: configuration
-      });
+      sendSuccessResponse(res, 'Webhook configuration retrieved successfully', configuration);
 
     } catch (error) {
       logger.error('Webhook configuration retrieval error', {
@@ -233,7 +218,7 @@ export class WebhookController {
         requestId: req.requestId
       });
 
-      sendErrorResponse(res, 'Failed to get webhook configuration', 500, 'WEBHOOK_CONFIG_RETRIEVAL_FAILED');
+      sendErrorResponse(res, 'Failed to get webhook configuration', 500);
     }
   }
 }

@@ -24,7 +24,7 @@ export class PaymentController {
       const requestId = req.requestId || 'unknown';
 
       if (!userId) {
-        return sendErrorResponse(res, 'User authentication required', 401, 'PAYMENT_AUTH_REQUIRED');
+        return sendErrorResponse(res, 'User authentication required', 401);
       }
 
       const request: CreatePaymentIntentRequest = {
@@ -46,10 +46,7 @@ export class PaymentController {
         requestId
       });
 
-      sendSuccessResponse(res, {
-        message: 'Payment intent created successfully',
-        data: paymentIntent
-      }, 201);
+      sendSuccessResponse(res, 'Payment intent created successfully', paymentIntent, 201);
 
     } catch (error) {
       logger.error('Failed to create payment intent', {
@@ -61,8 +58,7 @@ export class PaymentController {
       const statusCode = error instanceof Error && error.message.includes('Invalid') ? 400 : 500;
       sendErrorResponse(res,
         error instanceof Error ? error.message : 'Failed to create payment intent',
-        statusCode,
-        'PAYMENT_INTENT_CREATION_FAILED'
+        statusCode
       );
     }
   }
@@ -73,7 +69,7 @@ export class PaymentController {
       const requestId = req.requestId || 'unknown';
 
       if (!userId) {
-        return sendErrorResponse(res, 'User authentication required', 401, 'PAYMENT_AUTH_REQUIRED');
+        return sendErrorResponse(res, 'User authentication required', 401);
       }
 
       const request: ConfirmPaymentRequest = req.body;
@@ -86,10 +82,7 @@ export class PaymentController {
         requestId
       });
 
-      sendSuccessResponse(res, {
-        message: 'Payment confirmed successfully',
-        data: confirmResult
-      });
+      sendSuccessResponse(res, 'Payment confirmed successfully', confirmResult);
 
     } catch (error) {
       logger.error('Failed to confirm payment', {
@@ -102,8 +95,7 @@ export class PaymentController {
       const statusCode = error instanceof Error && error.message.includes('not found') ? 404 : 500;
       sendErrorResponse(res,
         error instanceof Error ? error.message : 'Failed to confirm payment',
-        statusCode,
-        'PAYMENT_CONFIRMATION_FAILED'
+        statusCode
       );
     }
   }
@@ -114,7 +106,7 @@ export class PaymentController {
       const requestId = req.requestId || 'unknown';
 
       if (!userId) {
-        return sendErrorResponse(res, 'User authentication required', 401, 'PAYMENT_AUTH_REQUIRED');
+        return sendErrorResponse(res, 'User authentication required', 401);
       }
 
       const request: PaymentLinkRequest = {
@@ -135,10 +127,7 @@ export class PaymentController {
         requestId
       });
 
-      sendSuccessResponse(res, {
-        message: 'Payment link created successfully',
-        data: paymentLink
-      }, 201);
+      sendSuccessResponse(res, 'Payment link created successfully', paymentLink, 201);
 
     } catch (error) {
       logger.error('Failed to create payment link', {
@@ -150,8 +139,7 @@ export class PaymentController {
       const statusCode = error instanceof Error && error.message.includes('Invalid') ? 400 : 500;
       sendErrorResponse(res,
         error instanceof Error ? error.message : 'Failed to create payment link',
-        statusCode,
-        'PAYMENT_LINK_CREATION_FAILED'
+        statusCode
       );
     }
   }
@@ -163,11 +151,11 @@ export class PaymentController {
       const paymentId = parseInt(req.params.paymentId);
 
       if (!userId) {
-        return sendErrorResponse(res, 'User authentication required', 401, 'PAYMENT_AUTH_REQUIRED');
+        return sendErrorResponse(res, 'User authentication required', 401);
       }
 
       if (isNaN(paymentId)) {
-        return sendErrorResponse(res, 'Invalid payment ID', 400, 'INVALID_PAYMENT_ID');
+        return sendErrorResponse(res, 'Invalid payment ID', 400);
       }
 
       const request: PaymentStatusRequest = { paymentId };
@@ -180,10 +168,7 @@ export class PaymentController {
         requestId
       });
 
-      sendSuccessResponse(res, {
-        message: 'Payment status retrieved successfully',
-        data: paymentStatus
-      });
+      sendSuccessResponse(res, 'Payment status retrieved successfully', paymentStatus);
 
     } catch (error) {
       logger.error('Failed to get payment status', {
@@ -196,8 +181,7 @@ export class PaymentController {
       const statusCode = error instanceof Error && error.message.includes('not found') ? 404 : 500;
       sendErrorResponse(res,
         error instanceof Error ? error.message : 'Failed to get payment status',
-        statusCode,
-        'PAYMENT_STATUS_RETRIEVAL_FAILED'
+        statusCode
       );
     }
   }
@@ -208,7 +192,7 @@ export class PaymentController {
       const requestId = req.requestId || 'unknown';
 
       if (!userId) {
-        return sendErrorResponse(res, 'User authentication required', 401, 'PAYMENT_AUTH_REQUIRED');
+        return sendErrorResponse(res, 'User authentication required', 401);
       }
 
       const request: PaymentHistoryRequest = {
@@ -226,10 +210,7 @@ export class PaymentController {
         requestId
       });
 
-      sendSuccessResponse(res, {
-        message: 'Payment history retrieved successfully',
-        data: paymentHistory
-      });
+      sendSuccessResponse(res, 'Payment history retrieved successfully', paymentHistory);
 
     } catch (error) {
       logger.error('Failed to get payment history', {
@@ -240,8 +221,7 @@ export class PaymentController {
 
       sendErrorResponse(res,
         error instanceof Error ? error.message : 'Failed to get payment history',
-        500,
-        'PAYMENT_HISTORY_RETRIEVAL_FAILED'
+        500
       );
     }
   }
@@ -253,11 +233,11 @@ export class PaymentController {
       const paymentId = parseInt(req.params.paymentId);
 
       if (!userId) {
-        return sendErrorResponse(res, 'User authentication required', 401, 'PAYMENT_AUTH_REQUIRED');
+        return sendErrorResponse(res, 'User authentication required', 401);
       }
 
       if (isNaN(paymentId)) {
-        return sendErrorResponse(res, 'Invalid payment ID', 400, 'INVALID_PAYMENT_ID');
+        return sendErrorResponse(res, 'Invalid payment ID', 400);
       }
 
       await this.paymentService.cancelPayment(paymentId, requestId);
@@ -268,10 +248,7 @@ export class PaymentController {
         requestId
       });
 
-      sendSuccessResponse(res, {
-        message: 'Payment cancelled successfully',
-        data: { paymentId, status: 'cancelled' }
-      });
+      sendSuccessResponse(res, 'Payment cancelled successfully', { paymentId, status: 'cancelled' });
 
     } catch (error) {
       logger.error('Failed to cancel payment', {
@@ -285,8 +262,7 @@ export class PaymentController {
                         error instanceof Error && error.message.includes('Cannot cancel') ? 400 : 500;
       sendErrorResponse(res,
         error instanceof Error ? error.message : 'Failed to cancel payment',
-        statusCode,
-        'PAYMENT_CANCELLATION_FAILED'
+        statusCode
       );
     }
   }
@@ -317,10 +293,7 @@ export class PaymentController {
         requestId
       });
 
-      sendSuccessResponse(res, {
-        message: 'Payment methods retrieved successfully',
-        data: supportedMethods
-      });
+      sendSuccessResponse(res, 'Payment methods retrieved successfully', supportedMethods);
 
     } catch (error) {
       logger.error('Failed to get payment methods', {
@@ -330,8 +303,7 @@ export class PaymentController {
 
       sendErrorResponse(res,
         'Failed to get payment methods',
-        500,
-        'PAYMENT_METHODS_RETRIEVAL_FAILED'
+        500
       );
     }
   }

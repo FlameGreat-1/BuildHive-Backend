@@ -21,7 +21,7 @@ export class InvoiceController {
       const requestId = req.requestId || 'unknown';
 
       if (!userId) {
-        return sendErrorResponse(res, 'User authentication required', 401, 'INVOICE_AUTH_REQUIRED');
+        return sendErrorResponse(res, 'User authentication required', 401);
       }
 
       const request: CreateInvoiceRequest = {
@@ -43,11 +43,8 @@ export class InvoiceController {
         userId,
         requestId
       });
-
-      sendSuccessResponse(res, {
-        message: 'Invoice created successfully',
-        data: invoice
-      }, 201);
+      
+      sendSuccessResponse(res, 'Invoice created successfully', invoice, 201);
 
     } catch (error) {
       logger.error('Failed to create invoice', {
@@ -59,8 +56,7 @@ export class InvoiceController {
       const statusCode = error instanceof Error && error.message.includes('Invalid') ? 400 : 500;
       sendErrorResponse(res, 
         error instanceof Error ? error.message : 'Failed to create invoice',
-        statusCode,
-        'INVOICE_CREATION_FAILED'
+        statusCode
       );
     }
   }
@@ -72,11 +68,11 @@ export class InvoiceController {
       const invoiceId = parseInt(req.params.invoiceId);
 
       if (!userId) {
-        return sendErrorResponse(res, 'User authentication required', 401, 'INVOICE_AUTH_REQUIRED');
+        return sendErrorResponse(res, 'User authentication required', 401);
       }
 
       if (isNaN(invoiceId)) {
-        return sendErrorResponse(res, 'Invalid invoice ID', 400, 'INVALID_INVOICE_ID');
+        return sendErrorResponse(res, 'Invalid invoice ID', 400);
       }
 
       const request: UpdateInvoiceStatusRequest = {
@@ -93,10 +89,7 @@ export class InvoiceController {
         requestId
       });
 
-      sendSuccessResponse(res, {
-        message: 'Invoice status updated successfully',
-        data: updateResult
-      });
+      sendSuccessResponse(res, 'Invoice status updated successfully', updateResult);
 
     } catch (error) {
       logger.error('Failed to update invoice status', {
@@ -109,8 +102,7 @@ export class InvoiceController {
       const statusCode = error instanceof Error && error.message.includes('not found') ? 404 : 500;
       sendErrorResponse(res,
         error instanceof Error ? error.message : 'Failed to update invoice status',
-        statusCode,
-        'INVOICE_STATUS_UPDATE_FAILED'
+        statusCode
       );
     }
   }
@@ -122,11 +114,11 @@ export class InvoiceController {
       const invoiceId = parseInt(req.params.invoiceId);
 
       if (!userId) {
-        return sendErrorResponse(res, 'User authentication required', 401, 'INVOICE_AUTH_REQUIRED');
+        return sendErrorResponse(res, 'User authentication required', 401);
       }
 
       if (isNaN(invoiceId)) {
-        return sendErrorResponse(res, 'Invalid invoice ID', 400, 'INVALID_INVOICE_ID');
+        return sendErrorResponse(res, 'Invalid invoice ID', 400);
       }
 
       const invoice = await this.invoiceService.getInvoice(invoiceId, requestId);
@@ -139,10 +131,7 @@ export class InvoiceController {
         requestId
       });
 
-      sendSuccessResponse(res, {
-        message: 'Invoice retrieved successfully',
-        data: invoice
-      });
+      sendSuccessResponse(res, 'Invoice retrieved successfully', invoice);
 
     } catch (error) {
       logger.error('Failed to get invoice', {
@@ -155,8 +144,7 @@ export class InvoiceController {
       const statusCode = error instanceof Error && error.message.includes('not found') ? 404 : 500;
       sendErrorResponse(res,
         error instanceof Error ? error.message : 'Failed to get invoice',
-        statusCode,
-        'INVOICE_RETRIEVAL_FAILED'
+        statusCode
       );
     }
   }
@@ -167,7 +155,7 @@ export class InvoiceController {
       const requestId = req.requestId || 'unknown';
 
       if (!userId) {
-        return sendErrorResponse(res, 'User authentication required', 401, 'INVOICE_AUTH_REQUIRED');
+        return sendErrorResponse(res, 'User authentication required', 401);
       }
 
       const request: InvoiceListRequest = {
@@ -187,10 +175,7 @@ export class InvoiceController {
         requestId
       });
 
-      sendSuccessResponse(res, {
-        message: 'Invoices retrieved successfully',
-        data: invoices
-      });
+      sendSuccessResponse(res, 'Invoices retrieved successfully', invoices);
 
     } catch (error) {
       logger.error('Failed to get user invoices', {
@@ -201,8 +186,7 @@ export class InvoiceController {
 
       sendErrorResponse(res,
         error instanceof Error ? error.message : 'Failed to get invoices',
-        500,
-        'INVOICES_RETRIEVAL_FAILED'
+        500
       );
     }
   }
@@ -214,11 +198,11 @@ export class InvoiceController {
       const invoiceId = parseInt(req.params.invoiceId);
 
       if (!userId) {
-        return sendErrorResponse(res, 'User authentication required', 401, 'INVOICE_AUTH_REQUIRED');
+        return sendErrorResponse(res, 'User authentication required', 401);
       }
 
       if (isNaN(invoiceId)) {
-        return sendErrorResponse(res, 'Invalid invoice ID', 400, 'INVALID_INVOICE_ID');
+        return sendErrorResponse(res, 'Invalid invoice ID', 400);
       }
 
       await this.invoiceService.sendInvoice(invoiceId, requestId);
@@ -229,10 +213,7 @@ export class InvoiceController {
         requestId
       });
 
-      sendSuccessResponse(res, {
-        message: 'Invoice sent successfully',
-        data: { invoiceId, status: 'sent' }
-      });
+      sendSuccessResponse(res, 'Invoice sent successfully', { invoiceId, status: 'sent' });
 
     } catch (error) {
       logger.error('Failed to send invoice', {
@@ -246,8 +227,7 @@ export class InvoiceController {
                         error instanceof Error && error.message.includes('Only draft') ? 400 : 500;
       sendErrorResponse(res,
         error instanceof Error ? error.message : 'Failed to send invoice',
-        statusCode,
-        'INVOICE_SEND_FAILED'
+        statusCode
       );
     }
   }
@@ -259,11 +239,11 @@ export class InvoiceController {
       const invoiceId = parseInt(req.params.invoiceId);
 
       if (!userId) {
-        return sendErrorResponse(res, 'User authentication required', 401, 'INVOICE_AUTH_REQUIRED');
+        return sendErrorResponse(res, 'User authentication required', 401);
       }
 
       if (isNaN(invoiceId)) {
-        return sendErrorResponse(res, 'Invalid invoice ID', 400, 'INVALID_INVOICE_ID');
+        return sendErrorResponse(res, 'Invalid invoice ID', 400);
       }
 
       await this.invoiceService.cancelInvoice(invoiceId, requestId);
@@ -274,10 +254,7 @@ export class InvoiceController {
         requestId
       });
 
-      sendSuccessResponse(res, {
-        message: 'Invoice cancelled successfully',
-        data: { invoiceId, status: 'cancelled' }
-      });
+      sendSuccessResponse(res, 'Invoice cancelled successfully', { invoiceId, status: 'cancelled' });
 
     } catch (error) {
       logger.error('Failed to cancel invoice', {
@@ -291,8 +268,7 @@ export class InvoiceController {
                         error instanceof Error && error.message.includes('Cannot cancel') ? 400 : 500;
       sendErrorResponse(res,
         error instanceof Error ? error.message : 'Failed to cancel invoice',
-        statusCode,
-        'INVOICE_CANCELLATION_FAILED'
+        statusCode
       );
     }
   }
@@ -304,11 +280,11 @@ export class InvoiceController {
       const invoiceId = parseInt(req.params.invoiceId);
 
       if (!userId) {
-        return sendErrorResponse(res, 'User authentication required', 401, 'INVOICE_AUTH_REQUIRED');
+        return sendErrorResponse(res, 'User authentication required', 401);
       }
 
       if (isNaN(invoiceId)) {
-        return sendErrorResponse(res, 'Invalid invoice ID', 400, 'INVALID_INVOICE_ID');
+        return sendErrorResponse(res, 'Invalid invoice ID', 400);
       }
 
       await this.invoiceService.deleteInvoice(invoiceId, requestId);
@@ -319,10 +295,7 @@ export class InvoiceController {
         requestId
       });
 
-      sendSuccessResponse(res, {
-        message: 'Invoice deleted successfully',
-        data: { invoiceId, deleted: true }
-      });
+      sendSuccessResponse(res, 'Invoice deleted successfully', { invoiceId, deleted: true });
 
     } catch (error) {
       logger.error('Failed to delete invoice', {
@@ -336,8 +309,7 @@ export class InvoiceController {
                         error instanceof Error && error.message.includes('Cannot delete') ? 400 : 500;
       sendErrorResponse(res,
         error instanceof Error ? error.message : 'Failed to delete invoice',
-        statusCode,
-        'INVOICE_DELETION_FAILED'
+        statusCode
       );
     }
   }

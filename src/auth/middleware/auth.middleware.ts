@@ -5,13 +5,14 @@ import { AppError } from '../../shared/utils';
 import { HTTP_STATUS_CODES, ERROR_CODES } from '../../config/auth';
 import { extractTokenFromHeader } from '../utils';
 
-interface AuthenticatedRequest extends Request {
+export interface AuthenticatedRequest extends Request {
   user?: {
     id: string;
     email: string;
     role: string;
     emailVerified: boolean;
   };
+  requestId?: string;
 }
 
 export const authenticate = async (

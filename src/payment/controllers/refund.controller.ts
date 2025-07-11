@@ -21,7 +21,7 @@ export class RefundController {
       const requestId = req.requestId || 'unknown';
 
       if (!userId) {
-        return sendErrorResponse(res, 'User authentication required', 401, 'REFUND_AUTH_REQUIRED');
+        return sendErrorResponse(res, 'User authentication required', 401);
       }
 
       const request: CreateRefundRequest = {
@@ -44,10 +44,7 @@ export class RefundController {
         requestId
       });
 
-      sendSuccessResponse(res, {
-        message: 'Refund created successfully',
-        data: refund
-      }, 201);
+      sendSuccessResponse(res, 'Refund created successfully', refund, 201);
 
     } catch (error) {
       logger.error('Failed to create refund', {
@@ -61,8 +58,7 @@ export class RefundController {
                         error instanceof Error && error.message.includes('cannot exceed') ? 400 : 500;
       sendErrorResponse(res,
         error instanceof Error ? error.message : 'Failed to create refund',
-        statusCode,
-        'REFUND_CREATION_FAILED'
+        statusCode
       );
     }
   }
@@ -74,11 +70,11 @@ export class RefundController {
       const refundId = parseInt(req.params.refundId);
 
       if (!userId) {
-        return sendErrorResponse(res, 'User authentication required', 401, 'REFUND_AUTH_REQUIRED');
+        return sendErrorResponse(res, 'User authentication required', 401);
       }
 
       if (isNaN(refundId)) {
-        return sendErrorResponse(res, 'Invalid refund ID', 400, 'INVALID_REFUND_ID');
+        return sendErrorResponse(res, 'Invalid refund ID', 400);
       }
 
       const request: UpdateRefundStatusRequest = {
@@ -95,10 +91,7 @@ export class RefundController {
         requestId
       });
 
-      sendSuccessResponse(res, {
-        message: 'Refund status updated successfully',
-        data: updateResult
-      });
+      sendSuccessResponse(res, 'Refund status updated successfully', updateResult);
 
     } catch (error) {
       logger.error('Failed to update refund status', {
@@ -111,8 +104,7 @@ export class RefundController {
       const statusCode = error instanceof Error && error.message.includes('not found') ? 404 : 500;
       sendErrorResponse(res,
         error instanceof Error ? error.message : 'Failed to update refund status',
-        statusCode,
-        'REFUND_STATUS_UPDATE_FAILED'
+        statusCode
       );
     }
   }
@@ -124,11 +116,11 @@ export class RefundController {
       const refundId = parseInt(req.params.refundId);
 
       if (!userId) {
-        return sendErrorResponse(res, 'User authentication required', 401, 'REFUND_AUTH_REQUIRED');
+        return sendErrorResponse(res, 'User authentication required', 401);
       }
 
       if (isNaN(refundId)) {
-        return sendErrorResponse(res, 'Invalid refund ID', 400, 'INVALID_REFUND_ID');
+        return sendErrorResponse(res, 'Invalid refund ID', 400);
       }
 
       const refund = await this.refundService.getRefund(refundId, requestId);
@@ -141,10 +133,7 @@ export class RefundController {
         requestId
       });
 
-      sendSuccessResponse(res, {
-        message: 'Refund retrieved successfully',
-        data: refund
-      });
+      sendSuccessResponse(res, 'Refund retrieved successfully', refund);
 
     } catch (error) {
       logger.error('Failed to get refund', {
@@ -157,8 +146,7 @@ export class RefundController {
       const statusCode = error instanceof Error && error.message.includes('not found') ? 404 : 500;
       sendErrorResponse(res,
         error instanceof Error ? error.message : 'Failed to get refund',
-        statusCode,
-        'REFUND_RETRIEVAL_FAILED'
+        statusCode
       );
     }
   }
@@ -169,7 +157,7 @@ export class RefundController {
       const requestId = req.requestId || 'unknown';
 
       if (!userId) {
-        return sendErrorResponse(res, 'User authentication required', 401, 'REFUND_AUTH_REQUIRED');
+        return sendErrorResponse(res, 'User authentication required', 401);
       }
 
       const request: RefundListRequest = {
@@ -189,10 +177,7 @@ export class RefundController {
         requestId
       });
 
-      sendSuccessResponse(res, {
-        message: 'Refunds retrieved successfully',
-        data: refunds
-      });
+      sendSuccessResponse(res, 'Refunds retrieved successfully', refunds);
 
     } catch (error) {
       logger.error('Failed to get user refunds', {
@@ -203,8 +188,7 @@ export class RefundController {
 
       sendErrorResponse(res,
         error instanceof Error ? error.message : 'Failed to get refunds',
-        500,
-        'REFUNDS_RETRIEVAL_FAILED'
+        500
       );
     }
   }
@@ -216,11 +200,11 @@ export class RefundController {
       const paymentId = parseInt(req.params.paymentId);
 
       if (!userId) {
-        return sendErrorResponse(res, 'User authentication required', 401, 'REFUND_AUTH_REQUIRED');
+        return sendErrorResponse(res, 'User authentication required', 401);
       }
 
       if (isNaN(paymentId)) {
-        return sendErrorResponse(res, 'Invalid payment ID', 400, 'INVALID_PAYMENT_ID');
+        return sendErrorResponse(res, 'Invalid payment ID', 400);
       }
 
       const refunds = await this.refundService.getPaymentRefunds(paymentId, requestId);
@@ -232,10 +216,7 @@ export class RefundController {
         requestId
       });
 
-      sendSuccessResponse(res, {
-        message: 'Payment refunds retrieved successfully',
-        data: refunds
-      });
+      sendSuccessResponse(res, 'Payment refunds retrieved successfully', refunds);
 
     } catch (error) {
       logger.error('Failed to get payment refunds', {
@@ -247,8 +228,7 @@ export class RefundController {
 
       sendErrorResponse(res,
         error instanceof Error ? error.message : 'Failed to get payment refunds',
-        500,
-        'PAYMENT_REFUNDS_RETRIEVAL_FAILED'
+        500
       );
     }
   }
@@ -260,11 +240,11 @@ export class RefundController {
       const refundId = parseInt(req.params.refundId);
 
       if (!userId) {
-        return sendErrorResponse(res, 'User authentication required', 401, 'REFUND_AUTH_REQUIRED');
+        return sendErrorResponse(res, 'User authentication required', 401);
       }
 
       if (isNaN(refundId)) {
-        return sendErrorResponse(res, 'Invalid refund ID', 400, 'INVALID_REFUND_ID');
+        return sendErrorResponse(res, 'Invalid refund ID', 400);
       }
 
       await this.refundService.cancelRefund(refundId, requestId);
@@ -275,10 +255,7 @@ export class RefundController {
         requestId
       });
 
-      sendSuccessResponse(res, {
-        message: 'Refund cancelled successfully',
-        data: { refundId, status: 'cancelled' }
-      });
+      sendSuccessResponse(res, 'Refund cancelled successfully', { refundId, status: 'cancelled' });
 
     } catch (error) {
       logger.error('Failed to cancel refund', {
@@ -292,8 +269,7 @@ export class RefundController {
                         error instanceof Error && error.message.includes('Cannot cancel') ? 400 : 500;
       sendErrorResponse(res,
         error instanceof Error ? error.message : 'Failed to cancel refund',
-        statusCode,
-        'REFUND_CANCELLATION_FAILED'
+        statusCode
       );
     }
   }
