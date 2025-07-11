@@ -18,14 +18,40 @@ export class PaymentController {
     this.paymentService = new PaymentService();
   }
 
+  private getUserId(req: AuthenticatedRequest): number | null {
+    if (!req.user?.id) {
+      return null;
+    }
+    const userId = parseInt(req.user.id);
+    return isNaN(userId) ? null : userId;
+  }
+
+  private validateAuthentication(req: AuthenticatedRequest, res: Response): number | null {
+    if (!req.user) {
+      sendErrorResponse(res, 'User authentication required', 401);
+      return null;
+    }
+
+    if (!req.user.id) {
+      sendErrorResponse(res, 'Invalid user session', 401);
+      return null;
+    }
+
+    const userId = this.getUserId(req);
+    if (!userId) {
+      sendErrorResponse(res, 'Invalid user ID', 401);
+      return null;
+    }
+
+    return userId;
+  }
+
   async createPaymentIntent(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      const userId = req.user ? parseInt(req.user.id) : undefined;
-      const requestId = req.requestId || 'unknown';
+      const userId = this.validateAuthentication(req, res);
+      if (!userId) return;
 
-      if (!userId) {
-        return sendErrorResponse(res, 'User authentication required', 401);
-      }
+      const requestId = req.requestId || 'unknown';
 
       const request: CreatePaymentIntentRequest = {
         ...req.body,
@@ -51,7 +77,7 @@ export class PaymentController {
     } catch (error) {
       logger.error('Failed to create payment intent', {
         error: error instanceof Error ? error.message : 'Unknown error',
-        userId: req.user ? parseInt(req.user.id) : undefined,
+        userId: this.getUserId(req),
         requestId: req.requestId
       });
 
@@ -65,12 +91,10 @@ export class PaymentController {
 
   async confirmPayment(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      const userId = req.user ? parseInt(req.user.id) : undefined;
-      const requestId = req.requestId || 'unknown';
+      const userId = this.validateAuthentication(req, res);
+      if (!userId) return;
 
-      if (!userId) {
-        return sendErrorResponse(res, 'User authentication required', 401);
-      }
+      const requestId = req.requestId || 'unknown';
 
       const request: ConfirmPaymentRequest = req.body;
       const confirmResult = await this.paymentService.confirmPayment(request, requestId);
@@ -88,7 +112,7 @@ export class PaymentController {
       logger.error('Failed to confirm payment', {
         paymentIntentId: req.body.paymentIntentId,
         error: error instanceof Error ? error.message : 'Unknown error',
-        userId: req.user ? parseInt(req.user.id) : undefined,
+        userId: this.getUserId(req),
         requestId: req.requestId
       });
 
@@ -102,12 +126,10 @@ export class PaymentController {
 
   async createPaymentLink(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      const userId = req.user ? parseInt(req.user.id) : undefined;
-      const requestId = req.requestId || 'unknown';
+      const userId = this.validateAuthentication(req, res);
+      if (!userId) return;
 
-      if (!userId) {
-        return sendErrorResponse(res, 'User authentication required', 401);
-      }
+      const requestId = req.requestId || 'unknown';
 
       const request: PaymentLinkRequest = {
         ...req.body,
@@ -132,7 +154,7 @@ export class PaymentController {
     } catch (error) {
       logger.error('Failed to create payment link', {
         error: error instanceof Error ? error.message : 'Unknown error',
-        userId: req.user ? parseInt(req.user.id) : undefined,
+        userId: this.getUserId(req),
         requestId: req.requestId
       });
 
@@ -146,13 +168,11 @@ export class PaymentController {
 
   async getPaymentStatus(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      const userId = req.user ? parseInt(req.user.id) : undefined;
+      const userId = this.validateAuthentication(req, res);
+      if (!userId) return;
+
       const requestId = req.requestId || 'unknown';
       const paymentId = parseInt(req.params.paymentId);
-
-      if (!userId) {
-        return sendErrorResponse(res, 'User authentication required', 401);
-      }
 
       if (isNaN(paymentId)) {
         return sendErrorResponse(res, 'Invalid payment ID', 400);
@@ -174,7 +194,7 @@ export class PaymentController {
       logger.error('Failed to get payment status', {
         paymentId: req.params.paymentId,
         error: error instanceof Error ? error.message : 'Unknown error',
-        userId: req.user ? parseInt(req.user.id) : undefined,
+        userId: this.getUserId(req),
         requestId: req.requestId
       });
 
@@ -188,12 +208,10 @@ export class PaymentController {
 
   async getPaymentHistory(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      const userId = req.user ? parseInt(req.user.id) : undefined;
-      const requestId = req.requestId || 'unknown';
+      const userId = this.validateAuthentication(req, res);
+      if (!userId) return;
 
-      if (!userId) {
-        return sendErrorResponse(res, 'User authentication required', 401);
-      }
+      const requestId = req.requestId || 'unknown';
 
       const request: PaymentHistoryRequest = {
         userId,
@@ -215,7 +233,7 @@ export class PaymentController {
     } catch (error) {
       logger.error('Failed to get payment history', {
         error: error instanceof Error ? error.message : 'Unknown error',
-        userId: req.user ? parseInt(req.user.id) : undefined,
+        userId: this.getUserId(req),
         requestId: req.requestId
       });
 
@@ -228,13 +246,11 @@ export class PaymentController {
 
   async cancelPayment(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      const userId = req.user ? parseInt(req.user.id) : undefined;
+      const userId = this.validateAuthentication(req, res);
+      if (!userId) return;
+
       const requestId = req.requestId || 'unknown';
       const paymentId = parseInt(req.params.paymentId);
-
-      if (!userId) {
-        return sendErrorResponse(res, 'User authentication required', 401);
-      }
 
       if (isNaN(paymentId)) {
         return sendErrorResponse(res, 'Invalid payment ID', 400);
@@ -254,7 +270,7 @@ export class PaymentController {
       logger.error('Failed to cancel payment', {
         paymentId: req.params.paymentId,
         error: error instanceof Error ? error.message : 'Unknown error',
-        userId: req.user ? parseInt(req.user.id) : undefined,
+        userId: this.getUserId(req),
         requestId: req.requestId
       });
 

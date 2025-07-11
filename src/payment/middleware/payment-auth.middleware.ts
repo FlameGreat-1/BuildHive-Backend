@@ -1,18 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 import { PAYMENT_CONSTANTS } from '../../config/payment';
-import { authenticate } from '../../auth/middleware';
+import { authenticate, AuthenticatedRequest } from '../../auth/middleware';
 import { database } from '../../shared/database/connection';
 import { logger, createErrorResponse } from '../../shared/utils';
 import { PaymentRepository } from '../repositories';
-
-interface AuthenticatedRequest extends Request {
-  user?: {
-    id: number;
-    email: string;
-    role: string;
-  };
-  requestId?: string;
-}
 
 export const authenticatePaymentUser = async (
   req: AuthenticatedRequest,
@@ -20,7 +11,7 @@ export const authenticatePaymentUser = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    await authenticate(req, res, () => {  // ✅ FIXED: was authenticateToken
+    await authenticate(req, res, () => {
       if (!req.user) {
         logger.warn('Payment authentication failed - no user found', {
           requestId: req.requestId,
@@ -75,7 +66,7 @@ export const authorizePaymentAccess = async (
     const paymentId = req.params.paymentId || req.body.paymentId;
     
     if (paymentId) {
-      const paymentRepository = new PaymentRepository(database);  // ✅ FIXED: was getDbConnection()
+      const paymentRepository = new PaymentRepository(database);
       
       const payment = await paymentRepository.getPaymentById(
         parseInt(paymentId),
@@ -96,7 +87,7 @@ export const authorizePaymentAccess = async (
         return;
       }
 
-      if (payment.user_id !== req.user.id && req.user.role !== 'admin') {
+      if (payment.user_id !== parseInt(req.user.id) && req.user.role !== 'admin') {
         logger.warn('Unauthorized payment access attempt', {
           paymentId,
           paymentUserId: payment.user_id,
@@ -150,7 +141,7 @@ export const authorizeInvoiceAccess = async (
     const invoiceId = req.params.invoiceId || req.body.invoiceId;
     
     if (invoiceId) {
-      const invoiceRepository = new (await import('../repositories')).InvoiceRepository(database);  // ✅ FIXED: was getDbConnection()
+      const invoiceRepository = new (await import('../repositories')).InvoiceRepository(database);
       
       const invoice = await invoiceRepository.getInvoiceById(
         parseInt(invoiceId),
@@ -171,7 +162,7 @@ export const authorizeInvoiceAccess = async (
         return;
       }
 
-      if (invoice.user_id !== req.user.id && req.user.role !== 'admin') {
+      if (invoice.user_id !== parseInt(req.user.id) && req.user.role !== 'admin') {
         logger.warn('Unauthorized invoice access attempt', {
           invoiceId,
           invoiceUserId: invoice.user_id,
@@ -225,7 +216,7 @@ export const authorizeRefundAccess = async (
     const refundId = req.params.refundId || req.body.refundId;
     
     if (refundId) {
-      const refundRepository = new (await import('../repositories')).RefundRepository(database);  // ✅ FIXED: was getDbConnection()
+      const refundRepository = new (await import('../repositories')).RefundRepository(database);
       
       const refund = await refundRepository.getRefundById(
         parseInt(refundId),
@@ -246,7 +237,7 @@ export const authorizeRefundAccess = async (
         return;
       }
 
-      if (refund.user_id !== req.user.id && req.user.role !== 'admin') {
+      if (refund.user_id !== parseInt(req.user.id) && req.user.role !== 'admin') {
         logger.warn('Unauthorized refund access attempt', {
           refundId,
           refundUserId: refund.user_id,
@@ -367,10 +358,10 @@ export const validatePaymentLimits = async (
         return;
       }
 
-      const paymentRepository = new PaymentRepository(database);  // ✅ FIXED: was getDbConnection()
+      const paymentRepository = new PaymentRepository(database);
       
       const dailyTotal = await paymentRepository.getUserTotalAmount(
-        req.user.id,
+        parseInt(req.user.id),
         undefined,
         req.requestId || 'unknown'
       );

@@ -15,14 +15,40 @@ export class RefundController {
     this.refundService = new RefundService();
   }
 
+  private getUserId(req: AuthenticatedRequest): number | null {
+    if (!req.user?.id) {
+      return null;
+    }
+    const userId = parseInt(req.user.id);
+    return isNaN(userId) ? null : userId;
+  }
+
+  private validateAuthentication(req: AuthenticatedRequest, res: Response): number | null {
+    if (!req.user) {
+      sendErrorResponse(res, 'User authentication required', 401);
+      return null;
+    }
+
+    if (!req.user.id) {
+      sendErrorResponse(res, 'Invalid user session', 401);
+      return null;
+    }
+
+    const userId = this.getUserId(req);
+    if (!userId) {
+      sendErrorResponse(res, 'Invalid user ID', 401);
+      return null;
+    }
+
+    return userId;
+  }
+
   async createRefund(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      const userId = req.user ? parseInt(req.user.id) : undefined;
-      const requestId = req.requestId || 'unknown';
+      const userId = this.validateAuthentication(req, res);
+      if (!userId) return;
 
-      if (!userId) {
-        return sendErrorResponse(res, 'User authentication required', 401);
-      }
+      const requestId = req.requestId || 'unknown';
 
       const request: CreateRefundRequest = {
         ...req.body,
@@ -49,7 +75,7 @@ export class RefundController {
     } catch (error) {
       logger.error('Failed to create refund', {
         error: error instanceof Error ? error.message : 'Unknown error',
-        userId: req.user ? parseInt(req.user.id) : undefined,
+        userId: this.getUserId(req),
         requestId: req.requestId
       });
 
@@ -65,13 +91,11 @@ export class RefundController {
 
   async updateRefundStatus(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      const userId = req.user ? parseInt(req.user.id) : undefined;
+      const userId = this.validateAuthentication(req, res);
+      if (!userId) return;
+
       const requestId = req.requestId || 'unknown';
       const refundId = parseInt(req.params.refundId);
-
-      if (!userId) {
-        return sendErrorResponse(res, 'User authentication required', 401);
-      }
 
       if (isNaN(refundId)) {
         return sendErrorResponse(res, 'Invalid refund ID', 400);
@@ -97,7 +121,7 @@ export class RefundController {
       logger.error('Failed to update refund status', {
         refundId: req.params.refundId,
         error: error instanceof Error ? error.message : 'Unknown error',
-        userId: req.user ? parseInt(req.user.id) : undefined,
+        userId: this.getUserId(req),
         requestId: req.requestId
       });
 
@@ -111,13 +135,11 @@ export class RefundController {
 
   async getRefund(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      const userId = req.user ? parseInt(req.user.id) : undefined;
+      const userId = this.validateAuthentication(req, res);
+      if (!userId) return;
+
       const requestId = req.requestId || 'unknown';
       const refundId = parseInt(req.params.refundId);
-
-      if (!userId) {
-        return sendErrorResponse(res, 'User authentication required', 401);
-      }
 
       if (isNaN(refundId)) {
         return sendErrorResponse(res, 'Invalid refund ID', 400);
@@ -139,7 +161,7 @@ export class RefundController {
       logger.error('Failed to get refund', {
         refundId: req.params.refundId,
         error: error instanceof Error ? error.message : 'Unknown error',
-        userId: req.user ? parseInt(req.user.id) : undefined,
+        userId: this.getUserId(req),
         requestId: req.requestId
       });
 
@@ -153,12 +175,10 @@ export class RefundController {
 
   async getUserRefunds(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      const userId = req.user ? parseInt(req.user.id) : undefined;
-      const requestId = req.requestId || 'unknown';
+      const userId = this.validateAuthentication(req, res);
+      if (!userId) return;
 
-      if (!userId) {
-        return sendErrorResponse(res, 'User authentication required', 401);
-      }
+      const requestId = req.requestId || 'unknown';
 
       const request: RefundListRequest = {
         userId,
@@ -182,7 +202,7 @@ export class RefundController {
     } catch (error) {
       logger.error('Failed to get user refunds', {
         error: error instanceof Error ? error.message : 'Unknown error',
-        userId: req.user ? parseInt(req.user.id) : undefined,
+        userId: this.getUserId(req),
         requestId: req.requestId
       });
 
@@ -195,13 +215,11 @@ export class RefundController {
 
   async getPaymentRefunds(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      const userId = req.user ? parseInt(req.user.id) : undefined;
+      const userId = this.validateAuthentication(req, res);
+      if (!userId) return;
+
       const requestId = req.requestId || 'unknown';
       const paymentId = parseInt(req.params.paymentId);
-
-      if (!userId) {
-        return sendErrorResponse(res, 'User authentication required', 401);
-      }
 
       if (isNaN(paymentId)) {
         return sendErrorResponse(res, 'Invalid payment ID', 400);
@@ -222,7 +240,7 @@ export class RefundController {
       logger.error('Failed to get payment refunds', {
         paymentId: req.params.paymentId,
         error: error instanceof Error ? error.message : 'Unknown error',
-        userId: req.user ? parseInt(req.user.id) : undefined,
+        userId: this.getUserId(req),
         requestId: req.requestId
       });
 
@@ -235,13 +253,11 @@ export class RefundController {
 
   async cancelRefund(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      const userId = req.user ? parseInt(req.user.id) : undefined;
+      const userId = this.validateAuthentication(req, res);
+      if (!userId) return;
+
       const requestId = req.requestId || 'unknown';
       const refundId = parseInt(req.params.refundId);
-
-      if (!userId) {
-        return sendErrorResponse(res, 'User authentication required', 401);
-      }
 
       if (isNaN(refundId)) {
         return sendErrorResponse(res, 'Invalid refund ID', 400);
@@ -261,7 +277,7 @@ export class RefundController {
       logger.error('Failed to cancel refund', {
         refundId: req.params.refundId,
         error: error instanceof Error ? error.message : 'Unknown error',
-        userId: req.user ? parseInt(req.user.id) : undefined,
+        userId: this.getUserId(req),
         requestId: req.requestId
       });
 

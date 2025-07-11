@@ -651,3 +651,75 @@ export interface PaymentResponse {
   processedAt?: string;
   createdAt: string;
 }
+
+export enum PaymentStatus {
+  PENDING = 'pending',
+  PROCESSING = 'processing',
+  SUCCEEDED = 'succeeded',
+  FAILED = 'failed',
+  CANCELED = 'canceled',
+  REQUIRES_ACTION = 'requires_action'
+}
+
+export enum PaymentMethod {
+  CARD = 'card',
+  APPLE_PAY = 'apple_pay',
+  GOOGLE_PAY = 'google_pay',
+  BANK_TRANSFER = 'bank_transfer'
+}
+
+export enum PaymentType {
+  ONE_TIME = 'one_time',
+  SUBSCRIPTION = 'subscription',
+  CREDIT_PURCHASE = 'credit_purchase'
+}
+
+export enum WebhookEventType {
+  PAYMENT_SUCCEEDED = 'payment_succeeded',
+  PAYMENT_FAILED = 'payment_failed',
+  PAYMENT_REQUIRES_ACTION = 'payment_requires_action',
+  PAYMENT_METHOD_ATTACHED = 'payment_method_attached',
+  REFUND_CREATED = 'refund_created',
+  CHARGE_DISPUTE_CREATED = 'charge_dispute_created',
+  CHARGE_FAILED = 'charge_failed'
+}
+
+// Database record interfaces
+export interface PaymentDatabaseRecord {
+  id: number;
+  user_id: number;
+  stripe_payment_intent_id?: string;
+  amount: number;
+  currency: string;
+  payment_method: string;
+  status: string;
+  description?: string;
+  metadata?: any;
+  processed_at?: Date;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface PaymentMethodDatabaseRecord {
+  id: number;
+  user_id: number;
+  stripe_payment_method_id: string;
+  type: string;
+  card_last_four?: string;
+  card_brand?: string;
+  card_exp_month?: number;
+  card_exp_year?: number;
+  is_default: boolean;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface WebhookEventDatabaseRecord {
+  id: number;
+  stripe_event_id: string;
+  event_type: string;
+  processed: boolean;
+  data: any;
+  created_at: Date;
+  processed_at?: Date;
+}

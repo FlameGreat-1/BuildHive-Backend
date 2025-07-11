@@ -17,14 +17,40 @@ export class PaymentMethodController {
     this.paymentMethodService = new PaymentMethodService();
   }
 
+  private getUserId(req: AuthenticatedRequest): number | null {
+    if (!req.user?.id) {
+      return null;
+    }
+    const userId = parseInt(req.user.id);
+    return isNaN(userId) ? null : userId;
+  }
+
+  private validateAuthentication(req: AuthenticatedRequest, res: Response): number | null {
+    if (!req.user) {
+      sendErrorResponse(res, 'User authentication required', 401);
+      return null;
+    }
+
+    if (!req.user.id) {
+      sendErrorResponse(res, 'Invalid user session', 401);
+      return null;
+    }
+
+    const userId = this.getUserId(req);
+    if (!userId) {
+      sendErrorResponse(res, 'Invalid user ID', 401);
+      return null;
+    }
+
+    return userId;
+  }
+
   async createPaymentMethod(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      const userId = req.user ? parseInt(req.user.id) : undefined;
-      const requestId = req.requestId || 'unknown';
+      const userId = this.validateAuthentication(req, res);
+      if (!userId) return;
 
-      if (!userId) {
-        return sendErrorResponse(res, 'User authentication required', 401);
-      }
+      const requestId = req.requestId || 'unknown';
 
       const request: CreatePaymentMethodRequest = {
         ...req.body,
@@ -48,7 +74,7 @@ export class PaymentMethodController {
     } catch (error) {
       logger.error('Failed to create payment method', {
         error: error instanceof Error ? error.message : 'Unknown error',
-        userId: req.user ? parseInt(req.user.id) : undefined,
+        userId: this.getUserId(req),
         requestId: req.requestId
       });
 
@@ -62,12 +88,10 @@ export class PaymentMethodController {
 
   async attachPaymentMethod(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      const userId = req.user ? parseInt(req.user.id) : undefined;
-      const requestId = req.requestId || 'unknown';
+      const userId = this.validateAuthentication(req, res);
+      if (!userId) return;
 
-      if (!userId) {
-        return sendErrorResponse(res, 'User authentication required', 401);
-      }
+      const requestId = req.requestId || 'unknown';
 
       const request: AttachPaymentMethodRequest = req.body;
       const attachResult = await this.paymentMethodService.attachPaymentMethod(request, requestId);
@@ -85,7 +109,7 @@ export class PaymentMethodController {
       logger.error('Failed to attach payment method', {
         paymentMethodId: req.body.paymentMethodId,
         error: error instanceof Error ? error.message : 'Unknown error',
-        userId: req.user ? parseInt(req.user.id) : undefined,
+        userId: this.getUserId(req),
         requestId: req.requestId
       });
 
@@ -99,13 +123,11 @@ export class PaymentMethodController {
 
   async detachPaymentMethod(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      const userId = req.user ? parseInt(req.user.id) : undefined;
+      const userId = this.validateAuthentication(req, res);
+      if (!userId) return;
+
       const requestId = req.requestId || 'unknown';
       const paymentMethodId = req.params.paymentMethodId;
-
-      if (!userId) {
-        return sendErrorResponse(res, 'User authentication required', 401);
-      }
 
       if (!paymentMethodId) {
         return sendErrorResponse(res, 'Payment method ID is required', 400);
@@ -126,7 +148,7 @@ export class PaymentMethodController {
       logger.error('Failed to detach payment method', {
         paymentMethodId: req.params.paymentMethodId,
         error: error instanceof Error ? error.message : 'Unknown error',
-        userId: req.user ? parseInt(req.user.id) : undefined,
+        userId: this.getUserId(req),
         requestId: req.requestId
       });
 
@@ -141,13 +163,11 @@ export class PaymentMethodController {
 
   async setDefaultPaymentMethod(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      const userId = req.user ? parseInt(req.user.id) : undefined;
+      const userId = this.validateAuthentication(req, res);
+      if (!userId) return;
+
       const requestId = req.requestId || 'unknown';
       const paymentMethodId = parseInt(req.params.paymentMethodId);
-
-      if (!userId) {
-        return sendErrorResponse(res, 'User authentication required', 401);
-      }
 
       if (isNaN(paymentMethodId)) {
         return sendErrorResponse(res, 'Invalid payment method ID', 400);
@@ -172,7 +192,7 @@ export class PaymentMethodController {
       logger.error('Failed to set default payment method', {
         paymentMethodId: req.params.paymentMethodId,
         error: error instanceof Error ? error.message : 'Unknown error',
-        userId: req.user ? parseInt(req.user.id) : undefined,
+        userId: this.getUserId(req),
         requestId: req.requestId
       });
 
@@ -187,12 +207,10 @@ export class PaymentMethodController {
 
   async getUserPaymentMethods(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      const userId = req.user ? parseInt(req.user.id) : undefined;
-      const requestId = req.requestId || 'unknown';
+      const userId = this.validateAuthentication(req, res);
+      if (!userId) return;
 
-      if (!userId) {
-        return sendErrorResponse(res, 'User authentication required', 401);
-      }
+      const requestId = req.requestId || 'unknown';
 
       const request: PaymentMethodListRequest = {
         userId,
@@ -214,7 +232,7 @@ export class PaymentMethodController {
     } catch (error) {
       logger.error('Failed to get user payment methods', {
         error: error instanceof Error ? error.message : 'Unknown error',
-        userId: req.user ? parseInt(req.user.id) : undefined,
+        userId: this.getUserId(req),
         requestId: req.requestId
       });
 
@@ -227,13 +245,11 @@ export class PaymentMethodController {
 
   async deletePaymentMethod(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      const userId = req.user ? parseInt(req.user.id) : undefined;
+      const userId = this.validateAuthentication(req, res);
+      if (!userId) return;
+
       const requestId = req.requestId || 'unknown';
       const paymentMethodId = parseInt(req.params.paymentMethodId);
-
-      if (!userId) {
-        return sendErrorResponse(res, 'User authentication required', 401);
-      }
 
       if (isNaN(paymentMethodId)) {
         return sendErrorResponse(res, 'Invalid payment method ID', 400);
@@ -253,7 +269,7 @@ export class PaymentMethodController {
       logger.error('Failed to delete payment method', {
         paymentMethodId: req.params.paymentMethodId,
         error: error instanceof Error ? error.message : 'Unknown error',
-        userId: req.user ? parseInt(req.user.id) : undefined,
+        userId: this.getUserId(req),
         requestId: req.requestId
       });
 
@@ -269,12 +285,10 @@ export class PaymentMethodController {
 
   async getDefaultPaymentMethod(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      const userId = req.user ? parseInt(req.user.id) : undefined;
-      const requestId = req.requestId || 'unknown';
+      const userId = this.validateAuthentication(req, res);
+      if (!userId) return;
 
-      if (!userId) {
-        return sendErrorResponse(res, 'User authentication required', 401);
-      }
+      const requestId = req.requestId || 'unknown';
 
       const defaultPaymentMethod = await this.paymentMethodService.getDefaultPaymentMethod(userId, requestId);
 
@@ -293,7 +307,7 @@ export class PaymentMethodController {
     } catch (error) {
       logger.error('Failed to get default payment method', {
         error: error instanceof Error ? error.message : 'Unknown error',
-        userId: req.user ? parseInt(req.user.id) : undefined,
+        userId: this.getUserId(req),
         requestId: req.requestId
       });
 

@@ -78,7 +78,7 @@ export const authenticate = async (
     }
 
     req.user = {
-      id: user.id,
+      id: user.id.toString(),
       email: user.email,
       role: user.role,
       emailVerified: user.emailVerified
@@ -136,7 +136,7 @@ export const requireEmailVerification = async (
     }
 
     req.user = {
-      id: user.id,
+      id: user.id.toString(),
       email: user.email,
       role: user.role,
       emailVerified: user.emailVerified
@@ -176,7 +176,7 @@ export const optionalAuth = async (
 
     if (user && user.status !== 'suspended') {
       req.user = {
-        id: user.id,
+        id: user.id.toString(),
         email: user.email,
         role: user.role,
         emailVerified: user.emailVerified
