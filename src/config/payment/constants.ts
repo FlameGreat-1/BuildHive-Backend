@@ -25,7 +25,8 @@ export const PAYMENT_CONSTANTS = {
     DOMAIN_NAME: process.env.APPLE_PAY_DOMAIN || 'buildhive.com',
     DISPLAY_NAME: 'BuildHive',
     SUPPORTED_NETWORKS: ['visa', 'masterCard', 'amex'],
-    MERCHANT_CAPABILITIES: ['supports3DS', 'supportsCredit', 'supportsDebit']
+    MERCHANT_CAPABILITIES: ['supports3DS', 'supportsCredit', 'supportsDebit'],
+    SUPPORTED_COUNTRIES: ['AU', 'US', 'CA', 'GB']  
   },
 
   GOOGLE_PAY: {
@@ -33,7 +34,25 @@ export const PAYMENT_CONSTANTS = {
     MERCHANT_NAME: 'BuildHive',
     GATEWAY: 'stripe',
     SUPPORTED_NETWORKS: ['VISA', 'MASTERCARD', 'AMEX'],
-    SUPPORTED_METHODS: ['PAN_ONLY', 'CRYPTOGRAM_3DS']
+    SUPPORTED_METHODS: ['PAN_ONLY', 'CRYPTOGRAM_3DS'],
+    SUPPORTED_COUNTRIES: ['AU', 'US', 'CA', 'GB']  
+  },
+
+  DATABASE: {
+    TABLES: {
+      PAYMENTS: 'payments',
+      PAYMENT_METHODS: 'payment_methods',
+      WEBHOOK_EVENTS: 'webhook_events',
+      INVOICES: 'invoices',
+      REFUNDS: 'refunds'
+    }
+  },
+
+  LIMITS: {
+    MIN_AMOUNT: 50,
+    MAX_AMOUNT: 10000000,
+    MAX_REFUND_DAYS: 90,
+    MAX_PAYMENT_METHODS_PER_USER: 10
   },
 
   WEBHOOK: {

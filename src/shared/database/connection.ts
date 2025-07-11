@@ -818,3 +818,17 @@ export const closeDatabase = async (): Promise<void> => {
     throw error;
   }
 };
+
+export const environment = {
+  DB_HOST: process.env.DB_HOST || 'localhost',
+  DB_PORT: parseInt(process.env.DB_PORT || '5432'),
+  DB_NAME: process.env.DB_NAME || 'buildhive',
+  DB_USER: process.env.DB_USER || 'postgres',
+  DB_PASSWORD: process.env.DB_PASSWORD || '',
+  DB_SSL: process.env.DB_SSL === 'true',
+  DB_CONNECTION_TIMEOUT: parseInt(process.env.DB_CONNECTION_TIMEOUT || '30000'),
+  DB_IDLE_TIMEOUT: parseInt(process.env.DB_IDLE_TIMEOUT || '30000'),
+  DB_MAX_CONNECTIONS: parseInt(process.env.DB_MAX_CONNECTIONS || '10')
+};
+
+

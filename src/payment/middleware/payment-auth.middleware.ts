@@ -1,9 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 import { PAYMENT_CONSTANTS } from '../../config/payment';
-import { authenticateToken } from '../../auth/middleware';
+import { authenticate } from '../../auth/middleware';
+import { database } from '../../shared/database/connection';
 import { logger, createErrorResponse } from '../../shared/utils';
 import { PaymentRepository } from '../repositories';
-import { getDbConnection } from '../../shared/database';
 
 interface AuthenticatedRequest extends Request {
   user?: {
@@ -20,7 +20,7 @@ export const authenticatePaymentUser = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    await authenticateToken(req, res, () => {
+    await authenticate(req, res, () => {  // ✅ FIXED: was authenticateToken
       if (!req.user) {
         logger.warn('Payment authentication failed - no user found', {
           requestId: req.requestId,
@@ -75,8 +75,7 @@ export const authorizePaymentAccess = async (
     const paymentId = req.params.paymentId || req.body.paymentId;
     
     if (paymentId) {
-      const dbConnection = await getDbConnection();
-      const paymentRepository = new PaymentRepository(dbConnection);
+      const paymentRepository = new PaymentRepository(database);  // ✅ FIXED: was getDbConnection()
       
       const payment = await paymentRepository.getPaymentById(
         parseInt(paymentId),
@@ -151,8 +150,7 @@ export const authorizeInvoiceAccess = async (
     const invoiceId = req.params.invoiceId || req.body.invoiceId;
     
     if (invoiceId) {
-      const dbConnection = await getDbConnection();
-      const invoiceRepository = new (await import('../repositories')).InvoiceRepository(dbConnection);
+      const invoiceRepository = new (await import('../repositories')).InvoiceRepository(database);  // ✅ FIXED: was getDbConnection()
       
       const invoice = await invoiceRepository.getInvoiceById(
         parseInt(invoiceId),
@@ -227,8 +225,7 @@ export const authorizeRefundAccess = async (
     const refundId = req.params.refundId || req.body.refundId;
     
     if (refundId) {
-      const dbConnection = await getDbConnection();
-      const refundRepository = new (await import('../repositories')).RefundRepository(dbConnection);
+      const refundRepository = new (await import('../repositories')).RefundRepository(database);  // ✅ FIXED: was getDbConnection()
       
       const refund = await refundRepository.getRefundById(
         parseInt(refundId),
@@ -370,8 +367,7 @@ export const validatePaymentLimits = async (
         return;
       }
 
-      const dbConnection = await getDbConnection();
-      const paymentRepository = new PaymentRepository(dbConnection);
+      const paymentRepository = new PaymentRepository(database);  // ✅ FIXED: was getDbConnection()
       
       const dailyTotal = await paymentRepository.getUserTotalAmount(
         req.user.id,

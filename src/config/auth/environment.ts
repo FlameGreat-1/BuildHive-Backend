@@ -14,6 +14,16 @@ export const environment = {
   
   DATABASE_URL: process.env.DATABASE_URL!,
   
+  DB_HOST: process.env.DB_HOST || process.env.DATABASE_HOST || 'localhost',
+  DB_PORT: parseInt(process.env.DB_PORT || process.env.DATABASE_PORT || '5432'),
+  DB_NAME: process.env.DB_NAME || process.env.DATABASE_NAME || 'buildhive',
+  DB_USER: process.env.DB_USER || process.env.DATABASE_USER || 'postgres',
+  DB_PASSWORD: process.env.DB_PASSWORD || process.env.DATABASE_PASSWORD || '',
+  DB_SSL: process.env.DB_SSL === 'true' || process.env.NODE_ENV === 'production',
+  DB_CONNECTION_TIMEOUT: parseInt(process.env.DB_CONNECTION_TIMEOUT || '30000'),
+  DB_IDLE_TIMEOUT: parseInt(process.env.DB_IDLE_TIMEOUT || '30000'),
+  DB_MAX_CONNECTIONS: parseInt(process.env.DB_MAX_CONNECTIONS || '10'),
+  
   EMAIL_SERVICE: 'gmail',
   EMAIL_USER: process.env.EMAIL_USER || '',
   EMAIL_PASSWORD: process.env.EMAIL_PASSWORD || '',

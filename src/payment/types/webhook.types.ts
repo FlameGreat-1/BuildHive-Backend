@@ -31,6 +31,8 @@ export interface WebhookProcessingResult {
   eventId: string;
   eventType: WebhookEventType;
   processedAt: Date;
+  message?: string;     
+  processed?: boolean;
   error?: string;
   retryAfter?: number;
 }

@@ -1,4 +1,4 @@
-import { environment } from '../../shared/database/connection';
+import { environment } from '../auth';
 
 export const quoteDatabaseConfig = {
   host: environment.DB_HOST,
