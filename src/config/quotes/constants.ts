@@ -37,7 +37,10 @@ export const QUOTE_CONSTANTS = {
   MAX_VALID_DAYS: 365,
   DEFAULT_VALID_DAYS: 30,
   QUOTE_NUMBER_PREFIX: 'QT',
-  QUOTE_NUMBER_LENGTH: 8
+  QUOTE_NUMBER_LENGTH: 8,
+  DEFAULT_PAGE: 1,       
+  DEFAULT_LIMIT: 20,        
+  MAX_LIMIT: 100         
 } as const;
 
 export const GST_CONSTANTS = {

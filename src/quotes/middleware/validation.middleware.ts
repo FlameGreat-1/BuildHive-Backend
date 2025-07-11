@@ -9,8 +9,14 @@ import {
 import { validateQuoteItems, sanitizeQuoteInput, validateQuoteStatusTransition } from '../utils';
 import { QUOTE_CONSTANTS, QUOTE_STATUS, DELIVERY_METHOD } from '../../config/quotes';
 import { ValidationError } from '../../shared/types';
-import { sendQuoteValidationError } from '../../shared/utils';
-import { logger } from '../../shared/utils';
+import { createErrorResponse, logger } from '../../shared/utils';
+import { HTTP_STATUS_CODES } from '../../config/auth/constants';
+
+const sendValidationError = (res: Response, message: string, errors: ValidationError[]): void => {
+  res.status(HTTP_STATUS_CODES.BAD_REQUEST).json(
+    createErrorResponse(message, 'VALIDATION_ERROR', { errors })
+  );
+};
 
 export const validateCreateQuote = (
   req: Request,
@@ -52,14 +58,22 @@ export const validateCreateQuote = (
       code: 'REQUIRED_FIELD'
     });
   } else {
-    const itemErrors = validateQuoteItems(data.items);
-    itemErrors.forEach(error => {
+    try {
+      const itemErrors = validateQuoteItems(data.items);
+      itemErrors.forEach(error => {
+        errors.push({
+          field: 'items',
+          message: error,
+          code: 'VALIDATION_ERROR'
+        });
+      });
+    } catch (error) {
       errors.push({
         field: 'items',
-        message: error,
+        message: 'Invalid quote items format',
         code: 'VALIDATION_ERROR'
       });
-    });
+    }
   }
 
   if (!data.validUntil) {
@@ -103,7 +117,7 @@ export const validateCreateQuote = (
     });
   }
 
-  if (typeof data.gstEnabled !== 'boolean') {
+  if (data.gstEnabled !== undefined && typeof data.gstEnabled !== 'boolean') {
     errors.push({
       field: 'gstEnabled',
       message: 'GST enabled must be a boolean value',
@@ -130,28 +144,35 @@ export const validateCreateQuote = (
   if (errors.length > 0) {
     logger.warn('Quote creation validation failed', {
       requestId,
-      userId: req.user?.id,
+      userId: (req as any).user?.id,
       errors: errors.length,
       timestamp: new Date().toISOString()
     });
 
-    return sendQuoteValidationError(res, 'Quote validation failed', errors);
+    return sendValidationError(res, 'Quote validation failed', errors);
   }
 
-  if (data.title) {
-    req.body.title = sanitizeQuoteInput(data.title);
-  }
+  try {
+    if (data.title) {
+      req.body.title = sanitizeQuoteInput(data.title);
+    }
 
-  if (data.description) {
-    req.body.description = sanitizeQuoteInput(data.description);
-  }
+    if (data.description) {
+      req.body.description = sanitizeQuoteInput(data.description);
+    }
 
-  if (data.termsConditions) {
-    req.body.termsConditions = sanitizeQuoteInput(data.termsConditions);
-  }
+    if (data.termsConditions) {
+      req.body.termsConditions = sanitizeQuoteInput(data.termsConditions);
+    }
 
-  if (data.notes) {
-    req.body.notes = sanitizeQuoteInput(data.notes);
+    if (data.notes) {
+      req.body.notes = sanitizeQuoteInput(data.notes);
+    }
+  } catch (error) {
+    logger.error('Error sanitizing quote input', {
+      requestId,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
   }
 
   next();
@@ -204,14 +225,22 @@ export const validateUpdateQuote = (
         code: 'REQUIRED_FIELD'
       });
     } else {
-      const itemErrors = validateQuoteItems(data.items);
-      itemErrors.forEach(error => {
+      try {
+        const itemErrors = validateQuoteItems(data.items);
+        itemErrors.forEach(error => {
+          errors.push({
+            field: 'items',
+            message: error,
+            code: 'VALIDATION_ERROR'
+          });
+        });
+      } catch (error) {
         errors.push({
           field: 'items',
-          message: error,
+          message: 'Invalid quote items format',
           code: 'VALIDATION_ERROR'
         });
-      });
+      }
     }
   }
 
@@ -245,29 +274,36 @@ export const validateUpdateQuote = (
   if (errors.length > 0) {
     logger.warn('Quote update validation failed', {
       requestId,
-      userId: req.user?.id,
+      userId: (req as any).user?.id,
       quoteId: req.params.quoteId,
       errors: errors.length,
       timestamp: new Date().toISOString()
     });
 
-    return sendQuoteValidationError(res, 'Quote update validation failed', errors);
+    return sendValidationError(res, 'Quote update validation failed', errors);
   }
 
-  if (data.title) {
-    req.body.title = sanitizeQuoteInput(data.title);
-  }
+  try {
+    if (data.title) {
+      req.body.title = sanitizeQuoteInput(data.title);
+    }
 
-  if (data.description) {
-    req.body.description = sanitizeQuoteInput(data.description);
-  }
+    if (data.description) {
+      req.body.description = sanitizeQuoteInput(data.description);
+    }
 
-  if (data.termsConditions) {
-    req.body.termsConditions = sanitizeQuoteInput(data.termsConditions);
-  }
+    if (data.termsConditions) {
+      req.body.termsConditions = sanitizeQuoteInput(data.termsConditions);
+    }
 
-  if (data.notes) {
-    req.body.notes = sanitizeQuoteInput(data.notes);
+    if (data.notes) {
+      req.body.notes = sanitizeQuoteInput(data.notes);
+    }
+  } catch (error) {
+    logger.error('Error sanitizing quote input', {
+      requestId,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
   }
 
   next();
@@ -307,13 +343,13 @@ export const validateQuoteStatusUpdate = (
   if (errors.length > 0) {
     logger.warn('Quote status update validation failed', {
       requestId,
-      userId: req.user?.id,
+      userId: (req as any).user?.id,
       quoteId: req.params.quoteId,
       errors: errors.length,
       timestamp: new Date().toISOString()
     });
 
-    return sendQuoteValidationError(res, 'Quote status update validation failed', errors);
+    return sendValidationError(res, 'Quote status update validation failed', errors);
   }
 
   next();
@@ -388,13 +424,13 @@ export const validateQuoteDelivery = (
   if (errors.length > 0) {
     logger.warn('Quote delivery validation failed', {
       requestId,
-      userId: req.user?.id,
+      userId: (req as any).user?.id,
       quoteId: req.params.quoteId,
       errors: errors.length,
       timestamp: new Date().toISOString()
     });
 
-    return sendQuoteValidationError(res, 'Quote delivery validation failed', errors);
+    return sendValidationError(res, 'Quote delivery validation failed', errors);
   }
 
   next();
@@ -444,20 +480,27 @@ export const validateAIPricingRequest = (
   if (errors.length > 0) {
     logger.warn('AI pricing request validation failed', {
       requestId,
-      userId: req.user?.id,
+      userId: (req as any).user?.id,
       errors: errors.length,
       timestamp: new Date().toISOString()
     });
 
-    return sendQuoteValidationError(res, 'AI pricing request validation failed', errors);
+    return sendValidationError(res, 'AI pricing request validation failed', errors);
   }
 
-  if (data.jobDescription) {
-    req.body.jobDescription = sanitizeQuoteInput(data.jobDescription);
-  }
+  try {
+    if (data.jobDescription) {
+      req.body.jobDescription = sanitizeQuoteInput(data.jobDescription);
+    }
 
-  if (data.jobType) {
-    req.body.jobType = sanitizeQuoteInput(data.jobType);
+    if (data.jobType) {
+      req.body.jobType = sanitizeQuoteInput(data.jobType);
+    }
+  } catch (error) {
+    logger.error('Error sanitizing AI pricing input', {
+      requestId,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
   }
 
   next();
@@ -475,12 +518,12 @@ export const validateQuoteId = (
     
     logger.warn('Invalid quote ID provided', {
       requestId,
-      userId: req.user?.id,
+      userId: (req as any).user?.id,
       providedId: req.params.quoteId,
       timestamp: new Date().toISOString()
     });
 
-    return sendQuoteValidationError(res, 'Invalid quote ID', [{
+    return sendValidationError(res, 'Invalid quote ID', [{
       field: 'quoteId',
       message: 'Quote ID must be a positive number',
       code: 'INVALID_VALUE'
@@ -511,12 +554,12 @@ export const validatePaymentMethodId = (
   if (errors.length > 0) {
     logger.warn('Payment method validation failed', {
       requestId,
-      userId: req.user?.id,
+      userId: (req as any).user?.id,
       errors: errors.length,
       timestamp: new Date().toISOString()
     });
 
-    return sendQuoteValidationError(res, 'Payment method validation failed', errors);
+    return sendValidationError(res, 'Payment method validation failed', errors);
   }
 
   next();
@@ -566,17 +609,24 @@ export const validateRefundRequest = (
   if (errors.length > 0) {
     logger.warn('Refund request validation failed', {
       requestId,
-      userId: req.user?.id,
+      userId: (req as any).user?.id,
       quoteId: req.params.quoteId,
       errors: errors.length,
       timestamp: new Date().toISOString()
     });
 
-    return sendQuoteValidationError(res, 'Refund request validation failed', errors);
+    return sendValidationError(res, 'Refund request validation failed', errors);
   }
 
-  if (reason) {
-    req.body.reason = sanitizeQuoteInput(reason);
+  try {
+    if (reason) {
+      req.body.reason = sanitizeQuoteInput(reason);
+    }
+  } catch (error) {
+    logger.error('Error sanitizing refund reason', {
+      requestId,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
   }
 
   next();
@@ -594,12 +644,12 @@ export const validateQuoteNumber = (
     
     logger.warn('Invalid quote number provided', {
       requestId,
-      userId: req.user?.id,
+      userId: (req as any).user?.id,
       providedNumber: quoteNumber,
       timestamp: new Date().toISOString()
     });
 
-    return sendQuoteValidationError(res, 'Invalid quote number', [{
+    return sendValidationError(res, 'Invalid quote number', [{
       field: 'quoteNumber',
       message: 'Quote number is required',
       code: 'REQUIRED_FIELD'

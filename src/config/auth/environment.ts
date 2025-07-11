@@ -29,6 +29,20 @@ export const environment = {
   EMAIL_PASSWORD: process.env.EMAIL_PASSWORD || '',
   EMAIL_FROM: process.env.EMAIL_FROM || 'BuildHive <noreply@buildhive.com>',
   
+  OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
+  
+  // Stripe Configuration
+  STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY || '',
+  STRIPE_PUBLISHABLE_KEY: process.env.STRIPE_PUBLISHABLE_KEY || '',
+  STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET || '',
+  
+  // Apple Pay Configuration (matching your payment constants)
+  APPLE_PAY_MERCHANT_ID: process.env.APPLE_PAY_MERCHANT_ID || '',
+  APPLE_PAY_DOMAIN: process.env.APPLE_PAY_DOMAIN || '',
+  
+  // Google Pay Configuration (matching your payment constants)
+  GOOGLE_PAY_MERCHANT_ID: process.env.GOOGLE_PAY_MERCHANT_ID || '',
+  
   GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || '',
   GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || '',
   
