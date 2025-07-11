@@ -60,8 +60,7 @@ export const encryptSensitiveData = (data: string, key: string): {
   const iv = crypto.randomBytes(PAYMENT_SECURITY.ENCRYPTION.IV_LENGTH);
   const keyBuffer = Buffer.from(key.padEnd(32, '0').substring(0, 32), 'utf8');
   
-  // Use createCipherGCM for GCM mode
-  const cipher = crypto.createCipherGCM(PAYMENT_SECURITY.ENCRYPTION.ALGORITHM, keyBuffer, iv);
+  const cipher = crypto.createCipher('aes-256-gcm', keyBuffer);
   cipher.setAAD(Buffer.from('payment-data'));
   
   let encrypted = cipher.update(data, 'utf8', 'hex');
@@ -85,8 +84,7 @@ export const decryptSensitiveData = (
   const keyBuffer = Buffer.from(key.padEnd(32, '0').substring(0, 32), 'utf8');
   const ivBuffer = Buffer.from(iv, 'hex');
   
-  // Use createDecipherGCM for GCM mode
-  const decipher = crypto.createDecipherGCM(PAYMENT_SECURITY.ENCRYPTION.ALGORITHM, keyBuffer, ivBuffer);
+  const decipher = crypto.createDecipher('aes-256-gcm', keyBuffer);
   decipher.setAAD(Buffer.from('payment-data'));
   decipher.setAuthTag(Buffer.from(tag, 'hex'));
   

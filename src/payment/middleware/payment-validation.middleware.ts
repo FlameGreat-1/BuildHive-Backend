@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { PAYMENT_CONSTANTS } from '../../config/payment';
 import { logger, createErrorResponse } from '../../shared/utils';
+import { HTTP_STATUS_CODES } from '../../config/auth/constants';
 import { 
   validateCreatePaymentIntent,
   validateConfirmPayment,
@@ -20,9 +21,10 @@ import {
 interface ValidationRequest extends Request {
   requestId?: string;
   user?: {
-    id: number;
+    id: string;
     email: string;
     role: string;
+    emailVerified: boolean;
   };
 }
 
@@ -41,7 +43,7 @@ export const validatePaymentIntentCreation = (
         userId: req.user?.id
       });
 
-      res.status(400).json(createErrorResponse(
+      res.status(HTTP_STATUS_CODES.BAD_REQUEST).json(createErrorResponse(
         'Invalid payment intent data',
         'PAYMENT_INTENT_VALIDATION_ERROR',
         { validationErrors: validation.errors }
@@ -67,7 +69,7 @@ export const validatePaymentIntentCreation = (
       userId: req.user?.id
     });
 
-    res.status(500).json(createErrorResponse(
+    res.status(HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR).json(createErrorResponse(
       'Payment validation service unavailable',
       'PAYMENT_VALIDATION_SERVICE_ERROR'
     ));
@@ -89,7 +91,7 @@ export const validatePaymentConfirmation = (
         userId: req.user?.id
       });
 
-      res.status(400).json(createErrorResponse(
+      res.status(HTTP_STATUS_CODES.BAD_REQUEST).json(createErrorResponse(
         'Invalid payment confirmation data',
         'PAYMENT_CONFIRMATION_VALIDATION_ERROR',
         { validationErrors: validation.errors }
@@ -113,7 +115,7 @@ export const validatePaymentConfirmation = (
       userId: req.user?.id
     });
 
-    res.status(500).json(createErrorResponse(
+    res.status(HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR).json(createErrorResponse(
       'Payment validation service unavailable',
       'PAYMENT_VALIDATION_SERVICE_ERROR'
     ));
@@ -135,7 +137,7 @@ export const validatePaymentLinkCreation = (
         userId: req.user?.id
       });
 
-      res.status(400).json(createErrorResponse(
+      res.status(HTTP_STATUS_CODES.BAD_REQUEST).json(createErrorResponse(
         'Invalid payment link data',
         'PAYMENT_LINK_VALIDATION_ERROR',
         { validationErrors: validation.errors }
@@ -160,7 +162,7 @@ export const validatePaymentLinkCreation = (
       userId: req.user?.id
     });
 
-    res.status(500).json(createErrorResponse(
+    res.status(HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR).json(createErrorResponse(
       'Payment validation service unavailable',
       'PAYMENT_VALIDATION_SERVICE_ERROR'
     ));
@@ -182,7 +184,7 @@ export const validatePaymentMethodCreation = (
         userId: req.user?.id
       });
 
-      res.status(400).json(createErrorResponse(
+      res.status(HTTP_STATUS_CODES.BAD_REQUEST).json(createErrorResponse(
         'Invalid payment method data',
         'PAYMENT_METHOD_VALIDATION_ERROR',
         { validationErrors: validation.errors }
@@ -206,7 +208,7 @@ export const validatePaymentMethodCreation = (
       userId: req.user?.id
     });
 
-    res.status(500).json(createErrorResponse(
+    res.status(HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR).json(createErrorResponse(
       'Payment validation service unavailable',
       'PAYMENT_VALIDATION_SERVICE_ERROR'
     ));
@@ -228,7 +230,7 @@ export const validatePaymentMethodAttachment = (
         userId: req.user?.id
       });
 
-      res.status(400).json(createErrorResponse(
+      res.status(HTTP_STATUS_CODES.BAD_REQUEST).json(createErrorResponse(
         'Invalid payment method attachment data',
         'PAYMENT_METHOD_ATTACH_VALIDATION_ERROR',
         { validationErrors: validation.errors }
@@ -253,7 +255,7 @@ export const validatePaymentMethodAttachment = (
       userId: req.user?.id
     });
 
-    res.status(500).json(createErrorResponse(
+    res.status(HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR).json(createErrorResponse(
       'Payment validation service unavailable',
       'PAYMENT_VALIDATION_SERVICE_ERROR'
     ));
@@ -275,7 +277,7 @@ export const validatePaymentMethodDetachment = (
         userId: req.user?.id
       });
 
-      res.status(400).json(createErrorResponse(
+      res.status(HTTP_STATUS_CODES.BAD_REQUEST).json(createErrorResponse(
         'Invalid payment method detachment data',
         'PAYMENT_METHOD_DETACH_VALIDATION_ERROR',
         { validationErrors: validation.errors }
@@ -299,7 +301,7 @@ export const validatePaymentMethodDetachment = (
       userId: req.user?.id
     });
 
-    res.status(500).json(createErrorResponse(
+    res.status(HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR).json(createErrorResponse(
       'Payment validation service unavailable',
       'PAYMENT_VALIDATION_SERVICE_ERROR'
     ));
@@ -326,7 +328,7 @@ export const validateDefaultPaymentMethodSetting = (
         userId: req.user?.id
       });
 
-      res.status(400).json(createErrorResponse(
+      res.status(HTTP_STATUS_CODES.BAD_REQUEST).json(createErrorResponse(
         'Invalid default payment method data',
         'DEFAULT_PAYMENT_METHOD_VALIDATION_ERROR',
         { validationErrors: validation.errors }
@@ -350,7 +352,7 @@ export const validateDefaultPaymentMethodSetting = (
       userId: req.user?.id
     });
 
-    res.status(500).json(createErrorResponse(
+    res.status(HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR).json(createErrorResponse(
       'Payment validation service unavailable',
       'PAYMENT_VALIDATION_SERVICE_ERROR'
     ));
@@ -377,7 +379,7 @@ export const validateInvoiceCreation = (
         userId: req.user?.id
       });
 
-      res.status(400).json(createErrorResponse(
+      res.status(HTTP_STATUS_CODES.BAD_REQUEST).json(createErrorResponse(
         'Invalid invoice data',
         'INVOICE_VALIDATION_ERROR',
         { validationErrors: validation.errors }
@@ -403,7 +405,7 @@ export const validateInvoiceCreation = (
       userId: req.user?.id
     });
 
-    res.status(500).json(createErrorResponse(
+    res.status(HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR).json(createErrorResponse(
       'Invoice validation service unavailable',
       'INVOICE_VALIDATION_SERVICE_ERROR'
     ));
@@ -425,7 +427,7 @@ export const validateInvoiceStatusUpdate = (
         userId: req.user?.id
       });
 
-      res.status(400).json(createErrorResponse(
+      res.status(HTTP_STATUS_CODES.BAD_REQUEST).json(createErrorResponse(
         'Invalid invoice status update data',
         'INVOICE_STATUS_VALIDATION_ERROR',
         { validationErrors: validation.errors }
@@ -450,7 +452,7 @@ export const validateInvoiceStatusUpdate = (
       userId: req.user?.id
     });
 
-    res.status(500).json(createErrorResponse(
+    res.status(HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR).json(createErrorResponse(
       'Invoice validation service unavailable',
       'INVOICE_VALIDATION_SERVICE_ERROR'
     ));
@@ -472,7 +474,7 @@ export const validateInvoiceQueryParams = (
         userId: req.user?.id
       });
 
-      res.status(400).json(createErrorResponse(
+      res.status(HTTP_STATUS_CODES.BAD_REQUEST).json(createErrorResponse(
         'Invalid invoice query parameters',
         'INVOICE_QUERY_VALIDATION_ERROR',
         { validationErrors: validation.errors }
@@ -496,7 +498,7 @@ export const validateInvoiceQueryParams = (
       userId: req.user?.id
     });
 
-    res.status(500).json(createErrorResponse(
+    res.status(HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR).json(createErrorResponse(
       'Invoice validation service unavailable',
       'INVOICE_VALIDATION_SERVICE_ERROR'
     ));
@@ -523,7 +525,7 @@ export const validateRefundCreation = (
         userId: req.user?.id
       });
 
-      res.status(400).json(createErrorResponse(
+      res.status(HTTP_STATUS_CODES.BAD_REQUEST).json(createErrorResponse(
         'Invalid refund data',
         'REFUND_VALIDATION_ERROR',
         { validationErrors: validation.errors }
@@ -549,7 +551,7 @@ export const validateRefundCreation = (
       userId: req.user?.id
     });
 
-    res.status(500).json(createErrorResponse(
+    res.status(HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR).json(createErrorResponse(
       'Refund validation service unavailable',
       'REFUND_VALIDATION_SERVICE_ERROR'
     ));
@@ -571,7 +573,7 @@ export const validateRefundStatusUpdate = (
         userId: req.user?.id
       });
 
-      res.status(400).json(createErrorResponse(
+      res.status(HTTP_STATUS_CODES.BAD_REQUEST).json(createErrorResponse(
         'Invalid refund status update data',
         'REFUND_STATUS_VALIDATION_ERROR',
         { validationErrors: validation.errors }
@@ -596,7 +598,7 @@ export const validateRefundStatusUpdate = (
       userId: req.user?.id
     });
 
-    res.status(500).json(createErrorResponse(
+    res.status(HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR).json(createErrorResponse(
       'Refund validation service unavailable',
       'REFUND_VALIDATION_SERVICE_ERROR'
     ));
@@ -618,7 +620,7 @@ export const validateRefundQueryParams = (
         userId: req.user?.id
       });
 
-      res.status(400).json(createErrorResponse(
+      res.status(HTTP_STATUS_CODES.BAD_REQUEST).json(createErrorResponse(
         'Invalid refund query parameters',
         'REFUND_QUERY_VALIDATION_ERROR',
         { validationErrors: validation.errors }
@@ -642,7 +644,7 @@ export const validateRefundQueryParams = (
       userId: req.user?.id
     });
 
-    res.status(500).json(createErrorResponse(
+    res.status(HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR).json(createErrorResponse(
       'Refund validation service unavailable',
       'REFUND_VALIDATION_SERVICE_ERROR'
     ));
@@ -670,7 +672,7 @@ export const validateCurrencySupport = (
         userId: req.user?.id
       });
 
-      res.status(400).json(createErrorResponse(
+      res.status(HTTP_STATUS_CODES.BAD_REQUEST).json(createErrorResponse(
         `Currency ${currency} is not supported`,
         'UNSUPPORTED_CURRENCY',
         { 
@@ -695,7 +697,7 @@ export const validateCurrencySupport = (
       userId: req.user?.id
     });
 
-    res.status(500).json(createErrorResponse(
+    res.status(HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR).json(createErrorResponse(
       'Currency validation service unavailable',
       'CURRENCY_VALIDATION_SERVICE_ERROR'
     ));
