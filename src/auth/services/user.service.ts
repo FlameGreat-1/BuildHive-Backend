@@ -304,6 +304,11 @@ export class UserService {
       await this.userRepository.resetLoginAttempts(userId);
     }
   }
+  
+    async findById(id: string): Promise<User | null> {
+    return await this.getUserById(id);
+  }
+}
 
   async updateLastLogin(userId: string): Promise<void> {
     await this.userRepository.updateLastLogin(userId);

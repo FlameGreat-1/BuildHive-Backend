@@ -713,13 +713,19 @@ export enum PaymentStatus {
   PENDING = 'pending',
   PROCESSING = 'processing',
   SUCCEEDED = 'succeeded',
+  COMPLETED = 'completed',
   FAILED = 'failed',
   CANCELED = 'canceled',
+  CANCELLED = 'cancelled',
+  REFUNDED = 'refunded',
+  PARTIALLY_REFUNDED = 'partially_refunded',
   REQUIRES_ACTION = 'requires_action'
 }
 
 export enum PaymentMethod {
   CARD = 'card',
+  STRIPE_CARD = 'stripe_card',
+  CASH = 'cash',
   APPLE_PAY = 'apple_pay',
   GOOGLE_PAY = 'google_pay',
   BANK_TRANSFER = 'bank_transfer'
@@ -797,6 +803,7 @@ export interface WebhookEventDatabaseRecord {
   data: any;
   retry_count: number;          
   failure_reason?: string;
+  metadata?: any;
   created_at: Date;
   processed_at?: Date;
 }

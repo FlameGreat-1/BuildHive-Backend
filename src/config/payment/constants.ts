@@ -73,6 +73,18 @@ export const PAYMENT_CONSTANTS = {
     }
   },
 
+  FEES: {
+    STRIPE: {
+      PERCENTAGE: 2.9,
+      FIXED: 30,
+      INTERNATIONAL: 3.9
+    },
+    PLATFORM: {
+      PERCENTAGE: 1.5,
+      MINIMUM: 50
+    }
+  },
+
   ERROR_CODES: {
     PAYMENT_NOT_FOUND: 'PAYMENT_NOT_FOUND',
     PAYMENT_PROCESSING_ERROR: 'PAYMENT_PROCESSING_ERROR',

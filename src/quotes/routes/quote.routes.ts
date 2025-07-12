@@ -3,7 +3,7 @@ import rateLimit from 'express-rate-limit';
 import { QuoteController } from '../controllers';
 import { JobService } from '../../jobs/services';
 import { UserService } from '../../auth/services';
-import { authMiddleware } from '../../auth/middleware';
+import { authenticate } from '../../auth/middleware';
 import { 
   validateCreateQuote,
   validateUpdateQuote,
@@ -23,8 +23,8 @@ import {
   aiPricingRequestSchema,
   quoteFilterSchema
 } from '../validators';
-import { errorMiddleware } from '../../shared/middleware';
-import { loggingMiddleware } from '../../shared/middleware';
+import { errorHandler } from '../../shared/middleware';
+import { requestLogger } from '../../shared/middleware';
 import { QUOTE_RATE_LIMITS } from '../../config/quotes';
 
 const router = Router();
@@ -56,11 +56,11 @@ const jobService = new JobService();
 const userService = new UserService();
 const quoteController = new QuoteController(jobService, userService);
 
-router.use(loggingMiddleware);
+router.use(requestLogger);
 
 router.post(
   '/',
-  authMiddleware,
+  authenticate,
   createRateLimit(QUOTE_RATE_LIMITS.CREATION, 'Too many quote creation attempts'),
   validateCreateQuote,
   async (req, res, next) => {
@@ -70,7 +70,7 @@ router.post(
 
 router.get(
   '/',
-  authMiddleware,
+  authenticate,
   createRateLimit(QUOTE_RATE_LIMITS.VIEW, 'Too many quote view requests'),
   async (req, res, next) => {
     await quoteController.getQuotes(req, res, next);
@@ -79,7 +79,7 @@ router.get(
 
 router.get(
   '/analytics',
-  authMiddleware,
+  authenticate,
   createRateLimit(QUOTE_RATE_LIMITS.OPERATIONS, 'Too many analytics requests'),
   async (req, res, next) => {
     await quoteController.getAnalytics(req, res, next);
@@ -88,7 +88,7 @@ router.get(
 
 router.get(
   '/generate-number',
-  authMiddleware,
+  authenticate,
   createRateLimit(QUOTE_RATE_LIMITS.OPERATIONS, 'Too many quote number generation requests'),
   async (req, res, next) => {
     await quoteController.generateQuoteNumber(req, res, next);
@@ -97,7 +97,7 @@ router.get(
 
 router.post(
   '/calculate',
-  authMiddleware,
+  authenticate,
   createRateLimit(QUOTE_RATE_LIMITS.OPERATIONS, 'Too many quote calculation requests'),
   async (req, res, next) => {
     await quoteController.calculateQuote(req, res, next);
@@ -106,7 +106,7 @@ router.post(
 
 router.post(
   '/ai-pricing',
-  authMiddleware,
+  authenticate,
   createRateLimit(QUOTE_RATE_LIMITS.AI_PRICING, 'Too many AI pricing requests'),
   validateAIPricingRequest,
   async (req, res, next) => {
@@ -116,7 +116,7 @@ router.post(
 
 router.get(
   '/client',
-  authMiddleware,
+  authenticate,
   createRateLimit(QUOTE_RATE_LIMITS.VIEW, 'Too many client quote requests'),
   async (req, res, next) => {
     await quoteController.getClientQuotes(req, res, next);
@@ -143,7 +143,7 @@ router.get(
 
 router.post(
   '/accept/:quoteNumber',
-  authMiddleware,
+  authenticate,
   validateQuoteNumber,
   createRateLimit(QUOTE_RATE_LIMITS.STATUS_CHANGE, 'Too many quote acceptance attempts'),
   async (req, res, next) => {
@@ -153,7 +153,7 @@ router.post(
 
 router.post(
   '/reject/:quoteNumber',
-  authMiddleware,
+  authenticate,
   validateQuoteNumber,
   createRateLimit(QUOTE_RATE_LIMITS.STATUS_CHANGE, 'Too many quote rejection attempts'),
   async (req, res, next) => {
@@ -163,7 +163,7 @@ router.post(
 
 router.get(
   '/:quoteId',
-  authMiddleware,
+  authenticate,
   validateQuoteId,
   createRateLimit(QUOTE_RATE_LIMITS.VIEW, 'Too many quote detail requests'),
   async (req, res, next) => {
@@ -173,7 +173,7 @@ router.get(
 
 router.put(
   '/:quoteId',
-  authMiddleware,
+  authenticate,
   validateQuoteId,
   createRateLimit(QUOTE_RATE_LIMITS.UPDATE, 'Too many quote update attempts'),
   validateUpdateQuote,
@@ -184,7 +184,7 @@ router.put(
 
 router.patch(
   '/:quoteId/status',
-  authMiddleware,
+  authenticate,
   validateQuoteId,
   createRateLimit(QUOTE_RATE_LIMITS.STATUS_CHANGE, 'Too many status change attempts'),
   validateQuoteStatusUpdate,
@@ -195,7 +195,7 @@ router.patch(
 
 router.delete(
   '/:quoteId',
-  authMiddleware,
+  authenticate,
   validateQuoteId,
   createRateLimit(QUOTE_RATE_LIMITS.OPERATIONS, 'Too many quote deletion attempts'),
   async (req, res, next) => {
@@ -205,7 +205,7 @@ router.delete(
 
 router.post(
   '/:quoteId/send',
-  authMiddleware,
+  authenticate,
   validateQuoteId,
   createRateLimit(QUOTE_RATE_LIMITS.DELIVERY, 'Too many quote delivery attempts'),
   validateQuoteDelivery,
@@ -216,7 +216,7 @@ router.post(
 
 router.post(
   '/:quoteId/duplicate',
-  authMiddleware,
+  authenticate,
   validateQuoteId,
   createRateLimit(QUOTE_RATE_LIMITS.CREATION, 'Too many quote duplication attempts'),
   async (req, res, next) => {
@@ -226,7 +226,7 @@ router.post(
 
 router.post(
   '/:quoteNumber/accept-with-payment',
-  authMiddleware,
+  authenticate,
   validateQuoteNumber,
   validatePaymentMethodId,
   createRateLimit(QUOTE_RATE_LIMITS.PAYMENT, 'Too many payment acceptance attempts'),
@@ -237,7 +237,7 @@ router.post(
 
 router.post(
   '/:quoteNumber/payment-intent',
-  authMiddleware,
+  authenticate,
   validateQuoteNumber,
   createRateLimit(QUOTE_RATE_LIMITS.PAYMENT, 'Too many payment intent creation attempts'),
   async (req, res, next) => {
@@ -247,7 +247,7 @@ router.post(
 
 router.post(
   '/:quoteId/generate-invoice',
-  authMiddleware,
+  authenticate,
   validateQuoteId,
   createRateLimit(QUOTE_RATE_LIMITS.OPERATIONS, 'Too many invoice generation attempts'),
   async (req, res, next) => {
@@ -257,7 +257,7 @@ router.post(
 
 router.post(
   '/:quoteId/refund',
-  authMiddleware,
+  authenticate,
   validateQuoteId,
   validateRefundRequest,
   createRateLimit(QUOTE_RATE_LIMITS.OPERATIONS, 'Too many refund attempts'),
@@ -266,6 +266,6 @@ router.post(
   }
 );
 
-router.use(errorMiddleware);
+router.use(errorHandler);
 
 export { router as quoteRoutes };

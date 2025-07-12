@@ -1092,7 +1092,7 @@ export class QuoteServiceImpl implements QuoteService {
   }
 
   private async validateTradieExists(tradieId: number): Promise<void> {
-    const tradie = await this.userService.findById(tradieId);
+    const tradie = await this.userService.findById(tradieId.toString());
     if (!tradie) {
       throw new AppError(
         'Tradie not found',
@@ -1103,7 +1103,7 @@ export class QuoteServiceImpl implements QuoteService {
   }
 
   private async validateClientExists(clientId: number): Promise<void> {
-    const client = await this.userService.findById(clientId);
+    const client = await this.userService.findById(clientId.toString());
     if (!client) {
       throw new AppError(
         'Client not found',
@@ -1114,19 +1114,23 @@ export class QuoteServiceImpl implements QuoteService {
   }
 
   private async validateJobExists(jobId: number): Promise<void> {
-    const job = await this.jobService.findById(jobId);
-    if (!job) {
-      throw new AppError(
-        'Job not found',
-        HTTP_STATUS_CODES.NOT_FOUND,
-        'JOB_NOT_FOUND'
-      );
+    try {
+      await this.jobService.getJobById(jobId, 999999);
+    } catch (error) {
+      if (error instanceof AppError && error.message.includes('not found')) {
+        throw new AppError(
+          'Job not found',
+          HTTP_STATUS_CODES.NOT_FOUND,
+          'JOB_NOT_FOUND'
+        );
+      }
     }
   }
 
   private async validateJobAccess(jobId: number, tradieId: number): Promise<void> {
-    const hasAccess = await this.jobService.hasAccess(jobId, tradieId);
-    if (!hasAccess) {
+    try {
+      await this.jobService.getJobById(jobId, tradieId);
+    } catch (error) {
       throw new AppError(
         'Unauthorized access to job',
         HTTP_STATUS_CODES.FORBIDDEN,
