@@ -118,10 +118,13 @@ export interface CreatePaymentMethodRequest {
 }
 
 export interface CreatePaymentMethodResponse {
+  id: number;
   paymentMethodId: string;
   type: PaymentMethod;
   card?: CardDetails;
   clientSecret?: string;
+  isDefault?: boolean;
+  createdAt: string;
 }
 
 export interface AttachPaymentMethodRequest {
@@ -172,6 +175,18 @@ export interface ApplePayPaymentRequest {
   metadata?: Record<string, any>;
 }
 
+export interface ApplePayPaymentResponse {
+  paymentIntentId: string;
+  status: PaymentStatus;
+  amount: number;
+  currency: string;
+  clientSecret?: string;
+  requiresAction: boolean;
+  nextAction?: PaymentNextAction;
+  transactionId: string;
+  success: boolean;
+}
+
 export interface GooglePayTokenRequest {
   paymentMethodData: {
     tokenizationData: {
@@ -188,6 +203,18 @@ export interface GooglePayTokenRequest {
   currency: string;
   description?: string;
   metadata?: Record<string, any>;
+}
+
+export interface GooglePayPaymentResponse {
+  paymentIntentId: string;
+  status: PaymentStatus;
+  amount: number;
+  currency: string;
+  clientSecret?: string;
+  requiresAction: boolean;
+  nextAction?: PaymentNextAction;
+  transactionId: string;
+  success: boolean;
 }
 
 export interface GooglePayConfigResponse {
@@ -270,7 +297,6 @@ export interface PaymentCancelRequest {
 export type PaymentEntity = PaymentDatabaseRecord;
 export type PaymentMethodEntity = PaymentMethodDatabaseRecord;
 
-
 export interface CreateInvoiceRequest {
   amount: number;
   currency: string;
@@ -278,6 +304,19 @@ export interface CreateInvoiceRequest {
   dueDate?: Date;
   userId?: number;
   metadata?: Record<string, any>;
+}
+
+export interface CreateInvoiceResponse {
+  id: number;
+  invoiceNumber: string;
+  amount: number;
+  currency: string;
+  status: string;
+  dueDate: string;
+  paymentLink?: string;
+  stripeInvoiceId?: string;
+  createdAt: string;
+  success: boolean;
 }
 
 export interface UpdateInvoiceStatusRequest {

@@ -170,7 +170,6 @@ export interface ClientDatabaseRecord {
   updated_at: Date;
 }
 
-// Quote-specific enums
 export enum QuoteStatus {
   DRAFT = 'draft',
   SENT = 'sent', 
@@ -199,7 +198,6 @@ export enum DeliveryMethod {
   PORTAL = 'portal'
 }
 
-// Database record interfaces
 export interface QuoteDatabaseRecord {
   id: number;
   tradie_id: number;
@@ -238,33 +236,6 @@ export interface QuoteItemDatabaseRecord {
   updated_at: Date;
 }
 
-// Payment-specific enums
-export enum PaymentStatus {
-  PENDING = 'pending',
-  PROCESSING = 'processing',
-  COMPLETED = 'completed',
-  FAILED = 'failed',
-  CANCELLED = 'cancelled',
-  REFUNDED = 'refunded',
-  PARTIALLY_REFUNDED = 'partially_refunded'
-}
-
-export enum PaymentMethod {
-  STRIPE_CARD = 'stripe_card',
-  APPLE_PAY = 'apple_pay',
-  GOOGLE_PAY = 'google_pay',
-  BANK_TRANSFER = 'bank_transfer',
-  CASH = 'cash'
-}
-
-export enum PaymentType {
-  CREDIT_PURCHASE = 'credit_purchase',
-  SUBSCRIPTION = 'subscription',
-  JOB_APPLICATION = 'job_application',
-  INVOICE_PAYMENT = 'invoice_payment',
-  REFUND = 'refund'
-}
-
 export enum SubscriptionPlan {
   BASIC = 'basic',
   PRO = 'pro',
@@ -284,60 +255,6 @@ export enum InvoiceStatus {
   PAID = 'paid',
   OVERDUE = 'overdue',
   CANCELLED = 'cancelled'
-}
-
-export enum RefundStatus {
-  PENDING = 'pending',
-  APPROVED = 'approved',
-  REJECTED = 'rejected',
-  PROCESSED = 'processed'
-}
-
-export enum WebhookEventType {
-  PAYMENT_SUCCEEDED = 'payment.succeeded',
-  PAYMENT_FAILED = 'payment.failed',
-  SUBSCRIPTION_CREATED = 'subscription.created',
-  SUBSCRIPTION_UPDATED = 'subscription.updated',
-  SUBSCRIPTION_CANCELLED = 'subscription.cancelled',
-  INVOICE_PAID = 'invoice.paid',
-  REFUND_CREATED = 'refund.created'
-}
-
-// Payment database record interfaces
-export interface PaymentDatabaseRecord {
-  id: number;
-  user_id: number;
-  stripe_payment_intent_id?: string;
-  amount: number;
-  currency: string;
-  payment_method: PaymentMethod;
-  payment_type: PaymentType;
-  status: PaymentStatus;
-  description?: string;
-  metadata?: Record<string, any>;
-  invoice_id?: number;
-  subscription_id?: number;
-  credits_purchased?: number;
-  stripe_fee?: number;
-  platform_fee?: number;
-  net_amount?: number;
-  processed_at?: Date;
-  created_at: Date;
-  updated_at: Date;
-}
-
-export interface PaymentMethodDatabaseRecord {
-  id: number;
-  user_id: number;
-  stripe_payment_method_id: string;
-  type: PaymentMethod;
-  card_last_four?: string;
-  card_brand?: string;
-  card_exp_month?: number;
-  card_exp_year?: number;
-  is_default: boolean;
-  created_at: Date;
-  updated_at: Date;
 }
 
 export interface InvoiceDatabaseRecord {
@@ -362,21 +279,11 @@ export interface RefundDatabaseRecord {
   user_id: number;
   amount: number;
   reason?: string;
-  status: RefundStatus;
+  status: string;
   stripe_refund_id?: string;
   processed_at?: Date;
   created_at: Date;
   updated_at: Date;
-}
-
-export interface WebhookEventDatabaseRecord {
-  id: number;
-  stripe_event_id: string;
-  event_type: WebhookEventType;
-  processed: boolean;
-  data: Record<string, any>;
-  created_at: Date;
-  processed_at?: Date;
 }
 
 export interface SubscriptionDatabaseRecord {

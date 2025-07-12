@@ -1,326 +1,316 @@
 import { Request, Response } from 'express';
-import { PAYMENT_CONSTANTS } from '../../config/payment';
 import { logger, sendSuccessResponse, sendErrorResponse } from '../../shared/utils';
-import { PaymentService } from '../services';
-import { AuthenticatedRequest } from '../../auth/middleware/auth.middleware';
-import { 
-  CreatePaymentIntentRequest,
-  ConfirmPaymentRequest,
-  PaymentLinkRequest,
-  PaymentStatusRequest,
-  PaymentHistoryRequest
-} from '../types';
+import { WebhookService } from '../services';
+import { StripeWebhookEvent, WebhookProcessingResult } from '../types';
 
-export class PaymentController {
-  private paymentService: PaymentService;
+interface WebhookRequest extends Request {
+  requestId?: string;
+  webhookEvent?: StripeWebhookEvent;
+}
+
+export class WebhookController {
+  private webhookService: WebhookService;
 
   constructor() {
-    this.paymentService = new PaymentService();
+    this.webhookService = new WebhookService();
   }
 
-  private getUserId(req: AuthenticatedRequest): number | null {
-    if (!req.user?.id) {
-      return null;
-    }
-    const userId = parseInt(req.user.id);
-    return isNaN(userId) ? null : userId;
-  }
-
-  private validateAuthentication(req: AuthenticatedRequest, res: Response): number | null {
-    if (!req.user) {
-      sendErrorResponse(res, 'User authentication required', 401);
-      return null;
-    }
-
-    if (!req.user.id) {
-      sendErrorResponse(res, 'Invalid user session', 401);
-      return null;
-    }
-
-    const userId = this.getUserId(req);
-    if (!userId) {
-      sendErrorResponse(res, 'Invalid user ID', 401);
-      return null;
-    }
-
-    return userId;
-  }
-
-  async createPaymentIntent(req: AuthenticatedRequest, res: Response): Promise<void> {
+  async handleStripeWebhook(req: WebhookRequest, res: Response): Promise<void> {
     try {
-      const userId = this.validateAuthentication(req, res);
-      if (!userId) return;
+      const requestId = req.requestId || 'webhook-unknown';
+      const webhookEvent = req.webhookEvent;
 
-      const requestId = req.requestId || 'unknown';
-
-      const request: CreatePaymentIntentRequest = {
-        ...req.body,
-        metadata: {
-          ...req.body.metadata,
-          userId: userId.toString()
-        }
-      };
-
-      const paymentIntent = await this.paymentService.createPaymentIntent(request, requestId);
-
-      logger.info('Payment intent created successfully', {
-        paymentIntentId: paymentIntent.paymentIntentId,
-        amount: request.amount,
-        currency: request.currency,
-        paymentMethod: request.paymentMethod,
-        userId,
-        requestId
-      });
-
-      sendSuccessResponse(res, 'Payment intent created successfully', paymentIntent, 201);
-
-    } catch (error) {
-      logger.error('Failed to create payment intent', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        userId: this.getUserId(req),
-        requestId: req.requestId
-      });
-
-      const statusCode = error instanceof Error && error.message.includes('Invalid') ? 400 : 500;
-      sendErrorResponse(res,
-        error instanceof Error ? error.message : 'Failed to create payment intent',
-        statusCode
-      );
-    }
-  }
-
-  async confirmPayment(req: AuthenticatedRequest, res: Response): Promise<void> {
-    try {
-      const userId = this.validateAuthentication(req, res);
-      if (!userId) return;
-
-      const requestId = req.requestId || 'unknown';
-
-      const request: ConfirmPaymentRequest = req.body;
-      const confirmResult = await this.paymentService.confirmPayment(request, requestId);
-
-      logger.info('Payment confirmed successfully', {
-        paymentIntentId: request.paymentIntentId,
-        status: confirmResult.status,
-        userId,
-        requestId
-      });
-
-      sendSuccessResponse(res, 'Payment confirmed successfully', confirmResult);
-
-    } catch (error) {
-      logger.error('Failed to confirm payment', {
-        paymentIntentId: req.body.paymentIntentId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        userId: this.getUserId(req),
-        requestId: req.requestId
-      });
-
-      const statusCode = error instanceof Error && error.message.includes('not found') ? 404 : 500;
-      sendErrorResponse(res,
-        error instanceof Error ? error.message : 'Failed to confirm payment',
-        statusCode
-      );
-    }
-  }
-
-  async createPaymentLink(req: AuthenticatedRequest, res: Response): Promise<void> {
-    try {
-      const userId = this.validateAuthentication(req, res);
-      if (!userId) return;
-
-      const requestId = req.requestId || 'unknown';
-
-      const request: PaymentLinkRequest = {
-        ...req.body,
-        metadata: {
-          ...req.body.metadata,
-          userId: userId.toString()
-        }
-      };
-
-      const paymentLink = await this.paymentService.createPaymentLink(request, requestId);
-
-      logger.info('Payment link created successfully', {
-        paymentLinkId: paymentLink.id,
-        amount: request.amount,
-        currency: request.currency,
-        userId,
-        requestId
-      });
-
-      sendSuccessResponse(res, 'Payment link created successfully', paymentLink, 201);
-
-    } catch (error) {
-      logger.error('Failed to create payment link', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        userId: this.getUserId(req),
-        requestId: req.requestId
-      });
-
-      const statusCode = error instanceof Error && error.message.includes('Invalid') ? 400 : 500;
-      sendErrorResponse(res,
-        error instanceof Error ? error.message : 'Failed to create payment link',
-        statusCode
-      );
-    }
-  }
-
-  async getPaymentStatus(req: AuthenticatedRequest, res: Response): Promise<void> {
-    try {
-      const userId = this.validateAuthentication(req, res);
-      if (!userId) return;
-
-      const requestId = req.requestId || 'unknown';
-      const paymentId = parseInt(req.params.paymentId);
-
-      if (isNaN(paymentId)) {
-        return sendErrorResponse(res, 'Invalid payment ID', 400);
+      if (!webhookEvent) {
+        logger.warn('Webhook event not found in request', {
+          requestId,
+          ip: req.ip
+        });
+        return sendErrorResponse(res, 'Webhook event not found', 400);
       }
 
-      const request: PaymentStatusRequest = { paymentId };
-      const paymentStatus = await this.paymentService.getPaymentStatus(request, requestId);
+      logger.info('Processing webhook event', {
+        eventId: webhookEvent.id,
+        eventType: webhookEvent.type,
+        requestId,
+        ip: req.ip
+      });
 
-      logger.info('Payment status retrieved successfully', {
-        paymentId,
-        status: paymentStatus.status,
-        userId,
+      const result: WebhookProcessingResult = await this.webhookService.processWebhookEvent(
+        webhookEvent,
         requestId
-      });
-
-      sendSuccessResponse(res, 'Payment status retrieved successfully', paymentStatus);
-
-    } catch (error) {
-      logger.error('Failed to get payment status', {
-        paymentId: req.params.paymentId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        userId: this.getUserId(req),
-        requestId: req.requestId
-      });
-
-      const statusCode = error instanceof Error && error.message.includes('not found') ? 404 : 500;
-      sendErrorResponse(res,
-        error instanceof Error ? error.message : 'Failed to get payment status',
-        statusCode
       );
-    }
-  }
 
-  async getPaymentHistory(req: AuthenticatedRequest, res: Response): Promise<void> {
-    try {
-      const userId = this.validateAuthentication(req, res);
-      if (!userId) return;
+      if (result.success) {
+        logger.info('Webhook processed successfully', {
+          eventId: result.eventId,
+          eventType: result.eventType,
+          processedAt: result.processedAt,
+          requestId
+        });
 
-      const requestId = req.requestId || 'unknown';
+        sendSuccessResponse(res, result.message || 'Webhook processed successfully', {
+          eventId: result.eventId,
+          eventType: result.eventType,
+          processed: true,
+          processedAt: result.processedAt
+        });
+      } else {
+        logger.warn('Webhook processing failed', {
+          eventId: result.eventId,
+          eventType: result.eventType,
+          error: result.error || 'Unknown processing error',
+          retryAfter: result.retryAfter,
+          requestId
+        });
 
-      const request: PaymentHistoryRequest = {
-        userId,
-        limit: parseInt(req.query.limit as string) || 50,
-        offset: parseInt(req.query.offset as string) || 0
-      };
+        const statusCode = result.retryAfter ? 429 : 400;
+        const response: any = {
+          eventId: result.eventId,
+          processed: false,
+          error: result.error || 'Processing failed'
+        };
 
-      const paymentHistory = await this.paymentService.getPaymentHistory(request, requestId);
+        if (result.retryAfter) {
+          response.retryAfter = result.retryAfter;
+          res.set('Retry-After', result.retryAfter.toString());
+        }
 
-      logger.info('Payment history retrieved successfully', {
-        userId,
-        count: paymentHistory.payments.length,
-        totalCount: paymentHistory.totalCount,
-        requestId
-      });
-
-      sendSuccessResponse(res, 'Payment history retrieved successfully', paymentHistory);
-
-    } catch (error) {
-      logger.error('Failed to get payment history', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        userId: this.getUserId(req),
-        requestId: req.requestId
-      });
-
-      sendErrorResponse(res,
-        error instanceof Error ? error.message : 'Failed to get payment history',
-        500
-      );
-    }
-  }
-
-  async cancelPayment(req: AuthenticatedRequest, res: Response): Promise<void> {
-    try {
-      const userId = this.validateAuthentication(req, res);
-      if (!userId) return;
-
-      const requestId = req.requestId || 'unknown';
-      const paymentId = parseInt(req.params.paymentId);
-
-      if (isNaN(paymentId)) {
-        return sendErrorResponse(res, 'Invalid payment ID', 400);
+        sendErrorResponse(res, result.error || 'Webhook processing failed', statusCode, response);
       }
 
-      await this.paymentService.cancelPayment(paymentId, requestId);
-
-      logger.info('Payment cancelled successfully', {
-        paymentId,
-        userId,
-        requestId
-      });
-
-      sendSuccessResponse(res, 'Payment cancelled successfully', { paymentId, status: 'cancelled' });
-
     } catch (error) {
-      logger.error('Failed to cancel payment', {
-        paymentId: req.params.paymentId,
+      logger.error('Webhook processing error', {
         error: error instanceof Error ? error.message : 'Unknown error',
-        userId: this.getUserId(req),
-        requestId: req.requestId
+        stack: error instanceof Error ? error.stack : undefined,
+        eventId: req.webhookEvent?.id,
+        eventType: req.webhookEvent?.type,
+        requestId: req.requestId || 'unknown',
+        ip: req.ip
       });
 
-      const statusCode = error instanceof Error && error.message.includes('not found') ? 404 : 
-                        error instanceof Error && error.message.includes('Cannot cancel') ? 400 : 500;
-      sendErrorResponse(res,
-        error instanceof Error ? error.message : 'Failed to cancel payment',
-        statusCode
-      );
+      sendErrorResponse(res, 'Internal webhook processing error', 500, {
+        eventId: req.webhookEvent?.id,
+        processed: false
+      });
     }
   }
 
-  async getPaymentMethods(req: AuthenticatedRequest, res: Response): Promise<void> {
+  async retryWebhookEvent(req: WebhookRequest, res: Response): Promise<void> {
     try {
-      const requestId = req.requestId || 'unknown';
+      const requestId = req.requestId || 'retry-unknown';
+      const eventId = req.params.eventId;
 
-      const supportedMethods = {
-        stripe: {
-          enabled: true,
-          types: ['card'],
-          currencies: PAYMENT_CONSTANTS.STRIPE.CURRENCY.SUPPORTED
-        },
-        applePay: {
-          enabled: !!process.env.APPLE_PAY_MERCHANT_ID,
-          countries: PAYMENT_CONSTANTS.APPLE_PAY?.SUPPORTED_COUNTRIES || [],
-          currencies: PAYMENT_CONSTANTS.STRIPE.CURRENCY.SUPPORTED
-        },
-        googlePay: {
-          enabled: !!process.env.GOOGLE_PAY_MERCHANT_ID,
-          countries: PAYMENT_CONSTANTS.GOOGLE_PAY?.SUPPORTED_COUNTRIES || [],
-          currencies: PAYMENT_CONSTANTS.STRIPE.CURRENCY.SUPPORTED
-        }
-      };
+      if (!eventId) {
+        logger.warn('Webhook retry attempted without event ID', {
+          requestId,
+          ip: req.ip
+        });
+        return sendErrorResponse(res, 'Event ID is required', 400);
+      }
 
-      logger.info('Payment methods retrieved successfully', {
+      logger.info('Retrying webhook event', {
+        eventId,
+        requestId,
+        ip: req.ip
+      });
+
+      const retryResult = await this.webhookService.retryWebhookEvent(eventId, requestId);
+
+      if (retryResult.success) {
+        logger.info('Webhook retry completed successfully', {
+          eventId,
+          message: retryResult.message || 'Retry successful',
+          requestId
+        });
+
+        sendSuccessResponse(res, retryResult.message || 'Webhook retry completed successfully', {
+          eventId,
+          retried: true,
+          success: true,
+          processedAt: retryResult.processedAt
+        });
+      } else {
+        logger.warn('Webhook retry failed', {
+          eventId,
+          error: retryResult.error || 'Retry failed',
+          requestId
+        });
+
+        sendErrorResponse(res, retryResult.error || 'Webhook retry failed', 400, {
+          eventId,
+          retried: false,
+          error: retryResult.error
+        });
+      }
+
+    } catch (error) {
+      logger.error('Webhook retry error', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        eventId: req.params.eventId,
+        requestId: req.requestId || 'unknown',
+        ip: req.ip
+      });
+
+      sendErrorResponse(res, 'Failed to retry webhook event', 500, {
+        eventId: req.params.eventId,
+        retried: false
+      });
+    }
+  }
+
+  async getWebhookEventStatus(req: WebhookRequest, res: Response): Promise<void> {
+    try {
+      const requestId = req.requestId || 'status-unknown';
+      const eventId = req.params.eventId;
+
+      if (!eventId) {
+        return sendErrorResponse(res, 'Event ID is required', 400);
+      }
+
+      logger.info('Retrieving webhook event status', {
+        eventId,
         requestId
       });
 
-      sendSuccessResponse(res, 'Payment methods retrieved successfully', supportedMethods);
+      const status = await this.webhookService.getWebhookEventStatus(eventId, requestId);
 
-    } catch (error) {
-      logger.error('Failed to get payment methods', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId: req.requestId
+      if (!status) {
+        logger.warn('Webhook event not found', {
+          eventId,
+          requestId
+        });
+        return sendErrorResponse(res, 'Webhook event not found', 404);
+      }
+
+      logger.info('Webhook event status retrieved', {
+        eventId,
+        processed: status.processed,
+        requestId
       });
 
-      sendErrorResponse(res,
-        'Failed to get payment methods',
-        500
-      );
+      sendSuccessResponse(res, 'Webhook event status retrieved successfully', status);
+
+    } catch (error) {
+      logger.error('Failed to get webhook event status', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        eventId: req.params.eventId,
+        requestId: req.requestId || 'unknown'
+      });
+
+      sendErrorResponse(res, 'Failed to get webhook event status', 500);
+    }
+  }
+
+  async listWebhookEvents(req: WebhookRequest, res: Response): Promise<void> {
+    try {
+      const requestId = req.requestId || 'list-unknown';
+      const limit = parseInt(req.query.limit as string) || 50;
+      const offset = parseInt(req.query.offset as string) || 0;
+      const eventType = req.query.eventType as string;
+      const processed = req.query.processed === 'true' ? true : 
+                       req.query.processed === 'false' ? false : undefined;
+
+      logger.info('Listing webhook events', {
+        limit,
+        offset,
+        eventType,
+        processed,
+        requestId
+      });
+
+      const events = await this.webhookService.listWebhookEvents({
+        limit,
+        offset,
+        eventType,
+        processed
+      }, requestId);
+
+      sendSuccessResponse(res, 'Webhook events retrieved successfully', events);
+
+    } catch (error) {
+      logger.error('Failed to list webhook events', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        requestId: req.requestId || 'unknown'
+      });
+
+      sendErrorResponse(res, 'Failed to list webhook events', 500);
+    }
+  }
+
+  async getWebhookStats(req: WebhookRequest, res: Response): Promise<void> {
+    try {
+      const requestId = req.requestId || 'stats-unknown';
+      const startDate = req.query.startDate ? new Date(req.query.startDate as string) : undefined;
+      const endDate = req.query.endDate ? new Date(req.query.endDate as string) : undefined;
+
+      logger.info('Retrieving webhook statistics', {
+        startDate,
+        endDate,
+        requestId
+      });
+
+      const stats = await this.webhookService.getWebhookStats({
+        startDate,
+        endDate
+      }, requestId);
+
+      sendSuccessResponse(res, 'Webhook statistics retrieved successfully', stats);
+
+    } catch (error) {
+      logger.error('Failed to get webhook statistics', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        requestId: req.requestId || 'unknown'
+      });
+
+      sendErrorResponse(res, 'Failed to get webhook statistics', 500);
+    }
+  }
+
+  async deleteWebhookEvent(req: WebhookRequest, res: Response): Promise<void> {
+    try {
+      const requestId = req.requestId || 'delete-unknown';
+      const eventId = req.params.eventId;
+
+      if (!eventId) {
+        return sendErrorResponse(res, 'Event ID is required', 400);
+      }
+
+      logger.info('Deleting webhook event', {
+        eventId,
+        requestId
+      });
+
+      const deleted = await this.webhookService.deleteWebhookEvent(eventId, requestId);
+
+      if (deleted) {
+        logger.info('Webhook event deleted successfully', {
+          eventId,
+          requestId
+        });
+
+        sendSuccessResponse(res, 'Webhook event deleted successfully', {
+          eventId,
+          deleted: true
+        });
+      } else {
+        logger.warn('Webhook event not found for deletion', {
+          eventId,
+          requestId
+        });
+
+        sendErrorResponse(res, 'Webhook event not found', 404);
+      }
+
+    } catch (error) {
+      logger.error('Failed to delete webhook event', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        eventId: req.params.eventId,
+        requestId: req.requestId || 'unknown'
+      });
+
+      sendErrorResponse(res, 'Failed to delete webhook event', 500);
     }
   }
 }
+
+export const webhookController = new WebhookController();

@@ -280,7 +280,7 @@ class DatabaseConnection implements DatabaseClient {
       const createInvoicesTable = `
         CREATE TABLE IF NOT EXISTS invoices (
           id SERIAL PRIMARY KEY,
-          quote_id INTEGER REFERENCES quotes(id) ON DELETE SET NULL,
+          quote_id INTEGER,
           user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
           invoice_number VARCHAR(50) UNIQUE NOT NULL,
           amount DECIMAL(12,2) NOT NULL,
@@ -537,58 +537,6 @@ class DatabaseConnection implements DatabaseClient {
         );
       `;
 
-      const createQuotePaymentsTable = `
-        CREATE TABLE IF NOT EXISTS quote_payments (
-          id SERIAL PRIMARY KEY,
-          quote_id INTEGER REFERENCES quotes(id) ON DELETE CASCADE,
-          payment_intent_id VARCHAR(255) UNIQUE,
-          payment_id VARCHAR(255),
-          amount DECIMAL(12,2) NOT NULL,
-          currency VARCHAR(3) NOT NULL DEFAULT 'AUD',
-          status VARCHAR(20) NOT NULL DEFAULT 'pending',
-          payment_method_type VARCHAR(50),
-          stripe_customer_id VARCHAR(255),
-          refund_id VARCHAR(255),
-          refund_status VARCHAR(20),
-          invoice_id VARCHAR(255),
-          invoice_number VARCHAR(50),
-          failure_reason TEXT,
-          paid_at TIMESTAMP,
-          refunded_at TIMESTAMP,
-          created_at TIMESTAMP DEFAULT NOW(),
-          updated_at TIMESTAMP DEFAULT NOW()
-        );
-      `;
-
-      const createUserPaymentMethodsTable = `
-        CREATE TABLE IF NOT EXISTS user_payment_methods (
-          id SERIAL PRIMARY KEY,
-          user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-          payment_method_id VARCHAR(255) NOT NULL,
-          type VARCHAR(50) NOT NULL,
-          card_brand VARCHAR(20),
-          card_last4 VARCHAR(4),
-          card_expiry_month INTEGER,
-          card_expiry_year INTEGER,
-          is_default BOOLEAN DEFAULT FALSE,
-          created_at TIMESTAMP DEFAULT NOW(),
-          updated_at TIMESTAMP DEFAULT NOW(),
-          UNIQUE(user_id, payment_method_id)
-        );
-      `;
-
-      const createPaymentWebhooksTable = `
-        CREATE TABLE IF NOT EXISTS payment_webhooks (
-          id SERIAL PRIMARY KEY,
-          stripe_event_id VARCHAR(255) UNIQUE NOT NULL,
-          event_type VARCHAR(100) NOT NULL,
-          processed BOOLEAN DEFAULT FALSE,
-          payload JSONB NOT NULL,
-          created_at TIMESTAMP DEFAULT NOW(),
-          processed_at TIMESTAMP
-        );
-      `;
-
       const createQuoteItemsTable = `
         CREATE TABLE IF NOT EXISTS quote_items (
           id SERIAL PRIMARY KEY,
@@ -619,15 +567,6 @@ class DatabaseConnection implements DatabaseClient {
 
       await this.query(createQuotesTable);
       logger.info('Quotes table created/verified');
-
-      await this.query(createQuotePaymentsTable);
-      logger.info('Quote payments table created/verified');
-
-      await this.query(createUserPaymentMethodsTable);
-      logger.info('User payment methods table created/verified');
-
-      await this.query(createPaymentWebhooksTable);
-      logger.info('Payment webhooks table created/verified');
 
       await this.query(createQuoteItemsTable);
       logger.info('Quote items table created/verified');
@@ -666,13 +605,7 @@ class DatabaseConnection implements DatabaseClient {
         'CREATE INDEX IF NOT EXISTS idx_quotes_valid_until ON quotes(valid_until);',
         'CREATE INDEX IF NOT EXISTS idx_quotes_created_at ON quotes(created_at);',
         'CREATE INDEX IF NOT EXISTS idx_quote_items_quote_id ON quote_items(quote_id);',
-        'CREATE INDEX IF NOT EXISTS idx_quote_items_sort_order ON quote_items(sort_order);',
-        'CREATE INDEX IF NOT EXISTS idx_quote_payments_quote_id ON quote_payments(quote_id);',
-        'CREATE INDEX IF NOT EXISTS idx_quote_payments_payment_intent_id ON quote_payments(payment_intent_id);',
-        'CREATE INDEX IF NOT EXISTS idx_quote_payments_status ON quote_payments(status);',
-        'CREATE INDEX IF NOT EXISTS idx_user_payment_methods_user_id ON user_payment_methods(user_id);',
-        'CREATE INDEX IF NOT EXISTS idx_payment_webhooks_stripe_event_id ON payment_webhooks(stripe_event_id);',
-        'CREATE INDEX IF NOT EXISTS idx_payment_webhooks_processed ON payment_webhooks(processed);'
+        'CREATE INDEX IF NOT EXISTS idx_quote_items_sort_order ON quote_items(sort_order);'
       ];
 
       for (const indexQuery of indexes) {
@@ -710,9 +643,6 @@ class DatabaseConnection implements DatabaseClient {
       await this.query('DROP TABLE IF EXISTS sessions CASCADE');
       await this.query('DROP TABLE IF EXISTS profiles CASCADE');
       await this.query('DROP TABLE IF EXISTS users CASCADE');
-      await this.query('DROP TABLE IF EXISTS payment_webhooks CASCADE');
-      await this.query('DROP TABLE IF EXISTS user_payment_methods CASCADE');
-      await this.query('DROP TABLE IF EXISTS quote_payments CASCADE');
 
       await this.createTables();
       
@@ -763,6 +693,10 @@ class DatabaseConnection implements DatabaseClient {
 }
 
 export const database = new DatabaseConnection();
+
+export const getDbConnection = (): DatabaseConnection => {
+  return database;
+};
 
 export const connectDatabase = async (): Promise<void> => {
   try {
@@ -818,17 +752,3 @@ export const closeDatabase = async (): Promise<void> => {
     throw error;
   }
 };
-
-export const environment = {
-  DB_HOST: process.env.DB_HOST || 'localhost',
-  DB_PORT: parseInt(process.env.DB_PORT || '5432'),
-  DB_NAME: process.env.DB_NAME || 'buildhive',
-  DB_USER: process.env.DB_USER || 'postgres',
-  DB_PASSWORD: process.env.DB_PASSWORD || '',
-  DB_SSL: process.env.DB_SSL === 'true',
-  DB_CONNECTION_TIMEOUT: parseInt(process.env.DB_CONNECTION_TIMEOUT || '30000'),
-  DB_IDLE_TIMEOUT: parseInt(process.env.DB_IDLE_TIMEOUT || '30000'),
-  DB_MAX_CONNECTIONS: parseInt(process.env.DB_MAX_CONNECTIONS || '10')
-};
-
-

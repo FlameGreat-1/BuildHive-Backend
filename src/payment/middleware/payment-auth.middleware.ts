@@ -2,7 +2,8 @@ import { Request, Response, NextFunction } from 'express';
 import { PAYMENT_CONSTANTS } from '../../config/payment';
 import { authenticate, AuthenticatedRequest } from '../../auth/middleware';
 import { database } from '../../shared/database/connection';
-import { logger, createErrorResponse } from '../../shared/utils';
+import { logger, AppError } from '../../shared/utils';
+import { HTTP_STATUS_CODES } from '../../config/auth/constants';
 import { PaymentRepository } from '../repositories';
 
 export const authenticatePaymentUser = async (
@@ -11,30 +12,7 @@ export const authenticatePaymentUser = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    await authenticate(req, res, () => {
-      if (!req.user) {
-        logger.warn('Payment authentication failed - no user found', {
-          requestId: req.requestId,
-          ip: req.ip,
-          userAgent: req.get('User-Agent')
-        });
-
-        res.status(401).json(createErrorResponse(
-          'Authentication required for payment operations',
-          'PAYMENT_AUTH_REQUIRED',
-          { requiresAuth: true }
-        ));
-        return;
-      }
-
-      logger.info('Payment user authenticated successfully', {
-        userId: req.user.id,
-        email: req.user.email,
-        requestId: req.requestId
-      });
-
-      next();
-    });
+    await authenticate(req, res, next);
   } catch (error) {
     logger.error('Payment authentication error', {
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -42,9 +20,9 @@ export const authenticatePaymentUser = async (
       ip: req.ip
     });
 
-    res.status(500).json(createErrorResponse(
+    next(new AppError(
       'Authentication service unavailable',
-      'PAYMENT_AUTH_ERROR'
+      HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR
     ));
   }
 };
@@ -56,11 +34,10 @@ export const authorizePaymentAccess = async (
 ): Promise<void> => {
   try {
     if (!req.user) {
-      res.status(401).json(createErrorResponse(
+      return next(new AppError(
         'User authentication required',
-        'PAYMENT_USER_REQUIRED'
+        HTTP_STATUS_CODES.UNAUTHORIZED
       ));
-      return;
     }
 
     const paymentId = req.params.paymentId || req.body.paymentId;
@@ -80,11 +57,10 @@ export const authorizePaymentAccess = async (
           requestId: req.requestId
         });
 
-        res.status(404).json(createErrorResponse(
+        return next(new AppError(
           'Payment not found',
-          'PAYMENT_NOT_FOUND'
+          HTTP_STATUS_CODES.NOT_FOUND
         ));
-        return;
       }
 
       if (payment.user_id !== parseInt(req.user.id) && req.user.role !== 'admin') {
@@ -95,11 +71,10 @@ export const authorizePaymentAccess = async (
           requestId: req.requestId
         });
 
-        res.status(403).json(createErrorResponse(
+        return next(new AppError(
           'Access denied to this payment',
-          'PAYMENT_ACCESS_DENIED'
+          HTTP_STATUS_CODES.FORBIDDEN
         ));
-        return;
       }
     }
 
@@ -117,9 +92,9 @@ export const authorizePaymentAccess = async (
       requestId: req.requestId
     });
 
-    res.status(500).json(createErrorResponse(
+    next(new AppError(
       'Authorization service unavailable',
-      'PAYMENT_AUTH_SERVICE_ERROR'
+      HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR
     ));
   }
 };
@@ -131,11 +106,10 @@ export const authorizeInvoiceAccess = async (
 ): Promise<void> => {
   try {
     if (!req.user) {
-      res.status(401).json(createErrorResponse(
+      return next(new AppError(
         'User authentication required',
-        'INVOICE_USER_REQUIRED'
+        HTTP_STATUS_CODES.UNAUTHORIZED
       ));
-      return;
     }
 
     const invoiceId = req.params.invoiceId || req.body.invoiceId;
@@ -155,11 +129,10 @@ export const authorizeInvoiceAccess = async (
           requestId: req.requestId
         });
 
-        res.status(404).json(createErrorResponse(
+        return next(new AppError(
           'Invoice not found',
-          'INVOICE_NOT_FOUND'
+          HTTP_STATUS_CODES.NOT_FOUND
         ));
-        return;
       }
 
       if (invoice.user_id !== parseInt(req.user.id) && req.user.role !== 'admin') {
@@ -170,11 +143,10 @@ export const authorizeInvoiceAccess = async (
           requestId: req.requestId
         });
 
-        res.status(403).json(createErrorResponse(
+        return next(new AppError(
           'Access denied to this invoice',
-          'INVOICE_ACCESS_DENIED'
+          HTTP_STATUS_CODES.FORBIDDEN
         ));
-        return;
       }
     }
 
@@ -192,9 +164,9 @@ export const authorizeInvoiceAccess = async (
       requestId: req.requestId
     });
 
-    res.status(500).json(createErrorResponse(
+    next(new AppError(
       'Invoice authorization service unavailable',
-      'INVOICE_AUTH_SERVICE_ERROR'
+      HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR
     ));
   }
 };
@@ -206,11 +178,10 @@ export const authorizeRefundAccess = async (
 ): Promise<void> => {
   try {
     if (!req.user) {
-      res.status(401).json(createErrorResponse(
+      return next(new AppError(
         'User authentication required',
-        'REFUND_USER_REQUIRED'
+        HTTP_STATUS_CODES.UNAUTHORIZED
       ));
-      return;
     }
 
     const refundId = req.params.refundId || req.body.refundId;
@@ -230,11 +201,10 @@ export const authorizeRefundAccess = async (
           requestId: req.requestId
         });
 
-        res.status(404).json(createErrorResponse(
+        return next(new AppError(
           'Refund not found',
-          'REFUND_NOT_FOUND'
+          HTTP_STATUS_CODES.NOT_FOUND
         ));
-        return;
       }
 
       if (refund.user_id !== parseInt(req.user.id) && req.user.role !== 'admin') {
@@ -245,11 +215,10 @@ export const authorizeRefundAccess = async (
           requestId: req.requestId
         });
 
-        res.status(403).json(createErrorResponse(
+        return next(new AppError(
           'Access denied to this refund',
-          'REFUND_ACCESS_DENIED'
+          HTTP_STATUS_CODES.FORBIDDEN
         ));
-        return;
       }
     }
 
@@ -267,9 +236,9 @@ export const authorizeRefundAccess = async (
       requestId: req.requestId
     });
 
-    res.status(500).json(createErrorResponse(
+    next(new AppError(
       'Refund authorization service unavailable',
-      'REFUND_AUTH_SERVICE_ERROR'
+      HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR
     ));
   }
 };
@@ -278,11 +247,10 @@ export const requirePaymentRole = (allowedRoles: string[]) => {
   return (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
     try {
       if (!req.user) {
-        res.status(401).json(createErrorResponse(
+        return next(new AppError(
           'Authentication required',
-          'PAYMENT_AUTH_REQUIRED'
+          HTTP_STATUS_CODES.UNAUTHORIZED
         ));
-        return;
       }
 
       if (!allowedRoles.includes(req.user.role)) {
@@ -293,12 +261,10 @@ export const requirePaymentRole = (allowedRoles: string[]) => {
           requestId: req.requestId
         });
 
-        res.status(403).json(createErrorResponse(
+        return next(new AppError(
           'Insufficient permissions for this payment operation',
-          'PAYMENT_INSUFFICIENT_ROLE',
-          { requiredRoles: allowedRoles }
+          HTTP_STATUS_CODES.FORBIDDEN
         ));
-        return;
       }
 
       logger.info('Payment role authorization successful', {
@@ -315,9 +281,9 @@ export const requirePaymentRole = (allowedRoles: string[]) => {
         requestId: req.requestId
       });
 
-      res.status(500).json(createErrorResponse(
+      next(new AppError(
         'Role authorization service unavailable',
-        'PAYMENT_ROLE_AUTH_ERROR'
+        HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR
       ));
     }
   };
@@ -330,32 +296,27 @@ export const validatePaymentLimits = async (
 ): Promise<void> => {
   try {
     if (!req.user) {
-      res.status(401).json(createErrorResponse(
+      return next(new AppError(
         'Authentication required',
-        'PAYMENT_AUTH_REQUIRED'
+        HTTP_STATUS_CODES.UNAUTHORIZED
       ));
-      return;
     }
 
     const amount = req.body.amount;
     
     if (amount) {
       if (amount < PAYMENT_CONSTANTS.STRIPE.LIMITS.MIN_AMOUNT) {
-        res.status(400).json(createErrorResponse(
+        return next(new AppError(
           `Payment amount must be at least ${PAYMENT_CONSTANTS.STRIPE.LIMITS.MIN_AMOUNT} cents`,
-          'PAYMENT_AMOUNT_TOO_LOW',
-          { minAmount: PAYMENT_CONSTANTS.STRIPE.LIMITS.MIN_AMOUNT }
+          HTTP_STATUS_CODES.BAD_REQUEST
         ));
-        return;
       }
 
       if (amount > PAYMENT_CONSTANTS.STRIPE.LIMITS.MAX_AMOUNT) {
-        res.status(400).json(createErrorResponse(
+        return next(new AppError(
           `Payment amount cannot exceed ${PAYMENT_CONSTANTS.STRIPE.LIMITS.MAX_AMOUNT} cents`,
-          'PAYMENT_AMOUNT_TOO_HIGH',
-          { maxAmount: PAYMENT_CONSTANTS.STRIPE.LIMITS.MAX_AMOUNT }
+          HTTP_STATUS_CODES.BAD_REQUEST
         ));
-        return;
       }
 
       const paymentRepository = new PaymentRepository(database);
@@ -377,16 +338,10 @@ export const validatePaymentLimits = async (
           requestId: req.requestId
         });
 
-        res.status(429).json(createErrorResponse(
+        return next(new AppError(
           'Daily payment limit exceeded',
-          'PAYMENT_DAILY_LIMIT_EXCEEDED',
-          { 
-            dailyLimit,
-            currentTotal: dailyTotal,
-            remainingLimit: Math.max(0, dailyLimit - dailyTotal)
-          }
+          HTTP_STATUS_CODES.TOO_MANY_REQUESTS
         ));
-        return;
       }
     }
 
@@ -404,9 +359,111 @@ export const validatePaymentLimits = async (
       requestId: req.requestId
     });
 
-    res.status(500).json(createErrorResponse(
+    next(new AppError(
       'Payment limits validation service unavailable',
-      'PAYMENT_LIMITS_SERVICE_ERROR'
+      HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR
+    ));
+  }
+};
+
+export const authenticateWebhookAdmin = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    await authenticate(req, res, next);
+    
+    if (!req.user) {
+      return next(new AppError(
+        'Admin authentication required for webhook operations',
+        HTTP_STATUS_CODES.UNAUTHORIZED
+      ));
+    }
+
+    if (req.user.role !== 'admin') {
+      logger.warn('Non-admin user attempted webhook admin operation', {
+        userId: req.user.id,
+        userRole: req.user.role,
+        requestId: req.requestId
+      });
+
+      return next(new AppError(
+        'Admin privileges required for webhook operations',
+        HTTP_STATUS_CODES.FORBIDDEN
+      ));
+    }
+
+    logger.info('Webhook admin authentication successful', {
+      userId: req.user.id,
+      requestId: req.requestId
+    });
+
+    next();
+  } catch (error) {
+    logger.error('Webhook admin authentication error', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      requestId: req.requestId
+    });
+
+    next(new AppError(
+      'Webhook admin authentication service unavailable',
+      HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR
+    ));
+  }
+};
+
+export const authorizeWebhookAccess = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    if (!req.user) {
+      return next(new AppError(
+        'Authentication required for webhook access',
+        HTTP_STATUS_CODES.UNAUTHORIZED
+      ));
+    }
+
+    const allowedRoles = ['admin', 'webhook_manager'];
+    
+    if (!allowedRoles.includes(req.user.role)) {
+      logger.warn('Unauthorized webhook access attempt', {
+        userId: req.user.id,
+        userRole: req.user.role,
+        allowedRoles,
+        requestId: req.requestId
+      });
+
+      return next(new AppError(
+        'Insufficient permissions for webhook operations',
+        HTTP_STATUS_CODES.FORBIDDEN
+      ));
+    }
+
+    const webhookId = req.params.webhookId || req.body.webhookId;
+    
+    if (webhookId) {
+      logger.info('Webhook access authorized', {
+        userId: req.user.id,
+        webhookId,
+        userRole: req.user.role,
+        requestId: req.requestId
+      });
+    }
+
+    next();
+  } catch (error) {
+    logger.error('Webhook authorization error', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      userId: req.user?.id,
+      requestId: req.requestId
+    });
+
+    next(new AppError(
+      'Webhook authorization service unavailable',
+      HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR
     ));
   }
 };

@@ -1,8 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 import { WEBHOOK_CONFIG } from '../../config/payment';
-import { logger, createErrorResponse } from '../../shared/utils';
+import { logger, AppError } from '../../shared/utils';
+import { HTTP_STATUS_CODES } from '../../config/auth/constants';
 import { validateWebhookEvent, validateWebhookSignature } from '../validators';
-import { parseWebhookEvent, isWebhookEventDuplicate } from '../utils';
+import { parseWebhookEvent } from '../utils';
 import { WebhookRepository } from '../repositories';
 import { getDbConnection } from '../../shared/database';
 
@@ -12,7 +13,7 @@ interface WebhookRequest extends Request {
   webhookEvent?: any;
 }
 
-export const validateWebhookSignatureMiddleware = async (
+export const validateWebhookSignature = async (
   req: WebhookRequest,
   res: Response,
   next: NextFunction
@@ -28,11 +29,10 @@ export const validateWebhookSignatureMiddleware = async (
         userAgent: req.get('User-Agent')
       });
 
-      res.status(400).json(createErrorResponse(
+      return next(new AppError(
         'Webhook signature required',
-        'WEBHOOK_SIGNATURE_MISSING'
+        HTTP_STATUS_CODES.BAD_REQUEST
       ));
-      return;
     }
 
     const signatureValidation = validateWebhookSignature({
@@ -48,12 +48,10 @@ export const validateWebhookSignatureMiddleware = async (
         ip: req.ip
       });
 
-      res.status(401).json(createErrorResponse(
+      return next(new AppError(
         'Invalid webhook signature',
-        'WEBHOOK_SIGNATURE_INVALID',
-        { validationErrors: signatureValidation.errors }
+        HTTP_STATUS_CODES.UNAUTHORIZED
       ));
-      return;
     }
 
     logger.info('Webhook signature validated successfully', {
@@ -69,14 +67,14 @@ export const validateWebhookSignatureMiddleware = async (
       ip: req.ip
     });
 
-    res.status(500).json(createErrorResponse(
+    next(new AppError(
       'Webhook signature validation service unavailable',
-      'WEBHOOK_SIGNATURE_SERVICE_ERROR'
+      HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR
     ));
   }
 };
 
-export const parseWebhookEventMiddleware = async (
+export const parseWebhookPayload = async (
   req: WebhookRequest,
   res: Response,
   next: NextFunction
@@ -86,11 +84,10 @@ export const parseWebhookEventMiddleware = async (
     const payload = req.rawBody || JSON.stringify(req.body);
 
     if (!signature || !payload) {
-      res.status(400).json(createErrorResponse(
+      return next(new AppError(
         'Missing webhook signature or payload',
-        'WEBHOOK_DATA_MISSING'
+        HTTP_STATUS_CODES.BAD_REQUEST
       ));
-      return;
     }
 
     const parseResult = parseWebhookEvent(payload, signature);
@@ -102,12 +99,10 @@ export const parseWebhookEventMiddleware = async (
         ip: req.ip
       });
 
-      res.status(400).json(createErrorResponse(
+      return next(new AppError(
         'Invalid webhook event',
-        'WEBHOOK_EVENT_INVALID',
-        { error: parseResult.error }
+        HTTP_STATUS_CODES.BAD_REQUEST
       ));
-      return;
     }
 
     req.webhookEvent = parseResult.event;
@@ -126,9 +121,9 @@ export const parseWebhookEventMiddleware = async (
       ip: req.ip
     });
 
-    res.status(500).json(createErrorResponse(
+    next(new AppError(
       'Webhook event parsing service unavailable',
-      'WEBHOOK_PARSING_SERVICE_ERROR'
+      HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR
     ));
   }
 };
@@ -140,11 +135,10 @@ export const validateWebhookEventMiddleware = (
 ): void => {
   try {
     if (!req.webhookEvent) {
-      res.status(400).json(createErrorResponse(
+      return next(new AppError(
         'Webhook event not found in request',
-        'WEBHOOK_EVENT_MISSING'
+        HTTP_STATUS_CODES.BAD_REQUEST
       ));
-      return;
     }
 
     const validation = validateWebhookEvent(req.webhookEvent);
@@ -157,12 +151,10 @@ export const validateWebhookEventMiddleware = (
         requestId: req.requestId
       });
 
-      res.status(400).json(createErrorResponse(
+      return next(new AppError(
         'Invalid webhook event format',
-        'WEBHOOK_EVENT_VALIDATION_ERROR',
-        { validationErrors: validation.errors }
+        HTTP_STATUS_CODES.BAD_REQUEST
       ));
-      return;
     }
 
     req.webhookEvent = validation.data;
@@ -181,9 +173,9 @@ export const validateWebhookEventMiddleware = (
       requestId: req.requestId
     });
 
-    res.status(500).json(createErrorResponse(
+    next(new AppError(
       'Webhook validation service unavailable',
-      'WEBHOOK_VALIDATION_SERVICE_ERROR'
+      HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR
     ));
   }
 };
@@ -195,14 +187,13 @@ export const checkWebhookDuplicateMiddleware = async (
 ): Promise<void> => {
   try {
     if (!req.webhookEvent) {
-      res.status(400).json(createErrorResponse(
+      return next(new AppError(
         'Webhook event not found in request',
-        'WEBHOOK_EVENT_MISSING'
+        HTTP_STATUS_CODES.BAD_REQUEST
       ));
-      return;
     }
 
-    const dbConnection = await getDbConnection();
+    const dbConnection = getDbConnection();
     const webhookRepository = new WebhookRepository(dbConnection);
 
     const existingEvent = await webhookRepository.getWebhookEventByStripeId(
@@ -218,7 +209,7 @@ export const checkWebhookDuplicateMiddleware = async (
         requestId: req.requestId
       });
 
-      res.status(200).json({
+      res.status(HTTP_STATUS_CODES.OK).json({
         success: true,
         message: 'Webhook event already processed',
         eventId: req.webhookEvent.id,
@@ -241,22 +232,22 @@ export const checkWebhookDuplicateMiddleware = async (
       requestId: req.requestId
     });
 
-    res.status(500).json(createErrorResponse(
+    next(new AppError(
       'Webhook duplicate check service unavailable',
-      'WEBHOOK_DUPLICATE_CHECK_ERROR'
+      HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR
     ));
   }
 };
 
-export const rateLimitWebhookMiddleware = (
+export const rateLimitWebhooks = (
   req: WebhookRequest,
   res: Response,
   next: NextFunction
 ): void => {
   try {
     const rateLimitKey = `webhook_${req.ip}`;
-    const maxRequests = WEBHOOK_CONFIG.SECURITY.RATE_LIMIT.MAX_REQUESTS;
-    const windowMs = WEBHOOK_CONFIG.SECURITY.RATE_LIMIT.WINDOW_MS;
+    const maxRequests = 100;
+    const windowMs = 60000;
 
     logger.info('Webhook rate limit check', {
       ip: req.ip,
@@ -273,9 +264,9 @@ export const rateLimitWebhookMiddleware = (
       requestId: req.requestId
     });
 
-    res.status(500).json(createErrorResponse(
+    next(new AppError(
       'Webhook rate limit service unavailable',
-      'WEBHOOK_RATE_LIMIT_ERROR'
+      HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR
     ));
   }
 };
@@ -346,9 +337,103 @@ export const handleWebhookErrorMiddleware = (
     return next(error);
   }
 
-  res.status(500).json(createErrorResponse(
+  next(new AppError(
     'Webhook processing failed',
-    'WEBHOOK_PROCESSING_ERROR',
-    { eventId: req.webhookEvent?.id }
+    HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR
   ));
+};
+
+export const validateWebhookIPMiddleware = (
+  req: WebhookRequest,
+  res: Response,
+  next: NextFunction
+): void => {
+  try {
+    const clientIP = req.ip || req.connection.remoteAddress;
+    const allowedIPs = WEBHOOK_CONFIG.SECURITY.ALLOWED_IPS;
+
+    if (!clientIP) {
+      logger.warn('Unable to determine client IP for webhook request', {
+        requestId: req.requestId,
+        headers: req.headers
+      });
+
+      return next(new AppError(
+        'Unable to verify request origin',
+        HTTP_STATUS_CODES.BAD_REQUEST
+      ));
+    }
+
+    if (!allowedIPs.includes(clientIP)) {
+      logger.warn('Webhook request from unauthorized IP', {
+        clientIP,
+        allowedIPs,
+        requestId: req.requestId
+      });
+
+      return next(new AppError(
+        'Unauthorized webhook source',
+        HTTP_STATUS_CODES.FORBIDDEN
+      ));
+    }
+
+    logger.info('Webhook IP validation successful', {
+      clientIP,
+      requestId: req.requestId
+    });
+
+    next();
+  } catch (error) {
+    logger.error('Webhook IP validation error', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      requestId: req.requestId
+    });
+
+    next(new AppError(
+      'Webhook IP validation service unavailable',
+      HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR
+    ));
+  }
+};
+
+export const setWebhookTimeoutMiddleware = (
+  req: WebhookRequest,
+  res: Response,
+  next: NextFunction
+): void => {
+  try {
+    const timeout = 30000;
+    
+    req.setTimeout(timeout, () => {
+      logger.warn('Webhook request timeout', {
+        timeout,
+        eventId: req.webhookEvent?.id,
+        requestId: req.requestId
+      });
+
+      if (!res.headersSent) {
+        next(new AppError(
+          'Webhook request timeout',
+          HTTP_STATUS_CODES.REQUEST_TIMEOUT
+        ));
+      }
+    });
+
+    res.setTimeout(timeout, () => {
+      logger.warn('Webhook response timeout', {
+        timeout,
+        eventId: req.webhookEvent?.id,
+        requestId: req.requestId
+      });
+    });
+
+    next();
+  } catch (error) {
+    logger.error('Webhook timeout setup error', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      requestId: req.requestId
+    });
+
+    next();
+  }
 };

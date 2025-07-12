@@ -663,3 +663,111 @@ export const validateCurrencySupport = (
     ));
   }
 };
+
+export const validateInvoiceAccess = (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): void => {
+  try {
+    const invoiceId = req.params.invoiceId || req.body.invoiceId;
+    const userId = req.user?.id;
+
+    if (!invoiceId) {
+      logger.warn('Invoice access validation failed - missing invoice ID', {
+        requestId: req.requestId,
+        userId
+      });
+
+      return next(new AppError(
+        'Invoice ID is required',
+        HTTP_STATUS_CODES.BAD_REQUEST
+      ));
+    }
+
+    if (!userId) {
+      logger.warn('Invoice access validation failed - missing user ID', {
+        invoiceId,
+        requestId: req.requestId
+      });
+
+      return next(new AppError(
+        'User authentication required',
+        HTTP_STATUS_CODES.UNAUTHORIZED
+      ));
+    }
+
+    logger.info('Invoice access validation successful', {
+      invoiceId,
+      userId,
+      requestId: req.requestId
+    });
+
+    next();
+  } catch (error) {
+    logger.error('Invoice access validation error', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      requestId: req.requestId,
+      userId: req.user?.id
+    });
+
+    next(new AppError(
+      'Invoice access validation service unavailable',
+      HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR
+    ));
+  }
+};
+
+export const validateRefundAccess = (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): void => {
+  try {
+    const refundId = req.params.refundId || req.body.refundId;
+    const userId = req.user?.id;
+
+    if (!refundId) {
+      logger.warn('Refund access validation failed - missing refund ID', {
+        requestId: req.requestId,
+        userId
+      });
+
+      return next(new AppError(
+        'Refund ID is required',
+        HTTP_STATUS_CODES.BAD_REQUEST
+      ));
+    }
+
+    if (!userId) {
+      logger.warn('Refund access validation failed - missing user ID', {
+        refundId,
+        requestId: req.requestId
+      });
+
+      return next(new AppError(
+        'User authentication required',
+        HTTP_STATUS_CODES.UNAUTHORIZED
+      ));
+    }
+
+    logger.info('Refund access validation successful', {
+      refundId,
+      userId,
+      requestId: req.requestId
+    });
+
+    next();
+  } catch (error) {
+    logger.error('Refund access validation error', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      requestId: req.requestId,
+      userId: req.user?.id
+    });
+
+    next(new AppError(
+      'Refund access validation service unavailable',
+      HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR
+    ));
+  }
+};
