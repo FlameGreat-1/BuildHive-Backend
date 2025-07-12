@@ -1,6 +1,5 @@
 import Joi from 'joi';
 import { PAYMENT_CONSTANTS } from '../../config/payment';
-import { InvoiceStatus } from '../../shared/types';
 
 export const createInvoiceSchema = Joi.object({
   quoteId: Joi.number()

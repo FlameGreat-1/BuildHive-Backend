@@ -1,6 +1,5 @@
 import Joi from 'joi';
 import { PAYMENT_CONSTANTS } from '../../config/payment';
-import { RefundStatus } from '../../shared/types';
 
 export const createRefundSchema = Joi.object({
   paymentId: Joi.number()
@@ -86,11 +85,11 @@ export const updateRefundStatusSchema = Joi.object({
     }),
 
   status: Joi.string()
-    .valid('pending', 'processing', 'processed', 'failed', 'cancelled')
+    .valid('pending', 'approved', 'rejected', 'processed', 'failed')
     .required()
     .messages({
       'string.base': 'Status must be a string',
-      'any.only': 'Status must be one of: pending, processing, processed, failed, cancelled',
+      'any.only': 'Status must be one of: pending, approved, rejected, processed, failed',
       'any.required': 'Status is required'
     }),
 
@@ -141,11 +140,11 @@ export const refundQuerySchema = Joi.object({
     }),
 
   status: Joi.string()
-    .valid('pending', 'processing', 'processed', 'failed', 'cancelled')
+    .valid('pending', 'approved', 'rejected', 'processed', 'failed')
     .optional()
     .messages({
       'string.base': 'Status must be a string',
-      'any.only': 'Status must be one of: pending, processing, processed, failed, cancelled'
+      'any.only': 'Status must be one of: pending, approved, rejected, processed, failed'
     }),
 
   limit: Joi.number()
@@ -278,4 +277,40 @@ const validateRefundBusinessRules = (data: any) => {
     errors: [],
     data
   };
+};
+
+export const validateRefundAmount = (data: any) => {
+  const { error, value } = Joi.object({
+    amount: Joi.number()
+      .integer()
+      .min(PAYMENT_CONSTANTS.STRIPE.LIMITS.MIN_AMOUNT)
+      .max(PAYMENT_CONSTANTS.STRIPE.LIMITS.MAX_AMOUNT)
+      .required()
+  }).validate(data, {
+    abortEarly: false,
+    stripUnknown: true
+  });
+
+  if (error) {
+    const validationErrors = error.details.map(detail => ({
+      field: detail.path.join('.'),
+      message: detail.message
+    }));
+    
+    return {
+      isValid: false,
+      errors: validationErrors,
+      data: null
+    };
+  }
+
+  return {
+    isValid: true,
+    errors: [],
+    data: value
+  };
+};
+
+export const validateRefundCreation = (data: any) => {
+  return validateCreateRefund(data);
 };

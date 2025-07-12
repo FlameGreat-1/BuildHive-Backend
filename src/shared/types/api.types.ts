@@ -293,7 +293,6 @@ export interface JobFilterRequest {
   sortOrder?: 'asc' | 'desc';
 }
 
-// Quote API request/response types
 export interface CreateQuoteRequest {
   clientId?: number;
   jobId?: number;
@@ -432,7 +431,6 @@ export interface SendQuoteResponse {
   trackingId: string;
 }
 
-// Payment API request/response types
 export interface CreatePaymentRequest {
   amount: number;
   currency: string;
@@ -475,6 +473,25 @@ export interface PaymentStatusResponse {
   creditsAwarded?: number;
 }
 
+export interface PaymentHistoryRequest {
+  userId: number;
+  limit?: number;
+  offset?: number;
+  startDate?: string;
+  endDate?: string;
+}
+
+export interface PaymentHistoryResponse {
+  payments: PaymentResponse[];
+  totalCount: number;
+  summary: {
+    totalAmount: number;
+    successfulPayments: number;
+    failedPayments: number;
+    pendingPayments: number;
+  };
+}
+
 export interface CreatePaymentMethodRequest {
   stripePaymentMethodId: string;
   type: string;
@@ -490,6 +507,13 @@ export interface PaymentMethodResponse {
   cardExpYear?: number;
   isDefault: boolean;
   createdAt: string;
+}
+
+export interface AttachPaymentMethodResponse {
+  success: boolean;
+  paymentMethodId: string;
+  customerId: string;
+  attached: boolean;
 }
 
 export interface CreateInvoiceRequest {
@@ -520,6 +544,17 @@ export interface CreateRefundRequest {
   reason?: string;
 }
 
+export interface CreateRefundResponse {
+  id: number;
+  paymentId: number;
+  amount: number;
+  status: string;
+  reason?: string;
+  stripeRefundId?: string;
+  success: boolean;
+  createdAt: string;
+}
+
 export interface RefundResponse {
   id: number;
   paymentId: number;
@@ -529,6 +564,16 @@ export interface RefundResponse {
   stripeRefundId?: string;
   processedAt?: string;
   createdAt: string;
+}
+
+export interface RefundListResponse {
+  refunds: RefundResponse[];
+  totalCount: number;
+  summary: {
+    totalRefunded: number;
+    pendingRefunds: number;
+    processedRefunds: number;
+  };
 }
 
 export interface SubscriptionRequest {
@@ -595,10 +640,22 @@ export interface PaymentLinkResponse {
 export interface ApplePaySessionRequest {
   validationUrl: string;
   displayName: string;
+  domainName: string;
 }
 
 export interface ApplePaySessionResponse {
   merchantSession: any;
+}
+
+export interface ApplePayValidationRequest {
+  validationUrl: string;
+  displayName: string;
+  domainName: string;
+}
+
+export interface ApplePayValidationResponse {
+  merchantSession: any;
+  success: boolean;
 }
 
 export interface GooglePayTokenRequest {
@@ -671,7 +728,17 @@ export enum PaymentMethod {
 export enum PaymentType {
   ONE_TIME = 'one_time',
   SUBSCRIPTION = 'subscription',
-  CREDIT_PURCHASE = 'credit_purchase'
+  CREDIT_PURCHASE = 'credit_purchase',
+  INVOICE_PAYMENT = 'invoice_payment',
+  JOB_APPLICATION = 'job_application'
+}
+
+export enum RefundStatus {
+  PENDING = 'pending',
+  APPROVED = 'approved',
+  REJECTED = 'rejected',
+  PROCESSED = 'processed',
+  FAILED = 'failed'
 }
 
 export enum WebhookEventType {
@@ -684,7 +751,6 @@ export enum WebhookEventType {
   CHARGE_FAILED = 'charge_failed'
 }
 
-// Database record interfaces
 export interface PaymentDatabaseRecord {
   id: number;
   user_id: number;
@@ -692,9 +758,16 @@ export interface PaymentDatabaseRecord {
   amount: number;
   currency: string;
   payment_method: string;
+  payment_type: string;
   status: string;
   description?: string;
   metadata?: any;
+  invoice_id?: number;
+  subscription_id?: number;
+  credits_purchased?: number;
+  stripe_fee?: number;
+  platform_fee?: number;
+  net_amount?: number;
   processed_at?: Date;
   created_at: Date;
   updated_at: Date;
@@ -714,6 +787,35 @@ export interface PaymentMethodDatabaseRecord {
   updated_at: Date;
 }
 
+export interface InvoiceDatabaseRecord {
+  id: number;
+  quote_id?: number;
+  user_id: number;
+  invoice_number: string;
+  amount: number;
+  currency: string;
+  status: string;
+  due_date: Date;
+  payment_link?: string;
+  stripe_invoice_id?: string;
+  paid_at?: Date;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface RefundDatabaseRecord {
+  id: number;
+  payment_id: number;
+  user_id: number;
+  amount: number;
+  reason?: string;
+  status: string;
+  stripe_refund_id?: string;
+  processed_at?: Date;
+  created_at: Date;
+  updated_at: Date;
+}
+
 export interface WebhookEventDatabaseRecord {
   id: number;
   stripe_event_id: string;
@@ -722,4 +824,30 @@ export interface WebhookEventDatabaseRecord {
   data: any;
   created_at: Date;
   processed_at?: Date;
+}
+
+export interface SubscriptionDatabaseRecord {
+  id: number;
+  user_id: number;
+  stripe_subscription_id: string;
+  plan: string;
+  status: string;
+  current_period_start: Date;
+  current_period_end: Date;
+  credits_included: number;
+  price: number;
+  currency: string;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface CreditTransactionDatabaseRecord {
+  id: number;
+  user_id: number;
+  payment_id?: number;
+  credits: number;
+  transaction_type: string;
+  description?: string;
+  job_application_id?: number;
+  created_at: Date;
 }

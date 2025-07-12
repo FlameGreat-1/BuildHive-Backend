@@ -1,7 +1,6 @@
 import Joi from 'joi';
 import { PAYMENT_CONSTANTS } from '../../config/payment';
 import { PaymentMethod, PaymentType } from '../../shared/types';
-import { validatePaymentAmount, validateCurrency } from '../utils';
 
 export const createPaymentIntentSchema = Joi.object({
   amount: Joi.number()
@@ -27,11 +26,11 @@ export const createPaymentIntentSchema = Joi.object({
     }),
 
   paymentMethod: Joi.string()
-    .valid(...Object.values(PAYMENT_CONSTANTS.PAYMENT_METHODS))
+    .valid(...Object.values(PaymentMethod))
     .required()
     .messages({
       'string.base': 'Payment method must be a string',
-      'any.only': `Payment method must be one of: ${Object.values(PAYMENT_CONSTANTS.PAYMENT_METHODS).join(', ')}`,
+      'any.only': `Payment method must be one of: ${Object.values(PaymentMethod).join(', ')}`,
       'any.required': 'Payment method is required'
     }),
 
@@ -342,15 +341,16 @@ export const validatePaymentCancel = (data: any) => {
 };
 
 const validatePaymentBusinessRules = (data: any) => {
-  if (!validatePaymentAmount(data.amount, data.currency)) {
+  if (data.amount <= 0) {
     return {
       isValid: false,
-      errors: [{ field: 'amount', message: 'Invalid payment amount for the specified currency' }],
+      errors: [{ field: 'amount', message: 'Payment amount must be greater than zero' }],
       data: null
     };
   }
 
-  if (!validateCurrency(data.currency)) {
+  const supportedCurrencies = PAYMENT_CONSTANTS.STRIPE.CURRENCY.SUPPORTED;
+  if (!supportedCurrencies.includes(data.currency)) {
     return {
       isValid: false,
       errors: [{ field: 'currency', message: 'Unsupported currency' }],

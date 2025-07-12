@@ -4,16 +4,16 @@ import { PaymentMethod } from '../../shared/types';
 
 export const createPaymentMethodSchema = Joi.object({
   type: Joi.string()
-    .valid(...Object.values(PAYMENT_CONSTANTS.PAYMENT_METHODS))
+    .valid(...Object.values(PaymentMethod))
     .required()
     .messages({
       'string.base': 'Payment method type must be a string',
-      'any.only': `Payment method type must be one of: ${Object.values(PAYMENT_CONSTANTS.PAYMENT_METHODS).join(', ')}`,
+      'any.only': `Payment method type must be one of: ${Object.values(PaymentMethod).join(', ')}`,
       'any.required': 'Payment method type is required'
     }),
 
   card: Joi.when('type', {
-    is: PAYMENT_CONSTANTS.PAYMENT_METHODS.STRIPE_CARD,
+    is: PaymentMethod.CARD,
     then: Joi.object({
       number: Joi.string()
         .creditCard()
@@ -308,7 +308,7 @@ export const validateSetDefaultPaymentMethod = (data: any) => {
 };
 
 const validatePaymentMethodBusinessRules = (data: any) => {
-  if (data.type === PAYMENT_CONSTANTS.PAYMENT_METHODS.STRIPE_CARD && data.card) {
+  if (data.type === PaymentMethod.CARD && data.card) {
     const currentYear = new Date().getFullYear();
     const currentMonth = new Date().getMonth() + 1;
     

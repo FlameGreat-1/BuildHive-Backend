@@ -18,6 +18,20 @@ export const createResponse = <T = any>(
   };
 };
 
+export const createErrorResponse = (
+  message: string,
+  code?: string,
+  data?: any
+): any => {
+  return {
+    success: false,
+    message,
+    code,
+    data,
+    timestamp: new Date().toISOString()
+  };
+};
+
 export const sendSuccess = <T = any>(
   res: Response,
   message: string,
@@ -44,11 +58,12 @@ export const sendError = (
   res: Response,
   message: string,
   statusCode: number = HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR,
-  errors?: ValidationError[]
+  errors?: ValidationError[],
+  data?: any
 ): Response => {
   const requestId = res.locals.requestId || '';
   
-  const response = createResponse(false, message, undefined, errors);
+  const response = createResponse(false, message, data, errors);
   response.requestId = requestId;
   
   return res.status(statusCode).json(response);
@@ -157,16 +172,17 @@ export const sendSuccessResponse = <T = any>(
   message: string,
   data?: T,
   statusCode: number = HTTP_STATUS_CODES.OK
-): void => {
-  sendSuccess(res, message, data, statusCode);
+): Response => {
+  return sendSuccess(res, message, data, statusCode);
 };
 
 export const sendErrorResponse = (
   res: Response,
   message: string,
-  statusCode: number = HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR
-): void => {
-  sendError(res, message, statusCode);
+  statusCode: number = HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR,
+  data?: any
+): Response => {
+  return sendError(res, message, statusCode, undefined, data);
 };
 
 export const sendNotFoundResponse = (

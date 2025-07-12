@@ -1,7 +1,6 @@
 import Joi from 'joi';
 import { WEBHOOK_CONFIG } from '../../config/payment';
 import { WebhookEventType } from '../../shared/types';
-import { validateWebhookSignature, isSupportedWebhookEvent } from '../utils';
 
 export const webhookEventSchema = Joi.object({
   id: Joi.string()
@@ -164,6 +163,45 @@ export const webhookProcessingSchema = Joi.object({
     })
 });
 
+const isSupportedWebhookEvent = (eventType: string): boolean => {
+  return WEBHOOK_CONFIG.STRIPE.EVENTS.includes(eventType);
+};
+
+const verifyWebhookSignature = (payload: string, signature: string, secret: string, tolerance: number = 300): boolean => {
+  try {
+    const elements = signature.split(',');
+    const timestamp = elements.find(el => el.startsWith('t='))?.split('=')[1];
+    const signatures = elements.filter(el => el.startsWith('v1='));
+
+    if (!timestamp || signatures.length === 0) {
+      return false;
+    }
+
+    const timestampNum = parseInt(timestamp, 10);
+    const currentTime = Math.floor(Date.now() / 1000);
+
+    if (Math.abs(currentTime - timestampNum) > tolerance) {
+      return false;
+    }
+
+    const crypto = require('crypto');
+    const expectedSignature = crypto
+      .createHmac('sha256', secret)
+      .update(`${timestamp}.${payload}`)
+      .digest('hex');
+
+    return signatures.some(sig => {
+      const providedSignature = sig.split('=')[1];
+      return crypto.timingSafeEqual(
+        Buffer.from(expectedSignature, 'hex'),
+        Buffer.from(providedSignature, 'hex')
+      );
+    });
+  } catch (error) {
+    return false;
+  }
+};
+
 export const validateWebhookEvent = (data: any) => {
   const { error, value } = webhookEventSchema.validate(data, {
     abortEarly: false,
@@ -214,7 +252,7 @@ export const validateWebhookSignature = (data: any) => {
     };
   }
 
-  const signatureValidation = validateWebhookSignature(
+  const signatureValidation = verifyWebhookSignature(
     value.payload,
     value.signature,
     process.env.STRIPE_WEBHOOK_SECRET || '',
