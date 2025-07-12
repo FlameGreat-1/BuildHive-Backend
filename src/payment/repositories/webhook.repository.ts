@@ -227,6 +227,85 @@ export class WebhookRepository {
       throw error;
     }
   }
+  
+  async updateWebhookEvent(
+  id: number,
+  updateData: Partial<Pick<WebhookEventDatabaseRecord, 'processed' | 'retry_count' | 'failure_reason'>>,
+  requestId: string,
+  transaction?: DatabaseTransaction
+): Promise<WebhookEventDatabaseRecord> {
+  try {
+    const webhookEvent = await this.webhookEventModel.update(id, updateData, transaction);
+    
+    logger.info('Webhook event updated successfully', {
+      webhookEventId: id,
+      updateData,
+      requestId
+    });
+
+    return webhookEvent;
+  } catch (error) {
+    logger.error('Failed to update webhook event', {
+      webhookEventId: id,
+      updateData,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      requestId
+    });
+    throw error;
+  }
+}
+
+async getWebhookEventStatus(
+  id: number,
+  requestId: string
+): Promise<{ processed: boolean; retry_count: number; failure_reason?: string } | null> {
+  try {
+    const webhookEvent = await this.getWebhookEventById(id, requestId);
+    
+    if (!webhookEvent) {
+      return null;
+    }
+
+    return {
+      processed: webhookEvent.processed,
+      retry_count: webhookEvent.retry_count,
+      failure_reason: webhookEvent.failure_reason
+    };
+  } catch (error) {
+    logger.error('Failed to get webhook event status', {
+      webhookEventId: id,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      requestId
+    });
+    throw error;
+  }
+}
+
+async deleteWebhookEvent(
+  id: number,
+  requestId: string,
+  transaction?: DatabaseTransaction
+): Promise<boolean> {
+  try {
+    const deleted = await this.webhookEventModel.delete(id, transaction);
+    
+    if (deleted) {
+      logger.info('Webhook event deleted successfully', {
+        webhookEventId: id,
+        requestId
+      });
+    }
+
+    return deleted;
+  } catch (error) {
+    logger.error('Failed to delete webhook event', {
+      webhookEventId: id,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      requestId
+    });
+    throw error;
+  }
+}
 
   async cleanupOldWebhookEvents(
     olderThanDays: number,

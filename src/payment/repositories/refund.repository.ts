@@ -200,6 +200,60 @@ export class RefundRepository {
       throw error;
     }
   }
+  
+  async updateRefund(
+  id: number,
+  updateData: Partial<Pick<RefundDatabaseRecord, 'status' | 'description' | 'failure_reason' | 'processed_at'>>,
+  requestId: string,
+  transaction?: DatabaseTransaction
+): Promise<RefundDatabaseRecord> {
+  try {
+    const refund = await this.refundModel.update(id, updateData, transaction);
+    
+    logger.info('Refund updated successfully', {
+      refundId: id,
+      updateData,
+      requestId
+    });
+
+    return refund;
+  } catch (error) {
+    logger.error('Failed to update refund', {
+      refundId: id,
+      updateData,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      requestId
+    });
+    throw error;
+  }
+}
+
+async getRefundByStripeId(
+  stripeRefundId: string,
+  requestId: string
+): Promise<RefundDatabaseRecord | null> {
+  try {
+    const refund = await this.refundModel.findByStripeRefundId(stripeRefundId);
+    
+    if (refund) {
+      logger.info('Refund retrieved by Stripe ID', {
+        refundId: refund.id,
+        stripeRefundId,
+        requestId
+      });
+    }
+
+    return refund;
+  } catch (error) {
+    logger.error('Failed to retrieve refund by Stripe ID', {
+      stripeRefundId,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      requestId
+    });
+    throw error;
+  }
+}
+
 
   async deleteRefund(
     id: number,

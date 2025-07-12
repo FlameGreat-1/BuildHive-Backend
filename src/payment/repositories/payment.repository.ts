@@ -114,6 +114,30 @@ export class PaymentRepository {
       throw error;
     }
   }
+  
+  async getUserTotalPayments(
+  userId: number,
+  requestId: string
+): Promise<number> {
+  try {
+    const result = await this.paymentModel.countByUserId(userId);
+    
+    logger.info('User total payments count retrieved', {
+      userId,
+      totalCount: result,
+      requestId
+    });
+
+    return result;
+  } catch (error) {
+    logger.error('Failed to get user total payments count', {
+      userId,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      requestId
+    });
+    throw error;
+  }
+}
 
   async updatePaymentStatus(
     id: number,
@@ -308,6 +332,50 @@ export class PaymentRepository {
       throw error;
     }
   }
+  
+async getPaymentByStripeId(
+  stripePaymentIntentId: string,
+  requestId: string
+): Promise<PaymentDatabaseRecord | null> {
+  return this.getPaymentByStripeIntentId(stripePaymentIntentId, requestId);
+}
+
+async getPaymentsByUser(
+  userId: number,
+  limit: number = 50,
+  offset: number = 0,
+  requestId: string
+): Promise<PaymentDatabaseRecord[]> {
+  return this.getUserPayments(userId, limit, offset, requestId);
+}
+
+async updatePayment(
+  id: number,
+  updateData: Partial<Pick<PaymentDatabaseRecord, 'status' | 'processing_fee' | 'failure_reason' | 'processed_at'>>,
+  requestId: string,
+  transaction?: DatabaseTransaction
+): Promise<PaymentDatabaseRecord> {
+  try {
+    const payment = await this.paymentModel.update(id, updateData, transaction);
+    
+    logger.info('Payment updated successfully', {
+      paymentId: id,
+      updateData,
+      requestId
+    });
+
+    return payment;
+  } catch (error) {
+    logger.error('Failed to update payment', {
+      paymentId: id,
+      updateData,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      requestId
+    });
+    throw error;
+  }
+}
+
 
   async getPendingPayments(
     olderThanMinutes: number,

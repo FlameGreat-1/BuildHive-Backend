@@ -16,8 +16,9 @@ export class PaymentModel {
       INSERT INTO ${PAYMENT_TABLES.PAYMENTS} (
         user_id, stripe_payment_intent_id, amount, currency, payment_method,
         payment_type, status, description, metadata, invoice_id, subscription_id,
-        credits_purchased, stripe_fee, platform_fee, net_amount, processed_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+        credits_purchased, stripe_fee, platform_fee, processing_fee, net_amount, 
+        failure_reason, processed_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
       RETURNING *
     `;
 
@@ -36,7 +37,9 @@ export class PaymentModel {
       paymentData.credits_purchased,
       paymentData.stripe_fee,
       paymentData.platform_fee,
+      paymentData.processing_fee,
       paymentData.net_amount,
+      paymentData.failure_reason,
       paymentData.processed_at
     ];
 
@@ -48,6 +51,70 @@ export class PaymentModel {
     }
 
     return result.rows[0];
+  }
+
+  async update(
+    id: number,
+    updateData: Partial<Pick<PaymentDatabaseRecord, 'status' | 'processing_fee' | 'failure_reason' | 'processed_at' | 'metadata'>>,
+    transaction?: DatabaseTransaction
+  ): Promise<PaymentDatabaseRecord> {
+    const fields: string[] = [];
+    const values: any[] = [];
+    let paramIndex = 1;
+
+    if (updateData.status !== undefined) {
+      fields.push(`status = $${paramIndex++}`);
+      values.push(updateData.status);
+    }
+
+    if (updateData.processing_fee !== undefined) {
+      fields.push(`processing_fee = $${paramIndex++}`);
+      values.push(updateData.processing_fee);
+    }
+
+    if (updateData.failure_reason !== undefined) {
+      fields.push(`failure_reason = $${paramIndex++}`);
+      values.push(updateData.failure_reason);
+    }
+
+    if (updateData.processed_at !== undefined) {
+      fields.push(`processed_at = $${paramIndex++}`);
+      values.push(updateData.processed_at);
+    }
+
+    if (updateData.metadata !== undefined) {
+      fields.push(`metadata = $${paramIndex++}`);
+      values.push(JSON.stringify(updateData.metadata));
+    }
+
+    if (fields.length === 0) {
+      throw new Error('No fields to update');
+    }
+
+    fields.push('updated_at = CURRENT_TIMESTAMP');
+    values.push(id);
+
+    const query = `
+      UPDATE ${PAYMENT_TABLES.PAYMENTS} 
+      SET ${fields.join(', ')}
+      WHERE id = $${paramIndex}
+      RETURNING *
+    `;
+
+    const executor = transaction || this.client;
+    const result = await executor.query<PaymentDatabaseRecord>(query, values);
+    
+    if (result.rows.length === 0) {
+      throw new Error('Payment not found or update failed');
+    }
+
+    return result.rows[0];
+  }
+
+  async countByUserId(userId: number): Promise<number> {
+    const query = `SELECT COUNT(*) as count FROM ${PAYMENT_TABLES.PAYMENTS} WHERE user_id = $1`;
+    const result = await this.client.query<{ count: string }>(query, [userId]);
+    return parseInt(result.rows[0]?.count || '0', 10);
   }
 
   async findById(id: number): Promise<PaymentDatabaseRecord | null> {

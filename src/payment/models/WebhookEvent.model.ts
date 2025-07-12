@@ -15,8 +15,8 @@ export class WebhookEventModel {
   ): Promise<WebhookEventDatabaseRecord> {
     const query = `
       INSERT INTO ${PAYMENT_TABLES.WEBHOOK_EVENTS} (
-        stripe_event_id, event_type, processed, data
-      ) VALUES ($1, $2, $3, $4)
+        stripe_event_id, event_type, processed, data, retry_count, failure_reason, metadata
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7)
       RETURNING *
     `;
 
@@ -24,7 +24,10 @@ export class WebhookEventModel {
       webhookData.stripe_event_id,
       webhookData.event_type,
       webhookData.processed,
-      JSON.stringify(webhookData.data)
+      JSON.stringify(webhookData.data),
+      webhookData.retry_count || 0,
+      webhookData.failure_reason || null,
+      JSON.stringify(webhookData.metadata || {})
     ];
 
     const executor = transaction || this.client;
@@ -45,6 +48,84 @@ export class WebhookEventModel {
     });
 
     return result.rows[0];
+  }
+
+  async update(
+    id: number,
+    updateData: Partial<Pick<WebhookEventDatabaseRecord, 'processed' | 'retry_count' | 'failure_reason' | 'processed_at' | 'metadata'>>,
+    transaction?: DatabaseTransaction
+  ): Promise<WebhookEventDatabaseRecord> {
+    const fields: string[] = [];
+    const values: any[] = [];
+    let paramIndex = 1;
+
+    if (updateData.processed !== undefined) {
+      fields.push(`processed = $${paramIndex++}`);
+      values.push(updateData.processed);
+    }
+
+    if (updateData.retry_count !== undefined) {
+      fields.push(`retry_count = $${paramIndex++}`);
+      values.push(updateData.retry_count);
+    }
+
+    if (updateData.failure_reason !== undefined) {
+      fields.push(`failure_reason = $${paramIndex++}`);
+      values.push(updateData.failure_reason);
+    }
+
+    if (updateData.processed_at !== undefined) {
+      fields.push(`processed_at = $${paramIndex++}`);
+      values.push(updateData.processed_at);
+    }
+
+    if (updateData.metadata !== undefined) {
+      fields.push(`metadata = $${paramIndex++}`);
+      values.push(JSON.stringify(updateData.metadata));
+    }
+
+    if (fields.length === 0) {
+      throw new Error('No fields to update');
+    }
+
+    values.push(id);
+
+    const query = `
+      UPDATE ${PAYMENT_TABLES.WEBHOOK_EVENTS} 
+      SET ${fields.join(', ')}
+      WHERE id = $${paramIndex}
+      RETURNING *
+    `;
+
+    const executor = transaction || this.client;
+    const result = await executor.query<WebhookEventDatabaseRecord>(query, values);
+    
+    if (result.rows.length === 0) {
+      logger.error('Webhook event not found for update', { id });
+      throw new Error('Webhook event not found or update failed');
+    }
+
+    logger.info('Webhook event updated', {
+      id: result.rows[0].id,
+      stripeEventId: result.rows[0].stripe_event_id,
+      updatedFields: Object.keys(updateData)
+    });
+
+    return result.rows[0];
+  }
+
+  async delete(id: number, transaction?: DatabaseTransaction): Promise<boolean> {
+    const query = `DELETE FROM ${PAYMENT_TABLES.WEBHOOK_EVENTS} WHERE id = $1`;
+    const executor = transaction || this.client;
+    const result = await executor.query(query, [id]);
+    
+    const deleted = result.rowCount > 0;
+    
+    if (deleted) {
+      logger.info('Webhook event deleted', { id });
+    }
+    
+    return deleted;
   }
 
   async findById(id: number): Promise<WebhookEventDatabaseRecord | null> {

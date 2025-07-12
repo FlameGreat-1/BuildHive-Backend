@@ -279,8 +279,10 @@ export interface RefundDatabaseRecord {
   user_id: number;
   amount: number;
   reason?: string;
+  description?: string
   status: string;
   stripe_refund_id?: string;
+  failure_reason?: string; 
   processed_at?: Date;
   created_at: Date;
   updated_at: Date;

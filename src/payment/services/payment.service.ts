@@ -25,9 +25,9 @@ import { ApplePayService } from './apple-pay.service';
 import { GooglePayService } from './google-pay.service';
 
 export class PaymentService {
-  private paymentRepository: PaymentRepository;
-  private paymentMethodRepository: PaymentMethodRepository;
-  private invoiceRepository: InvoiceRepository;
+  private paymentRepository!: PaymentRepository;
+  private paymentMethodRepository!: PaymentMethodRepository;
+  private invoiceRepository!: InvoiceRepository;
   private stripeService: StripeService;
   private applePayService: ApplePayService;
   private googlePayService: GooglePayService;
@@ -39,11 +39,26 @@ export class PaymentService {
     this.googlePayService = new GooglePayService();
   }
 
-  private async initializeRepositories(): Promise<void> {
-    const dbConnection = await getDbConnection();
-    this.paymentRepository = new PaymentRepository(dbConnection);
-    this.paymentMethodRepository = new PaymentMethodRepository(dbConnection);
-    this.invoiceRepository = new InvoiceRepository(dbConnection);
+  private initializeRepositories(): void {
+    getDbConnection().then(dbConnection => {
+      this.paymentRepository = new PaymentRepository(dbConnection);
+      this.paymentMethodRepository = new PaymentMethodRepository(dbConnection);
+      this.invoiceRepository = new InvoiceRepository(dbConnection);
+    });
+  }
+
+  async createPayment(userId: number, paymentData: any, requestId: string): Promise<any> {
+    const createPaymentRequest: CreatePaymentIntentRequest = {
+      amount: paymentData.amount,
+      currency: paymentData.currency,
+      paymentMethod: paymentData.paymentMethod,
+      paymentType: paymentData.paymentType,
+      description: paymentData.description,
+      metadata: sanitizePaymentMetadata(paymentData.metadata || {}),
+      userId: userId
+    };
+    
+    return this.createPaymentIntent(createPaymentRequest, requestId);
   }
 
   async createPaymentIntent(
@@ -293,6 +308,18 @@ export class PaymentService {
     }
   }
 
+  async listPayments(userId: number, filters: any, requestId: string): Promise<any> {
+    const historyRequest: PaymentHistoryRequest = {
+      userId: userId,
+      limit: filters.limit || 50,
+      offset: filters.offset || 0,
+      startDate: filters.startDate,
+      endDate: filters.endDate
+    };
+    
+    return this.getPaymentHistory(historyRequest, requestId);
+  }
+
   async getPaymentHistory(
     request: PaymentHistoryRequest,
     requestId: string
@@ -305,7 +332,7 @@ export class PaymentService {
         requestId
       );
 
-      const totalCount = await this.paymentRepository.getUserTotalPayments(
+      const totalCount = await this.getUserTotalPayments(
         request.userId,
         requestId
       );
@@ -340,6 +367,38 @@ export class PaymentService {
         requestId
       });
 
+      throw error;
+    }
+  }
+
+  async updatePayment(paymentId: number, updateData: any, requestId: string): Promise<any> {
+    try {
+      const payment = await this.paymentRepository.getPaymentById(paymentId, requestId);
+      
+      if (!payment) {
+        throw new Error('Payment not found');
+      }
+
+      const updatedPayment = await this.paymentRepository.updatePayment(
+        paymentId,
+        updateData,
+        requestId
+      );
+
+      logger.info('Payment updated', {
+        paymentId,
+        updateData,
+        requestId
+      });
+
+      return updatedPayment;
+    } catch (error) {
+      logger.error('Failed to update payment', {
+        paymentId,
+        updateData,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        requestId
+      });
       throw error;
     }
   }
@@ -384,4 +443,11 @@ export class PaymentService {
       throw error;
     }
   }
+  
+  async getUserTotalPayments(userId: number, requestId: string): Promise<number> {
+  return this.paymentRepository.getUserTotalPayments(userId, requestId);
 }
+}
+
+
+ 

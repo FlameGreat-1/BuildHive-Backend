@@ -18,20 +18,6 @@ export const createResponse = <T = any>(
   };
 };
 
-export const createErrorResponse = (
-  message: string,
-  code?: string,
-  data?: any
-): any => {
-  return {
-    success: false,
-    message,
-    code,
-    data,
-    timestamp: new Date().toISOString()
-  };
-};
-
 export const sendSuccess = <T = any>(
   res: Response,
   message: string,

@@ -14,21 +14,22 @@ import {
 } from '../utils';
 
 export class WebhookService {
-  private webhookRepository: WebhookRepository;
-  private paymentRepository: PaymentRepository;
-  private refundRepository: RefundRepository;
-  private invoiceRepository: InvoiceRepository;
+  private webhookRepository!: WebhookRepository;
+  private paymentRepository!: PaymentRepository;
+  private refundRepository!: RefundRepository;
+  private invoiceRepository!: InvoiceRepository;
 
   constructor() {
     this.initializeRepositories();
   }
 
-  private async initializeRepositories(): Promise<void> {
-    const dbConnection = await getDbConnection();
-    this.webhookRepository = new WebhookRepository(dbConnection);
-    this.paymentRepository = new PaymentRepository(dbConnection);
-    this.refundRepository = new RefundRepository(dbConnection);
-    this.invoiceRepository = new InvoiceRepository(dbConnection);
+  private initializeRepositories(): void {
+    getDbConnection().then(dbConnection => {
+      this.webhookRepository = new WebhookRepository(dbConnection);
+      this.paymentRepository = new PaymentRepository(dbConnection);
+      this.refundRepository = new RefundRepository(dbConnection);
+      this.invoiceRepository = new InvoiceRepository(dbConnection);
+    });
   }
 
   async processWebhookEvent(
@@ -411,8 +412,8 @@ export class WebhookService {
       };
     }
   }
-
-  async retryFailedWebhookEvent(eventId: number, requestId: string): Promise<WebhookProcessingResult> {
+  
+    async retryFailedWebhookEvent(eventId: number, requestId: string): Promise<WebhookProcessingResult> {
     try {
       const webhookEvent = await this.webhookRepository.getWebhookEventById(eventId, requestId);
 
@@ -481,4 +482,122 @@ export class WebhookService {
       };
     }
   }
+
+  async retryWebhookEvent(eventId: string, requestId: string): Promise<WebhookProcessingResult> {
+    const numericEventId = parseInt(eventId);
+    if (isNaN(numericEventId)) {
+      return {
+        success: false,
+        processed: false,
+        eventId: null,
+        message: 'Invalid event ID'
+      };
+    }
+    return this.retryFailedWebhookEvent(numericEventId, requestId);
+  }
+
+  async getWebhookEventStatus(eventId: string, requestId: string): Promise<any> {
+    try {
+      const numericEventId = parseInt(eventId);
+      if (isNaN(numericEventId)) {
+        throw new Error('Invalid event ID');
+      }
+
+      const webhookEvent = await this.webhookRepository.getWebhookEventById(numericEventId, requestId);
+      
+      if (!webhookEvent) {
+        return null;
+      }
+
+      return {
+        id: webhookEvent.id,
+        stripeEventId: webhookEvent.stripe_event_id,
+        eventType: webhookEvent.event_type,
+        processed: webhookEvent.processed,
+        retryCount: webhookEvent.retry_count,
+        failureReason: webhookEvent.failure_reason,
+        createdAt: webhookEvent.created_at,
+        processedAt: webhookEvent.processed_at
+      };
+    } catch (error) {
+      logger.error('Failed to get webhook event status', {
+        eventId,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        requestId
+      });
+      throw error;
+    }
+  }
+
+  async listWebhookEvents(filters: any, requestId: string): Promise<any> {
+    try {
+      const events = await this.webhookRepository.getWebhookEventsByType(
+        filters.eventType,
+        filters.processed,
+        filters.limit || 50,
+        requestId
+      );
+
+      return {
+        events: events.map(event => ({
+          id: event.id,
+          stripeEventId: event.stripe_event_id,
+          eventType: event.event_type,
+          processed: event.processed,
+          retryCount: event.retry_count,
+          createdAt: event.created_at,
+          processedAt: event.processed_at
+        })),
+        total: events.length
+      };
+    } catch (error) {
+      logger.error('Failed to list webhook events', {
+        filters,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        requestId
+      });
+      throw error;
+    }
+  }
+
+  async getWebhookStats(filters: any, requestId: string): Promise<any> {
+    try {
+      const stats = await this.webhookRepository.getWebhookProcessingStats(requestId);
+      
+      return {
+        totalEvents: stats.totalEvents,
+        processedEvents: stats.processedEvents,
+        failedEvents: stats.failedEvents,
+        pendingEvents: stats.pendingEvents,
+        eventsByType: stats.eventsByType,
+        processingRate: stats.totalEvents > 0 ? (stats.processedEvents / stats.totalEvents) * 100 : 0
+      };
+    } catch (error) {
+      logger.error('Failed to get webhook stats', {
+        filters,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        requestId
+      });
+      throw error;
+    }
+  }
+
+  async deleteWebhookEvent(eventId: string, requestId: string): Promise<boolean> {
+    try {
+      const numericEventId = parseInt(eventId);
+      if (isNaN(numericEventId)) {
+        throw new Error('Invalid event ID');
+      }
+
+      return await this.webhookRepository.deleteWebhookEvent(numericEventId, requestId);
+    } catch (error) {
+      logger.error('Failed to delete webhook event', {
+        eventId,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        requestId
+      });
+      throw error;
+    }
+  }
 }
+

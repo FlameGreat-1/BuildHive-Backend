@@ -248,7 +248,7 @@ export class QuoteRepositoryImpl implements QuoteRepository {
     }
   }
   
-    async findByClient(clientId: number, filters: QuoteFilterOptions): Promise<QuoteListResult> {
+  async findByClient(clientId: number, filters: QuoteFilterOptions): Promise<QuoteListResult> {
     try {
       const offset = ((filters.page || 1) - 1) * (filters.limit || 20);
       
@@ -303,6 +303,63 @@ export class QuoteRepositoryImpl implements QuoteRepository {
         'Failed to retrieve quotes',
         HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR,
         'QUOTE_RETRIEVAL_ERROR'
+      );
+    }
+  }
+
+  async findByPaymentStatus(
+    paymentStatus: string,
+    tradieId?: number,
+    limit: number = 50,
+    offset: number = 0
+  ): Promise<QuoteWithRelations[]> {
+    try {
+      let query = `
+        SELECT q.*, 
+               c.name as client_name,
+               c.email as client_email,
+               c.phone as client_phone
+        FROM quotes q
+        LEFT JOIN clients c ON q.client_id = c.id
+        WHERE q.payment_status = $1
+      `;
+      
+      const params: any[] = [paymentStatus];
+      
+      if (tradieId) {
+        query += ` AND q.tradie_id = $${params.length + 1}`;
+        params.push(tradieId);
+      }
+      
+      query += ` ORDER BY q.created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+      params.push(limit, offset);
+
+      const result = await this.pool.query(query, params);
+      const quotes = result.rows.map(row => QuoteModel.fromRecordWithRelations(row));
+      
+      for (const quote of quotes) {
+        quote.items = await this.getQuoteItems(quote.id);
+      }
+
+      logger.info('Quotes retrieved by payment status', {
+        paymentStatus,
+        tradieId,
+        count: quotes.length
+      });
+
+      return quotes;
+
+    } catch (error) {
+      logger.error('Failed to find quotes by payment status', {
+        paymentStatus,
+        tradieId,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+
+      throw new AppError(
+        'Failed to retrieve quotes by payment status',
+        HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR,
+        'QUOTE_PAYMENT_STATUS_ERROR'
       );
     }
   }
@@ -604,7 +661,12 @@ export class QuoteRepositoryImpl implements QuoteRepository {
           COUNT(*) as total_quotes,
           COUNT(CASE WHEN status = 'accepted' THEN 1 END) as accepted_quotes,
           AVG(total_amount) as average_quote_value,
-          AVG(EXTRACT(EPOCH FROM (accepted_at - sent_at))/3600) as average_response_time
+          AVG(EXTRACT(EPOCH FROM (accepted_at - sent_at))/3600) as average_response_time,
+          COUNT(CASE WHEN payment_status = 'paid' THEN 1 END) as paid_quotes,
+          COUNT(CASE WHEN payment_status = 'pending' THEN 1 END) as pending_payment_quotes,
+          COUNT(CASE WHEN payment_status = 'refunded' THEN 1 END) as refunded_quotes,
+          SUM(CASE WHEN payment_status = 'paid' THEN total_amount ELSE 0 END) as total_revenue,
+          SUM(CASE WHEN payment_status = 'pending' THEN total_amount ELSE 0 END) as pending_revenue
         FROM quotes 
         WHERE tradie_id = $1 AND created_at BETWEEN $2 AND $3
       `;
@@ -622,7 +684,14 @@ export class QuoteRepositoryImpl implements QuoteRepository {
         averageQuoteValue: parseFloat(stats.average_quote_value) || 0,
         averageResponseTime: parseFloat(stats.average_response_time) || 0,
         topPerformingServices: [],
-        monthlyTrends: []
+        monthlyTrends: [],
+        paymentMetrics: {
+          paid: parseInt(stats.paid_quotes) || 0,
+          pendingPayment: parseInt(stats.pending_payment_quotes) || 0,
+          refunded: parseInt(stats.refunded_quotes) || 0,
+          totalRevenue: parseFloat(stats.total_revenue) || 0,
+          pendingRevenue: parseFloat(stats.pending_revenue) || 0
+        }
       };
 
     } catch (error) {
@@ -655,13 +724,18 @@ export class QuoteRepositoryImpl implements QuoteRepository {
       accepted: 0,
       rejected: 0,
       expired: 0,
-      cancelled: 0
+      cancelled: 0,
+      paid: 0,
+      pendingPayment: 0,
+      refunded: 0,
+      totalRevenue: 0,
+      pendingRevenue: 0
     };
 
     statusCounts.forEach(row => {
       const status = row.status as keyof QuoteSummary;
       const count = parseInt(row.count);
-      if (status in summary) {
+      if (status in summary && typeof summary[status] === 'number') {
         (summary as any)[status] = count;
       }
     });
@@ -669,4 +743,3 @@ export class QuoteRepositoryImpl implements QuoteRepository {
     return summary;
   }
 }
-

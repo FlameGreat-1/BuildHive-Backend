@@ -769,6 +769,8 @@ export interface PaymentDatabaseRecord {
   platform_fee?: number;
   net_amount?: number;
   processed_at?: Date;
+  processing_fee?: number;      
+  failure_reason?: string; 
   created_at: Date;
   updated_at: Date;
 }
@@ -787,67 +789,14 @@ export interface PaymentMethodDatabaseRecord {
   updated_at: Date;
 }
 
-export interface InvoiceDatabaseRecord {
-  id: number;
-  quote_id?: number;
-  user_id: number;
-  invoice_number: string;
-  amount: number;
-  currency: string;
-  status: string;
-  due_date: Date;
-  payment_link?: string;
-  stripe_invoice_id?: string;
-  paid_at?: Date;
-  created_at: Date;
-  updated_at: Date;
-}
-
-export interface RefundDatabaseRecord {
-  id: number;
-  payment_id: number;
-  user_id: number;
-  amount: number;
-  reason?: string;
-  status: string;
-  stripe_refund_id?: string;
-  processed_at?: Date;
-  created_at: Date;
-  updated_at: Date;
-}
-
 export interface WebhookEventDatabaseRecord {
   id: number;
   stripe_event_id: string;
   event_type: string;
   processed: boolean;
   data: any;
+  retry_count: number;          
+  failure_reason?: string;
   created_at: Date;
   processed_at?: Date;
-}
-
-export interface SubscriptionDatabaseRecord {
-  id: number;
-  user_id: number;
-  stripe_subscription_id: string;
-  plan: string;
-  status: string;
-  current_period_start: Date;
-  current_period_end: Date;
-  credits_included: number;
-  price: number;
-  currency: string;
-  created_at: Date;
-  updated_at: Date;
-}
-
-export interface CreditTransactionDatabaseRecord {
-  id: number;
-  user_id: number;
-  payment_id?: number;
-  credits: number;
-  transaction_type: string;
-  description?: string;
-  job_application_id?: number;
-  created_at: Date;
 }
