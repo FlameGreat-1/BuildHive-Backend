@@ -305,10 +305,9 @@ export class UserService {
     }
   }
   
-    async findById(id: string): Promise<User | null> {
+  async findById(id: string): Promise<User | null> {
     return await this.getUserById(id);
   }
-}
 
   async updateLastLogin(userId: string): Promise<void> {
     await this.userRepository.updateLastLogin(userId);
