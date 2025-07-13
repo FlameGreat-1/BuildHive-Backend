@@ -56,6 +56,10 @@ export class PaymentRepository {
     }
   }
 
+  async getPaymentById(id: number): Promise<PaymentDatabaseRecord | null> {
+    return this.findById(id);
+  }
+
   async findByStripePaymentIntentId(stripePaymentIntentId: string): Promise<PaymentDatabaseRecord | null> {
     try {
       const payment = await this.paymentModel.findByStripePaymentIntentId(stripePaymentIntentId);
@@ -234,6 +238,68 @@ export class PaymentRepository {
       logger.error('Failed to retrieve user total amount', {
         userId,
         status,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      throw error;
+    }
+  }
+
+  async getUserTotalAmount(userId: number): Promise<number> {
+    return this.getTotalAmountByUser(userId);
+  }
+
+  async findByInvoiceId(invoiceId: number): Promise<PaymentDatabaseRecord[]> {
+    try {
+      const payments = await this.paymentModel.findByInvoiceId(invoiceId);
+      
+      logger.info('Payments retrieved by invoice ID', {
+        invoiceId,
+        count: payments.length
+      });
+
+      return payments;
+    } catch (error) {
+      logger.error('Failed to retrieve payments by invoice ID', {
+        invoiceId,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      throw error;
+    }
+  }
+
+  async getRefundsByInvoiceId(invoiceId: number): Promise<any[]> {
+    try {
+      const refunds = await this.paymentModel.getRefundsByInvoiceId(invoiceId);
+      
+      logger.info('Refunds retrieved by invoice ID', {
+        invoiceId,
+        count: refunds.length
+      });
+
+      return refunds;
+    } catch (error) {
+      logger.error('Failed to retrieve refunds by invoice ID', {
+        invoiceId,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      throw error;
+    }
+  }
+
+  async hasPaymentsForInvoice(invoiceId: number): Promise<boolean> {
+    try {
+      const payments = await this.findByInvoiceId(invoiceId);
+      const hasPayments = payments.length > 0;
+      
+      logger.info('Checked payments for invoice', {
+        invoiceId,
+        hasPayments
+      });
+
+      return hasPayments;
+    } catch (error) {
+      logger.error('Failed to check payments for invoice', {
+        invoiceId,
         error: error instanceof Error ? error.message : 'Unknown error'
       });
       throw error;

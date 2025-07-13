@@ -27,8 +27,8 @@ import {
 } from '../../shared/types';
 
 export class ApplePayService {
-  private paymentRepository: PaymentRepository;
-  private paymentMethodRepository: PaymentMethodRepository;
+  private paymentRepository!: PaymentRepository;
+  private paymentMethodRepository!: PaymentMethodRepository;
   private stripeService: StripeService;
 
   constructor() {
@@ -42,10 +42,7 @@ export class ApplePayService {
     this.paymentMethodRepository = new PaymentMethodRepository(dbConnection);
   }
 
-  async createApplePaySession(
-    request: ApplePaySessionRequest,
-    requestId: string
-  ): Promise<ApplePaySessionResponse> {
+  async createApplePaySession(request: ApplePaySessionRequest): Promise<ApplePaySessionResponse> {
     try {
       if (!request.amount || !validatePaymentAmount(request.amount, request.currency || 'USD')) {
         throw new Error('Invalid payment amount for Apple Pay');
@@ -97,8 +94,7 @@ export class ApplePayService {
         amount: request.amount,
         currency: request.currency,
         processingFee,
-        totalAmount,
-        requestId
+        totalAmount
       });
 
       return {
@@ -113,18 +109,21 @@ export class ApplePayService {
       logger.error('Failed to create Apple Pay session', {
         amount: request.amount,
         currency: request.currency,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
-      throw error;
+      return {
+        merchantSession: null,
+        success: false,
+        session: null,
+        merchantIdentifier: '',
+        domainName: '',
+        displayName: request.displayName || request.merchantName || 'BuildHive'
+      };
     }
   }
 
-  async validateApplePayMerchant(
-    request: ApplePayValidationRequest,
-    requestId: string
-  ): Promise<ApplePayValidationResponse> {
+  async validateApplePayMerchant(request: ApplePayValidationRequest): Promise<ApplePayValidationResponse> {
     try {
       const validationUrl = request.validationUrl;
       const merchantIdentifier = process.env.APPLE_PAY_MERCHANT_ID;
@@ -162,8 +161,7 @@ export class ApplePayService {
 
       logger.info('Apple Pay merchant validated', {
         merchantIdentifier,
-        domainName,
-        requestId
+        domainName
       });
 
       return {
@@ -173,8 +171,7 @@ export class ApplePayService {
     } catch (error) {
       logger.error('Failed to validate Apple Pay merchant', {
         validationUrl: request.validationUrl,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       return {
@@ -184,25 +181,22 @@ export class ApplePayService {
     }
   }
 
-  async processApplePayPayment(
-    request: ApplePayPaymentRequest,
-    requestId: string
-  ): Promise<ApplePayPaymentResponse> {
+  async processApplePayPayment(request: ApplePayPaymentRequest): Promise<ApplePayPaymentResponse> {
     try {
-      const { paymentData, amount, currency, userId, paymentType, description, metadata, returnUrl } = request;
+      const { paymentData: requestPaymentData, amount, currency, userId, paymentType, description, metadata, returnUrl } = request;
 
       if (!validatePaymentAmount(amount, currency)) {
         throw new Error('Invalid payment amount');
       }
 
-      if (!paymentData) {
+      if (!requestPaymentData) {
         throw new Error('Apple Pay payment data is required');
       }
 
       const sanitizedMetadata = sanitizePaymentMetadata({
         userId: (userId || 1).toString(),
         paymentType: paymentType || PaymentType.ONE_TIME,
-        applePayTransaction: paymentData.transactionIdentifier || generateIdempotencyKey(),
+        applePayTransaction: requestPaymentData.transactionIdentifier || generateIdempotencyKey(),
         ...metadata
       });
 
@@ -218,15 +212,15 @@ export class ApplePayService {
         automaticPaymentMethods: true,
         userId: userId || 1,
         returnUrl
-      }, requestId);
+      });
 
       const confirmResult = await this.stripeService.confirmPaymentIntent({
         paymentIntentId: stripePaymentIntent.paymentIntentId,
         paymentMethodId: undefined,
         returnUrl
-      }, requestId);
+      });
 
-      const paymentData: Omit<PaymentDatabaseRecord, 'id' | 'created_at' | 'updated_at'> = {
+      const dbPaymentData: Omit<PaymentDatabaseRecord, 'id' | 'created_at' | 'updated_at'> = {
         user_id: userId || 1,
         stripe_payment_intent_id: stripePaymentIntent.paymentIntentId,
         amount,
@@ -236,18 +230,18 @@ export class ApplePayService {
         status: confirmResult.status as PaymentStatus,
         description: description || 'Apple Pay Payment',
         metadata: sanitizedMetadata,
-        invoice_id: null,
-        subscription_id: null,
-        credits_purchased: null,
-        stripe_fee: null,
-        platform_fee: null,
+        invoice_id: undefined,
+        subscription_id: undefined,
+        credits_purchased: undefined,
+        stripe_fee: undefined,
+        platform_fee: undefined,
         processing_fee: processingFee,
-        failure_reason: confirmResult.error || null,
+        failure_reason: confirmResult.error || undefined,
         net_amount: amount - processingFee,
-        processed_at: confirmResult.status === PaymentStatus.SUCCEEDED ? new Date() : null
+        processed_at: confirmResult.status === PaymentStatus.SUCCEEDED ? new Date() : undefined
       };
 
-      const savedPayment = await this.paymentRepository.create(paymentData);
+      const savedPayment = await this.paymentRepository.create(dbPaymentData);
 
       logger.info('Apple Pay payment processed', {
         paymentId: savedPayment.id,
@@ -255,14 +249,13 @@ export class ApplePayService {
         amount,
         currency,
         status: confirmResult.status,
-        userId,
-        requestId
+        userId
       });
 
       return {
         paymentIntentId: stripePaymentIntent.paymentIntentId,
         status: confirmResult.status,
-        transactionId: paymentData.transactionIdentifier || savedPayment.id.toString(),
+        transactionId: requestPaymentData.transactionIdentifier || savedPayment.id.toString(),
         amount,
         currency,
         clientSecret: stripePaymentIntent.clientSecret,
@@ -276,15 +269,14 @@ export class ApplePayService {
         amount: request.amount,
         currency: request.currency,
         userId: request.userId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       throw error;
     }
   }
 
-  async verifyApplePayDomain(domain: string, requestId: string): Promise<boolean> {
+  async verifyApplePayDomain(domain: string): Promise<boolean> {
     try {
       const allowedDomains = process.env.APPLE_PAY_ALLOWED_DOMAINS?.split(',') || [];
       const isAllowed = allowedDomains.includes(domain) || domain === process.env.APPLE_PAY_DOMAIN;
@@ -292,23 +284,21 @@ export class ApplePayService {
       logger.info('Apple Pay domain verification', {
         domain,
         isAllowed,
-        allowedDomains: allowedDomains.length,
-        requestId
+        allowedDomains: allowedDomains.length
       });
 
       return isAllowed;
     } catch (error) {
       logger.error('Failed to verify Apple Pay domain', {
         domain,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       return false;
     }
   }
 
-  async getApplePayCapabilities(requestId: string): Promise<{
+  async getApplePayCapabilities(): Promise<{
     supportedNetworks: string[];
     merchantCapabilities: string[];
     supportedCountries: string[];
@@ -317,11 +307,14 @@ export class ApplePayService {
     domainName: string;
   }> {
     try {
+      const supportedCountries = ['AU', 'US', 'CA', 'GB'] as const;
+      const supportedCurrencies = ['AUD', 'USD'] as const;
+      
       const capabilities = {
         supportedNetworks: ['visa', 'masterCard', 'amex', 'discover'],
         merchantCapabilities: ['supports3DS', 'supportsCredit', 'supportsDebit'],
-        supportedCountries: PAYMENT_CONSTANTS.APPLE_PAY?.SUPPORTED_COUNTRIES || ['US', 'CA', 'GB', 'AU'],
-        supportedCurrencies: PAYMENT_CONSTANTS.STRIPE?.CURRENCY?.SUPPORTED || ['USD', 'EUR', 'GBP', 'AUD'],
+        supportedCountries: [...supportedCountries],
+        supportedCurrencies: [...supportedCurrencies],
         merchantIdentifier: process.env.APPLE_PAY_MERCHANT_ID || '',
         domainName: process.env.APPLE_PAY_DOMAIN || ''
       };
@@ -329,40 +322,31 @@ export class ApplePayService {
       logger.info('Apple Pay capabilities retrieved', {
         supportedNetworks: capabilities.supportedNetworks.length,
         supportedCountries: capabilities.supportedCountries.length,
-        supportedCurrencies: capabilities.supportedCurrencies.length,
-        requestId
+        supportedCurrencies: capabilities.supportedCurrencies.length
       });
 
       return capabilities;
     } catch (error) {
       logger.error('Failed to get Apple Pay capabilities', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       throw error;
     }
   }
 
-  async createApplePayPaymentMethod(
-    userId: number,
-    applePayData: any,
-    requestId: string
-  ): Promise<{ id: number; stripePaymentMethodId: string }> {
+  async createApplePayPaymentMethod(userId: number, applePayData: any): Promise<{ id: number; stripePaymentMethodId: string }> {
     try {
-      const stripePaymentMethod = await this.stripeService.createPaymentMethodFromApplePay(
-        applePayData,
-        requestId
-      );
+      const stripePaymentMethod = await this.stripeService.createPaymentMethodFromApplePay(applePayData);
 
       const paymentMethodData = {
         user_id: userId,
         stripe_payment_method_id: stripePaymentMethod.id,
         type: PaymentMethod.APPLE_PAY,
-        card_last_four: null,
-        card_brand: null,
-        card_exp_month: null,
-        card_exp_year: null,
+        card_last_four: undefined,
+        card_brand: undefined,
+        card_exp_month: undefined,
+        card_exp_year: undefined,
         is_default: false
       };
 
@@ -371,8 +355,7 @@ export class ApplePayService {
       logger.info('Apple Pay payment method created', {
         paymentMethodId: savedPaymentMethod.id,
         stripePaymentMethodId: stripePaymentMethod.id,
-        userId,
-        requestId
+        userId
       });
 
       return {
@@ -382,18 +365,14 @@ export class ApplePayService {
     } catch (error) {
       logger.error('Failed to create Apple Pay payment method', {
         userId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       throw error;
     }
   }
 
-  async validateApplePayPayment(
-    paymentData: any,
-    requestId: string
-  ): Promise<boolean> {
+  async validateApplePayPayment(paymentData: any): Promise<boolean> {
     try {
       if (!paymentData || !paymentData.paymentMethod) {
         return false;
@@ -414,15 +393,13 @@ export class ApplePayService {
       logger.info('Apple Pay payment validation', {
         network: paymentData.paymentMethod.network,
         type: paymentData.paymentMethod.type,
-        isValid: hasRequiredFields && isNetworkSupported,
-        requestId
+        isValid: hasRequiredFields && isNetworkSupported
       });
 
       return hasRequiredFields && isNetworkSupported;
     } catch (error) {
       logger.error('Failed to validate Apple Pay payment', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       return false;

@@ -22,8 +22,8 @@ import { StripeService } from './stripe.service';
 import { InvoiceDatabaseRecord, InvoiceStatus } from '../../shared/types';
 
 export class InvoiceService {
-  private invoiceRepository: InvoiceRepository;
-  private paymentRepository: PaymentRepository;
+  private invoiceRepository!: InvoiceRepository;
+  private paymentRepository!: PaymentRepository;
   private stripeService: StripeService;
 
   constructor() {
@@ -37,10 +37,7 @@ export class InvoiceService {
     this.paymentRepository = new PaymentRepository(dbConnection);
   }
 
-  async createInvoice(
-    request: CreateInvoiceRequest,
-    requestId: string
-  ): Promise<CreateInvoiceResponse> {
+  async createInvoice(request: CreateInvoiceRequest): Promise<CreateInvoiceResponse> {
     try {
       if (!validatePaymentAmount(request.amount, request.currency)) {
         throw new Error('Invalid invoice amount');
@@ -55,24 +52,23 @@ export class InvoiceService {
       const totalAmount = request.amount + processingFee;
 
       const invoiceData: Omit<InvoiceDatabaseRecord, 'id' | 'created_at' | 'updated_at'> = {
-        quote_id: request.quoteId || null,
+        quote_id: request.quoteId || undefined,
         user_id: request.userId || 1,
         invoice_number: invoiceNumber,
         amount: request.amount,
         currency: request.currency,
         status: (request.status as InvoiceStatus) || InvoiceStatus.DRAFT,
-        due_date: new Date(request.dueDate),
-        description: request.description || null,
+        due_date: request.dueDate ? new Date(request.dueDate) : new Date(),
+        description: request.description || undefined,
         processing_fee: processingFee,
         metadata: sanitizePaymentMetadata(request.metadata || {}),
-        payment_link: null,
-        stripe_invoice_id: null,
-        paid_at: null
+        payment_link: undefined,
+        paid_at: undefined
       };
 
       const savedInvoice = await this.invoiceRepository.create(invoiceData);
 
-      if (request.status === 'sent' || request.autoSend) {
+      if (request.status === InvoiceStatus.SENT || request.autoSend) {
         const paymentLink = await this.stripeService.createPaymentLink({
           amount: totalAmount,
           currency: request.currency,
@@ -83,19 +79,17 @@ export class InvoiceService {
             invoiceNumber,
             userId: (request.userId || 1).toString()
           }
-        }, requestId);
+        });
 
-        const updatedInvoice = await this.invoiceRepository.update(
+        await this.invoiceRepository.update(
           savedInvoice.id,
           {
             payment_link: paymentLink.url,
-            stripe_invoice_id: paymentLink.id,
             status: InvoiceStatus.SENT
           }
         );
 
         savedInvoice.payment_link = paymentLink.url;
-        savedInvoice.stripe_invoice_id = paymentLink.id;
         savedInvoice.status = InvoiceStatus.SENT;
       }
 
@@ -105,8 +99,7 @@ export class InvoiceService {
         amount: request.amount,
         currency: request.currency,
         status: savedInvoice.status,
-        userId: request.userId,
-        requestId
+        userId: request.userId
       });
 
       return {
@@ -115,7 +108,7 @@ export class InvoiceService {
         amount: request.amount,
         currency: request.currency,
         status: savedInvoice.status,
-        dueDate: request.dueDate,
+        dueDate: savedInvoice.due_date.toISOString(),
         paymentLink: savedInvoice.payment_link || undefined,
         processingFee,
         createdAt: savedInvoice.created_at.toISOString()
@@ -125,18 +118,14 @@ export class InvoiceService {
         amount: request.amount,
         currency: request.currency,
         userId: request.userId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       throw error;
     }
   }
 
-  async updateInvoiceStatus(
-    request: UpdateInvoiceStatusRequest,
-    requestId: string
-  ): Promise<UpdateInvoiceStatusResponse> {
+  async updateInvoiceStatus(request: UpdateInvoiceStatusRequest): Promise<UpdateInvoiceStatusResponse> {
     try {
       const invoice = await this.invoiceRepository.findById(request.invoiceId);
 
@@ -148,8 +137,8 @@ export class InvoiceService {
         status: request.status as InvoiceStatus
       };
 
-      if (request.status === 'paid' && request.paidAt) {
-        updateData.paid_at = request.paidAt;
+      if (request.status === InvoiceStatus.PAID && request.paidAt) {
+        updateData.paid_at = new Date(request.paidAt);
       }
 
       await this.invoiceRepository.update(request.invoiceId, updateData);
@@ -157,13 +146,12 @@ export class InvoiceService {
       logger.info('Invoice status updated', {
         invoiceId: request.invoiceId,
         oldStatus: invoice.status,
-        newStatus: request.status,
-        requestId
+        newStatus: request.status
       });
 
       return {
         invoiceId: request.invoiceId,
-        status: request.status,
+        status: request.status as InvoiceStatus,
         updatedAt: new Date().toISOString(),
         success: true
       };
@@ -171,15 +159,14 @@ export class InvoiceService {
       logger.error('Failed to update invoice status', {
         invoiceId: request.invoiceId,
         status: request.status,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       throw error;
     }
   }
   
-  async getInvoice(invoiceId: number, requestId: string): Promise<InvoiceDetailsResponse> {
+  async getInvoice(invoiceId: number): Promise<InvoiceDetailsResponse> {
     try {
       const invoice = await this.invoiceRepository.findById(invoiceId);
 
@@ -193,11 +180,12 @@ export class InvoiceService {
       logger.info('Invoice retrieved', {
         invoiceId,
         invoiceNumber: invoice.invoice_number,
-        status: invoice.status,
-        requestId
+        status: invoice.status
       });
 
       return {
+        invoiceNumber: invoice.invoice_number,
+        status: invoice.status,
         invoice: {
           id: invoice.id,
           invoiceNumber: invoice.invoice_number,
@@ -245,18 +233,14 @@ export class InvoiceService {
     } catch (error) {
       logger.error('Failed to get invoice', {
         invoiceId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       throw error;
     }
   }
 
-  async getUserInvoices(
-    request: InvoiceListRequest,
-    requestId: string
-  ): Promise<InvoiceListResponse> {
+  async getUserInvoices(request: InvoiceListRequest): Promise<InvoiceListResponse> {
     try {
       const invoices = await this.invoiceRepository.findByUserId(
         request.userId,
@@ -274,8 +258,7 @@ export class InvoiceService {
         userId: request.userId,
         status: request.status,
         count: filteredInvoices.length,
-        totalCount,
-        requestId
+        totalCount
       });
 
       return {
@@ -295,6 +278,7 @@ export class InvoiceService {
           createdAt: invoice.created_at.toISOString(),
           updatedAt: invoice.updated_at.toISOString()
         })),
+        totalCount,
         total: totalCount,
         page: Math.floor((request.offset || 0) / (request.limit || 50)) + 1,
         limit: request.limit || 50
@@ -302,15 +286,14 @@ export class InvoiceService {
     } catch (error) {
       logger.error('Failed to get user invoices', {
         userId: request.userId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       throw error;
     }
   }
 
-  async sendInvoice(invoiceId: number, requestId: string): Promise<void> {
+  async sendInvoice(invoiceId: number): Promise<void> {
     try {
       const invoice = await this.invoiceRepository.findById(invoiceId);
 
@@ -335,13 +318,12 @@ export class InvoiceService {
             invoiceNumber: invoice.invoice_number,
             userId: invoice.user_id.toString()
           }
-        }, requestId);
+        });
 
         await this.invoiceRepository.update(
           invoiceId,
           {
             payment_link: paymentLink.url,
-            stripe_invoice_id: paymentLink.id,
             status: InvoiceStatus.SENT
           }
         );
@@ -354,21 +336,19 @@ export class InvoiceService {
 
       logger.info('Invoice sent', {
         invoiceId,
-        invoiceNumber: invoice.invoice_number,
-        requestId
+        invoiceNumber: invoice.invoice_number
       });
     } catch (error) {
       logger.error('Failed to send invoice', {
         invoiceId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       throw error;
     }
   }
 
-  async cancelInvoice(invoiceId: number, requestId: string): Promise<void> {
+  async cancelInvoice(invoiceId: number): Promise<void> {
     try {
       const invoice = await this.invoiceRepository.findById(invoiceId);
 
@@ -392,21 +372,19 @@ export class InvoiceService {
       logger.info('Invoice cancelled', {
         invoiceId,
         invoiceNumber: invoice.invoice_number,
-        previousStatus: invoice.status,
-        requestId
+        previousStatus: invoice.status
       });
     } catch (error) {
       logger.error('Failed to cancel invoice', {
         invoiceId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       throw error;
     }
   }
 
-  async deleteInvoice(invoiceId: number, requestId: string): Promise<void> {
+  async deleteInvoice(invoiceId: number): Promise<void> {
     try {
       const invoice = await this.invoiceRepository.findById(invoiceId);
 
@@ -428,21 +406,19 @@ export class InvoiceService {
 
       logger.info('Invoice deleted', {
         invoiceId,
-        invoiceNumber: invoice.invoice_number,
-        requestId
+        invoiceNumber: invoice.invoice_number
       });
     } catch (error) {
       logger.error('Failed to delete invoice', {
         invoiceId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       throw error;
     }
   }
 
-  async markInvoiceOverdue(requestId: string): Promise<void> {
+  async markInvoiceOverdue(): Promise<void> {
     try {
       const overdueInvoices = await this.invoiceRepository.findOverdueInvoices();
 
@@ -455,19 +431,16 @@ export class InvoiceService {
         logger.info('Invoice marked as overdue', {
           invoiceId: invoice.id,
           invoiceNumber: invoice.invoice_number,
-          dueDate: invoice.due_date,
-          requestId
+          dueDate: invoice.due_date
         });
       }
 
       logger.info('Overdue invoices processed', {
-        count: overdueInvoices.length,
-        requestId
+        count: overdueInvoices.length
       });
     } catch (error) {
       logger.error('Failed to mark invoices as overdue', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       throw error;

@@ -26,8 +26,8 @@ import {
 } from '../../shared/types';
 
 export class GooglePayService {
-  private paymentRepository: PaymentRepository;
-  private paymentMethodRepository: PaymentMethodRepository;
+  private paymentRepository!: PaymentRepository;
+  private paymentMethodRepository!: PaymentMethodRepository;
   private stripeService: StripeService;
 
   constructor() {
@@ -41,10 +41,7 @@ export class GooglePayService {
     this.paymentMethodRepository = new PaymentMethodRepository(dbConnection);
   }
 
-  async getGooglePayConfig(
-    request: GooglePayConfigRequest,
-    requestId: string
-  ): Promise<GooglePayConfigResponse> {
+  async getGooglePayConfig(request: GooglePayConfigRequest): Promise<GooglePayConfigResponse> {
     try {
       const amount = request.amount || 0;
       const currency = request.currency || 'USD';
@@ -63,7 +60,6 @@ export class GooglePayService {
       const googlePayConfig = {
         merchantId: process.env.GOOGLE_PAY_MERCHANT_ID || '',
         environment: process.env.NODE_ENV === 'production' ? 'PRODUCTION' : 'TEST',
-        apiVersion: 2,
         apiVersionMinor: 0,
         allowedPaymentMethods: [{
           type: 'CARD',
@@ -109,15 +105,13 @@ export class GooglePayService {
         currency,
         processingFee,
         totalAmount,
-        environment: googlePayConfig.environment,
-        requestId
+        environment: googlePayConfig.environment
       });
 
       return {
         merchantId: googlePayConfig.merchantId,
         merchantName: request.merchantName || 'BuildHive',
         environment: googlePayConfig.environment,
-        apiVersion: googlePayConfig.apiVersion,
         apiVersionMinor: googlePayConfig.apiVersionMinor,
         allowedPaymentMethods: googlePayConfig.allowedPaymentMethods,
         merchantInfo: googlePayConfig.merchantInfo,
@@ -127,18 +121,14 @@ export class GooglePayService {
       logger.error('Failed to generate Google Pay config', {
         amount: request.amount,
         currency: request.currency,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       throw error;
     }
   }
 
-  async createGooglePayToken(
-    request: GooglePayTokenRequest,
-    requestId: string
-  ): Promise<GooglePayTokenResponse> {
+  async createGooglePayToken(request: GooglePayTokenRequest): Promise<GooglePayTokenResponse> {
     try {
       if (!request.paymentToken) {
         throw new Error('Google Pay payment token is required');
@@ -148,22 +138,18 @@ export class GooglePayService {
         throw new Error('Invalid payment amount');
       }
 
-      const isValidToken = await this.validateGooglePayToken(request.paymentToken, requestId);
+      const isValidToken = await this.validateGooglePayToken(request.paymentToken);
       
       if (!isValidToken) {
         throw new Error('Invalid Google Pay token');
       }
 
-      const stripeToken = await this.stripeService.createTokenFromGooglePay(
-        request.paymentToken,
-        requestId
-      );
+      const stripeToken = await this.stripeService.createTokenFromGooglePay(request.paymentToken);
 
       logger.info('Google Pay token created', {
         amount: request.amount,
         currency: request.currency,
-        stripeTokenId: stripeToken.id,
-        requestId
+        stripeTokenId: stripeToken.id
       });
 
       return {
@@ -175,8 +161,7 @@ export class GooglePayService {
       logger.error('Failed to create Google Pay token', {
         amount: request.amount,
         currency: request.currency,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       return {
@@ -187,10 +172,7 @@ export class GooglePayService {
     }
   }
 
-  async processGooglePayPayment(
-    request: GooglePayPaymentRequest,
-    requestId: string
-  ): Promise<GooglePayPaymentResponse> {
+  async processGooglePayPayment(request: GooglePayPaymentRequest): Promise<GooglePayPaymentResponse> {
     try {
       const { paymentToken, amount, currency, userId, paymentType, description, metadata, returnUrl } = request;
 
@@ -202,7 +184,7 @@ export class GooglePayService {
         throw new Error('Google Pay payment token is required');
       }
 
-      const isValidToken = await this.validateGooglePayToken(paymentToken, requestId);
+      const isValidToken = await this.validateGooglePayToken(paymentToken);
       
       if (!isValidToken) {
         throw new Error('Invalid Google Pay token');
@@ -227,15 +209,15 @@ export class GooglePayService {
         automaticPaymentMethods: true,
         userId: userId || 1,
         returnUrl
-      }, requestId);
+      });
 
       const confirmResult = await this.stripeService.confirmPaymentIntent({
         paymentIntentId: stripePaymentIntent.paymentIntentId,
         paymentMethodId: undefined,
         returnUrl
-      }, requestId);
+      });
 
-      const paymentData: Omit<PaymentDatabaseRecord, 'id' | 'created_at' | 'updated_at'> = {
+      const dbPaymentData: Omit<PaymentDatabaseRecord, 'id' | 'created_at' | 'updated_at'> = {
         user_id: userId || 1,
         stripe_payment_intent_id: stripePaymentIntent.paymentIntentId,
         amount,
@@ -245,18 +227,18 @@ export class GooglePayService {
         status: confirmResult.status as PaymentStatus,
         description: description || 'Google Pay Payment',
         metadata: sanitizedMetadata,
-        invoice_id: null,
-        subscription_id: null,
-        credits_purchased: null,
-        stripe_fee: null,
-        platform_fee: null,
+        invoice_id: undefined,
+        subscription_id: undefined,
+        credits_purchased: undefined,
+        stripe_fee: undefined,
+        platform_fee: undefined,
         processing_fee: processingFee,
-        failure_reason: confirmResult.error || null,
+        failure_reason: confirmResult.error || undefined,
         net_amount: amount - processingFee,
-        processed_at: confirmResult.status === PaymentStatus.SUCCEEDED ? new Date() : null
+        processed_at: confirmResult.status === PaymentStatus.SUCCEEDED ? new Date() : undefined
       };
 
-      const savedPayment = await this.paymentRepository.create(paymentData);
+      const savedPayment = await this.paymentRepository.create(dbPaymentData);
 
       logger.info('Google Pay payment processed', {
         paymentId: savedPayment.id,
@@ -264,8 +246,7 @@ export class GooglePayService {
         amount,
         currency,
         status: confirmResult.status,
-        userId,
-        requestId
+        userId
       });
 
       return {
@@ -285,18 +266,14 @@ export class GooglePayService {
         amount: request.amount,
         currency: request.currency,
         userId: request.userId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       throw error;
     }
   }
 
-  async validateGooglePayToken(
-    token: string | any,
-    requestId: string
-  ): Promise<boolean> {
+  async validateGooglePayToken(token: string | any): Promise<boolean> {
     try {
       if (!token) {
         return false;
@@ -329,22 +306,20 @@ export class GooglePayService {
         isValid: hasRequiredFields && isValidProtocolVersion,
         hasSignature: !!tokenData.signature,
         protocolVersion: tokenData.protocolVersion,
-        hasSignedMessage: !!tokenData.signedMessage,
-        requestId
+        hasSignedMessage: !!tokenData.signedMessage
       });
 
       return hasRequiredFields && isValidProtocolVersion;
     } catch (error) {
       logger.error('Failed to validate Google Pay token', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       return false;
     }
   }
 
-  async getGooglePayCapabilities(requestId: string): Promise<{
+  async getGooglePayCapabilities(): Promise<{
     supportedNetworks: string[];
     supportedAuthMethods: string[];
     supportedCountries: string[];
@@ -353,11 +328,14 @@ export class GooglePayService {
     environment: string;
   }> {
     try {
+      const supportedCountries = ['AU', 'US', 'CA', 'GB'] as const;
+      const supportedCurrencies = ['AUD', 'USD'] as const;
+      
       const capabilities = {
         supportedNetworks: ['AMEX', 'DISCOVER', 'MASTERCARD', 'VISA'],
         supportedAuthMethods: ['PAN_ONLY', 'CRYPTOGRAM_3DS'],
-        supportedCountries: PAYMENT_CONSTANTS.GOOGLE_PAY?.SUPPORTED_COUNTRIES || ['US', 'CA', 'GB', 'AU'],
-        supportedCurrencies: PAYMENT_CONSTANTS.STRIPE?.CURRENCY?.SUPPORTED || ['USD', 'EUR', 'GBP', 'AUD'],
+        supportedCountries: [...supportedCountries],
+        supportedCurrencies: [...supportedCurrencies],
         merchantId: process.env.GOOGLE_PAY_MERCHANT_ID || '',
         environment: process.env.NODE_ENV === 'production' ? 'PRODUCTION' : 'TEST'
       };
@@ -366,40 +344,31 @@ export class GooglePayService {
         supportedNetworks: capabilities.supportedNetworks.length,
         supportedCountries: capabilities.supportedCountries.length,
         supportedCurrencies: capabilities.supportedCurrencies.length,
-        environment: capabilities.environment,
-        requestId
+        environment: capabilities.environment
       });
 
       return capabilities;
     } catch (error) {
       logger.error('Failed to get Google Pay capabilities', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       throw error;
     }
   }
 
-  async createGooglePayPaymentMethod(
-    userId: number,
-    googlePayData: any,
-    requestId: string
-  ): Promise<{ id: number; stripePaymentMethodId: string }> {
+  async createGooglePayPaymentMethod(userId: number, googlePayData: any): Promise<{ id: number; stripePaymentMethodId: string }> {
     try {
-      const stripePaymentMethod = await this.stripeService.createPaymentMethodFromGooglePay(
-        googlePayData,
-        requestId
-      );
+      const stripePaymentMethod = await this.stripeService.createPaymentMethodFromGooglePay(googlePayData);
 
       const paymentMethodData = {
         user_id: userId,
         stripe_payment_method_id: stripePaymentMethod.id,
         type: PaymentMethod.GOOGLE_PAY,
-        card_last_four: null,
-        card_brand: null,
-        card_exp_month: null,
-        card_exp_year: null,
+        card_last_four: undefined,
+        card_brand: undefined,
+        card_exp_month: undefined,
+        card_exp_year: undefined,
         is_default: false
       };
 
@@ -408,8 +377,7 @@ export class GooglePayService {
       logger.info('Google Pay payment method created', {
         paymentMethodId: savedPaymentMethod.id,
         stripePaymentMethodId: stripePaymentMethod.id,
-        userId,
-        requestId
+        userId
       });
 
       return {
@@ -419,25 +387,20 @@ export class GooglePayService {
     } catch (error) {
       logger.error('Failed to create Google Pay payment method', {
         userId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       throw error;
     }
   }
 
-  async isGooglePayAvailable(
-    countryCode: string,
-    currency: string,
-    requestId: string
-  ): Promise<boolean> {
+  async isGooglePayAvailable(countryCode: string, currency: string): Promise<boolean> {
     try {
-      const supportedCountries = PAYMENT_CONSTANTS.GOOGLE_PAY?.SUPPORTED_COUNTRIES || ['US', 'CA', 'GB', 'AU'];
-      const supportedCurrencies = PAYMENT_CONSTANTS.STRIPE?.CURRENCY?.SUPPORTED || ['USD', 'EUR', 'GBP', 'AUD'];
+      const supportedCountries = ['AU', 'US', 'CA', 'GB'] as const;
+      const supportedCurrencies = ['AUD', 'USD'] as const;
 
-      const isCountrySupported = supportedCountries.includes(countryCode.toUpperCase());
-      const isCurrencySupported = supportedCurrencies.includes(currency.toUpperCase());
+      const isCountrySupported = supportedCountries.includes(countryCode.toUpperCase() as any);
+      const isCurrencySupported = supportedCurrencies.includes(currency.toUpperCase() as any);
       const isAvailable = isCountrySupported && isCurrencySupported;
 
       logger.info('Google Pay availability check', {
@@ -445,8 +408,7 @@ export class GooglePayService {
         currency,
         isCountrySupported,
         isCurrencySupported,
-        isAvailable,
-        requestId
+        isAvailable
       });
 
       return isAvailable;
@@ -454,8 +416,7 @@ export class GooglePayService {
       logger.error('Failed to check Google Pay availability', {
         countryCode,
         currency,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       return false;

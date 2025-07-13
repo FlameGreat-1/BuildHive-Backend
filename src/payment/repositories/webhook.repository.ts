@@ -77,6 +77,10 @@ export class WebhookRepository {
       throw error;
     }
   }
+  
+  async getWebhookEventByStripeId(stripeEventId: string): Promise<WebhookEventDatabaseRecord | null> {
+  return this.findByStripeEventId(stripeEventId);
+}
 
   async markAsProcessed(
     id: number,

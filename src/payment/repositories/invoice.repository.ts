@@ -81,6 +81,10 @@ export class InvoiceRepository {
       throw error;
     }
   }
+  
+  async getInvoiceById(id: number): Promise<InvoiceDatabaseRecord | null> {
+  return this.findById(id);
+}
 
   async findByInvoiceNumber(invoiceNumber: string): Promise<InvoiceDatabaseRecord | null> {
     try {

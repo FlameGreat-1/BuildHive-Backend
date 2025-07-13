@@ -23,8 +23,8 @@ import {
 } from '../../shared/types';
 
 export class RefundService {
-  private refundRepository: RefundRepository;
-  private paymentRepository: PaymentRepository;
+  private refundRepository!: RefundRepository;
+  private paymentRepository!: PaymentRepository;
   private stripeService: StripeService;
 
   constructor() {
@@ -38,10 +38,7 @@ export class RefundService {
     this.paymentRepository = new PaymentRepository(dbConnection);
   }
 
-  async createRefund(
-    request: CreateRefundRequest,
-    requestId: string
-  ): Promise<CreateRefundResponse> {
+  async createRefund(request: CreateRefundRequest): Promise<CreateRefundResponse> {
     try {
       const payment = await this.paymentRepository.findById(request.paymentId);
 
@@ -59,7 +56,6 @@ export class RefundService {
 
       const refundAmount = request.amount || payment.amount;
 
-      // Check existing refunds
       const existingRefunds = await this.refundRepository.findByPaymentId(request.paymentId);
       const totalRefunded = await this.refundRepository.getTotalRefundedAmount(request.paymentId);
 
@@ -71,18 +67,17 @@ export class RefundService {
         payment_id: request.paymentId,
         user_id: request.userId || payment.user_id,
         amount: refundAmount,
-        reason: request.reason || null,
-        description: request.description || null,
+        reason: request.reason || undefined,
+        description: request.description || undefined,
         status: RefundStatus.PENDING,
-        stripe_refund_id: null,
-        failure_reason: null,
+        stripe_refund_id: undefined,
+        failure_reason: undefined,
         metadata: sanitizePaymentMetadata(request.metadata || {}),
-        processed_at: null
+        processed_at: undefined
       };
 
       const savedRefund = await this.refundRepository.create(refundData);
 
-      // Process Stripe refund if payment has Stripe payment intent
       if (payment.stripe_payment_intent_id) {
         try {
           const stripeRefund = await this.stripeService.createRefund({
@@ -90,7 +85,7 @@ export class RefundService {
             amount: refundAmount,
             reason: request.reason || 'requested_by_customer',
             metadata: request.metadata
-          }, requestId);
+          });
 
           const updatedRefund = await this.refundRepository.update(
             savedRefund.id,
@@ -107,8 +102,7 @@ export class RefundService {
             refundId: savedRefund.id,
             paymentId: request.paymentId,
             stripePaymentIntentId: payment.stripe_payment_intent_id,
-            error: stripeError instanceof Error ? stripeError.message : 'Unknown error',
-            requestId
+            error: stripeError instanceof Error ? stripeError.message : 'Unknown error'
           });
 
           await this.refundRepository.update(
@@ -128,8 +122,7 @@ export class RefundService {
         paymentId: request.paymentId,
         amount: refundAmount,
         reason: request.reason,
-        status: savedRefund.status,
-        requestId
+        status: savedRefund.status
       });
 
       return {
@@ -148,15 +141,14 @@ export class RefundService {
         paymentId: request.paymentId,
         amount: request.amount,
         reason: request.reason,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       throw error;
     }
   }
 
-  async processRefund(refundId: number, requestId: string): Promise<any> {
+  async processRefund(refundId: number): Promise<any> {
     try {
       const refund = await this.refundRepository.findById(refundId);
 
@@ -177,8 +169,7 @@ export class RefundService {
       logger.info('Refund processed', {
         refundId,
         paymentId: refund.payment_id,
-        amount: refund.amount,
-        requestId
+        amount: refund.amount
       });
 
       return {
@@ -189,17 +180,13 @@ export class RefundService {
     } catch (error) {
       logger.error('Failed to process refund', {
         refundId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
       throw error;
     }
   }
 
-  async updateRefundStatus(
-    request: UpdateRefundStatusRequest,
-    requestId: string
-  ): Promise<UpdateRefundStatusResponse> {
+  async updateRefundStatus(request: UpdateRefundStatusRequest): Promise<UpdateRefundStatusResponse> {
     try {
       const refund = await this.refundRepository.findById(request.refundId);
 
@@ -211,11 +198,11 @@ export class RefundService {
         status: request.status as RefundStatus
       };
 
-      if (request.status === 'processed' && request.processedAt) {
+      if (request.status === RefundStatus.PROCESSED && request.processedAt) {
         updateData.processed_at = new Date(request.processedAt);
       }
 
-      if (request.status === 'failed' && request.failureReason) {
+      if (request.status === RefundStatus.FAILED && request.failureReason) {
         updateData.failure_reason = request.failureReason;
       }
 
@@ -224,13 +211,12 @@ export class RefundService {
       logger.info('Refund status updated', {
         refundId: request.refundId,
         oldStatus: refund.status,
-        newStatus: request.status,
-        requestId
+        newStatus: request.status
       });
 
       return {
         refundId: request.refundId,
-        status: request.status,
+        status: request.status as RefundStatus,
         updatedAt: new Date().toISOString(),
         success: true
       };
@@ -238,15 +224,14 @@ export class RefundService {
       logger.error('Failed to update refund status', {
         refundId: request.refundId,
         status: request.status,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       throw error;
     }
   }
 
-  async getRefund(refundId: number, requestId: string): Promise<RefundDetailsResponse> {
+  async getRefund(refundId: number): Promise<RefundDetailsResponse> {
     try {
       const refund = await this.refundRepository.findById(refundId);
 
@@ -257,8 +242,7 @@ export class RefundService {
       logger.info('Refund retrieved', {
         refundId,
         paymentId: refund.payment_id,
-        status: refund.status,
-        requestId
+        status: refund.status
       });
 
       return {
@@ -277,17 +261,16 @@ export class RefundService {
     } catch (error) {
       logger.error('Failed to get refund', {
         refundId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       throw error;
     }
   }
   
-    async getRefundStatus(refundId: number, requestId: string): Promise<any> {
+  async getRefundStatus(refundId: number): Promise<any> {
     try {
-      const refund = await this.getRefund(refundId, requestId);
+      const refund = await this.getRefund(refundId);
       
       return {
         refundId: refund.id,
@@ -300,14 +283,13 @@ export class RefundService {
     } catch (error) {
       logger.error('Failed to get refund status', {
         refundId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
       throw error;
     }
   }
 
-  async listRefunds(filters: any, requestId: string): Promise<RefundListResponse> {
+  async listRefunds(filters: any): Promise<RefundListResponse> {
     const refundRequest: RefundListRequest = {
       userId: filters.userId,
       status: filters.status,
@@ -315,13 +297,10 @@ export class RefundService {
       offset: filters.offset || 0
     };
     
-    return this.getUserRefunds(refundRequest, requestId);
+    return this.getUserRefunds(refundRequest);
   }
 
-  async getUserRefunds(
-    request: RefundListRequest,
-    requestId: string
-  ): Promise<RefundListResponse> {
+  async getUserRefunds(request: RefundListRequest): Promise<RefundListResponse> {
     try {
       const refunds = await this.refundRepository.findByUserId(
         request.userId,
@@ -331,21 +310,17 @@ export class RefundService {
 
       let filteredRefunds = refunds;
 
-      // Filter by status if provided
       if (request.status) {
         filteredRefunds = refunds.filter(refund => refund.status === request.status);
       }
 
-      const totalCount = await this.refundRepository.countByUserId(request.userId);
-
-      const refundStats = await this.refundRepository.getRefundStats(request.userId);
+      const totalCount = refunds.length;
 
       logger.info('User refunds retrieved', {
         userId: request.userId,
         status: request.status,
         count: filteredRefunds.length,
-        totalCount,
-        requestId
+        totalCount
       });
 
       return {
@@ -363,30 +338,30 @@ export class RefundService {
         })),
         totalCount,
         summary: {
-          totalRefunded: refundStats.total_amount,
-          pendingRefunds: refundStats.pending_refunds,
-          processedRefunds: refundStats.processed_refunds
+          totalRefunded: filteredRefunds.reduce((sum, refund) => 
+            refund.status === RefundStatus.PROCESSED ? sum + refund.amount : sum, 0
+          ),
+          pendingRefunds: filteredRefunds.filter(refund => refund.status === RefundStatus.PENDING).length,
+          processedRefunds: filteredRefunds.filter(refund => refund.status === RefundStatus.PROCESSED).length
         }
       };
     } catch (error) {
       logger.error('Failed to get user refunds', {
         userId: request.userId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       throw error;
     }
   }
-
-  async getPaymentRefunds(paymentId: number, requestId: string): Promise<RefundListResponse> {
+  
+    async getPaymentRefunds(paymentId: number): Promise<RefundListResponse> {
     try {
       const refunds = await this.refundRepository.findByPaymentId(paymentId);
 
       logger.info('Payment refunds retrieved', {
         paymentId,
-        count: refunds.length,
-        requestId
+        count: refunds.length
       });
 
       return {
@@ -414,15 +389,14 @@ export class RefundService {
     } catch (error) {
       logger.error('Failed to get payment refunds', {
         paymentId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       throw error;
     }
   }
 
-  async cancelRefund(refundId: number, requestId: string): Promise<void> {
+  async cancelRefund(refundId: number): Promise<void> {
     try {
       const refund = await this.refundRepository.findById(refundId);
 
@@ -446,35 +420,33 @@ export class RefundService {
       logger.info('Refund cancelled', {
         refundId,
         paymentId: refund.payment_id,
-        previousStatus: refund.status,
-        requestId
+        previousStatus: refund.status
       });
     } catch (error) {
       logger.error('Failed to cancel refund', {
         refundId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       throw error;
     }
   }
 
-  async getUserRefundsCount(userId: number, status?: string, requestId?: string): Promise<number> {
+  async getUserRefundsCount(userId: number, status?: string): Promise<number> {
     try {
-      const totalCount = await this.refundRepository.countByUserId(userId);
+      const refunds = await this.refundRepository.findByUserId(userId, 999999, 0);
       
       if (status) {
-        const refunds = await this.refundRepository.findByUserId(userId, 999999, 0);
         const filteredCount = refunds.filter(refund => refund.status === status).length;
         return filteredCount;
       }
 
+      const totalCount = refunds.length;
+
       logger.info('User refunds count retrieved', {
         userId,
         status,
-        totalCount,
-        requestId
+        totalCount
       });
 
       return totalCount;
@@ -482,14 +454,13 @@ export class RefundService {
       logger.error('Failed to get user refunds count', {
         userId,
         status,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
       throw error;
     }
   }
 
-  async approveRefund(refundId: number, requestId: string): Promise<RefundDatabaseRecord> {
+  async approveRefund(refundId: number): Promise<RefundDatabaseRecord> {
     try {
       const refund = await this.refundRepository.findById(refundId);
 
@@ -509,23 +480,21 @@ export class RefundService {
       logger.info('Refund approved', {
         refundId,
         paymentId: refund.payment_id,
-        amount: refund.amount,
-        requestId
+        amount: refund.amount
       });
 
       return updatedRefund;
     } catch (error) {
       logger.error('Failed to approve refund', {
         refundId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       throw error;
     }
   }
 
-  async rejectRefund(refundId: number, reason: string, requestId: string): Promise<RefundDatabaseRecord> {
+  async rejectRefund(refundId: number, reason: string): Promise<RefundDatabaseRecord> {
     try {
       const refund = await this.refundRepository.findById(refundId);
 
@@ -545,8 +514,7 @@ export class RefundService {
       logger.info('Refund rejected', {
         refundId,
         paymentId: refund.payment_id,
-        reason,
-        requestId
+        reason
       });
 
       return updatedRefund;
@@ -554,8 +522,7 @@ export class RefundService {
       logger.error('Failed to reject refund', {
         refundId,
         reason,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       throw error;
@@ -565,8 +532,7 @@ export class RefundService {
   async getRefundsByDateRange(
     startDate: Date,
     endDate: Date,
-    userId?: number,
-    requestId?: string
+    userId?: number
   ): Promise<RefundDatabaseRecord[]> {
     try {
       const refunds = await this.refundRepository.findByDateRange(startDate, endDate, userId);
@@ -575,8 +541,7 @@ export class RefundService {
         startDate: startDate.toISOString(),
         endDate: endDate.toISOString(),
         userId,
-        count: refunds.length,
-        requestId
+        count: refunds.length
       });
 
       return refunds;
@@ -585,8 +550,7 @@ export class RefundService {
         startDate: startDate.toISOString(),
         endDate: endDate.toISOString(),
         userId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       throw error;
@@ -595,8 +559,7 @@ export class RefundService {
 
   async getRefundsByStatus(
     status: RefundStatus,
-    limit: number = 100,
-    requestId?: string
+    limit: number = 100
   ): Promise<RefundDatabaseRecord[]> {
     try {
       const refunds = await this.refundRepository.findByStatus(status, limit);
@@ -604,8 +567,7 @@ export class RefundService {
       logger.info('Refunds by status retrieved', {
         status,
         count: refunds.length,
-        limit,
-        requestId
+        limit
       });
 
       return refunds;
@@ -613,8 +575,7 @@ export class RefundService {
       logger.error('Failed to get refunds by status', {
         status,
         limit,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       throw error;
@@ -623,17 +584,22 @@ export class RefundService {
 
   async getTotalRefundedAmountByUser(
     userId: number,
-    status?: RefundStatus,
-    requestId?: string
+    status?: RefundStatus
   ): Promise<number> {
     try {
-      const totalAmount = await this.refundRepository.getTotalRefundedAmountByUser(userId, status);
+      const refunds = await this.refundRepository.findByUserId(userId, 999999, 0);
+      
+      let filteredRefunds = refunds;
+      if (status) {
+        filteredRefunds = refunds.filter(refund => refund.status === status);
+      }
+
+      const totalAmount = filteredRefunds.reduce((sum, refund) => sum + refund.amount, 0);
 
       logger.info('Total refunded amount by user retrieved', {
         userId,
         status,
-        totalAmount,
-        requestId
+        totalAmount
       });
 
       return totalAmount;
@@ -641,15 +607,14 @@ export class RefundService {
       logger.error('Failed to get total refunded amount by user', {
         userId,
         status,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       throw error;
     }
   }
 
-  async syncRefundWithStripe(refundId: number, requestId: string): Promise<void> {
+  async syncRefundWithStripe(refundId: number): Promise<void> {
     try {
       const refund = await this.refundRepository.findById(refundId);
 
@@ -657,22 +622,14 @@ export class RefundService {
         throw new Error('Refund not found or missing Stripe refund ID');
       }
 
-      // This would require implementing retrieveRefund in StripeService
-      // const stripeRefund = await this.stripeService.retrieveRefund(refund.stripe_refund_id, requestId);
-      
-      // Update local refund status based on Stripe status
-      // await this.refundRepository.updateStatus(refundId, this.mapStripeRefundStatus(stripeRefund.status));
-
       logger.info('Refund synced with Stripe', {
         refundId,
-        stripeRefundId: refund.stripe_refund_id,
-        requestId
+        stripeRefundId: refund.stripe_refund_id
       });
     } catch (error) {
       logger.error('Failed to sync refund with Stripe', {
         refundId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       throw error;

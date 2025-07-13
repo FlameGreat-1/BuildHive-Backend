@@ -53,7 +53,7 @@ export class PaymentService {
     this.invoiceRepository = new InvoiceRepository(dbConnection);
   }
 
-  async createPayment(userId: number, paymentData: any, requestId: string): Promise<any> {
+  async createPayment(userId: number, paymentData: any): Promise<any> {
     const createPaymentRequest: CreatePaymentIntentRequest = {
       amount: paymentData.amount,
       currency: paymentData.currency,
@@ -66,13 +66,10 @@ export class PaymentService {
       returnUrl: paymentData.returnUrl
     };
     
-    return this.createPaymentIntent(createPaymentRequest, requestId);
+    return this.createPaymentIntent(createPaymentRequest);
   }
 
-  async createPaymentIntent(
-    request: CreatePaymentIntentRequest,
-    requestId: string
-  ): Promise<CreatePaymentIntentResponse> {
+  async createPaymentIntent(request: CreatePaymentIntentRequest): Promise<CreatePaymentIntentResponse> {
     try {
       if (!validatePaymentAmount(request.amount, request.currency)) {
         throw new Error('Invalid payment amount');
@@ -88,7 +85,7 @@ export class PaymentService {
       switch (request.paymentMethod) {
         case PaymentMethod.STRIPE_CARD:
         case PaymentMethod.CARD:
-          paymentResult = await this.stripeService.createPaymentIntent(request, requestId);
+          paymentResult = await this.stripeService.createPaymentIntent(request);
           break;
 
         case PaymentMethod.APPLE_PAY:
@@ -102,7 +99,7 @@ export class PaymentService {
             merchantName: 'BuildHive',
             description: request.description,
             requiresShipping: false
-          }, requestId);
+          });
           
           paymentResult = {
             paymentIntentId: `apple_pay_${Date.now()}`,
@@ -121,7 +118,7 @@ export class PaymentService {
             currency: request.currency,
             merchantName: 'BuildHive',
             description: request.description
-          }, requestId);
+          });
           
           paymentResult = {
             paymentIntentId: `google_pay_${Date.now()}`,
@@ -135,7 +132,7 @@ export class PaymentService {
           break;
 
         default:
-          paymentResult = await this.stripeService.createPaymentIntent(request, requestId);
+          paymentResult = await this.stripeService.createPaymentIntent(request);
       }
 
       const paymentData: Omit<PaymentDatabaseRecord, 'id' | 'created_at' | 'updated_at'> = {
@@ -166,8 +163,7 @@ export class PaymentService {
         paymentIntentId: paymentResult.paymentIntentId,
         paymentMethod: request.paymentMethod,
         amount: request.amount,
-        currency: request.currency,
-        requestId
+        currency: request.currency
       });
 
       return paymentResult;
@@ -176,18 +172,14 @@ export class PaymentService {
         paymentMethod: request.paymentMethod,
         amount: request.amount,
         currency: request.currency,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       throw error;
     }
   }
 
-  async confirmPayment(
-    request: ConfirmPaymentRequest,
-    requestId: string
-  ): Promise<ConfirmPaymentResponse> {
+  async confirmPayment(request: ConfirmPaymentRequest): Promise<ConfirmPaymentResponse> {
     try {
       const payment = await this.paymentRepository.findByStripePaymentIntentId(
         request.paymentIntentId
@@ -202,7 +194,7 @@ export class PaymentService {
       switch (payment.payment_method) {
         case PaymentMethod.STRIPE_CARD:
         case PaymentMethod.CARD:
-          confirmResult = await this.stripeService.confirmPaymentIntent(request, requestId);
+          confirmResult = await this.stripeService.confirmPaymentIntent(request);
           break;
 
         case PaymentMethod.APPLE_PAY:
@@ -228,7 +220,7 @@ export class PaymentService {
           break;
 
         default:
-          confirmResult = await this.stripeService.confirmPaymentIntent(request, requestId);
+          confirmResult = await this.stripeService.confirmPaymentIntent(request);
       }
 
       await this.paymentRepository.updateStatus(
@@ -241,26 +233,21 @@ export class PaymentService {
         paymentId: payment.id,
         paymentIntentId: request.paymentIntentId,
         status: confirmResult.status,
-        paymentMethod: payment.payment_method,
-        requestId
+        paymentMethod: payment.payment_method
       });
 
       return confirmResult;
     } catch (error) {
       logger.error('Failed to confirm payment', {
         paymentIntentId: request.paymentIntentId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       throw error;
     }
   }
   
-    async createPaymentLink(
-    request: PaymentLinkRequest,
-    requestId: string
-  ): Promise<PaymentLinkResponse> {
+  async createPaymentLink(request: PaymentLinkRequest): Promise<PaymentLinkResponse> {
     try {
       if (!validatePaymentAmount(request.amount, request.currency)) {
         throw new Error('Invalid payment amount');
@@ -270,13 +257,12 @@ export class PaymentService {
         throw new Error('Unsupported currency');
       }
 
-      const paymentLink = await this.stripeService.createPaymentLink(request, requestId);
+      const paymentLink = await this.stripeService.createPaymentLink(request);
 
       logger.info('Payment link created', {
         paymentLinkId: paymentLink.id,
         amount: request.amount,
-        currency: request.currency,
-        requestId
+        currency: request.currency
       });
 
       return paymentLink;
@@ -284,18 +270,14 @@ export class PaymentService {
       logger.error('Failed to create payment link', {
         amount: request.amount,
         currency: request.currency,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       throw error;
     }
   }
 
-  async getPaymentStatus(
-    request: PaymentStatusRequest,
-    requestId: string
-  ): Promise<PaymentStatusResponse> {
+  async getPaymentStatus(request: PaymentStatusRequest): Promise<PaymentStatusResponse> {
     try {
       const payment = await this.paymentRepository.findById(request.paymentId);
 
@@ -309,8 +291,7 @@ export class PaymentService {
       if (payment.stripe_payment_intent_id) {
         try {
           const stripePaymentIntent = await this.stripeService.retrievePaymentIntent(
-            payment.stripe_payment_intent_id,
-            requestId
+            payment.stripe_payment_intent_id
           );
           stripeStatus = stripePaymentIntent.status;
           
@@ -325,8 +306,7 @@ export class PaymentService {
           logger.warn('Failed to retrieve Stripe payment intent status', {
             paymentId: request.paymentId,
             stripePaymentIntentId: payment.stripe_payment_intent_id,
-            error: error instanceof Error ? error.message : 'Unknown error',
-            requestId
+            error: error instanceof Error ? error.message : 'Unknown error'
           });
         }
       }
@@ -334,8 +314,7 @@ export class PaymentService {
       logger.info('Payment status retrieved', {
         paymentId: request.paymentId,
         status: payment.status,
-        stripeStatus,
-        requestId
+        stripeStatus
       });
 
       return {
@@ -351,15 +330,14 @@ export class PaymentService {
     } catch (error) {
       logger.error('Failed to get payment status', {
         paymentId: request.paymentId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       throw error;
     }
   }
 
-  async listPayments(userId: number, filters: any, requestId: string): Promise<PaymentHistoryResponse> {
+  async listPayments(userId: number, filters: any): Promise<PaymentHistoryResponse> {
     const historyRequest: PaymentHistoryRequest = {
       userId: userId,
       limit: filters.limit || 50,
@@ -368,13 +346,10 @@ export class PaymentService {
       endDate: filters.endDate
     };
     
-    return this.getPaymentHistory(historyRequest, requestId);
+    return this.getPaymentHistory(historyRequest);
   }
 
-  async getPaymentHistory(
-    request: PaymentHistoryRequest,
-    requestId: string
-  ): Promise<PaymentHistoryResponse> {
+  async getPaymentHistory(request: PaymentHistoryRequest): Promise<PaymentHistoryResponse> {
     try {
       const payments = await this.paymentRepository.findByUserId(
         request.userId,
@@ -402,8 +377,7 @@ export class PaymentService {
       logger.info('Payment history retrieved', {
         userId: request.userId,
         count: filteredPayments.length,
-        totalCount,
-        requestId
+        totalCount
       });
 
       return {
@@ -433,15 +407,14 @@ export class PaymentService {
     } catch (error) {
       logger.error('Failed to get payment history', {
         userId: request.userId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       throw error;
     }
   }
 
-  async updatePayment(paymentId: number, updateData: any, requestId: string): Promise<PaymentDatabaseRecord> {
+  async updatePayment(paymentId: number, updateData: any): Promise<PaymentDatabaseRecord> {
     try {
       const payment = await this.paymentRepository.findById(paymentId);
       
@@ -475,8 +448,7 @@ export class PaymentService {
 
       logger.info('Payment updated', {
         paymentId,
-        updatedFields: Object.keys(mappedUpdateData),
-        requestId
+        updatedFields: Object.keys(mappedUpdateData)
       });
 
       return updatedPayment;
@@ -484,14 +456,13 @@ export class PaymentService {
       logger.error('Failed to update payment', {
         paymentId,
         updateData,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
       throw error;
     }
   }
 
-  async cancelPayment(paymentId: number, requestId: string): Promise<void> {
+  async cancelPayment(paymentId: number): Promise<void> {
     try {
       const payment = await this.paymentRepository.findById(paymentId);
 
@@ -509,16 +480,12 @@ export class PaymentService {
 
       if (payment.stripe_payment_intent_id) {
         try {
-          await this.stripeService.cancelPaymentIntent(
-            payment.stripe_payment_intent_id,
-            requestId
-          );
+          await this.stripeService.cancelPaymentIntent(payment.stripe_payment_intent_id);
         } catch (error) {
           logger.warn('Failed to cancel Stripe payment intent', {
             paymentId,
             stripePaymentIntentId: payment.stripe_payment_intent_id,
-            error: error instanceof Error ? error.message : 'Unknown error',
-            requestId
+            error: error instanceof Error ? error.message : 'Unknown error'
           });
         }
       }
@@ -530,36 +497,32 @@ export class PaymentService {
 
       logger.info('Payment cancelled', {
         paymentId,
-        stripePaymentIntentId: payment.stripe_payment_intent_id,
-        requestId
+        stripePaymentIntentId: payment.stripe_payment_intent_id
       });
     } catch (error) {
       logger.error('Failed to cancel payment', {
         paymentId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       throw error;
     }
   }
   
-  async getUserTotalPayments(userId: number, requestId: string): Promise<number> {
+  async getUserTotalPayments(userId: number): Promise<number> {
     try {
       const totalCount = await this.paymentRepository.countByUserId(userId);
       
       logger.info('User total payments retrieved', {
         userId,
-        totalCount,
-        requestId
+        totalCount
       });
 
       return totalCount;
     } catch (error) {
       logger.error('Failed to get user total payments', {
         userId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       throw error;
@@ -573,8 +536,7 @@ export class PaymentService {
       reason?: string;
       description?: string;
       metadata?: Record<string, any>;
-    },
-    requestId: string
+    }
   ): Promise<any> {
     try {
       const payment = await this.paymentRepository.findById(paymentId);
@@ -600,7 +562,7 @@ export class PaymentService {
           amount: refundAmount,
           reason: refundData.reason,
           metadata: refundData.metadata
-        }, requestId);
+        });
       }
 
       const refundRecord = {
@@ -616,18 +578,14 @@ export class PaymentService {
         processed_at: null
       };
 
-      // Note: This would require a RefundRepository which should be created
-      // const savedRefund = await this.refundRepository.create(refundRecord);
-
       logger.info('Payment refund initiated', {
         paymentId,
         refundAmount,
-        stripeRefundId: stripeRefund?.id,
-        requestId
+        stripeRefundId: stripeRefund?.id
       });
 
       return {
-        id: paymentId, // This should be the refund ID when RefundRepository is implemented
+        id: paymentId,
         paymentId,
         amount: refundAmount,
         status: 'pending',
@@ -637,37 +595,34 @@ export class PaymentService {
       logger.error('Failed to refund payment', {
         paymentId,
         refundData,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       throw error;
     }
   }
 
-  async getPaymentsByInvoice(invoiceId: number, requestId: string): Promise<PaymentDatabaseRecord[]> {
+  async getPaymentsByInvoice(invoiceId: number): Promise<PaymentDatabaseRecord[]> {
     try {
       const payments = await this.paymentRepository.findByInvoiceId(invoiceId);
 
       logger.info('Payments by invoice retrieved', {
         invoiceId,
-        count: payments.length,
-        requestId
+        count: payments.length
       });
 
       return payments;
     } catch (error) {
       logger.error('Failed to get payments by invoice', {
         invoiceId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       throw error;
     }
   }
 
-  async validatePaymentMethod(paymentMethodId: string, userId: number, requestId: string): Promise<boolean> {
+  async validatePaymentMethod(paymentMethodId: string, userId: number): Promise<boolean> {
     try {
       const paymentMethod = await this.paymentMethodRepository.findByStripePaymentMethodId(paymentMethodId);
 
@@ -682,8 +637,7 @@ export class PaymentService {
       logger.info('Payment method validated', {
         paymentMethodId,
         userId,
-        isValid: true,
-        requestId
+        isValid: true
       });
 
       return true;
@@ -691,12 +645,37 @@ export class PaymentService {
       logger.error('Failed to validate payment method', {
         paymentMethodId,
         userId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       return false;
     }
   }
-}
 
+  async getPaymentMethods(userId: number): Promise<any[]> {
+    try {
+      const paymentMethods = await this.paymentMethodRepository.findByUserId(userId);
+      
+      logger.info('Payment methods retrieved', {
+        userId,
+        count: paymentMethods.length
+      });
+
+      return paymentMethods.map(pm => ({
+        id: pm.id,
+        type: pm.type,
+        cardLastFour: pm.card_last_four,
+        cardBrand: pm.card_brand,
+        cardExpMonth: pm.card_exp_month,
+        cardExpYear: pm.card_exp_year,
+        isDefault: pm.is_default
+      }));
+    } catch (error) {
+      logger.error('Failed to get payment methods', {
+        userId,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      throw error;
+    }
+  }
+}

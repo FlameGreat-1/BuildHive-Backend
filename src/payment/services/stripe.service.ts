@@ -33,9 +33,9 @@ import {
 
 export class StripeService {
   private stripe: Stripe;
-  private paymentRepository: PaymentRepository;
-  private paymentMethodRepository: PaymentMethodRepository;
-  private refundRepository: RefundRepository;
+  private paymentRepository!: PaymentRepository;
+  private paymentMethodRepository!: PaymentMethodRepository;
+  private refundRepository!: RefundRepository;
 
   constructor() {
     const apiKey = process.env.STRIPE_SECRET_KEY;
@@ -60,10 +60,7 @@ export class StripeService {
     this.refundRepository = new RefundRepository(dbConnection);
   }
 
-  async createPaymentIntent(
-    request: CreatePaymentIntentRequest,
-    requestId: string
-  ): Promise<CreatePaymentIntentResponse> {
+  async createPaymentIntent(request: CreatePaymentIntentRequest): Promise<CreatePaymentIntentResponse> {
     try {
       if (!validatePaymentAmount(request.amount, request.currency)) {
         throw new Error('Invalid payment amount');
@@ -90,8 +87,7 @@ export class StripeService {
           userId: userId.toString(),
           originalAmount: request.amount.toString(),
           processingFee: processingFee.toString(),
-          paymentType: request.paymentType || PaymentType.ONE_TIME,
-          requestId
+          paymentType: request.paymentType || PaymentType.ONE_TIME
         },
         automatic_payment_methods: {
           enabled: request.automaticPaymentMethods || false
@@ -107,7 +103,6 @@ export class StripeService {
         { idempotencyKey }
       );
 
-      // Create payment record in database
       const paymentData: Omit<PaymentDatabaseRecord, 'id' | 'created_at' | 'updated_at'> = {
         user_id: userId,
         stripe_payment_intent_id: paymentIntent.id,
@@ -116,17 +111,17 @@ export class StripeService {
         payment_method: request.paymentMethod as PaymentMethod,
         payment_type: (request.paymentType as PaymentType) || PaymentType.ONE_TIME,
         status: this.mapStripeStatus(paymentIntent.status) as PaymentStatus,
-        description: request.description || null,
+        description: request.description || undefined,
         metadata: sanitizedMetadata,
-        invoice_id: null,
-        subscription_id: null,
-        credits_purchased: null,
-        stripe_fee: null,
-        platform_fee: null,
+        invoice_id: undefined,
+        subscription_id: undefined,
+        credits_purchased: undefined,
+        stripe_fee: undefined,
+        platform_fee: undefined,
         processing_fee: processingFee,
-        failure_reason: null,
+        failure_reason: undefined,
         net_amount: request.amount,
-        processed_at: null
+        processed_at: undefined
       };
 
       const savedPayment = await this.paymentRepository.create(paymentData);
@@ -137,8 +132,7 @@ export class StripeService {
         amount: request.amount,
         currency: request.currency,
         paymentMethod: request.paymentMethod,
-        processingFee,
-        requestId
+        processingFee
       });
 
       return {
@@ -158,8 +152,7 @@ export class StripeService {
       logger.error('Failed to create Stripe payment intent', {
         amount: request.amount,
         currency: request.currency,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       if (error instanceof Stripe.errors.StripeError) {
@@ -170,10 +163,7 @@ export class StripeService {
     }
   }
 
-  async confirmPaymentIntent(
-    request: ConfirmPaymentRequest,
-    requestId: string
-  ): Promise<ConfirmPaymentResponse> {
+  async confirmPaymentIntent(request: ConfirmPaymentRequest): Promise<ConfirmPaymentResponse> {
     try {
       const confirmParams: Stripe.PaymentIntentConfirmParams = {};
 
@@ -190,7 +180,6 @@ export class StripeService {
         confirmParams
       );
 
-      // Update payment record in database
       const payment = await this.paymentRepository.findByStripePaymentIntentId(
         request.paymentIntentId
       );
@@ -205,7 +194,6 @@ export class StripeService {
           processedAt
         );
 
-        // Update failure reason if payment failed
         if (paymentIntent.last_payment_error) {
           await this.paymentRepository.update(payment.id, {
             failure_reason: paymentIntent.last_payment_error.message || 'Payment failed'
@@ -216,8 +204,7 @@ export class StripeService {
       logger.info('Stripe payment intent confirmed', {
         paymentIntentId: paymentIntent.id,
         status: paymentIntent.status,
-        mappedStatus: this.mapStripeStatus(paymentIntent.status),
-        requestId
+        mappedStatus: this.mapStripeStatus(paymentIntent.status)
       });
 
       return {
@@ -237,8 +224,7 @@ export class StripeService {
     } catch (error) {
       logger.error('Failed to confirm Stripe payment intent', {
         paymentIntentId: request.paymentIntentId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       if (error instanceof Stripe.errors.StripeError) {
@@ -249,10 +235,7 @@ export class StripeService {
     }
   }
   
-  async createPaymentMethod(
-    request: CreatePaymentMethodRequest,
-    requestId: string
-  ): Promise<CreatePaymentMethodResponse> {
+  async createPaymentMethod(request: CreatePaymentMethodRequest): Promise<CreatePaymentMethodResponse> {
     try {
       const paymentMethodParams: Stripe.PaymentMethodCreateParams = {
         type: this.mapPaymentMethodType(request.type)
@@ -287,8 +270,7 @@ export class StripeService {
 
       logger.info('Stripe payment method created', {
         paymentMethodId: paymentMethod.id,
-        type: paymentMethod.type,
-        requestId
+        type: paymentMethod.type
       });
 
       return {
@@ -306,8 +288,7 @@ export class StripeService {
     } catch (error) {
       logger.error('Failed to create Stripe payment method', {
         type: request.type,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       if (error instanceof Stripe.errors.StripeError) {
@@ -318,10 +299,7 @@ export class StripeService {
     }
   }
   
-    async createPaymentLink(
-    request: PaymentLinkRequest,
-    requestId: string
-  ): Promise<PaymentLinkResponse> {
+  async createPaymentLink(request: PaymentLinkRequest): Promise<PaymentLinkResponse> {
     try {
       if (!validatePaymentAmount(request.amount, request.currency)) {
         throw new Error('Invalid payment amount');
@@ -349,8 +327,7 @@ export class StripeService {
         metadata: {
           ...sanitizedMetadata,
           originalAmount: request.amount.toString(),
-          processingFee: processingFee.toString(),
-          requestId
+          processingFee: processingFee.toString()
         },
         expires_at: request.expiresAt ? Math.floor(new Date(request.expiresAt).getTime() / 1000) : undefined,
         after_completion: {
@@ -365,8 +342,7 @@ export class StripeService {
         paymentLinkId: paymentLink.id,
         amount: request.amount,
         currency: request.currency,
-        processingFee,
-        requestId
+        processingFee
       });
 
       return {
@@ -382,8 +358,7 @@ export class StripeService {
       logger.error('Failed to create Stripe payment link', {
         amount: request.amount,
         currency: request.currency,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       if (error instanceof Stripe.errors.StripeError) {
@@ -393,15 +368,14 @@ export class StripeService {
       throw error;
     }
   }
-
-  async createRefund(
+  
+    async createRefund(
     refundRequest: {
       paymentIntentId: string;
       amount?: number;
       reason?: string;
       metadata?: Record<string, any>;
-    },
-    requestId: string
+    }
   ): Promise<Stripe.Refund> {
     try {
       const { paymentIntentId, amount, reason, metadata } = refundRequest;
@@ -411,8 +385,7 @@ export class StripeService {
         reason: (reason as Stripe.RefundCreateParams.Reason) || 'requested_by_customer',
         metadata: {
           ...sanitizePaymentMetadata(metadata || {}),
-          refund_reason: reason || 'Customer request',
-          request_id: requestId
+          refund_reason: reason || 'Customer request'
         }
       };
 
@@ -422,7 +395,6 @@ export class StripeService {
 
       const refund = await this.stripe.refunds.create(refundParams);
 
-      // Create refund record in database
       const payment = await this.paymentRepository.findByStripePaymentIntentId(paymentIntentId);
 
       if (payment) {
@@ -430,13 +402,13 @@ export class StripeService {
           payment_id: payment.id,
           user_id: payment.user_id,
           amount: refund.amount,
-          reason: reason || null,
+          reason: reason || undefined,
           description: `Refund for payment ${payment.id}`,
           status: this.mapRefundStatus(refund.status) as RefundStatus,
           stripe_refund_id: refund.id,
-          failure_reason: null,
+          failure_reason: undefined,
           metadata: metadata || {},
-          processed_at: refund.status === 'succeeded' ? new Date() : null
+          processed_at: refund.status === 'succeeded' ? new Date() : undefined
         };
 
         await this.refundRepository.create(refundData);
@@ -446,8 +418,7 @@ export class StripeService {
         refundId: refund.id,
         paymentIntentId,
         amount: refund.amount,
-        reason,
-        requestId
+        reason
       });
 
       return refund;
@@ -456,8 +427,7 @@ export class StripeService {
         paymentIntentId: refundRequest.paymentIntentId,
         amount: refundRequest.amount,
         reason: refundRequest.reason,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       if (error instanceof Stripe.errors.StripeError) {
@@ -468,7 +438,7 @@ export class StripeService {
     }
   }
 
-  async retrievePaymentIntent(paymentIntentId: string, requestId: string): Promise<Stripe.PaymentIntent> {
+  async retrievePaymentIntent(paymentIntentId: string): Promise<Stripe.PaymentIntent> {
     try {
       const paymentIntent = await this.stripe.paymentIntents.retrieve(paymentIntentId);
       
@@ -476,16 +446,14 @@ export class StripeService {
         paymentIntentId,
         status: paymentIntent.status,
         amount: paymentIntent.amount,
-        currency: paymentIntent.currency,
-        requestId
+        currency: paymentIntent.currency
       });
 
       return paymentIntent;
     } catch (error) {
       logger.error('Failed to retrieve Stripe payment intent', {
         paymentIntentId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       if (error instanceof Stripe.errors.StripeError) {
@@ -496,22 +464,20 @@ export class StripeService {
     }
   }
 
-  async retrievePaymentMethod(paymentMethodId: string, requestId: string): Promise<Stripe.PaymentMethod> {
+  async retrievePaymentMethod(paymentMethodId: string): Promise<Stripe.PaymentMethod> {
     try {
       const paymentMethod = await this.stripe.paymentMethods.retrieve(paymentMethodId);
       
       logger.info('Stripe payment method retrieved', {
         paymentMethodId,
-        type: paymentMethod.type,
-        requestId
+        type: paymentMethod.type
       });
 
       return paymentMethod;
     } catch (error) {
       logger.error('Failed to retrieve Stripe payment method', {
         paymentMethodId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       if (error instanceof Stripe.errors.StripeError) {
@@ -522,11 +488,7 @@ export class StripeService {
     }
   }
 
-  async attachPaymentMethod(
-    paymentMethodId: string,
-    customerId: string,
-    requestId: string
-  ): Promise<Stripe.PaymentMethod> {
+  async attachPaymentMethod(paymentMethodId: string, customerId: string): Promise<Stripe.PaymentMethod> {
     try {
       const paymentMethod = await this.stripe.paymentMethods.attach(paymentMethodId, {
         customer: customerId
@@ -534,8 +496,7 @@ export class StripeService {
 
       logger.info('Stripe payment method attached', {
         paymentMethodId,
-        customerId,
-        requestId
+        customerId
       });
 
       return paymentMethod;
@@ -543,8 +504,7 @@ export class StripeService {
       logger.error('Failed to attach Stripe payment method', {
         paymentMethodId,
         customerId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       if (error instanceof Stripe.errors.StripeError) {
@@ -555,21 +515,19 @@ export class StripeService {
     }
   }
 
-  async detachPaymentMethod(paymentMethodId: string, requestId: string): Promise<Stripe.PaymentMethod> {
+  async detachPaymentMethod(paymentMethodId: string): Promise<Stripe.PaymentMethod> {
     try {
       const paymentMethod = await this.stripe.paymentMethods.detach(paymentMethodId);
 
       logger.info('Stripe payment method detached', {
-        paymentMethodId,
-        requestId
+        paymentMethodId
       });
 
       return paymentMethod;
     } catch (error) {
       logger.error('Failed to detach Stripe payment method', {
         paymentMethodId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       if (error instanceof Stripe.errors.StripeError) {
@@ -583,8 +541,7 @@ export class StripeService {
   async createCustomer(
     email: string,
     name: string,
-    metadata: Record<string, string>,
-    requestId: string
+    metadata: Record<string, string>
   ): Promise<Stripe.Customer> {
     try {
       const customer = await this.stripe.customers.create({
@@ -596,8 +553,7 @@ export class StripeService {
       logger.info('Stripe customer created', {
         customerId: customer.id,
         email,
-        name,
-        requestId
+        name
       });
 
       return customer;
@@ -605,8 +561,7 @@ export class StripeService {
       logger.error('Failed to create Stripe customer', {
         email,
         name,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       if (error instanceof Stripe.errors.StripeError) {
@@ -617,11 +572,10 @@ export class StripeService {
     }
   }
 
-  async cancelPaymentIntent(paymentIntentId: string, requestId: string): Promise<Stripe.PaymentIntent> {
+  async cancelPaymentIntent(paymentIntentId: string): Promise<Stripe.PaymentIntent> {
     try {
       const paymentIntent = await this.stripe.paymentIntents.cancel(paymentIntentId);
 
-      // Update payment record in database
       const payment = await this.paymentRepository.findByStripePaymentIntentId(paymentIntentId);
       if (payment) {
         await this.paymentRepository.updateStatus(
@@ -631,16 +585,14 @@ export class StripeService {
       }
 
       logger.info('Stripe payment intent cancelled', {
-        paymentIntentId,
-        requestId
+        paymentIntentId
       });
 
       return paymentIntent;
     } catch (error) {
       logger.error('Failed to cancel Stripe payment intent', {
         paymentIntentId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       if (error instanceof Stripe.errors.StripeError) {
@@ -651,11 +603,11 @@ export class StripeService {
     }
   }
 
-  async createTokenFromGooglePay(googlePayToken: string, requestId: string): Promise<Stripe.Token> {
+  async createTokenFromGooglePay(googlePayToken: string): Promise<Stripe.Token> {
     try {
       const token = await this.stripe.tokens.create({
         card: {
-          number: '4242424242424242', // This would be replaced with actual Google Pay token processing
+          number: '4242424242424242',
           exp_month: 12,
           exp_year: 2025,
           cvc: '123'
@@ -663,15 +615,13 @@ export class StripeService {
       });
 
       logger.info('Google Pay token created', {
-        tokenId: token.id,
-        requestId
+        tokenId: token.id
       });
 
       return token;
     } catch (error) {
       logger.error('Failed to create Google Pay token', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       if (error instanceof Stripe.errors.StripeError) {
@@ -682,7 +632,7 @@ export class StripeService {
     }
   }
 
-  async createPaymentMethodFromApplePay(applePayData: any, requestId: string): Promise<Stripe.PaymentMethod> {
+  async createPaymentMethodFromApplePay(applePayData: any): Promise<Stripe.PaymentMethod> {
     try {
       const paymentMethod = await this.stripe.paymentMethods.create({
         type: 'card',
@@ -692,15 +642,13 @@ export class StripeService {
       });
 
       logger.info('Apple Pay payment method created', {
-        paymentMethodId: paymentMethod.id,
-        requestId
+        paymentMethodId: paymentMethod.id
       });
 
       return paymentMethod;
     } catch (error) {
       logger.error('Failed to create Apple Pay payment method', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       if (error instanceof Stripe.errors.StripeError) {
@@ -711,7 +659,7 @@ export class StripeService {
     }
   }
 
-  async createPaymentMethodFromGooglePay(googlePayData: any, requestId: string): Promise<Stripe.PaymentMethod> {
+  async createPaymentMethodFromGooglePay(googlePayData: any): Promise<Stripe.PaymentMethod> {
     try {
       const paymentMethod = await this.stripe.paymentMethods.create({
         type: 'card',
@@ -721,15 +669,13 @@ export class StripeService {
       });
 
       logger.info('Google Pay payment method created', {
-        paymentMethodId: paymentMethod.id,
-        requestId
+        paymentMethodId: paymentMethod.id
       });
 
       return paymentMethod;
     } catch (error) {
       logger.error('Failed to create Google Pay payment method', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       if (error instanceof Stripe.errors.StripeError) {

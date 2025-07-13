@@ -57,6 +57,10 @@ export class RefundRepository {
       throw error;
     }
   }
+  
+  async getRefundById(id: number): Promise<RefundDatabaseRecord | null> {
+  return this.findById(id);
+}
 
   async findByPaymentId(paymentId: number): Promise<RefundDatabaseRecord[]> {
     try {

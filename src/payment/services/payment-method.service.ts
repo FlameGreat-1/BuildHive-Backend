@@ -6,9 +6,7 @@ import {
   CreatePaymentMethodRequest,
   CreatePaymentMethodResponse,
   AttachPaymentMethodRequest,
-  AttachPaymentMethodResponse,
   DetachPaymentMethodRequest,
-  DetachPaymentMethodResponse,
   SetDefaultPaymentMethodRequest,
   SetDefaultPaymentMethodResponse,
   PaymentMethodListRequest,
@@ -23,9 +21,22 @@ import {
   PaymentMethod 
 } from '../../shared/types';
 
+export interface AttachPaymentMethodResponse {
+  success: boolean;
+  paymentMethodId: string;
+  customerId: string;
+  attached: boolean;
+}
+
+export interface DetachPaymentMethodResponse {
+  success: boolean;
+  paymentMethodId: string;
+  detached: boolean;
+}
+
 export class PaymentMethodService {
-  private paymentMethodRepository: PaymentMethodRepository;
-  private paymentRepository: PaymentRepository;
+  private paymentMethodRepository!: PaymentMethodRepository;
+  private paymentRepository!: PaymentRepository;
   private stripeService: StripeService;
 
   constructor() {
@@ -39,15 +50,9 @@ export class PaymentMethodService {
     this.paymentRepository = new PaymentRepository(dbConnection);
   }
 
-  async createPaymentMethod(
-    request: CreatePaymentMethodRequest,
-    requestId: string
-  ): Promise<CreatePaymentMethodResponse> {
+  async createPaymentMethod(request: CreatePaymentMethodRequest): Promise<CreatePaymentMethodResponse> {
     try {
-      const stripePaymentMethod = await this.stripeService.createPaymentMethod(
-        request,
-        requestId
-      );
+      const stripePaymentMethod = await this.stripeService.createPaymentMethod(request);
 
       const userId = parseInt(request.metadata?.userId || '0');
       
@@ -59,10 +64,10 @@ export class PaymentMethodService {
         user_id: userId,
         stripe_payment_method_id: stripePaymentMethod.paymentMethodId,
         type: request.type,
-        card_last_four: stripePaymentMethod.card?.last4 || null,
-        card_brand: stripePaymentMethod.card?.brand || null,
-        card_exp_month: stripePaymentMethod.card?.expMonth || null,
-        card_exp_year: stripePaymentMethod.card?.expYear || null,
+        card_last_four: stripePaymentMethod.card?.last4 || undefined,
+        card_brand: stripePaymentMethod.card?.brand || undefined,
+        card_exp_month: stripePaymentMethod.card?.expMonth || undefined,
+        card_exp_year: stripePaymentMethod.card?.expYear || undefined,
         is_default: request.setAsDefault || false
       };
 
@@ -81,8 +86,7 @@ export class PaymentMethodService {
         stripePaymentMethodId: stripePaymentMethod.paymentMethodId,
         type: request.type,
         userId,
-        isDefault: request.setAsDefault,
-        requestId
+        isDefault: request.setAsDefault
       });
 
       return {
@@ -97,23 +101,18 @@ export class PaymentMethodService {
       logger.error('Failed to create payment method', {
         type: request.type,
         userId: request.metadata?.userId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       throw error;
     }
   }
 
-  async attachPaymentMethod(
-    request: AttachPaymentMethodRequest,
-    requestId: string
-  ): Promise<AttachPaymentMethodResponse> {
+  async attachPaymentMethod(request: AttachPaymentMethodRequest): Promise<AttachPaymentMethodResponse> {
     try {
       const stripePaymentMethod = await this.stripeService.attachPaymentMethod(
         request.paymentMethodId,
-        request.customerId,
-        requestId
+        request.customerId
       );
 
       const paymentMethod = await this.paymentMethodRepository.findByStripePaymentMethodId(
@@ -134,8 +133,7 @@ export class PaymentMethodService {
 
       logger.info('Payment method attached', {
         paymentMethodId: request.paymentMethodId,
-        customerId: request.customerId,
-        requestId
+        customerId: request.customerId
       });
 
       return {
@@ -148,18 +146,14 @@ export class PaymentMethodService {
       logger.error('Failed to attach payment method', {
         paymentMethodId: request.paymentMethodId,
         customerId: request.customerId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       throw error;
     }
   }
 
-  async detachPaymentMethod(
-    request: DetachPaymentMethodRequest,
-    requestId: string
-  ): Promise<DetachPaymentMethodResponse> {
+  async detachPaymentMethod(request: DetachPaymentMethodRequest): Promise<DetachPaymentMethodResponse> {
     try {
       const paymentMethod = await this.paymentMethodRepository.findByStripePaymentMethodId(
         request.paymentMethodId
@@ -173,12 +167,11 @@ export class PaymentMethodService {
         throw new Error('Cannot detach default payment method');
       }
 
-      await this.stripeService.detachPaymentMethod(request.paymentMethodId, requestId);
+      await this.stripeService.detachPaymentMethod(request.paymentMethodId);
 
       logger.info('Payment method detached', {
         paymentMethodId: request.paymentMethodId,
-        paymentMethodDbId: paymentMethod.id,
-        requestId
+        paymentMethodDbId: paymentMethod.id
       });
 
       return {
@@ -189,18 +182,14 @@ export class PaymentMethodService {
     } catch (error) {
       logger.error('Failed to detach payment method', {
         paymentMethodId: request.paymentMethodId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       throw error;
     }
   }
 
-  async setDefaultPaymentMethod(
-    request: SetDefaultPaymentMethodRequest,
-    requestId: string
-  ): Promise<SetDefaultPaymentMethodResponse> {
+  async setDefaultPaymentMethod(request: SetDefaultPaymentMethodRequest): Promise<SetDefaultPaymentMethodResponse> {
     try {
       const paymentMethod = await this.paymentMethodRepository.findById(
         request.paymentMethodId
@@ -221,8 +210,7 @@ export class PaymentMethodService {
 
       logger.info('Default payment method set', {
         paymentMethodId: request.paymentMethodId,
-        userId: request.userId,
-        requestId
+        userId: request.userId
       });
 
       return {
@@ -234,18 +222,14 @@ export class PaymentMethodService {
       logger.error('Failed to set default payment method', {
         paymentMethodId: request.paymentMethodId,
         userId: request.userId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       throw error;
     }
   }
   
-    async getUserPaymentMethods(
-    request: PaymentMethodListRequest,
-    requestId: string
-  ): Promise<PaymentMethodListResponse> {
+  async getUserPaymentMethods(request: PaymentMethodListRequest): Promise<PaymentMethodListResponse> {
     try {
       const paymentMethods = await this.paymentMethodRepository.findByUserId(
         request.userId
@@ -261,8 +245,7 @@ export class PaymentMethodService {
       logger.info('User payment methods retrieved', {
         userId: request.userId,
         count: paginatedPaymentMethods.length,
-        totalCount,
-        requestId
+        totalCount
       });
 
       return {
@@ -283,15 +266,14 @@ export class PaymentMethodService {
     } catch (error) {
       logger.error('Failed to get user payment methods', {
         userId: request.userId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       throw error;
     }
   }
-
-  async deletePaymentMethod(paymentMethodId: number, userId: number, requestId: string): Promise<void> {
+  
+    async deletePaymentMethod(paymentMethodId: number, userId: number): Promise<void> {
     try {
       const paymentMethod = await this.paymentMethodRepository.findById(paymentMethodId);
 
@@ -307,7 +289,6 @@ export class PaymentMethodService {
         throw new Error('Cannot delete default payment method. Please set another payment method as default first.');
       }
 
-      // Check if payment method has any active payments
       const hasActivePayments = await this.paymentRepository.hasPaymentsWithPaymentMethod(
         paymentMethod.stripe_payment_method_id
       );
@@ -316,25 +297,18 @@ export class PaymentMethodService {
         throw new Error('Cannot delete payment method with active payments');
       }
 
-      // Detach from Stripe first
       if (paymentMethod.stripe_payment_method_id) {
         try {
-          await this.stripeService.detachPaymentMethod(
-            paymentMethod.stripe_payment_method_id,
-            requestId
-          );
+          await this.stripeService.detachPaymentMethod(paymentMethod.stripe_payment_method_id);
         } catch (error) {
           logger.warn('Failed to detach payment method from Stripe', {
             paymentMethodId,
             stripePaymentMethodId: paymentMethod.stripe_payment_method_id,
-            error: error instanceof Error ? error.message : 'Unknown error',
-            requestId
+            error: error instanceof Error ? error.message : 'Unknown error'
           });
-          // Continue with deletion even if Stripe detach fails
         }
       }
 
-      // Delete from database
       const deleted = await this.paymentMethodRepository.delete(paymentMethodId, userId);
 
       if (!deleted) {
@@ -344,37 +318,33 @@ export class PaymentMethodService {
       logger.info('Payment method deleted', {
         paymentMethodId,
         userId,
-        stripePaymentMethodId: paymentMethod.stripe_payment_method_id,
-        requestId
+        stripePaymentMethodId: paymentMethod.stripe_payment_method_id
       });
     } catch (error) {
       logger.error('Failed to delete payment method', {
         paymentMethodId,
         userId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       throw error;
     }
   }
 
-  async getDefaultPaymentMethod(userId: number, requestId: string): Promise<any> {
+  async getDefaultPaymentMethod(userId: number): Promise<any> {
     try {
       const defaultPaymentMethod = await this.paymentMethodRepository.findDefaultByUserId(userId);
 
       if (!defaultPaymentMethod) {
         logger.info('No default payment method found', {
-          userId,
-          requestId
+          userId
         });
         return null;
       }
 
       logger.info('Default payment method retrieved', {
         userId,
-        paymentMethodId: defaultPaymentMethod.id,
-        requestId
+        paymentMethodId: defaultPaymentMethod.id
       });
 
       return {
@@ -392,8 +362,7 @@ export class PaymentMethodService {
     } catch (error) {
       logger.error('Failed to get default payment method', {
         userId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       throw error;
@@ -409,8 +378,7 @@ export class PaymentMethodService {
       cardExpMonth?: number;
       cardExpYear?: number;
       isDefault?: boolean;
-    },
-    requestId: string
+    }
   ): Promise<PaymentMethodDatabaseRecord> {
     try {
       const paymentMethod = await this.paymentMethodRepository.findById(paymentMethodId);
@@ -462,8 +430,7 @@ export class PaymentMethodService {
       logger.info('Payment method updated', {
         paymentMethodId,
         userId,
-        updatedFields: Object.keys(updateData),
-        requestId
+        updatedFields: Object.keys(updateData)
       });
 
       return updatedPaymentMethod;
@@ -472,19 +439,14 @@ export class PaymentMethodService {
         paymentMethodId,
         userId,
         updateData,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       throw error;
     }
   }
 
-  async getPaymentMethodById(
-    paymentMethodId: number,
-    userId: number,
-    requestId: string
-  ): Promise<any> {
+  async getPaymentMethodById(paymentMethodId: number, userId: number): Promise<any> {
     try {
       const paymentMethod = await this.paymentMethodRepository.findById(paymentMethodId);
 
@@ -498,8 +460,7 @@ export class PaymentMethodService {
 
       logger.info('Payment method retrieved', {
         paymentMethodId,
-        userId,
-        requestId
+        userId
       });
 
       return {
@@ -518,19 +479,14 @@ export class PaymentMethodService {
       logger.error('Failed to get payment method', {
         paymentMethodId,
         userId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       throw error;
     }
   }
 
-  async validatePaymentMethodOwnership(
-    paymentMethodId: number,
-    userId: number,
-    requestId: string
-  ): Promise<boolean> {
+  async validatePaymentMethodOwnership(paymentMethodId: number, userId: number): Promise<boolean> {
     try {
       const paymentMethod = await this.paymentMethodRepository.findById(paymentMethodId);
 
@@ -543,8 +499,7 @@ export class PaymentMethodService {
       logger.info('Payment method ownership validated', {
         paymentMethodId,
         userId,
-        isOwner,
-        requestId
+        isOwner
       });
 
       return isOwner;
@@ -552,37 +507,34 @@ export class PaymentMethodService {
       logger.error('Failed to validate payment method ownership', {
         paymentMethodId,
         userId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       return false;
     }
   }
 
-  async getExpiredPaymentMethods(userId?: number, requestId?: string): Promise<PaymentMethodDatabaseRecord[]> {
+  async getExpiredPaymentMethods(userId?: number): Promise<PaymentMethodDatabaseRecord[]> {
     try {
       const expiredPaymentMethods = await this.paymentMethodRepository.findExpiredCards(userId);
 
       logger.info('Expired payment methods retrieved', {
         userId,
-        count: expiredPaymentMethods.length,
-        requestId
+        count: expiredPaymentMethods.length
       });
 
       return expiredPaymentMethods;
     } catch (error) {
       logger.error('Failed to get expired payment methods', {
         userId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       throw error;
     }
   }
 
-  async syncWithStripe(paymentMethodId: number, requestId: string): Promise<void> {
+  async syncWithStripe(paymentMethodId: number): Promise<void> {
     try {
       const paymentMethod = await this.paymentMethodRepository.findById(paymentMethodId);
 
@@ -591,8 +543,7 @@ export class PaymentMethodService {
       }
 
       const stripePaymentMethod = await this.stripeService.retrievePaymentMethod(
-        paymentMethod.stripe_payment_method_id,
-        requestId
+        paymentMethod.stripe_payment_method_id
       );
 
       if (stripePaymentMethod.card) {
@@ -606,14 +557,12 @@ export class PaymentMethodService {
 
       logger.info('Payment method synced with Stripe', {
         paymentMethodId,
-        stripePaymentMethodId: paymentMethod.stripe_payment_method_id,
-        requestId
+        stripePaymentMethodId: paymentMethod.stripe_payment_method_id
       });
     } catch (error) {
       logger.error('Failed to sync payment method with Stripe', {
         paymentMethodId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       throw error;

@@ -20,10 +20,10 @@ import {
 } from '../../shared/types';
 
 export class WebhookService {
-  private webhookRepository: WebhookRepository;
-  private paymentRepository: PaymentRepository;
-  private refundRepository: RefundRepository;
-  private invoiceRepository: InvoiceRepository;
+  private webhookRepository!: WebhookRepository;
+  private paymentRepository!: PaymentRepository;
+  private refundRepository!: RefundRepository;
+  private invoiceRepository!: InvoiceRepository;
 
   constructor() {
     this.initializeRepositories();
@@ -37,11 +37,7 @@ export class WebhookService {
     this.invoiceRepository = new InvoiceRepository(dbConnection);
   }
 
-  async processWebhookEvent(
-    payload: string,
-    signature: string,
-    requestId: string
-  ): Promise<WebhookProcessingResult> {
+  async processWebhookEvent(payload: string, signature: string): Promise<WebhookProcessingResult> {
     try {
       if (!validateWebhookSignature(payload, signature, process.env.STRIPE_WEBHOOK_SECRET || '')) {
         throw new Error('Invalid webhook signature');
@@ -54,15 +50,13 @@ export class WebhookService {
 
       const event = parseResult.event;
 
-      // Check for duplicate events
-      const existingEvent = await this.webhookRepository.findByStripeEventId(event.id);
+      const existingEvent = await this.webhookRepository.getWebhookEventByStripeId(event.id);
 
       if (existingEvent) {
         logger.info('Duplicate webhook event ignored', {
           eventId: event.id,
           eventType: event.type,
-          existingEventId: existingEvent.id,
-          requestId
+          existingEventId: existingEvent.id
         });
 
         return {
@@ -73,34 +67,30 @@ export class WebhookService {
         };
       }
 
-      // Create webhook event record
       const webhookEventData: Omit<WebhookEventDatabaseRecord, 'id' | 'created_at' | 'processed_at'> = {
         stripe_event_id: event.id,
         event_type: event.type,
         processed: false,
         data: event.data,
         retry_count: 0,
-        failure_reason: null,
+        failure_reason: undefined,
         metadata: {
           apiVersion: event.api_version,
           created: event.created,
-          livemode: event.livemode,
-          requestId
+          livemode: event.livemode
         }
       };
 
       const savedEvent = await this.webhookRepository.create(webhookEventData);
 
-      // Process the webhook event
-      const processingResult = await this.handleWebhookEvent(event, requestId);
+      const processingResult = await this.handleWebhookEvent(event);
 
-      // Update webhook event with processing result
       await this.webhookRepository.update(
         savedEvent.id,
         {
           processed: processingResult.success,
-          processed_at: processingResult.success ? new Date() : null,
-          failure_reason: processingResult.success ? null : processingResult.message
+          processed_at: processingResult.success ? new Date() : undefined,
+          failure_reason: processingResult.success ? undefined : processingResult.message
         }
       );
 
@@ -108,8 +98,7 @@ export class WebhookService {
         eventId: event.id,
         eventType: event.type,
         success: processingResult.success,
-        message: processingResult.message,
-        requestId
+        message: processingResult.message
       });
 
       return {
@@ -120,8 +109,7 @@ export class WebhookService {
       };
     } catch (error) {
       logger.error('Failed to process webhook event', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       return {
@@ -133,44 +121,40 @@ export class WebhookService {
     }
   }
 
-  private async handleWebhookEvent(
-    event: StripeWebhookEvent,
-    requestId: string
-  ): Promise<{ success: boolean; message: string }> {
+  private async handleWebhookEvent(event: StripeWebhookEvent): Promise<{ success: boolean; message: string }> {
     try {
       switch (event.type) {
         case 'payment_intent.succeeded':
-          return await this.handlePaymentIntentSucceeded(event, requestId);
+          return await this.handlePaymentIntentSucceeded(event);
 
         case 'payment_intent.payment_failed':
-          return await this.handlePaymentIntentFailed(event, requestId);
+          return await this.handlePaymentIntentFailed(event);
 
         case 'payment_intent.canceled':
-          return await this.handlePaymentIntentCanceled(event, requestId);
+          return await this.handlePaymentIntentCanceled(event);
 
         case 'payment_method.attached':
-          return await this.handlePaymentMethodAttached(event, requestId);
+          return await this.handlePaymentMethodAttached(event);
 
         case 'charge.dispute.created':
-          return await this.handleChargeDisputeCreated(event, requestId);
+          return await this.handleChargeDisputeCreated(event);
 
         case 'invoice.payment_succeeded':
-          return await this.handleInvoicePaymentSucceeded(event, requestId);
+          return await this.handleInvoicePaymentSucceeded(event);
 
         case 'invoice.payment_failed':
-          return await this.handleInvoicePaymentFailed(event, requestId);
+          return await this.handleInvoicePaymentFailed(event);
 
         case 'refund.created':
-          return await this.handleRefundCreated(event, requestId);
+          return await this.handleRefundCreated(event);
 
         case 'refund.updated':
-          return await this.handleRefundUpdated(event, requestId);
+          return await this.handleRefundUpdated(event);
 
         default:
           logger.warn('Unhandled webhook event type', {
             eventType: event.type,
-            eventId: event.id,
-            requestId
+            eventId: event.id
           });
 
           return {
@@ -182,8 +166,7 @@ export class WebhookService {
       logger.error('Failed to handle webhook event', {
         eventType: event.type,
         eventId: event.id,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       return {
@@ -193,10 +176,7 @@ export class WebhookService {
     }
   }
 
-  private async handlePaymentIntentSucceeded(
-    event: StripeWebhookEvent,
-    requestId: string
-  ): Promise<{ success: boolean; message: string }> {
+  private async handlePaymentIntentSucceeded(event: StripeWebhookEvent): Promise<{ success: boolean; message: string }> {
     try {
       const paymentIntent = event.data.object;
       const payment = await this.paymentRepository.findByStripePaymentIntentId(paymentIntent.id);
@@ -217,8 +197,7 @@ export class WebhookService {
       logger.info('Payment intent succeeded processed', {
         paymentIntentId: paymentIntent.id,
         paymentId: payment.id,
-        amount: paymentIntent.amount,
-        requestId
+        amount: paymentIntent.amount
       });
 
       return {
@@ -233,10 +212,7 @@ export class WebhookService {
     }
   }
 
-  private async handlePaymentIntentFailed(
-    event: StripeWebhookEvent,
-    requestId: string
-  ): Promise<{ success: boolean; message: string }> {
+  private async handlePaymentIntentFailed(event: StripeWebhookEvent): Promise<{ success: boolean; message: string }> {
     try {
       const paymentIntent = event.data.object;
       const payment = await this.paymentRepository.findByStripePaymentIntentId(paymentIntent.id);
@@ -258,8 +234,7 @@ export class WebhookService {
       logger.info('Payment intent failed processed', {
         paymentIntentId: paymentIntent.id,
         paymentId: payment.id,
-        failureReason,
-        requestId
+        failureReason
       });
 
       return {
@@ -274,10 +249,7 @@ export class WebhookService {
     }
   }
 
-  private async handlePaymentIntentCanceled(
-    event: StripeWebhookEvent,
-    requestId: string
-  ): Promise<{ success: boolean; message: string }> {
+  private async handlePaymentIntentCanceled(event: StripeWebhookEvent): Promise<{ success: boolean; message: string }> {
     try {
       const paymentIntent = event.data.object;
       const payment = await this.paymentRepository.findByStripePaymentIntentId(paymentIntent.id);
@@ -296,8 +268,7 @@ export class WebhookService {
 
       logger.info('Payment intent canceled processed', {
         paymentIntentId: paymentIntent.id,
-        paymentId: payment.id,
-        requestId
+        paymentId: payment.id
       });
 
       return {
@@ -312,18 +283,14 @@ export class WebhookService {
     }
   }
 
-  private async handlePaymentMethodAttached(
-    event: StripeWebhookEvent,
-    requestId: string
-  ): Promise<{ success: boolean; message: string }> {
+  private async handlePaymentMethodAttached(event: StripeWebhookEvent): Promise<{ success: boolean; message: string }> {
     try {
       const paymentMethod = event.data.object;
       
       logger.info('Payment method attached processed', {
         paymentMethodId: paymentMethod.id,
         customerId: paymentMethod.customer,
-        type: paymentMethod.type,
-        requestId
+        type: paymentMethod.type
       });
 
       return {
@@ -338,10 +305,7 @@ export class WebhookService {
     }
   }
 
-  private async handleChargeDisputeCreated(
-    event: StripeWebhookEvent,
-    requestId: string
-  ): Promise<{ success: boolean; message: string }> {
+  private async handleChargeDisputeCreated(event: StripeWebhookEvent): Promise<{ success: boolean; message: string }> {
     try {
       const dispute = event.data.object;
       
@@ -350,12 +314,8 @@ export class WebhookService {
         chargeId: dispute.charge,
         amount: dispute.amount,
         reason: dispute.reason,
-        status: dispute.status,
-        requestId
+        status: dispute.status
       });
-
-      // TODO: In the future we need to  Implement dispute handling logic
-      // This could include updating payment status, notifying administrators, etc.
 
       return {
         success: true,
@@ -369,15 +329,11 @@ export class WebhookService {
     }
   }
   
-    private async handleInvoicePaymentSucceeded(
-    event: StripeWebhookEvent,
-    requestId: string
-  ): Promise<{ success: boolean; message: string }> {
+  private async handleInvoicePaymentSucceeded(event: StripeWebhookEvent): Promise<{ success: boolean; message: string }> {
     try {
       const invoice = event.data.object;
       
-      // Find invoice by Stripe invoice ID
-      const localInvoice = await this.invoiceRepository.findByStripeInvoiceId(invoice.id);
+      const localInvoice = await this.invoiceRepository.getInvoiceByStripeId(invoice.id);
       
       if (localInvoice) {
         await this.invoiceRepository.updateStatus(
@@ -390,8 +346,7 @@ export class WebhookService {
       logger.info('Invoice payment succeeded processed', {
         stripeInvoiceId: invoice.id,
         localInvoiceId: localInvoice?.id,
-        amount: invoice.amount_paid,
-        requestId
+        amount: invoice.amount_paid
       });
 
       return {
@@ -405,16 +360,12 @@ export class WebhookService {
       };
     }
   }
-
-  private async handleInvoicePaymentFailed(
-    event: StripeWebhookEvent,
-    requestId: string
-  ): Promise<{ success: boolean; message: string }> {
+  
+    private async handleInvoicePaymentFailed(event: StripeWebhookEvent): Promise<{ success: boolean; message: string }> {
     try {
       const invoice = event.data.object;
       
-      // Find invoice by Stripe invoice ID
-      const localInvoice = await this.invoiceRepository.findByStripeInvoiceId(invoice.id);
+      const localInvoice = await this.invoiceRepository.getInvoiceByStripeId(invoice.id);
       
       if (localInvoice) {
         await this.invoiceRepository.updateStatus(
@@ -426,8 +377,7 @@ export class WebhookService {
       logger.warn('Invoice payment failed processed', {
         stripeInvoiceId: invoice.id,
         localInvoiceId: localInvoice?.id,
-        amount: invoice.amount_due,
-        requestId
+        amount: invoice.amount_due
       });
 
       return {
@@ -442,15 +392,11 @@ export class WebhookService {
     }
   }
 
-  private async handleRefundCreated(
-    event: StripeWebhookEvent,
-    requestId: string
-  ): Promise<{ success: boolean; message: string }> {
+  private async handleRefundCreated(event: StripeWebhookEvent): Promise<{ success: boolean; message: string }> {
     try {
       const refund = event.data.object;
       
-      // Find refund by Stripe refund ID
-      const localRefund = await this.refundRepository.findByStripeRefundId(refund.id);
+      const localRefund = await this.refundRepository.getRefundByStripeId(refund.id);
       
       if (localRefund) {
         await this.refundRepository.updateStatus(
@@ -463,8 +409,7 @@ export class WebhookService {
         stripeRefundId: refund.id,
         localRefundId: localRefund?.id,
         amount: refund.amount,
-        status: refund.status,
-        requestId
+        status: refund.status
       });
 
       return {
@@ -479,15 +424,11 @@ export class WebhookService {
     }
   }
 
-  private async handleRefundUpdated(
-    event: StripeWebhookEvent,
-    requestId: string
-  ): Promise<{ success: boolean; message: string }> {
+  private async handleRefundUpdated(event: StripeWebhookEvent): Promise<{ success: boolean; message: string }> {
     try {
       const refund = event.data.object;
       
-      // Find refund by Stripe refund ID
-      const localRefund = await this.refundRepository.findByStripeRefundId(refund.id);
+      const localRefund = await this.refundRepository.getRefundByStripeId(refund.id);
       
       if (localRefund) {
         let status: RefundStatus;
@@ -519,8 +460,7 @@ export class WebhookService {
         stripeRefundId: refund.id,
         localRefundId: localRefund?.id,
         amount: refund.amount,
-        status: refund.status,
-        requestId
+        status: refund.status
       });
 
       return {
@@ -535,7 +475,7 @@ export class WebhookService {
     }
   }
   
-  async retryFailedWebhookEvent(eventId: number, requestId: string): Promise<WebhookProcessingResult> {
+  async retryFailedWebhookEvent(eventId: number): Promise<WebhookProcessingResult> {
     try {
       const webhookEvent = await this.webhookRepository.findById(eventId);
 
@@ -552,7 +492,7 @@ export class WebhookService {
         };
       }
 
-      const maxRetries = WEBHOOK_CONFIG?.STRIPE?.RETRY_CONFIG?.MAX_ATTEMPTS || 3;
+      const maxRetries = 3;
       if (webhookEvent.retry_count >= maxRetries) {
         throw new Error('Maximum retry attempts exceeded');
       }
@@ -566,15 +506,15 @@ export class WebhookService {
         livemode: true
       } as StripeWebhookEvent;
 
-      const processingResult = await this.handleWebhookEvent(event, requestId);
+      const processingResult = await this.handleWebhookEvent(event);
 
       await this.webhookRepository.update(
         eventId,
         {
           processed: processingResult.success,
-          processed_at: processingResult.success ? new Date() : null,
+          processed_at: processingResult.success ? new Date() : undefined,
           retry_count: webhookEvent.retry_count + 1,
-          failure_reason: processingResult.success ? null : processingResult.message
+          failure_reason: processingResult.success ? undefined : processingResult.message
         }
       );
 
@@ -582,8 +522,7 @@ export class WebhookService {
         eventId,
         stripeEventId: webhookEvent.stripe_event_id,
         success: processingResult.success,
-        retryCount: webhookEvent.retry_count + 1,
-        requestId
+        retryCount: webhookEvent.retry_count + 1
       });
 
       return {
@@ -595,8 +534,7 @@ export class WebhookService {
     } catch (error) {
       logger.error('Failed to retry webhook event', {
         eventId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
 
       return {
@@ -608,7 +546,7 @@ export class WebhookService {
     }
   }
 
-  async retryWebhookEvent(eventId: string, requestId: string): Promise<WebhookProcessingResult> {
+  async retryWebhookEvent(eventId: string): Promise<WebhookProcessingResult> {
     const numericEventId = parseInt(eventId);
     if (isNaN(numericEventId)) {
       return {
@@ -618,10 +556,10 @@ export class WebhookService {
         message: 'Invalid event ID'
       };
     }
-    return this.retryFailedWebhookEvent(numericEventId, requestId);
+    return this.retryFailedWebhookEvent(numericEventId);
   }
 
-  async getWebhookEventStatus(eventId: string, requestId: string): Promise<any> {
+  async getWebhookEventStatus(eventId: string): Promise<any> {
     try {
       const numericEventId = parseInt(eventId);
       if (isNaN(numericEventId)) {
@@ -648,14 +586,13 @@ export class WebhookService {
     } catch (error) {
       logger.error('Failed to get webhook event status', {
         eventId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
       throw error;
     }
   }
 
-  async listWebhookEvents(filters: any, requestId: string): Promise<any> {
+  async listWebhookEvents(filters: any): Promise<any> {
     try {
       const events = await this.webhookRepository.findByEventType(
         filters.eventType,
@@ -683,14 +620,13 @@ export class WebhookService {
     } catch (error) {
       logger.error('Failed to list webhook events', {
         filters,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
       throw error;
     }
   }
 
-  async getWebhookStats(filters: any, requestId: string): Promise<any> {
+  async getWebhookStats(filters: any): Promise<any> {
     try {
       const stats = await this.webhookRepository.getProcessingStats();
       
@@ -701,20 +637,19 @@ export class WebhookService {
         failedEvents: stats.total_events - stats.processed_events - stats.pending_events,
         eventsByType: stats.events_by_type,
         processingRate: stats.total_events > 0 ? (stats.processed_events / stats.total_events) * 100 : 0,
-        averageProcessingTime: 0, // This would need to be calculated based on created_at and processed_at
-        lastProcessedAt: new Date().toISOString() // This would need to be the latest processed_at from events
+        averageProcessingTime: 0,
+        lastProcessedAt: new Date().toISOString()
       };
     } catch (error) {
       logger.error('Failed to get webhook stats', {
         filters,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
       throw error;
     }
   }
 
-  async deleteWebhookEvent(eventId: string, requestId: string): Promise<boolean> {
+  async deleteWebhookEvent(eventId: string): Promise<boolean> {
     try {
       const numericEventId = parseInt(eventId);
       if (isNaN(numericEventId)) {
@@ -725,8 +660,7 @@ export class WebhookService {
 
       if (deleted) {
         logger.info('Webhook event deleted', {
-          eventId: numericEventId,
-          requestId
+          eventId: numericEventId
         });
       }
 
@@ -734,71 +668,64 @@ export class WebhookService {
     } catch (error) {
       logger.error('Failed to delete webhook event', {
         eventId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
       throw error;
     }
   }
 
-  async getUnprocessedEvents(limit: number = 100, requestId?: string): Promise<WebhookEventDatabaseRecord[]> {
+  async getUnprocessedEvents(limit: number = 100): Promise<WebhookEventDatabaseRecord[]> {
     try {
       const unprocessedEvents = await this.webhookRepository.findUnprocessed(limit);
 
       logger.info('Unprocessed webhook events retrieved', {
         count: unprocessedEvents.length,
-        limit,
-        requestId
+        limit
       });
 
       return unprocessedEvents;
     } catch (error) {
       logger.error('Failed to get unprocessed webhook events', {
         limit,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
       throw error;
     }
   }
 
-  async markEventAsProcessed(eventId: number, requestId: string): Promise<WebhookEventDatabaseRecord> {
+  async markEventAsProcessed(eventId: number): Promise<WebhookEventDatabaseRecord> {
     try {
       const updatedEvent = await this.webhookRepository.markAsProcessed(eventId);
 
       logger.info('Webhook event marked as processed', {
         eventId,
-        stripeEventId: updatedEvent.stripe_event_id,
-        requestId
+        stripeEventId: updatedEvent.stripe_event_id
       });
 
       return updatedEvent;
     } catch (error) {
       logger.error('Failed to mark webhook event as processed', {
         eventId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
       throw error;
     }
   }
 
-  async cleanupOldEvents(olderThanDays: number = 90, requestId?: string): Promise<number> {
+  async cleanupOldEvents(olderThanDays: number = 90): Promise<number> {
     try {
       const deletedCount = await this.webhookRepository.deleteOldEvents(olderThanDays);
 
       logger.info('Old webhook events cleaned up', {
         deletedCount,
-        olderThanDays,
-        requestId
+        olderThanDays
       });
 
       return deletedCount;
     } catch (error) {
       logger.error('Failed to cleanup old webhook events', {
         olderThanDays,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
       throw error;
     }
@@ -807,8 +734,7 @@ export class WebhookService {
   async getEventsByDateRange(
     startDate: Date,
     endDate: Date,
-    eventType?: string,
-    requestId?: string
+    eventType?: string
   ): Promise<WebhookEventDatabaseRecord[]> {
     try {
       const events = await this.webhookRepository.findByDateRange(startDate, endDate, eventType);
@@ -817,8 +743,7 @@ export class WebhookService {
         startDate: startDate.toISOString(),
         endDate: endDate.toISOString(),
         eventType,
-        count: events.length,
-        requestId
+        count: events.length
       });
 
       return events;
@@ -827,8 +752,7 @@ export class WebhookService {
         startDate: startDate.toISOString(),
         endDate: endDate.toISOString(),
         eventType,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
       throw error;
     }
