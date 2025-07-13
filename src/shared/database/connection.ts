@@ -770,3 +770,4 @@ export const closeDatabase = async (): Promise<void> => {
   }
 };
 
+export const connection = database;

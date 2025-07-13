@@ -178,6 +178,7 @@ export interface ApplePaySessionResponse {
   session?: any;
   merchantIdentifier?: string;
   domainName?: string;
+  displayName: string;
 }
 
 export interface ApplePayPaymentRequest {
@@ -220,6 +221,7 @@ export interface GooglePayTokenRequest {
   currency: string;
   description?: string;
   metadata?: Record<string, any>;
+  paymentToken: string;
 }
 
 export interface GooglePayTokenResponse {
@@ -235,6 +237,9 @@ export interface GooglePayPaymentRequest {
   description?: string;
   metadata?: Record<string, any>;
   userId?: number;
+  paymentToken: string;
+  paymentType: string;
+  returnUrl: string;
 }
 
 export interface GooglePayPaymentResponse {
@@ -253,11 +258,16 @@ export interface GooglePayPaymentResponse {
 export interface GooglePayConfigRequest {
   merchantId: string;
   environment: 'TEST' | 'PRODUCTION';
+  amount: number;
+  currency: string;
+  merchantName: string;
+  description: string;
 }
 
 export interface GooglePayConfigResponse {
   merchantId: string;
   merchantName: string;
+  environment: string;
   allowedPaymentMethods: Array<{
     type: string;
     parameters: {
@@ -337,8 +347,15 @@ export interface PaymentCancelRequest {
   reason?: string;
 }
 
+export interface PaymentMethodDatabaseRecordFixed extends Omit<PaymentMethodDatabaseRecord, 'card_last_four' | 'card_brand' | 'card_exp_month' | 'card_exp_year'> {
+  card_last_four: string | null | undefined;
+  card_brand: string | null | undefined;
+  card_exp_month: number | null | undefined;
+  card_exp_year: number | null | undefined;
+}
+
 export type PaymentEntity = PaymentDatabaseRecord;
-export type PaymentMethodEntity = PaymentMethodDatabaseRecord;
+export type PaymentMethodEntity = PaymentMethodDatabaseRecordFixed;
 
 export interface CreateInvoiceRequest {
   amount: number;
@@ -390,6 +407,7 @@ export interface InvoiceListRequest {
 export interface InvoiceListResponse {
   invoices: any[];
   total: number;
+  totalCount: number;
   page: number;
   limit: number;
 }
@@ -398,6 +416,8 @@ export interface InvoiceDetailsResponse {
   invoice: any;
   payments: any[];
   refunds: any[];
+  invoiceNumber: string;
+  status: string;
 }
 
 export interface CreateRefundRequest {
@@ -447,4 +467,63 @@ export type ApplePayValidationResponse = ApplePaySessionResponse;
 export interface WebhookValidationResult {
   isValid: boolean;
   errors?: string[];
+  event?: any;
+}
+
+export interface WebhookEventRequest {
+  id: string;
+  type: string;
+  data: {
+    object: any;
+  };
+  created: number;
+  livemode: boolean;
+  pending_webhooks: number;
+  request: {
+    id: string;
+    idempotency_key?: string;
+  };
+}
+
+export interface PaymentService {
+  getPaymentMethods(): Promise<PaymentMethod[]>;
+}
+
+export interface PaymentRepository {
+  getPaymentById(id: number): Promise<PaymentDatabaseRecord | null>;
+  getUserTotalAmount(userId: number): Promise<number>;
+}
+
+export interface InvoiceRepository {
+  getInvoiceById(id: number): Promise<any>;
+}
+
+export interface RefundRepository {
+  getRefundById(id: number): Promise<any>;
+}
+
+export interface WebhookRepository {
+  getWebhookEventByStripeId(stripeId: string): Promise<any>;
+}
+
+export interface WebhookService {
+  retryWebhookEvent(eventId: string): Promise<any>;
+}
+
+export interface ApplePayConfig {
+  supportedNetworks: string[];
+  merchantCapabilities: string[];
+  supportedCountries: string[];
+  supportedCurrencies: string[];
+  merchantIdentifier: string;
+  domainName: string;
+}
+
+export interface GooglePayConfig {
+  supportedNetworks: string[];
+  supportedAuthMethods: string[];
+  supportedCountries: string[];
+  supportedCurrencies: string[];
+  merchantId: string;
+  environment: string;
 }

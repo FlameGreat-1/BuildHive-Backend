@@ -97,6 +97,7 @@ export interface WebhookRetryConfig {
 
 export interface WebhookValidationResult {
   isValid: boolean;
+  errors?: string[];
   event?: StripeWebhookEvent;
   error?: string;
 }
@@ -154,3 +155,7 @@ export interface WebhookBatchProcessingResult {
 }
 
 export type WebhookEventEntity = WebhookEventDatabaseRecord;
+
+export type validateWebhookEvent = (payload: string, signature: string, secret: string) => Promise<WebhookValidationResult>;
+
+export type validateWebhookSignature = (payload: string, signature: string, secret: string) => boolean;
