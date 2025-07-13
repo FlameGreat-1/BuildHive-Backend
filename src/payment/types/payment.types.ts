@@ -3,7 +3,9 @@ import {
   PaymentMethod, 
   PaymentType,
   PaymentDatabaseRecord,
-  PaymentMethodDatabaseRecord 
+  PaymentMethodDatabaseRecord,
+  InvoiceStatus,
+  RefundStatus
 } from '../../shared/types';
 
 export interface PaymentIntent {
@@ -40,6 +42,7 @@ export interface CreatePaymentIntentRequest {
   metadata?: Record<string, any>;
   automaticPaymentMethods?: boolean;
   returnUrl?: string;
+  userId?: number;
 }
 
 export interface CreatePaymentIntentResponse {
@@ -50,6 +53,7 @@ export interface CreatePaymentIntentResponse {
   currency: string;
   requiresAction: boolean;
   nextAction?: PaymentNextAction;
+  processingFee: number;
 }
 
 export interface ConfirmPaymentRequest {
@@ -160,11 +164,20 @@ export interface ApplePaySessionRequest {
   validationUrl: string;
   displayName: string;
   domainName: string;
+  amount?: number;
+  currency?: string;
+  countryCode?: string;
+  merchantName?: string;
+  description?: string;
+  requiresShipping?: boolean;
 }
 
 export interface ApplePaySessionResponse {
   merchantSession: any;
   success: boolean;
+  session?: any;
+  merchantIdentifier?: string;
+  domainName?: string;
 }
 
 export interface ApplePayPaymentRequest {
@@ -173,6 +186,9 @@ export interface ApplePayPaymentRequest {
   currency: string;
   description?: string;
   metadata?: Record<string, any>;
+  userId?: number;
+  paymentType?: string;
+  returnUrl?: string;
 }
 
 export interface ApplePayPaymentResponse {
@@ -185,6 +201,7 @@ export interface ApplePayPaymentResponse {
   nextAction?: PaymentNextAction;
   transactionId: string;
   success: boolean;
+  processingFee?: number;
 }
 
 export interface GooglePayTokenRequest {
@@ -205,6 +222,21 @@ export interface GooglePayTokenRequest {
   metadata?: Record<string, any>;
 }
 
+export interface GooglePayTokenResponse {
+  token: string;
+  paymentMethod: any;
+  success: boolean;
+}
+
+export interface GooglePayPaymentRequest {
+  token: any;
+  amount: number;
+  currency: string;
+  description?: string;
+  metadata?: Record<string, any>;
+  userId?: number;
+}
+
 export interface GooglePayPaymentResponse {
   paymentIntentId: string;
   status: PaymentStatus;
@@ -215,6 +247,12 @@ export interface GooglePayPaymentResponse {
   nextAction?: PaymentNextAction;
   transactionId: string;
   success: boolean;
+  processingFee?: number;
+}
+
+export interface GooglePayConfigRequest {
+  merchantId: string;
+  environment: 'TEST' | 'PRODUCTION';
 }
 
 export interface GooglePayConfigResponse {
@@ -234,6 +272,11 @@ export interface GooglePayConfigResponse {
       };
     };
   }>;
+  config?: {
+    merchantId: string;
+    environment: string;
+    allowedPaymentMethods: any[];
+  };
 }
 
 export interface PaymentFeeCalculation {
@@ -304,6 +347,10 @@ export interface CreateInvoiceRequest {
   dueDate?: Date;
   userId?: number;
   metadata?: Record<string, any>;
+  quoteId?: number;
+  invoiceNumber?: string;
+  status?: InvoiceStatus;
+  autoSend?: boolean;
 }
 
 export interface CreateInvoiceResponse {
@@ -323,6 +370,14 @@ export interface UpdateInvoiceStatusRequest {
   invoiceId: number;
   status: string;
   reason?: string;
+  paidAt?: Date;
+}
+
+export interface UpdateInvoiceStatusResponse {
+  invoiceId: number;
+  status: InvoiceStatus;
+  updatedAt: string;
+  success: boolean;
 }
 
 export interface InvoiceListRequest {
@@ -330,6 +385,19 @@ export interface InvoiceListRequest {
   status?: string;
   limit?: number;
   offset?: number;
+}
+
+export interface InvoiceListResponse {
+  invoices: any[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface InvoiceDetailsResponse {
+  invoice: any;
+  payments: any[];
+  refunds: any[];
 }
 
 export interface CreateRefundRequest {
@@ -370,4 +438,13 @@ export interface PaymentMethodListRequest {
   limit?: number;
   offset?: number;
   type?: string;
+}
+
+export type CreatePaymentRequest = CreatePaymentIntentRequest;
+export type ApplePayValidationRequest = ApplePaySessionRequest;
+export type ApplePayValidationResponse = ApplePaySessionResponse;
+
+export interface WebhookValidationResult {
+  isValid: boolean;
+  errors?: string[];
 }

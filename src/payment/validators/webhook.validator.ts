@@ -1,6 +1,8 @@
 import Joi from 'joi';
+import crypto from 'crypto';
 import { WEBHOOK_CONFIG } from '../../config/payment';
 import { WebhookEventType } from '../../shared/types';
+import { WebhookValidationResult } from '../types';
 
 export const webhookEventSchema = Joi.object({
   id: Joi.string()
@@ -184,7 +186,6 @@ const verifyWebhookSignature = (payload: string, signature: string, secret: stri
       return false;
     }
 
-    const crypto = require('crypto');
     const expectedSignature = crypto
       .createHmac('sha256', secret)
       .update(`${timestamp}.${payload}`)
@@ -202,22 +203,22 @@ const verifyWebhookSignature = (payload: string, signature: string, secret: stri
   }
 };
 
-export const validateWebhookEvent = (data: any) => {
-  const { error, value } = webhookEventSchema.validate(data, {
+export const validateWebhookEvent = async (
+  event: any,
+  signature: string,
+  secret: string
+): Promise<WebhookValidationResult> => {
+  const { error, value } = webhookEventSchema.validate(event, {
     abortEarly: false,
     stripUnknown: true
   });
 
   if (error) {
-    const validationErrors = error.details.map(detail => ({
-      field: detail.path.join('.'),
-      message: detail.message
-    }));
+    const validationErrors = error.details.map(detail => detail.message);
     
     return {
       isValid: false,
-      errors: validationErrors,
-      data: null
+      errors: validationErrors
     };
   }
 
@@ -226,52 +227,46 @@ export const validateWebhookEvent = (data: any) => {
     return customValidation;
   }
 
+  const signatureValidation = verifyWebhookSignature(
+    JSON.stringify(event),
+    signature,
+    secret
+  );
+
+  if (!signatureValidation) {
+    return {
+      isValid: false,
+      errors: ['Invalid webhook signature']
+    };
+  }
+
   return {
-    isValid: true,
-    errors: [],
-    data: value
+    isValid: true
   };
 };
 
-export const validateWebhookSignature = (data: any) => {
+export const validateWebhookSignature = (
+  payload: string,
+  signature: string,
+  secret: string
+): boolean => {
+  const data = { payload, signature };
+  
   const { error, value } = webhookSignatureSchema.validate(data, {
     abortEarly: false,
     stripUnknown: true
   });
 
   if (error) {
-    const validationErrors = error.details.map(detail => ({
-      field: detail.path.join('.'),
-      message: detail.message
-    }));
-    
-    return {
-      isValid: false,
-      errors: validationErrors,
-      data: null
-    };
+    return false;
   }
 
-  const signatureValidation = verifyWebhookSignature(
+  return verifyWebhookSignature(
     value.payload,
     value.signature,
-    process.env.STRIPE_WEBHOOK_SECRET || '',
+    secret,
     value.tolerance
   );
-
-  if (!signatureValidation) {
-    return {
-      isValid: false,
-      errors: [{ field: 'signature', message: 'Invalid webhook signature' }],
-      data: null
-    };
-  }
-
-  return {
-    isValid: true,
-    errors: [],
-    data: value
-  };
 };
 
 export const validateWebhookProcessing = (data: any) => {
@@ -300,12 +295,11 @@ export const validateWebhookProcessing = (data: any) => {
   };
 };
 
-const validateWebhookBusinessRules = (data: any) => {
+const validateWebhookBusinessRules = (data: any): WebhookValidationResult => {
   if (!isSupportedWebhookEvent(data.type)) {
     return {
       isValid: false,
-      errors: [{ field: 'type', message: 'Unsupported webhook event type' }],
-      data: null
+      errors: ['Unsupported webhook event type']
     };
   }
 
@@ -315,14 +309,11 @@ const validateWebhookBusinessRules = (data: any) => {
   if (eventAge > maxAge) {
     return {
       isValid: false,
-      errors: [{ field: 'created', message: 'Webhook event is too old' }],
-      data: null
+      errors: ['Webhook event is too old']
     };
   }
 
   return {
-    isValid: true,
-    errors: [],
-    data
+    isValid: true
   };
 };

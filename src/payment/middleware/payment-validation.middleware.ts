@@ -527,6 +527,75 @@ export const validateRefundCreation = (
   }
 };
 
+export const validateRefundAmount = (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): void => {
+  try {
+    const { amount, paymentId } = req.body;
+    
+    if (!amount || typeof amount !== 'number' || amount <= 0) {
+      logger.warn('Invalid refund amount', {
+        amount,
+        requestId: req.requestId,
+        userId: req.user?.id
+      });
+
+      return next(new AppError(
+        'Refund amount must be a positive number',
+        HTTP_STATUS_CODES.BAD_REQUEST
+      ));
+    }
+
+    if (amount > PAYMENT_CONSTANTS.STRIPE.LIMITS.MAX_AMOUNT) {
+      logger.warn('Refund amount exceeds maximum limit', {
+        amount,
+        maxAmount: PAYMENT_CONSTANTS.STRIPE.LIMITS.MAX_AMOUNT,
+        requestId: req.requestId,
+        userId: req.user?.id
+      });
+
+      return next(new AppError(
+        `Refund amount cannot exceed ${PAYMENT_CONSTANTS.STRIPE.LIMITS.MAX_AMOUNT}`,
+        HTTP_STATUS_CODES.BAD_REQUEST
+      ));
+    }
+
+    if (!paymentId) {
+      logger.warn('Missing payment ID for refund', {
+        requestId: req.requestId,
+        userId: req.user?.id
+      });
+
+      return next(new AppError(
+        'Payment ID is required for refund',
+        HTTP_STATUS_CODES.BAD_REQUEST
+      ));
+    }
+
+    logger.info('Refund amount validation successful', {
+      amount,
+      paymentId,
+      requestId: req.requestId,
+      userId: req.user?.id
+    });
+
+    next();
+  } catch (error) {
+    logger.error('Refund amount validation error', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      requestId: req.requestId,
+      userId: req.user?.id
+    });
+
+    next(new AppError(
+      'Refund amount validation service unavailable',
+      HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR
+    ));
+  }
+};
+
 export const validateRefundStatusUpdate = (
   req: AuthenticatedRequest,
   res: Response,

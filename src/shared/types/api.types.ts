@@ -441,6 +441,9 @@ export interface CreatePaymentRequest {
   invoiceId?: number;
   creditsToPurchase?: number;
   subscriptionPlan?: string;
+  userId?: number;
+  automaticPaymentMethods?: boolean;
+  returnUrl?: string;
 }
 
 export interface CreatePaymentResponse {
@@ -456,6 +459,33 @@ export interface CreatePaymentResponse {
     type: string;
     redirectUrl?: string;
   };
+  processingFee?: number;
+}
+
+export interface CreatePaymentIntentRequest {
+  amount: number;
+  currency: string;
+  paymentMethod: string;
+  paymentType: string;
+  description?: string;
+  metadata?: Record<string, any>;
+  automaticPaymentMethods?: boolean;
+  returnUrl?: string;
+  userId?: number;
+}
+
+export interface CreatePaymentIntentResponse {
+  paymentIntentId: string;
+  clientSecret: string;
+  status: string;
+  amount: number;
+  currency: string;
+  requiresAction: boolean;
+  nextAction?: {
+    type: string;
+    redirectUrl?: string;
+  };
+  processingFee: number;
 }
 
 export interface PaymentStatusRequest {
@@ -522,6 +552,11 @@ export interface CreateInvoiceRequest {
   currency: string;
   dueDate: string;
   description?: string;
+  userId?: number;
+  metadata?: Record<string, any>;
+  invoiceNumber?: string;
+  status?: string;
+  autoSend?: boolean;
 }
 
 export interface InvoiceResponse {
@@ -531,6 +566,9 @@ export interface InvoiceResponse {
   currency: string;
   status: string;
   dueDate: string;
+  description?: string;
+  processingFee?: number;
+  metadata?: Record<string, any>;
   paymentLink?: string;
   stripeInvoiceId?: string;
   paidAt?: string;
@@ -538,10 +576,39 @@ export interface InvoiceResponse {
   updatedAt: string;
 }
 
+export interface UpdateInvoiceStatusRequest {
+  invoiceId: number;
+  status: string;
+  reason?: string;
+  paidAt?: Date;
+}
+
+export interface UpdateInvoiceStatusResponse {
+  invoiceId: number;
+  status: string;
+  updatedAt: string;
+  success: boolean;
+}
+
+export interface InvoiceListResponse {
+  invoices: InvoiceResponse[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface InvoiceDetailsResponse {
+  invoice: InvoiceResponse;
+  payments: PaymentResponse[];
+  refunds: RefundResponse[];
+}
+
 export interface CreateRefundRequest {
   paymentId: number;
   amount?: number;
   reason?: string;
+  userId?: number;
+  metadata?: Record<string, any>;
 }
 
 export interface CreateRefundResponse {
@@ -561,8 +628,10 @@ export interface RefundResponse {
   amount: number;
   status: string;
   reason?: string;
+  description?: string;
   stripeRefundId?: string;
   processedAt?: string;
+  metadata?: Record<string, any>;
   createdAt: string;
 }
 
@@ -641,10 +710,20 @@ export interface ApplePaySessionRequest {
   validationUrl: string;
   displayName: string;
   domainName: string;
+  amount?: number;
+  currency?: string;
+  countryCode?: string;
+  merchantName?: string;
+  description?: string;
+  requiresShipping?: boolean;
 }
 
 export interface ApplePaySessionResponse {
   merchantSession: any;
+  success?: boolean;
+  session?: any;
+  merchantIdentifier?: string;
+  domainName?: string;
 }
 
 export interface ApplePayValidationRequest {
@@ -658,10 +737,97 @@ export interface ApplePayValidationResponse {
   success: boolean;
 }
 
+export interface ApplePayPaymentRequest {
+  paymentData: any;
+  amount: number;
+  currency: string;
+  description?: string;
+  metadata?: Record<string, any>;
+  userId?: number;
+  paymentType?: string;
+  returnUrl?: string;
+}
+
+export interface ApplePayPaymentResponse {
+  paymentIntentId: string;
+  status: string;
+  amount: number;
+  currency: string;
+  clientSecret?: string;
+  requiresAction: boolean;
+  nextAction?: {
+    type: string;
+    redirectUrl?: string;
+  };
+  transactionId: string;
+  success: boolean;
+  processingFee?: number;
+}
+
 export interface GooglePayTokenRequest {
   paymentToken: string;
   amount: number;
   currency: string;
+}
+
+export interface GooglePayTokenResponse {
+  token: string;
+  paymentMethod: any;
+  success: boolean;
+}
+
+export interface GooglePayPaymentRequest {
+  token: any;
+  amount: number;
+  currency: string;
+  description?: string;
+  metadata?: Record<string, any>;
+  userId?: number;
+}
+
+export interface GooglePayPaymentResponse {
+  paymentIntentId: string;
+  status: string;
+  amount: number;
+  currency: string;
+  clientSecret?: string;
+  requiresAction: boolean;
+  nextAction?: {
+    type: string;
+    redirectUrl?: string;
+  };
+  transactionId: string;
+  success: boolean;
+  processingFee?: number;
+}
+
+export interface GooglePayConfigRequest {
+  merchantId: string;
+  environment: 'TEST' | 'PRODUCTION';
+}
+
+export interface GooglePayConfigResponse {
+  merchantId: string;
+  merchantName: string;
+  allowedPaymentMethods: Array<{
+    type: string;
+    parameters: {
+      allowedAuthMethods: string[];
+      allowedCardNetworks: string[];
+    };
+    tokenizationSpecification: {
+      type: string;
+      parameters: {
+        gateway: string;
+        gatewayMerchantId: string;
+      };
+    };
+  }>;
+  config?: {
+    merchantId: string;
+    environment: string;
+    allowedPaymentMethods: any[];
+  };
 }
 
 export interface WebhookEventRequest {

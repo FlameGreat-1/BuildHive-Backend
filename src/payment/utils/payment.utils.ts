@@ -39,6 +39,14 @@ export const generatePaymentReference = (userId: number, timestamp?: Date): stri
   return `PAY-${userId}-${dateStr}-${timeStr}`;
 };
 
+export const generateInvoiceNumber = (): string => {
+  const timestamp = Date.now();
+  const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+  const year = new Date().getFullYear();
+  
+  return `INV-${year}-${timestamp}-${random}`;
+};
+
 export const generatePaymentDescription = (
   paymentType: string,
   metadata?: Record<string, any>
@@ -57,11 +65,11 @@ export const generatePaymentDescription = (
 };
 
 export const isPaymentSuccessful = (status: PaymentStatus): boolean => {
-  return status === PaymentStatus.COMPLETED;
+  return status === PaymentStatus.SUCCEEDED || status === PaymentStatus.COMPLETED;
 };
 
 export const isPaymentFailed = (status: PaymentStatus): boolean => {
-  return status === PaymentStatus.FAILED || status === PaymentStatus.CANCELLED;
+  return status === PaymentStatus.FAILED || status === PaymentStatus.CANCELED || status === PaymentStatus.CANCELLED;
 };
 
 export const isPaymentPending = (status: PaymentStatus): boolean => {
@@ -72,11 +80,14 @@ export const getPaymentStatusMessage = (status: PaymentStatus): string => {
   const statusMessages: Record<PaymentStatus, string> = {
     [PaymentStatus.PENDING]: 'Payment is being processed',
     [PaymentStatus.PROCESSING]: 'Payment is currently processing',
+    [PaymentStatus.SUCCEEDED]: 'Payment completed successfully',
     [PaymentStatus.COMPLETED]: 'Payment completed successfully',
     [PaymentStatus.FAILED]: 'Payment failed',
+    [PaymentStatus.CANCELED]: 'Payment was cancelled',
     [PaymentStatus.CANCELLED]: 'Payment was cancelled',
     [PaymentStatus.REFUNDED]: 'Payment has been refunded',
-    [PaymentStatus.PARTIALLY_REFUNDED]: 'Payment has been partially refunded'
+    [PaymentStatus.PARTIALLY_REFUNDED]: 'Payment has been partially refunded',
+    [PaymentStatus.REQUIRES_ACTION]: 'Payment requires additional action'
   };
   
   return statusMessages[status] || 'Unknown payment status';
@@ -177,6 +188,7 @@ export const isCardExpired = (month: number, year: number): boolean => {
 
 export const getPaymentMethodDisplayName = (paymentMethod: PaymentMethod): string => {
   const displayNames: Record<PaymentMethod, string> = {
+    [PaymentMethod.CARD]: 'Credit/Debit Card',
     [PaymentMethod.STRIPE_CARD]: 'Credit/Debit Card',
     [PaymentMethod.APPLE_PAY]: 'Apple Pay',
     [PaymentMethod.GOOGLE_PAY]: 'Google Pay',

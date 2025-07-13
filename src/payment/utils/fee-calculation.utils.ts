@@ -44,6 +44,11 @@ export const calculateTotalFees = (amount: number, paymentMethod: PaymentMethod)
   };
 };
 
+export const calculateProcessingFee = (amount: number, currency: string, paymentMethod: PaymentMethod): number => {
+  const fees = calculateTotalFees(amount, paymentMethod);
+  return fees.stripeFee + fees.platformFee;
+};
+
 export const calculateNetAmount = (grossAmount: number, paymentMethod: PaymentMethod): number => {
   const fees = calculateTotalFees(grossAmount, paymentMethod);
   return fees.netAmount;

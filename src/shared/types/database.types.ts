@@ -257,6 +257,14 @@ export enum InvoiceStatus {
   CANCELLED = 'cancelled'
 }
 
+export enum RefundStatus {
+  PENDING = 'pending',
+  APPROVED = 'approved',
+  REJECTED = 'rejected',
+  PROCESSED = 'processed',
+  FAILED = 'failed'
+}
+
 export interface InvoiceDatabaseRecord {
   id: number;
   quote_id?: number;
@@ -266,6 +274,9 @@ export interface InvoiceDatabaseRecord {
   currency: string;
   status: InvoiceStatus;
   due_date: Date;
+  description?: string;
+  processing_fee?: number;
+  metadata?: Record<string, any>;
   payment_link?: string;
   stripe_invoice_id?: string;
   paid_at?: Date;
@@ -279,11 +290,12 @@ export interface RefundDatabaseRecord {
   user_id: number;
   amount: number;
   reason?: string;
-  description?: string
-  status: string;
+  description?: string;
+  status: RefundStatus;
   stripe_refund_id?: string;
   failure_reason?: string; 
   processed_at?: Date;
+  metadata?: Record<string, any>;
   created_at: Date;
   updated_at: Date;
 }

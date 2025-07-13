@@ -16,6 +16,15 @@ const router = Router();
 const paymentController = new PaymentController();
 
 router.post(
+  '/create',
+  authenticatePaymentUser,
+  validatePaymentIntentCreation,
+  validateCurrencySupport,
+  validatePaymentLimits,
+  paymentController.createPayment.bind(paymentController)
+);
+
+router.post(
   '/intent',
   authenticatePaymentUser,
   validatePaymentIntentCreation,
@@ -25,7 +34,7 @@ router.post(
 );
 
 router.post(
-  '/confirm',
+  '/confirm/:paymentId',
   authenticatePaymentUser,
   authorizePaymentAccess,
   validatePaymentConfirmation,
@@ -43,6 +52,7 @@ router.post(
 
 router.get(
   '/methods',
+  authenticatePaymentUser,
   paymentController.getPaymentMethods.bind(paymentController)
 );
 
@@ -50,6 +60,12 @@ router.get(
   '/history',
   authenticatePaymentUser,
   paymentController.getPaymentHistory.bind(paymentController)
+);
+
+router.get(
+  '/list',
+  authenticatePaymentUser,
+  paymentController.listPayments.bind(paymentController)
 );
 
 router.get(
@@ -64,6 +80,13 @@ router.post(
   authenticatePaymentUser,
   authorizePaymentAccess,
   paymentController.cancelPayment.bind(paymentController)
+);
+
+router.get(
+  '/:paymentId',
+  authenticatePaymentUser,
+  authorizePaymentAccess,
+  paymentController.getPaymentStatus.bind(paymentController)
 );
 
 export { router as paymentRoutes };
