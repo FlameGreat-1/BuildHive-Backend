@@ -253,6 +253,8 @@ class DatabaseConnection implements DatabaseClient {
           credits_purchased INTEGER,
           stripe_fee DECIMAL(10,2),
           platform_fee DECIMAL(10,2),
+          processing_fee DECIMAL(10,2),
+          failure_reason TEXT,
           net_amount DECIMAL(12,2),
           processed_at TIMESTAMP,
           created_at TIMESTAMP DEFAULT NOW(),
@@ -287,6 +289,9 @@ class DatabaseConnection implements DatabaseClient {
           currency VARCHAR(3) NOT NULL DEFAULT 'AUD',
           status VARCHAR(20) NOT NULL DEFAULT 'draft',
           due_date TIMESTAMP NOT NULL,
+          description TEXT,
+          processing_fee DECIMAL(10,2),
+          metadata JSONB DEFAULT '{}',
           payment_link TEXT,
           stripe_invoice_id VARCHAR(255),
           paid_at TIMESTAMP,
@@ -302,15 +307,18 @@ class DatabaseConnection implements DatabaseClient {
           user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
           amount DECIMAL(12,2) NOT NULL,
           reason TEXT,
+          description TEXT,
           status VARCHAR(20) NOT NULL DEFAULT 'pending',
           stripe_refund_id VARCHAR(255),
+          failure_reason TEXT,
+          metadata JSONB DEFAULT '{}',
           processed_at TIMESTAMP,
           created_at TIMESTAMP DEFAULT NOW(),
           updated_at TIMESTAMP DEFAULT NOW()
         );
       `;
-
-      const createSubscriptionsTable = `
+      
+            const createSubscriptionsTable = `
         CREATE TABLE IF NOT EXISTS subscriptions (
           id SERIAL PRIMARY KEY,
           user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
@@ -347,6 +355,9 @@ class DatabaseConnection implements DatabaseClient {
           event_type VARCHAR(100) NOT NULL,
           processed BOOLEAN DEFAULT FALSE,
           data JSONB NOT NULL,
+          retry_count INTEGER DEFAULT 0,
+          failure_reason TEXT,
+          metadata JSONB DEFAULT '{}',
           created_at TIMESTAMP DEFAULT NOW(),
           processed_at TIMESTAMP
         );
@@ -392,23 +403,29 @@ class DatabaseConnection implements DatabaseClient {
         'CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(status);',
         'CREATE INDEX IF NOT EXISTS idx_payments_payment_type ON payments(payment_type);',
         'CREATE INDEX IF NOT EXISTS idx_payments_created_at ON payments(created_at);',
+        'CREATE INDEX IF NOT EXISTS idx_payments_invoice_id ON payments(invoice_id);',
         'CREATE INDEX IF NOT EXISTS idx_payment_methods_user_id ON payment_methods(user_id);',
         'CREATE INDEX IF NOT EXISTS idx_payment_methods_is_default ON payment_methods(is_default);',
+        'CREATE INDEX IF NOT EXISTS idx_payment_methods_stripe_id ON payment_methods(stripe_payment_method_id);',
         'CREATE INDEX IF NOT EXISTS idx_invoices_user_id ON invoices(user_id);',
         'CREATE INDEX IF NOT EXISTS idx_invoices_quote_id ON invoices(quote_id);',
         'CREATE INDEX IF NOT EXISTS idx_invoices_status ON invoices(status);',
         'CREATE INDEX IF NOT EXISTS idx_invoices_due_date ON invoices(due_date);',
+        'CREATE INDEX IF NOT EXISTS idx_invoices_invoice_number ON invoices(invoice_number);',
         'CREATE INDEX IF NOT EXISTS idx_refunds_payment_id ON refunds(payment_id);',
         'CREATE INDEX IF NOT EXISTS idx_refunds_user_id ON refunds(user_id);',
         'CREATE INDEX IF NOT EXISTS idx_refunds_status ON refunds(status);',
+        'CREATE INDEX IF NOT EXISTS idx_refunds_stripe_refund_id ON refunds(stripe_refund_id);',
         'CREATE INDEX IF NOT EXISTS idx_subscriptions_user_id ON subscriptions(user_id);',
         'CREATE INDEX IF NOT EXISTS idx_subscriptions_status ON subscriptions(status);',
+        'CREATE INDEX IF NOT EXISTS idx_subscriptions_stripe_id ON subscriptions(stripe_subscription_id);',
         'CREATE INDEX IF NOT EXISTS idx_credit_transactions_user_id ON credit_transactions(user_id);',
         'CREATE INDEX IF NOT EXISTS idx_credit_transactions_payment_id ON credit_transactions(payment_id);',
         'CREATE INDEX IF NOT EXISTS idx_credit_transactions_type ON credit_transactions(transaction_type);',
         'CREATE INDEX IF NOT EXISTS idx_webhook_events_stripe_event_id ON webhook_events(stripe_event_id);',
         'CREATE INDEX IF NOT EXISTS idx_webhook_events_processed ON webhook_events(processed);',
-        'CREATE INDEX IF NOT EXISTS idx_webhook_events_event_type ON webhook_events(event_type);'
+        'CREATE INDEX IF NOT EXISTS idx_webhook_events_event_type ON webhook_events(event_type);',
+        'CREATE INDEX IF NOT EXISTS idx_webhook_events_retry_count ON webhook_events(retry_count);'
       ];
 
       for (const indexQuery of paymentIndexes) {
@@ -752,3 +769,4 @@ export const closeDatabase = async (): Promise<void> => {
     throw error;
   }
 };
+

@@ -9,9 +9,8 @@ export class InvoiceRepository {
     this.invoiceModel = new InvoiceModel(client);
   }
 
-  async createInvoice(
+  async create(
     invoiceData: Omit<InvoiceDatabaseRecord, 'id' | 'created_at' | 'updated_at'>,
-    requestId: string,
     transaction?: DatabaseTransaction
   ): Promise<InvoiceDatabaseRecord> {
     try {
@@ -21,8 +20,7 @@ export class InvoiceRepository {
         invoiceId: invoice.id,
         invoiceNumber: invoice.invoice_number,
         userId: invoice.user_id,
-        amount: invoice.amount,
-        requestId
+        amount: invoice.amount
       });
 
       return invoice;
@@ -31,17 +29,15 @@ export class InvoiceRepository {
         invoiceNumber: invoiceData.invoice_number,
         userId: invoiceData.user_id,
         amount: invoiceData.amount,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
       throw error;
     }
   }
 
-  async updateInvoice(
+  async update(
     id: number,
-    updateData: Partial<Omit<InvoiceDatabaseRecord, 'id' | 'created_at' | 'updated_at'>>,
-    requestId: string,
+    updateData: Partial<Pick<InvoiceDatabaseRecord, 'status' | 'description' | 'processing_fee' | 'metadata' | 'payment_link' | 'paid_at'>>,
     transaction?: DatabaseTransaction
   ): Promise<InvoiceDatabaseRecord> {
     try {
@@ -51,26 +47,20 @@ export class InvoiceRepository {
         invoiceId: id,
         invoiceNumber: invoice.invoice_number,
         userId: invoice.user_id,
-        updatedFields: Object.keys(updateData),
-        requestId
+        updatedFields: Object.keys(updateData)
       });
 
       return invoice;
     } catch (error) {
       logger.error('Failed to update invoice', {
         invoiceId: id,
-        updateData,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
       throw error;
     }
   }
 
-  async getInvoiceById(
-    id: number,
-    requestId: string
-  ): Promise<InvoiceDatabaseRecord | null> {
+  async findById(id: number): Promise<InvoiceDatabaseRecord | null> {
     try {
       const invoice = await this.invoiceModel.findById(id);
       
@@ -78,8 +68,7 @@ export class InvoiceRepository {
         logger.info('Invoice retrieved successfully', {
           invoiceId: id,
           invoiceNumber: invoice.invoice_number,
-          userId: invoice.user_id,
-          requestId
+          userId: invoice.user_id
         });
       }
 
@@ -87,17 +76,13 @@ export class InvoiceRepository {
     } catch (error) {
       logger.error('Failed to retrieve invoice', {
         invoiceId: id,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
       throw error;
     }
   }
 
-  async getInvoiceByNumber(
-    invoiceNumber: string,
-    requestId: string
-  ): Promise<InvoiceDatabaseRecord | null> {
+  async findByInvoiceNumber(invoiceNumber: string): Promise<InvoiceDatabaseRecord | null> {
     try {
       const invoice = await this.invoiceModel.findByInvoiceNumber(invoiceNumber);
       
@@ -105,8 +90,7 @@ export class InvoiceRepository {
         logger.info('Invoice retrieved by number', {
           invoiceId: invoice.id,
           invoiceNumber,
-          userId: invoice.user_id,
-          requestId
+          userId: invoice.user_id
         });
       }
 
@@ -114,30 +98,25 @@ export class InvoiceRepository {
     } catch (error) {
       logger.error('Failed to retrieve invoice by number', {
         invoiceNumber,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
       throw error;
     }
   }
 
-  async getUserInvoices(
+  async findByUserId(
     userId: number,
-    limit: number,
-    offset: number,
-    requestId: string,
-    status?: InvoiceStatus
+    limit: number = 50,
+    offset: number = 0
   ): Promise<InvoiceDatabaseRecord[]> {
     try {
-      const invoices = await this.invoiceModel.findByUserId(userId, limit, offset, status);
+      const invoices = await this.invoiceModel.findByUserId(userId, limit, offset);
       
       logger.info('User invoices retrieved', {
         userId,
         count: invoices.length,
         limit,
-        offset,
-        status,
-        requestId
+        offset
       });
 
       return invoices;
@@ -146,46 +125,35 @@ export class InvoiceRepository {
         userId,
         limit,
         offset,
-        status,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
       throw error;
     }
   }
 
-  async getUserInvoicesCount(
-    userId: number,
-    requestId: string,
-    status?: InvoiceStatus
-  ): Promise<number> {
+  async countByUserId(userId: number): Promise<number> {
     try {
-      const count = await this.invoiceModel.countByUserId(userId, status);
+      const count = await this.invoiceModel.countByUserId(userId);
       
       logger.info('User invoices count retrieved', {
         userId,
-        count,
-        status,
-        requestId
+        count
       });
 
       return count;
     } catch (error) {
       logger.error('Failed to retrieve user invoices count', {
         userId,
-        status,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
       throw error;
     }
   }
 
-  async updateInvoiceStatus(
+  async updateStatus(
     id: number,
     status: InvoiceStatus,
-    paidAt: Date | undefined,
-    requestId: string,
+    paidAt?: Date,
     transaction?: DatabaseTransaction
   ): Promise<InvoiceDatabaseRecord> {
     try {
@@ -195,8 +163,7 @@ export class InvoiceRepository {
         invoiceId: id,
         invoiceNumber: invoice.invoice_number,
         newStatus: status,
-        paidAt,
-        requestId
+        paidAt
       });
 
       return invoice;
@@ -204,26 +171,46 @@ export class InvoiceRepository {
       logger.error('Failed to update invoice status', {
         invoiceId: id,
         status,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
       throw error;
     }
   }
 
-  async getInvoicesByStatus(
+  async updateMetadata(
+    id: number,
+    metadata: Record<string, any>,
+    transaction?: DatabaseTransaction
+  ): Promise<InvoiceDatabaseRecord> {
+    try {
+      const invoice = await this.invoiceModel.updateMetadata(id, metadata, transaction);
+      
+      logger.info('Invoice metadata updated', {
+        invoiceId: id
+      });
+
+      return invoice;
+    } catch (error) {
+      logger.error('Failed to update invoice metadata', {
+        invoiceId: id,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      throw error;
+    }
+  }
+
+  async findByStatus(
     status: InvoiceStatus,
-    limit: number,
-    requestId: string
+    limit: number = 100,
+    offset: number = 0
   ): Promise<InvoiceDatabaseRecord[]> {
     try {
-      const invoices = await this.invoiceModel.findByStatus(status, limit);
+      const invoices = await this.invoiceModel.findByStatus(status, limit, offset);
       
       logger.info('Invoices retrieved by status', {
         status,
         count: invoices.length,
-        limit,
-        requestId
+        limit
       });
 
       return invoices;
@@ -231,68 +218,98 @@ export class InvoiceRepository {
       logger.error('Failed to retrieve invoices by status', {
         status,
         limit,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
       throw error;
     }
   }
 
-  async getOverdueInvoices(requestId: string): Promise<InvoiceDatabaseRecord[]> {
+  async findByQuoteId(quoteId: number): Promise<InvoiceDatabaseRecord[]> {
+    try {
+      const invoices = await this.invoiceModel.findByQuoteId(quoteId);
+      
+      logger.info('Invoices retrieved by quote ID', {
+        quoteId,
+        count: invoices.length
+      });
+
+      return invoices;
+    } catch (error) {
+      logger.error('Failed to retrieve invoices by quote ID', {
+        quoteId,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      throw error;
+    }
+  }
+
+  async findOverdueInvoices(): Promise<InvoiceDatabaseRecord[]> {
     try {
       const invoices = await this.invoiceModel.findOverdueInvoices();
       
       logger.info('Overdue invoices retrieved', {
-        count: invoices.length,
-        requestId
+        count: invoices.length
       });
 
       return invoices;
     } catch (error) {
       logger.error('Failed to retrieve overdue invoices', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
       throw error;
     }
   }
 
-  async getInvoicesByDateRange(
+  async findByDateRange(
     startDate: Date,
     endDate: Date,
-    limit: number,
-    offset: number,
-    requestId: string
+    userId?: number
   ): Promise<InvoiceDatabaseRecord[]> {
     try {
-      const invoices = await this.invoiceModel.findByDateRange(startDate, endDate, limit, offset);
+      const invoices = await this.invoiceModel.findByDateRange(startDate, endDate, userId);
       
       logger.info('Invoices retrieved by date range', {
-        startDate,
-        endDate,
-        count: invoices.length,
-        limit,
-        offset,
-        requestId
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+        userId,
+        count: invoices.length
       });
 
       return invoices;
     } catch (error) {
       logger.error('Failed to retrieve invoices by date range', {
-        startDate,
-        endDate,
-        limit,
-        offset,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+        userId,
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
       throw error;
     }
   }
 
-  async deleteInvoice(
+  async getTotalAmountByUser(userId: number, status?: InvoiceStatus): Promise<number> {
+    try {
+      const totalAmount = await this.invoiceModel.getTotalAmountByUser(userId, status);
+      
+      logger.info('User total invoice amount retrieved', {
+        userId,
+        status,
+        totalAmount
+      });
+
+      return totalAmount;
+    } catch (error) {
+      logger.error('Failed to retrieve user total invoice amount', {
+        userId,
+        status,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      throw error;
+    }
+  }
+
+  async delete(
     id: number,
-    requestId: string,
     transaction?: DatabaseTransaction
   ): Promise<boolean> {
     try {
@@ -300,8 +317,7 @@ export class InvoiceRepository {
       
       if (deleted) {
         logger.info('Invoice deleted successfully', {
-          invoiceId: id,
-          requestId
+          invoiceId: id
         });
       }
 
@@ -309,8 +325,7 @@ export class InvoiceRepository {
     } catch (error) {
       logger.error('Failed to delete invoice', {
         invoiceId: id,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
       throw error;
     }

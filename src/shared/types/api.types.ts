@@ -1,3 +1,5 @@
+import { PaymentStatus, PaymentMethod, PaymentType, RefundStatus } from './database.types';
+
 export interface ApiResponse<T = any> {
   success: boolean;
   message: string;
@@ -546,6 +548,18 @@ export interface AttachPaymentMethodResponse {
   attached: boolean;
 }
 
+export interface DetachPaymentMethodResponse {
+  success: boolean;
+  paymentMethodId: string;
+  detached: boolean;
+}
+
+export interface SetDefaultPaymentMethodResponse {
+  success: boolean;
+  paymentMethodId: string;
+  isDefault: boolean;
+}
+
 export interface CreateInvoiceRequest {
   quoteId?: number;
   amount: number;
@@ -592,13 +606,26 @@ export interface UpdateInvoiceStatusResponse {
 
 export interface InvoiceListResponse {
   invoices: InvoiceResponse[];
-  total: number;
+  totalCount: number;
   page: number;
   limit: number;
 }
 
 export interface InvoiceDetailsResponse {
-  invoice: InvoiceResponse;
+  id: number;
+  invoiceNumber: string;
+  amount: number;
+  currency: string;
+  status: string;
+  dueDate: string;
+  description?: string;
+  processingFee?: number;
+  metadata?: Record<string, any>;
+  paymentLink?: string;
+  stripeInvoiceId?: string;
+  paidAt?: string;
+  createdAt: string;
+  updatedAt: string;
   payments: PaymentResponse[];
   refunds: RefundResponse[];
 }
@@ -607,6 +634,7 @@ export interface CreateRefundRequest {
   paymentId: number;
   amount?: number;
   reason?: string;
+  description?: string;
   userId?: number;
   metadata?: Record<string, any>;
 }
@@ -617,6 +645,7 @@ export interface CreateRefundResponse {
   amount: number;
   status: string;
   reason?: string;
+  description?: string;
   stripeRefundId?: string;
   success: boolean;
   createdAt: string;
@@ -724,6 +753,7 @@ export interface ApplePaySessionResponse {
   session?: any;
   merchantIdentifier?: string;
   domainName?: string;
+  displayName?: string;
 }
 
 export interface ApplePayValidationRequest {
@@ -777,12 +807,14 @@ export interface GooglePayTokenResponse {
 }
 
 export interface GooglePayPaymentRequest {
-  token: any;
+  paymentToken: string;
+  paymentType?: string;
   amount: number;
   currency: string;
   description?: string;
   metadata?: Record<string, any>;
   userId?: number;
+  returnUrl?: string;
 }
 
 export interface GooglePayPaymentResponse {
@@ -802,13 +834,17 @@ export interface GooglePayPaymentResponse {
 }
 
 export interface GooglePayConfigRequest {
-  merchantId: string;
-  environment: 'TEST' | 'PRODUCTION';
+  amount?: number;
+  currency?: string;
+  merchantName?: string;
+  description?: string;
 }
 
 export interface GooglePayConfigResponse {
   merchantId: string;
-  merchantName: string;
+  environment: string;
+  apiVersion: number;
+  apiVersionMinor: number;
   allowedPaymentMethods: Array<{
     type: string;
     parameters: {
@@ -823,10 +859,13 @@ export interface GooglePayConfigResponse {
       };
     };
   }>;
-  config?: {
-    merchantId: string;
-    environment: string;
-    allowedPaymentMethods: any[];
+  merchantInfo: {
+    merchantName: string;
+  };
+  transactionInfo: {
+    totalPriceStatus: string;
+    totalPrice: string;
+    currencyCode: string;
   };
 }
 
@@ -834,6 +873,19 @@ export interface WebhookEventRequest {
   stripeEventId: string;
   eventType: string;
   data: Record<string, any>;
+}
+
+export interface WebhookEventResponse {
+  id: number;
+  stripeEventId: string;
+  eventType: string;
+  processed: boolean;
+  data: Record<string, any>;
+  retryCount: number;
+  failureReason?: string;
+  metadata?: Record<string, any>;
+  createdAt: string;
+  processedAt?: string;
 }
 
 export interface PaymentFilterRequest {
@@ -870,47 +922,10 @@ export interface PaymentResponse {
   creditsAwarded?: number;
   stripeFee?: number;
   platformFee?: number;
+  processingFee?: number;
   netAmount?: number;
   processedAt?: string;
   createdAt: string;
-}
-
-export enum PaymentStatus {
-  PENDING = 'pending',
-  PROCESSING = 'processing',
-  SUCCEEDED = 'succeeded',
-  COMPLETED = 'completed',
-  FAILED = 'failed',
-  CANCELED = 'canceled',
-  CANCELLED = 'cancelled',
-  REFUNDED = 'refunded',
-  PARTIALLY_REFUNDED = 'partially_refunded',
-  REQUIRES_ACTION = 'requires_action'
-}
-
-export enum PaymentMethod {
-  CARD = 'card',
-  STRIPE_CARD = 'stripe_card',
-  CASH = 'cash',
-  APPLE_PAY = 'apple_pay',
-  GOOGLE_PAY = 'google_pay',
-  BANK_TRANSFER = 'bank_transfer'
-}
-
-export enum PaymentType {
-  ONE_TIME = 'one_time',
-  SUBSCRIPTION = 'subscription',
-  CREDIT_PURCHASE = 'credit_purchase',
-  INVOICE_PAYMENT = 'invoice_payment',
-  JOB_APPLICATION = 'job_application'
-}
-
-export enum RefundStatus {
-  PENDING = 'pending',
-  APPROVED = 'approved',
-  REJECTED = 'rejected',
-  PROCESSED = 'processed',
-  FAILED = 'failed'
 }
 
 export enum WebhookEventType {
@@ -921,55 +936,4 @@ export enum WebhookEventType {
   REFUND_CREATED = 'refund_created',
   CHARGE_DISPUTE_CREATED = 'charge_dispute_created',
   CHARGE_FAILED = 'charge_failed'
-}
-
-export interface PaymentDatabaseRecord {
-  id: number;
-  user_id: number;
-  stripe_payment_intent_id?: string;
-  amount: number;
-  currency: string;
-  payment_method: string;
-  payment_type: string;
-  status: string;
-  description?: string;
-  metadata?: any;
-  invoice_id?: number;
-  subscription_id?: number;
-  credits_purchased?: number;
-  stripe_fee?: number;
-  platform_fee?: number;
-  net_amount?: number;
-  processed_at?: Date;
-  processing_fee?: number;      
-  failure_reason?: string; 
-  created_at: Date;
-  updated_at: Date;
-}
-
-export interface PaymentMethodDatabaseRecord {
-  id: number;
-  user_id: number;
-  stripe_payment_method_id: string;
-  type: string;
-  card_last_four?: string;
-  card_brand?: string;
-  card_exp_month?: number;
-  card_exp_year?: number;
-  is_default: boolean;
-  created_at: Date;
-  updated_at: Date;
-}
-
-export interface WebhookEventDatabaseRecord {
-  id: number;
-  stripe_event_id: string;
-  event_type: string;
-  processed: boolean;
-  data: any;
-  retry_count: number;          
-  failure_reason?: string;
-  metadata?: any;
-  created_at: Date;
-  processed_at?: Date;
 }

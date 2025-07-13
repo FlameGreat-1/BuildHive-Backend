@@ -19,6 +19,7 @@ import {
   generateInvoiceNumber
 } from '../utils';
 import { StripeService } from './stripe.service';
+import { InvoiceDatabaseRecord, InvoiceStatus } from '../../shared/types';
 
 export class InvoiceService {
   private invoiceRepository: InvoiceRepository;
@@ -26,12 +27,12 @@ export class InvoiceService {
   private stripeService: StripeService;
 
   constructor() {
-    this.initializeRepositories();
     this.stripeService = new StripeService();
+    this.initializeRepositories();
   }
 
   private async initializeRepositories(): Promise<void> {
-    const dbConnection = await getDbConnection();
+    const dbConnection = getDbConnection();
     this.invoiceRepository = new InvoiceRepository(dbConnection);
     this.paymentRepository = new PaymentRepository(dbConnection);
   }
@@ -53,20 +54,23 @@ export class InvoiceService {
       const processingFee = calculateProcessingFee(request.amount, request.currency);
       const totalAmount = request.amount + processingFee;
 
-      const invoiceData = {
-        quoteId: request.quoteId,
-        userId: request.userId,
-        invoiceNumber,
+      const invoiceData: Omit<InvoiceDatabaseRecord, 'id' | 'created_at' | 'updated_at'> = {
+        quote_id: request.quoteId || null,
+        user_id: request.userId || 1,
+        invoice_number: invoiceNumber,
         amount: request.amount,
         currency: request.currency,
-        status: request.status || 'draft',
-        dueDate: request.dueDate,
-        description: request.description,
-        processingFee,
-        metadata: sanitizePaymentMetadata(request.metadata || {})
+        status: (request.status as InvoiceStatus) || InvoiceStatus.DRAFT,
+        due_date: new Date(request.dueDate),
+        description: request.description || null,
+        processing_fee: processingFee,
+        metadata: sanitizePaymentMetadata(request.metadata || {}),
+        payment_link: null,
+        stripe_invoice_id: null,
+        paid_at: null
       };
 
-      const savedInvoice = await this.invoiceRepository.createInvoice(invoiceData, requestId);
+      const savedInvoice = await this.invoiceRepository.create(invoiceData);
 
       if (request.status === 'sent' || request.autoSend) {
         const paymentLink = await this.stripeService.createPaymentLink({
@@ -77,23 +81,22 @@ export class InvoiceService {
           metadata: {
             invoiceId: savedInvoice.id.toString(),
             invoiceNumber,
-            userId: request.userId.toString()
+            userId: (request.userId || 1).toString()
           }
         }, requestId);
 
-        await this.invoiceRepository.updateInvoice(
+        const updatedInvoice = await this.invoiceRepository.update(
           savedInvoice.id,
           {
-            paymentLink: paymentLink.url,
-            stripeInvoiceId: paymentLink.id,
-            status: 'sent'
-          },
-          requestId
+            payment_link: paymentLink.url,
+            stripe_invoice_id: paymentLink.id,
+            status: InvoiceStatus.SENT
+          }
         );
 
         savedInvoice.payment_link = paymentLink.url;
         savedInvoice.stripe_invoice_id = paymentLink.id;
-        savedInvoice.status = 'sent';
+        savedInvoice.status = InvoiceStatus.SENT;
       }
 
       logger.info('Invoice created', {
@@ -113,9 +116,9 @@ export class InvoiceService {
         currency: request.currency,
         status: savedInvoice.status,
         dueDate: request.dueDate,
-        paymentLink: savedInvoice.payment_link,
+        paymentLink: savedInvoice.payment_link || undefined,
         processingFee,
-        createdAt: savedInvoice.created_at
+        createdAt: savedInvoice.created_at.toISOString()
       };
     } catch (error) {
       logger.error('Failed to create invoice', {
@@ -135,21 +138,21 @@ export class InvoiceService {
     requestId: string
   ): Promise<UpdateInvoiceStatusResponse> {
     try {
-      const invoice = await this.invoiceRepository.getInvoiceById(request.invoiceId, requestId);
+      const invoice = await this.invoiceRepository.findById(request.invoiceId);
 
       if (!invoice) {
         throw new Error('Invoice not found');
       }
 
-      const updateData: any = {
-        status: request.status
+      const updateData: Partial<Pick<InvoiceDatabaseRecord, 'status' | 'paid_at'>> = {
+        status: request.status as InvoiceStatus
       };
 
       if (request.status === 'paid' && request.paidAt) {
-        updateData.paidAt = request.paidAt;
+        updateData.paid_at = request.paidAt;
       }
 
-      await this.invoiceRepository.updateInvoice(request.invoiceId, updateData, requestId);
+      await this.invoiceRepository.update(request.invoiceId, updateData);
 
       logger.info('Invoice status updated', {
         invoiceId: request.invoiceId,
@@ -161,7 +164,8 @@ export class InvoiceService {
       return {
         invoiceId: request.invoiceId,
         status: request.status,
-        updatedAt: new Date()
+        updatedAt: new Date().toISOString(),
+        success: true
       };
     } catch (error) {
       logger.error('Failed to update invoice status', {
@@ -175,13 +179,16 @@ export class InvoiceService {
     }
   }
   
-    async getInvoice(invoiceId: number, requestId: string): Promise<InvoiceDetailsResponse> {
+  async getInvoice(invoiceId: number, requestId: string): Promise<InvoiceDetailsResponse> {
     try {
-      const invoice = await this.invoiceRepository.getInvoiceById(invoiceId, requestId);
+      const invoice = await this.invoiceRepository.findById(invoiceId);
 
       if (!invoice) {
         throw new Error('Invoice not found');
       }
+
+      const payments = await this.paymentRepository.findByInvoiceId(invoiceId);
+      const refunds = await this.paymentRepository.getRefundsByInvoiceId(invoiceId);
 
       logger.info('Invoice retrieved', {
         invoiceId,
@@ -191,22 +198,49 @@ export class InvoiceService {
       });
 
       return {
-        id: invoice.id,
-        quoteId: invoice.quote_id,
-        userId: invoice.user_id,
-        invoiceNumber: invoice.invoice_number,
-        amount: invoice.amount,
-        currency: invoice.currency,
-        status: invoice.status,
-        dueDate: invoice.due_date,
-        paidAt: invoice.paid_at,
-        paymentLink: invoice.payment_link,
-        stripeInvoiceId: invoice.stripe_invoice_id,
-        description: invoice.description,
-        processingFee: invoice.processing_fee,
-        metadata: invoice.metadata,
-        createdAt: invoice.created_at,
-        updatedAt: invoice.updated_at
+        invoice: {
+          id: invoice.id,
+          invoiceNumber: invoice.invoice_number,
+          amount: invoice.amount,
+          currency: invoice.currency,
+          status: invoice.status,
+          dueDate: invoice.due_date.toISOString(),
+          description: invoice.description || undefined,
+          processingFee: invoice.processing_fee || undefined,
+          metadata: invoice.metadata || undefined,
+          paymentLink: invoice.payment_link || undefined,
+          stripeInvoiceId: invoice.stripe_invoice_id || undefined,
+          paidAt: invoice.paid_at?.toISOString(),
+          createdAt: invoice.created_at.toISOString(),
+          updatedAt: invoice.updated_at.toISOString()
+        },
+        payments: payments.map(payment => ({
+          id: payment.id,
+          amount: payment.amount,
+          currency: payment.currency,
+          paymentMethod: payment.payment_method,
+          paymentType: payment.payment_type,
+          status: payment.status,
+          description: payment.description || undefined,
+          creditsAwarded: payment.credits_purchased || undefined,
+          stripeFee: payment.stripe_fee || undefined,
+          platformFee: payment.platform_fee || undefined,
+          netAmount: payment.net_amount || undefined,
+          processedAt: payment.processed_at?.toISOString(),
+          createdAt: payment.created_at.toISOString()
+        })),
+        refunds: refunds.map(refund => ({
+          id: refund.id,
+          paymentId: refund.payment_id,
+          amount: refund.amount,
+          status: refund.status,
+          reason: refund.reason || undefined,
+          description: refund.description || undefined,
+          stripeRefundId: refund.stripe_refund_id || undefined,
+          processedAt: refund.processed_at?.toISOString(),
+          metadata: refund.metadata || undefined,
+          createdAt: refund.created_at.toISOString()
+        }))
       };
     } catch (error) {
       logger.error('Failed to get invoice', {
@@ -224,45 +258,46 @@ export class InvoiceService {
     requestId: string
   ): Promise<InvoiceListResponse> {
     try {
-      const invoices = await this.invoiceRepository.getUserInvoices(
+      const invoices = await this.invoiceRepository.findByUserId(
         request.userId,
-        request.status,
-        request.limit,
-        request.offset,
-        requestId
+        request.limit || 50,
+        request.offset || 0
       );
 
-      const totalCount = await this.invoiceRepository.getUserInvoicesCount(
-        request.userId,
-        request.status,
-        requestId
-      );
+      const filteredInvoices = request.status 
+        ? invoices.filter(invoice => invoice.status === request.status)
+        : invoices;
+
+      const totalCount = await this.invoiceRepository.countByUserId(request.userId);
 
       logger.info('User invoices retrieved', {
         userId: request.userId,
         status: request.status,
-        count: invoices.length,
+        count: filteredInvoices.length,
         totalCount,
         requestId
       });
 
       return {
-        invoices: invoices.map(invoice => ({
+        invoices: filteredInvoices.map(invoice => ({
           id: invoice.id,
           invoiceNumber: invoice.invoice_number,
           amount: invoice.amount,
           currency: invoice.currency,
           status: invoice.status,
-          dueDate: invoice.due_date,
-          paidAt: invoice.paid_at,
-          paymentLink: invoice.payment_link,
-          description: invoice.description,
-          processingFee: invoice.processing_fee,
-          createdAt: invoice.created_at,
-          updatedAt: invoice.updated_at
+          dueDate: invoice.due_date.toISOString(),
+          description: invoice.description || undefined,
+          processingFee: invoice.processing_fee || undefined,
+          metadata: invoice.metadata || undefined,
+          paymentLink: invoice.payment_link || undefined,
+          stripeInvoiceId: invoice.stripe_invoice_id || undefined,
+          paidAt: invoice.paid_at?.toISOString(),
+          createdAt: invoice.created_at.toISOString(),
+          updatedAt: invoice.updated_at.toISOString()
         })),
-        totalCount,
-        hasMore: (request.offset || 0) + invoices.length < totalCount
+        total: totalCount,
+        page: Math.floor((request.offset || 0) / (request.limit || 50)) + 1,
+        limit: request.limit || 50
       };
     } catch (error) {
       logger.error('Failed to get user invoices', {
@@ -277,13 +312,13 @@ export class InvoiceService {
 
   async sendInvoice(invoiceId: number, requestId: string): Promise<void> {
     try {
-      const invoice = await this.invoiceRepository.getInvoiceById(invoiceId, requestId);
+      const invoice = await this.invoiceRepository.findById(invoiceId);
 
       if (!invoice) {
         throw new Error('Invoice not found');
       }
 
-      if (invoice.status !== 'draft') {
+      if (invoice.status !== InvoiceStatus.DRAFT) {
         throw new Error('Only draft invoices can be sent');
       }
 
@@ -302,20 +337,18 @@ export class InvoiceService {
           }
         }, requestId);
 
-        await this.invoiceRepository.updateInvoice(
+        await this.invoiceRepository.update(
           invoiceId,
           {
-            paymentLink: paymentLink.url,
-            stripeInvoiceId: paymentLink.id,
-            status: 'sent'
-          },
-          requestId
+            payment_link: paymentLink.url,
+            stripe_invoice_id: paymentLink.id,
+            status: InvoiceStatus.SENT
+          }
         );
       } else {
-        await this.invoiceRepository.updateInvoice(
+        await this.invoiceRepository.update(
           invoiceId,
-          { status: 'sent' },
-          requestId
+          { status: InvoiceStatus.SENT }
         );
       }
 
@@ -337,24 +370,23 @@ export class InvoiceService {
 
   async cancelInvoice(invoiceId: number, requestId: string): Promise<void> {
     try {
-      const invoice = await this.invoiceRepository.getInvoiceById(invoiceId, requestId);
+      const invoice = await this.invoiceRepository.findById(invoiceId);
 
       if (!invoice) {
         throw new Error('Invoice not found');
       }
 
-      if (invoice.status === 'paid') {
+      if (invoice.status === InvoiceStatus.PAID) {
         throw new Error('Cannot cancel paid invoice');
       }
 
-      if (invoice.status === 'cancelled') {
+      if (invoice.status === InvoiceStatus.CANCELLED) {
         throw new Error('Invoice already cancelled');
       }
 
-      await this.invoiceRepository.updateInvoice(
+      await this.invoiceRepository.update(
         invoiceId,
-        { status: 'cancelled' },
-        requestId
+        { status: InvoiceStatus.CANCELLED }
       );
 
       logger.info('Invoice cancelled', {
@@ -376,23 +408,23 @@ export class InvoiceService {
 
   async deleteInvoice(invoiceId: number, requestId: string): Promise<void> {
     try {
-      const invoice = await this.invoiceRepository.getInvoiceById(invoiceId, requestId);
+      const invoice = await this.invoiceRepository.findById(invoiceId);
 
       if (!invoice) {
         throw new Error('Invoice not found');
       }
 
-      if (invoice.status === 'paid') {
+      if (invoice.status === InvoiceStatus.PAID) {
         throw new Error('Cannot delete paid invoice');
       }
 
-      const hasPayments = await this.paymentRepository.hasPaymentsForInvoice(invoiceId, requestId);
+      const hasPayments = await this.paymentRepository.hasPaymentsForInvoice(invoiceId);
 
       if (hasPayments) {
         throw new Error('Cannot delete invoice with associated payments');
       }
 
-      await this.invoiceRepository.deleteInvoice(invoiceId, requestId);
+      await this.invoiceRepository.delete(invoiceId);
 
       logger.info('Invoice deleted', {
         invoiceId,
@@ -412,13 +444,12 @@ export class InvoiceService {
 
   async markInvoiceOverdue(requestId: string): Promise<void> {
     try {
-      const overdueInvoices = await this.invoiceRepository.getOverdueInvoices(requestId);
+      const overdueInvoices = await this.invoiceRepository.findOverdueInvoices();
 
       for (const invoice of overdueInvoices) {
-        await this.invoiceRepository.updateInvoice(
+        await this.invoiceRepository.updateStatus(
           invoice.id,
-          { status: 'overdue' },
-          requestId
+          InvoiceStatus.OVERDUE
         );
 
         logger.info('Invoice marked as overdue', {
@@ -443,4 +474,3 @@ export class InvoiceService {
     }
   }
 }
-

@@ -98,6 +98,36 @@ export enum MaterialUnit {
   BOX = 'box'
 }
 
+export enum PaymentStatus {
+  PENDING = 'pending',
+  PROCESSING = 'processing',
+  SUCCEEDED = 'succeeded',
+  COMPLETED = 'completed',
+  FAILED = 'failed',
+  CANCELED = 'canceled',
+  CANCELLED = 'cancelled',
+  REFUNDED = 'refunded',
+  PARTIALLY_REFUNDED = 'partially_refunded',
+  REQUIRES_ACTION = 'requires_action'
+}
+
+export enum PaymentMethod {
+  CARD = 'card',
+  STRIPE_CARD = 'stripe_card',
+  CASH = 'cash',
+  APPLE_PAY = 'apple_pay',
+  GOOGLE_PAY = 'google_pay',
+  BANK_TRANSFER = 'bank_transfer'
+}
+
+export enum PaymentType {
+  ONE_TIME = 'one_time',
+  SUBSCRIPTION = 'subscription',
+  CREDIT_PURCHASE = 'credit_purchase',
+  INVOICE_PAYMENT = 'invoice_payment',
+  JOB_APPLICATION = 'job_application'
+}
+
 export interface JobDatabaseRecord {
   id: number;
   tradie_id: number;
@@ -265,6 +295,44 @@ export enum RefundStatus {
   FAILED = 'failed'
 }
 
+export interface PaymentDatabaseRecord {
+  id: number;
+  user_id: number;
+  stripe_payment_intent_id?: string;
+  amount: number;
+  currency: string;
+  payment_method: PaymentMethod;
+  payment_type: PaymentType;
+  status: PaymentStatus;
+  description?: string;
+  metadata?: Record<string, any>;
+  invoice_id?: number;
+  subscription_id?: number;
+  credits_purchased?: number;
+  stripe_fee?: number;
+  platform_fee?: number;
+  processing_fee?: number;
+  failure_reason?: string;
+  net_amount?: number;
+  processed_at?: Date;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface PaymentMethodDatabaseRecord {
+  id: number;
+  user_id: number;
+  stripe_payment_method_id: string;
+  type: string;
+  card_last_four?: string;
+  card_brand?: string;
+  card_exp_month?: number;
+  card_exp_year?: number;
+  is_default: boolean;
+  created_at: Date;
+  updated_at: Date;
+}
+
 export interface InvoiceDatabaseRecord {
   id: number;
   quote_id?: number;
@@ -324,4 +392,68 @@ export interface CreditTransactionDatabaseRecord {
   description?: string;
   job_application_id?: number;
   created_at: Date;
+}
+
+export interface WebhookEventDatabaseRecord {
+  id: number;
+  stripe_event_id: string;
+  event_type: string;
+  processed: boolean;
+  data: Record<string, any>;
+  retry_count: number;
+  failure_reason?: string;
+  metadata?: Record<string, any>;
+  created_at: Date;
+  processed_at?: Date;
+}
+
+export interface UserDatabaseRecord {
+  id: number;
+  username: string;
+  email: string;
+  password_hash?: string;
+  role: UserRole;
+  status: UserStatus;
+  auth_provider: AuthProvider;
+  social_id?: string;
+  email_verified: boolean;
+  email_verification_token?: string;
+  email_verification_expires?: Date;
+  password_reset_token?: string;
+  password_reset_expires?: Date;
+  login_attempts: number;
+  locked_until?: Date;
+  last_login_at?: Date;
+  stripe_customer_id?: string;
+  credit_balance: number;
+  subscription_id?: number;
+  subscription_status?: string;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface ProfileDatabaseRecord {
+  id: number;
+  user_id: number;
+  first_name?: string;
+  last_name?: string;
+  phone?: string;
+  avatar?: string;
+  bio?: string;
+  location?: string;
+  timezone?: string;
+  preferences: Record<string, any>;
+  metadata: Record<string, any>;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface SessionDatabaseRecord {
+  id: number;
+  user_id: number;
+  token: string;
+  type: string;
+  expires_at: Date;
+  created_at: Date;
+  updated_at: Date;
 }
