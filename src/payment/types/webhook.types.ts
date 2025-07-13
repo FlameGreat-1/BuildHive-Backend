@@ -28,13 +28,9 @@ export interface WebhookEventPayload {
 
 export interface WebhookProcessingResult {
   success: boolean;
-  eventId: string;
-  eventType: WebhookEventType;
-  processedAt: Date;
-  message?: string;     
-  processed?: boolean;
-  error?: string;
-  retryAfter?: number;
+  processed: boolean;
+  eventId: string | null;
+  message: string;
 }
 
 export interface PaymentIntentWebhookData {
@@ -155,7 +151,3 @@ export interface WebhookBatchProcessingResult {
 }
 
 export type WebhookEventEntity = WebhookEventDatabaseRecord;
-
-export type validateWebhookEvent = (payload: string, signature: string, secret: string) => Promise<WebhookValidationResult>;
-
-export type validateWebhookSignature = (payload: string, signature: string, secret: string) => boolean;

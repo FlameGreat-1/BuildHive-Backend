@@ -203,46 +203,39 @@ const verifyWebhookSignature = (payload: string, signature: string, secret: stri
   }
 };
 
-export const validateWebhookEvent = async (
-  event: any,
-  signature: string,
-  secret: string
-): Promise<WebhookValidationResult> => {
-  const { error, value } = webhookEventSchema.validate(event, {
-    abortEarly: false,
-    stripUnknown: true
-  });
-
-  if (error) {
-    const validationErrors = error.details.map(detail => detail.message);
+export const validateWebhookEvent = async (payload: string): Promise<WebhookValidationResult> => {
+  try {
+    const event = JSON.parse(payload);
     
+    const { error, value } = webhookEventSchema.validate(event, {
+      abortEarly: false,
+      stripUnknown: true
+    });
+
+    if (error) {
+      const validationErrors = error.details.map(detail => detail.message);
+      
+      return {
+        isValid: false,
+        errors: validationErrors
+      };
+    }
+
+    const customValidation = validateWebhookBusinessRules(value);
+    if (!customValidation.isValid) {
+      return customValidation;
+    }
+
+    return {
+      isValid: true,
+      event: value
+    };
+  } catch (error) {
     return {
       isValid: false,
-      errors: validationErrors
+      errors: ['Invalid JSON payload']
     };
   }
-
-  const customValidation = validateWebhookBusinessRules(value);
-  if (!customValidation.isValid) {
-    return customValidation;
-  }
-
-  const signatureValidation = verifyWebhookSignature(
-    JSON.stringify(event),
-    signature,
-    secret
-  );
-
-  if (!signatureValidation) {
-    return {
-      isValid: false,
-      errors: ['Invalid webhook signature']
-    };
-  }
-
-  return {
-    isValid: true
-  };
 };
 
 export const validateWebhookSignature = (

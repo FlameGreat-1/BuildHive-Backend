@@ -527,3 +527,78 @@ export interface GooglePayConfig {
   merchantId: string;
   environment: string;
 }
+
+export interface PaymentStatusResponse {
+  paymentId: number;
+  status: PaymentStatus;
+  amount: number;
+  currency: string;
+  paymentMethod: PaymentMethod;
+  createdAt: string;
+  processedAt?: string;
+  failureReason?: string;
+}
+
+export interface PaymentHistoryResponse {
+  payments: PaymentDatabaseRecord[];
+  totalCount: number;
+  page: number;
+  limit: number;
+  summary: PaymentSummary;
+}
+
+export interface CreateRefundResponse {
+  id: number;
+  paymentId: number;
+  amount: number;
+  status: RefundStatus;
+  reason?: string;
+  description?: string;
+  stripeRefundId?: string;
+  success: boolean;
+  createdAt: string;
+}
+
+export interface UpdateRefundStatusResponse {
+  refundId: number;
+  status: RefundStatus;
+  updatedAt: string;
+  success: boolean;
+}
+
+export interface RefundListResponse {
+  refunds: any[];
+  totalCount: number;
+  summary: {
+    totalRefunded: number;
+    pendingRefunds: number;
+    processedRefunds: number;
+  };
+}
+
+export interface RefundDetailsResponse {
+  id: number;
+  paymentId: number;
+  amount: number;
+  status: RefundStatus;
+  reason?: string;
+  description?: string;
+  stripeRefundId?: string;
+  processedAt?: string;
+  metadata?: Record<string, any>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SetDefaultPaymentMethodResponse {
+  success: boolean;
+  paymentMethodId: number;
+  isDefault: boolean;
+}
+
+export interface PaymentMethodListResponse {
+  paymentMethods: any[];
+  totalCount: number;
+  page: number;
+  limit: number;
+}
