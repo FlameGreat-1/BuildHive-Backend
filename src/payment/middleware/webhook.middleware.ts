@@ -131,11 +131,11 @@ export const parseWebhookPayload = async (
   }
 };
 
-export const validateWebhookEventMiddleware = (
+export const validateWebhookEventMiddleware = async (
   req: WebhookRequest,
   res: Response,
   next: NextFunction
-): void => {
+): Promise<void> => {
   try {
     if (!req.webhookEvent) {
       return next(new AppError(
@@ -144,7 +144,7 @@ export const validateWebhookEventMiddleware = (
       ));
     }
 
-    const validation = validateWebhookEvent(req.webhookEvent);
+    const validation = await validateWebhookEvent(JSON.stringify(req.webhookEvent));
 
     if (!validation.isValid) {
       logger.warn('Webhook event validation failed', {
@@ -160,11 +160,11 @@ export const validateWebhookEventMiddleware = (
       ));
     }
 
-    req.webhookEvent = validation.data;
+    req.webhookEvent = validation.event;
 
     logger.info('Webhook event validation successful', {
-      eventId: validation.data.id,
-      eventType: validation.data.type,
+      eventId: validation.event?.id,
+      eventType: validation.event?.type,
       requestId: req.requestId
     });
 

@@ -150,4 +150,20 @@ export interface WebhookBatchProcessingResult {
   }>;
 }
 
+export interface WebhookEventRequest {
+  id: string;
+  type: string;
+  data: {
+    object: any;
+  };
+  created: number;
+  livemode: boolean;
+  pending_webhooks: number;
+  request: {
+    id: string;
+    idempotency_key?: string;
+  };
+  stripeEventId?: string;
+}
+
 export type WebhookEventEntity = WebhookEventDatabaseRecord;
