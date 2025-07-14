@@ -5,19 +5,17 @@ import { getDbConnection } from '../../shared/database';
 import { 
   WebhookEventType,
   WebhookProcessingResult,
-  StripeWebhookEvent
-} from '../types';
-import { 
-  parseWebhookEvent,
-  validateWebhookSignature,
-  isWebhookEventDuplicate
-} from '../utils';
-import { 
+  StripeWebhookEvent,
   WebhookEventDatabaseRecord, 
   PaymentStatus, 
   RefundStatus,
   InvoiceStatus
 } from '../../shared/types';
+import { 
+  parseWebhookEvent,
+  validateWebhookSignature,
+  isWebhookEventDuplicate
+} from '../utils';
 
 export class WebhookService {
   private webhookRepository!: WebhookRepository;

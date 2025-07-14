@@ -387,9 +387,8 @@ export interface CreateInvoiceResponse {
   paymentLink?: string;
   stripeInvoiceId?: string;
   processingFee?: number;
-  success: boolean; 
-  createdAt: string;
   success: boolean;
+  createdAt: string;
 }
 
 export interface UpdateInvoiceStatusRequest {

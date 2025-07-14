@@ -153,6 +153,7 @@ export interface WebhookBatchProcessingResult {
 export interface WebhookEventRequest {
   id: string;
   type: string;
+  eventType?: string;
   data: {
     object: any;
   };

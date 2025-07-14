@@ -38,11 +38,11 @@ export const validateWebhookSignature = async (
       ));
     }
 
-    const signatureValidation = validateWebhookSignature({
+    const signatureValidation = await validateSignature(
       payload,
       signature,
-      tolerance: WEBHOOK_CONFIG.SECURITY.SIGNATURE_TOLERANCE
-    });
+      WEBHOOK_CONFIG.SECURITY.SIGNATURE_TOLERANCE
+    );
 
     if (!signatureValidation.isValid) {
       logger.warn('Webhook signature validation failed', {
