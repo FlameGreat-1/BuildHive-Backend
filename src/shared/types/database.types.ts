@@ -105,6 +105,7 @@ export enum PaymentStatus {
   COMPLETED = 'completed',
   FAILED = 'failed',
   CANCELLED = 'cancelled',
+  CANCELED = 'cancelled',
   REFUNDED = 'refunded',
   PARTIALLY_REFUNDED = 'partially_refunded',
   REQUIRES_ACTION = 'requires_action'

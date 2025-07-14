@@ -392,7 +392,7 @@ export class WebhookService {
     try {
       const refund = event.data.object;
       
-      const localRefund = await this.refundRepository.getRefundByStripeId(refund.id);
+      const localRefund = await this.refundRepository.findByStripeRefundId(refund.id);
       
       if (localRefund) {
         await this.refundRepository.updateStatus(
@@ -424,7 +424,7 @@ export class WebhookService {
     try {
       const refund = event.data.object;
       
-      const localRefund = await this.refundRepository.getRefundByStripeId(refund.id);
+      const localRefund = await this.refundRepository.findByStripeRefundId(refund.id);
       
       if (localRefund) {
         let status: RefundStatus;

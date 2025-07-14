@@ -153,6 +153,29 @@ export class InvoiceRepository {
       throw error;
     }
   }
+  
+  async getInvoiceByStripeId(stripeInvoiceId: string): Promise<InvoiceDatabaseRecord | null> {
+  try {
+    const invoice = await this.invoiceModel.findByStripeInvoiceId(stripeInvoiceId);
+    
+    if (invoice) {
+      logger.info('Invoice retrieved by Stripe ID', {
+        invoiceId: invoice.id,
+        invoiceNumber: invoice.invoice_number,
+        stripeInvoiceId
+      });
+    }
+
+    return invoice;
+  } catch (error) {
+    logger.error('Failed to retrieve invoice by Stripe ID', {
+      stripeInvoiceId,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+    throw error;
+  }
+}
+
 
   async updateStatus(
     id: number,

@@ -167,7 +167,8 @@ export class ApplePayService {
 
       return {
         merchantSession,
-        success: true
+        success: true,
+        displayName: displayName
       };
     } catch (error) {
       logger.error('Failed to validate Apple Pay merchant', {
@@ -177,7 +178,8 @@ export class ApplePayService {
 
       return {
         merchantSession: null,
-        success: false
+        success: false,
+        displayName: request.displayName || 'BuildHive'
       };
     }
   }

@@ -222,6 +222,28 @@ export class PaymentRepository {
       throw error;
     }
   }
+  
+  async hasPaymentsWithPaymentMethod(stripePaymentMethodId: string): Promise<boolean> {
+  try {
+    const payments = await this.paymentModel.findByStripePaymentMethodId(stripePaymentMethodId);
+    const hasPayments = payments.length > 0;
+    
+    logger.info('Checked payments with payment method', {
+      stripePaymentMethodId,
+      hasPayments,
+      count: payments.length
+    });
+
+    return hasPayments;
+  } catch (error) {
+    logger.error('Failed to check payments with payment method', {
+      stripePaymentMethodId,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+    throw error;
+  }
+}
+
 
   async getTotalAmountByUser(userId: number, status?: PaymentStatus): Promise<number> {
     try {

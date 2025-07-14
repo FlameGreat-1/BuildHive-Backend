@@ -19,7 +19,7 @@ import {
   generateInvoiceNumber
 } from '../utils';
 import { StripeService } from './stripe.service';
-import { InvoiceDatabaseRecord, InvoiceStatus } from '../../shared/types';
+import { InvoiceDatabaseRecord, InvoiceStatus, PaymentMethod } from '../../shared/types';
 
 export class InvoiceService {
   private invoiceRepository!: InvoiceRepository;
@@ -48,7 +48,7 @@ export class InvoiceService {
       }
 
       const invoiceNumber = request.invoiceNumber || generateInvoiceNumber();
-      const processingFee = calculateProcessingFee(request.amount, request.currency);
+      const processingFee = calculateProcessingFee(request.amount, request.currency, PaymentMethod.CARD);
       const totalAmount = request.amount + processingFee;
 
       const invoiceData: Omit<InvoiceDatabaseRecord, 'id' | 'created_at' | 'updated_at'> = {
@@ -111,7 +111,8 @@ export class InvoiceService {
         dueDate: savedInvoice.due_date.toISOString(),
         paymentLink: savedInvoice.payment_link || undefined,
         processingFee,
-        createdAt: savedInvoice.created_at.toISOString()
+        createdAt: savedInvoice.created_at.toISOString(),
+        success: true
       };
     } catch (error) {
       logger.error('Failed to create invoice', {
@@ -175,7 +176,7 @@ export class InvoiceService {
       }
 
       const payments = await this.paymentRepository.findByInvoiceId(invoiceId);
-      const refunds = await this.paymentRepository.getRefundsByInvoiceId(invoiceId);
+      const refunds = await this.paymentRepository.findByInvoiceId(invoiceId);
 
       logger.info('Invoice retrieved', {
         invoiceId,
@@ -217,7 +218,7 @@ export class InvoiceService {
           processedAt: payment.processed_at?.toISOString(),
           createdAt: payment.created_at.toISOString()
         })),
-        refunds: refunds.map(refund => ({
+        refunds: refunds.map((refund: any) => ({
           id: refund.id,
           paymentId: refund.payment_id,
           amount: refund.amount,

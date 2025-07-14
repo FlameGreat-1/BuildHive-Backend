@@ -107,6 +107,33 @@ export class RefundRepository {
       throw error;
     }
   }
+  
+  async findByDateRange(
+  startDate: Date,
+  endDate: Date,
+  userId?: number
+): Promise<RefundDatabaseRecord[]> {
+  try {
+    const refunds = await this.refundModel.findByDateRange(startDate, endDate, userId);
+    
+    logger.info('Refunds retrieved by date range', {
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString(),
+      userId,
+      count: refunds.length
+    });
+
+    return refunds;
+  } catch (error) {
+    logger.error('Failed to retrieve refunds by date range', {
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString(),
+      userId,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+    throw error;
+  }
+}
 
   async updateStatus(
     id: number,

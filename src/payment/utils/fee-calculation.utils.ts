@@ -3,7 +3,10 @@ import { PaymentMethod } from '../../shared/types';
 import { PaymentFeeCalculation } from '../types';
 
 export const calculateStripeFee = (amount: number, paymentMethod: PaymentMethod): number => {
-  const { STRIPE_PERCENTAGE, STRIPE_FIXED, APPLE_PAY_PERCENTAGE, GOOGLE_PAY_PERCENTAGE } = PAYMENT_CONSTANTS.FEES;
+  const STRIPE_PERCENTAGE = PAYMENT_CONSTANTS.STRIPE.PERCENTAGE;
+  const STRIPE_FIXED = PAYMENT_CONSTANTS.STRIPE.FIXED;
+  const APPLE_PAY_PERCENTAGE = PAYMENT_CONSTANTS.STRIPE.PERCENTAGE;
+  const GOOGLE_PAY_PERCENTAGE = PAYMENT_CONSTANTS.STRIPE.PERCENTAGE;
   
   let percentage: number;
   
@@ -25,7 +28,7 @@ export const calculateStripeFee = (amount: number, paymentMethod: PaymentMethod)
 };
 
 export const calculatePlatformFee = (amount: number): number => {
-  const { PLATFORM_PERCENTAGE } = PAYMENT_CONSTANTS.FEES;
+  const PLATFORM_PERCENTAGE = PAYMENT_CONSTANTS.PLATFORM.PERCENTAGE;
   return Math.round((amount * PLATFORM_PERCENTAGE) / 100);
 };
 
@@ -55,7 +58,11 @@ export const calculateNetAmount = (grossAmount: number, paymentMethod: PaymentMe
 };
 
 export const calculateGrossAmount = (netAmount: number, paymentMethod: PaymentMethod): number => {
-  const { STRIPE_PERCENTAGE, STRIPE_FIXED, PLATFORM_PERCENTAGE, APPLE_PAY_PERCENTAGE, GOOGLE_PAY_PERCENTAGE } = PAYMENT_CONSTANTS.FEES;
+  const STRIPE_PERCENTAGE = PAYMENT_CONSTANTS.STRIPE.PERCENTAGE;
+  const STRIPE_FIXED = PAYMENT_CONSTANTS.STRIPE.FIXED;
+  const PLATFORM_PERCENTAGE = PAYMENT_CONSTANTS.PLATFORM.PERCENTAGE;
+  const APPLE_PAY_PERCENTAGE = PAYMENT_CONSTANTS.STRIPE.PERCENTAGE;
+  const GOOGLE_PAY_PERCENTAGE = PAYMENT_CONSTANTS.STRIPE.PERCENTAGE;
   
   let stripePercentage: number;
   
@@ -84,7 +91,8 @@ export const getFeeBreakdown = (amount: number, paymentMethod: PaymentMethod): {
   totalFees: number;
   netAmount: number;
 } => {
-  const { STRIPE_FIXED, PLATFORM_PERCENTAGE } = PAYMENT_CONSTANTS.FEES;
+  const STRIPE_FIXED = PAYMENT_CONSTANTS.STRIPE.FIXED;
+  const PLATFORM_PERCENTAGE = PAYMENT_CONSTANTS.PLATFORM.PERCENTAGE;
   
   const stripePercentageFee = calculateStripeFee(amount, paymentMethod) - STRIPE_FIXED;
   const stripeFixedFee = STRIPE_FIXED;
@@ -129,7 +137,7 @@ export const validateMinimumAmount = (amount: number, paymentMethod: PaymentMeth
 };
 
 export const getMinimumChargeAmount = (paymentMethod: PaymentMethod): number => {
-  const { MIN_AMOUNT } = PAYMENT_CONSTANTS.STRIPE.LIMITS;
+  const MIN_AMOUNT = PAYMENT_CONSTANTS.STRIPE.LIMITS.MIN_AMOUNT;
   const fees = calculateTotalFees(MIN_AMOUNT, paymentMethod);
   
   if (fees.netAmount <= 0) {
