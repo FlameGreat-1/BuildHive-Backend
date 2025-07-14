@@ -141,7 +141,7 @@ export class RefundRepository {
     offset: number = 0
   ): Promise<RefundDatabaseRecord[]> {
     try {
-      const refunds = await this.refundModel.findByStatus(status, limit, offset);
+      const refunds = await this.refundModel.findByStatus(status, limit);
       
       logger.info('Refunds retrieved by status', {
         status,

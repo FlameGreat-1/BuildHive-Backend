@@ -267,25 +267,6 @@ export class PaymentRepository {
     }
   }
 
-  async getRefundsByInvoiceId(invoiceId: number): Promise<any[]> {
-    try {
-      const refunds = await this.paymentModel.getRefundsByInvoiceId(invoiceId);
-      
-      logger.info('Refunds retrieved by invoice ID', {
-        invoiceId,
-        count: refunds.length
-      });
-
-      return refunds;
-    } catch (error) {
-      logger.error('Failed to retrieve refunds by invoice ID', {
-        invoiceId,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
-      throw error;
-    }
-  }
-
   async hasPaymentsForInvoice(invoiceId: number): Promise<boolean> {
     try {
       const payments = await this.findByInvoiceId(invoiceId);

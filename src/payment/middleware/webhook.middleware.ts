@@ -37,8 +37,8 @@ export const validateWebhookSignature = async (
         HTTP_STATUS_CODES.BAD_REQUEST
       ));
     }
-
-    const signatureValidation = validateSignature(payload, signature);
+    
+    const signatureValidation = validateSignature(payload, signature, process.env.STRIPE_WEBHOOK_SECRET || '');
 
     if (!signatureValidation) {
       logger.warn('Webhook signature validation failed', {
@@ -138,8 +138,8 @@ export const validateWebhookEventMiddleware = async (
         HTTP_STATUS_CODES.BAD_REQUEST
       ));
     }
-
-    const validation = await validateWebhookEvent(req.webhookEvent);
+    
+    const validation = await validateWebhookEvent(JSON.stringify(req.webhookEvent));
 
     if (!validation.isValid) {
       logger.warn('Webhook event validation failed', {

@@ -33,9 +33,9 @@ import {
 
 export class StripeService {
   private stripe: Stripe;
-  private paymentRepository!: PaymentRepository;
-  private paymentMethodRepository!: PaymentMethodRepository;
-  private refundRepository!: RefundRepository;
+  private paymentRepository: PaymentRepository;
+  private paymentMethodRepository: PaymentMethodRepository;
+  private refundRepository: RefundRepository;
 
   constructor() {
     const apiKey = process.env.STRIPE_SECRET_KEY;
@@ -50,10 +50,6 @@ export class StripeService {
       timeout: PAYMENT_CONSTANTS.STRIPE?.TIMEOUT || 30000
     });
 
-    this.initializeRepositories();
-  }
-
-  private async initializeRepositories(): Promise<void> {
     const dbConnection = getDbConnection();
     this.paymentRepository = new PaymentRepository(dbConnection);
     this.paymentMethodRepository = new PaymentMethodRepository(dbConnection);

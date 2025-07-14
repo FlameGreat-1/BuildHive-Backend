@@ -146,6 +146,12 @@ export class PaymentModel {
     const result = await this.client.query<PaymentDatabaseRecord>(query, [userId, limit, offset]);
     return result.rows;
   }
+  
+  async findByInvoiceId(invoiceId: number): Promise<PaymentDatabaseRecord[]> {
+    const query = `SELECT * FROM ${PAYMENT_TABLES.PAYMENTS} WHERE invoice_id = $1`;
+    const result = await this.client.query<PaymentDatabaseRecord>(query, [invoiceId]);
+    return result.rows;
+  }
 
   async updateStatus(
     id: number,

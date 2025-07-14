@@ -46,8 +46,7 @@ export const authorizePaymentAccess = async (
       const paymentRepository = new PaymentRepository(database);
       
       const payment = await paymentRepository.getPaymentById(
-        parseInt(paymentId),
-        req.requestId || 'unknown'
+        parseInt(paymentId)
       );
 
       if (!payment) {
@@ -118,8 +117,7 @@ export const authorizeInvoiceAccess = async (
       const invoiceRepository = new (await import('../repositories')).InvoiceRepository(database);
       
       const invoice = await invoiceRepository.getInvoiceById(
-        parseInt(invoiceId),
-        req.requestId || 'unknown'
+        parseInt(invoiceId)
       );
 
       if (!invoice) {
@@ -190,8 +188,7 @@ export const authorizeRefundAccess = async (
       const refundRepository = new (await import('../repositories')).RefundRepository(database);
       
       const refund = await refundRepository.getRefundById(
-        parseInt(refundId),
-        req.requestId || 'unknown'
+        parseInt(refundId)
       );
 
       if (!refund) {
@@ -322,9 +319,7 @@ export const validatePaymentLimits = async (
       const paymentRepository = new PaymentRepository(database);
       
       const dailyTotal = await paymentRepository.getUserTotalAmount(
-        parseInt(req.user.id),
-        undefined,
-        req.requestId || 'unknown'
+        parseInt(req.user.id)
       );
 
       const dailyLimit = PAYMENT_CONSTANTS.LIMITS.DAILY_LIMIT;
