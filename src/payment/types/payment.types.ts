@@ -66,6 +66,7 @@ export interface ConfirmPaymentResponse {
   paymentIntentId: string;
   status: PaymentStatus;
   requiresAction: boolean;
+  clientSecret?: string;
   nextAction?: PaymentNextAction;
   error?: PaymentError;
 }
@@ -119,6 +120,8 @@ export interface CreatePaymentMethodRequest {
     cvc: string;
   };
   billingDetails?: BillingDetails;
+  metadata?: Record<string, any>;
+  setAsDefault?: boolean;
 }
 
 export interface CreatePaymentMethodResponse {
@@ -268,6 +271,7 @@ export interface GooglePayConfigResponse {
   merchantId: string;
   merchantName: string;
   environment: string;
+  apiVersionMinor?: number; 
   allowedPaymentMethods: Array<{
     type: string;
     parameters: {
@@ -379,6 +383,7 @@ export interface CreateInvoiceResponse {
   dueDate: string;
   paymentLink?: string;
   stripeInvoiceId?: string;
+  processingFee?: number;
   createdAt: string;
   success: boolean;
 }
@@ -424,6 +429,7 @@ export interface CreateRefundRequest {
   paymentId: string;
   amount: number;
   reason: string;
+  description?: string;  
   userId?: number;
   metadata?: Record<string, any>;
 }
@@ -534,9 +540,13 @@ export interface PaymentStatusResponse {
   amount: number;
   currency: string;
   paymentMethod: PaymentMethod;
+  paymentType: PaymentType;  
+  description?: string;      
   createdAt: string;
   processedAt?: string;
   failureReason?: string;
+  creditsAwarded?: number;   
+  metadata?: Record<string, any>; 
 }
 
 export interface PaymentHistoryResponse {
