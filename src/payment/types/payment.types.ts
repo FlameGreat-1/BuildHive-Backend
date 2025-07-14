@@ -66,6 +66,8 @@ export interface ConfirmPaymentResponse {
   paymentIntentId: string;
   status: PaymentStatus;
   requiresAction: boolean;
+  amount: number;           
+  currency: string;
   clientSecret?: string;
   nextAction?: PaymentNextAction;
   error?: PaymentError;
@@ -271,6 +273,7 @@ export interface GooglePayConfigResponse {
   merchantId: string;
   merchantName: string;
   environment: string;
+  merchantInfo?: any;
   apiVersionMinor?: number; 
   allowedPaymentMethods: Array<{
     type: string;
@@ -384,6 +387,7 @@ export interface CreateInvoiceResponse {
   paymentLink?: string;
   stripeInvoiceId?: string;
   processingFee?: number;
+  success: boolean; 
   createdAt: string;
   success: boolean;
 }
@@ -438,6 +442,8 @@ export interface UpdateRefundStatusRequest {
   refundId: number;
   status: string;
   reason?: string;
+  processedAt?: Date;       
+  failureReason?: string; 
 }
 
 export interface RefundListRequest {
@@ -469,27 +475,6 @@ export interface PaymentMethodListRequest {
 export type CreatePaymentRequest = CreatePaymentIntentRequest;
 export type ApplePayValidationRequest = ApplePaySessionRequest;
 export type ApplePayValidationResponse = ApplePaySessionResponse;
-
-export interface WebhookValidationResult {
-  isValid: boolean;
-  errors?: string[];
-  event?: any;
-}
-
-export interface WebhookEventRequest {
-  id: string;
-  type: string;
-  data: {
-    object: any;
-  };
-  created: number;
-  livemode: boolean;
-  pending_webhooks: number;
-  request: {
-    id: string;
-    idempotency_key?: string;
-  };
-}
 
 export interface PaymentService {
   getPaymentMethods(): Promise<PaymentMethod[]>;

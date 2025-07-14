@@ -2,7 +2,10 @@ import { Request, Response, NextFunction } from 'express';
 import { WEBHOOK_CONFIG } from '../../config/payment';
 import { logger, AppError } from '../../shared/utils';
 import { HTTP_STATUS_CODES } from '../../config/auth/constants';
-import { validateWebhookEvent, validateWebhookSignature } from '../validators';
+import { 
+  validateWebhookEvent, 
+  validateWebhookSignature as validateSignature 
+} from '../validators';
 import { parseWebhookEvent } from '../utils';
 import { WebhookRepository } from '../repositories';
 import { getDbConnection } from '../../shared/database';
