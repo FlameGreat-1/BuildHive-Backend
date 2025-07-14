@@ -32,11 +32,7 @@ export class WebhookController {
         requestId
       });
 
-      const signatureValid = validateWebhookSignature(
-        payload,
-        signature,
-        process.env.STRIPE_WEBHOOK_SECRET || ''
-      );
+      const signatureValid = validateWebhookSignature(payload, signature);
 
       if (!signatureValid) {
         logger.warn('Invalid webhook signature', {
@@ -46,11 +42,7 @@ export class WebhookController {
         return sendErrorResponse(res, 'Invalid webhook signature', 400);
       }
 
-      const validationResult = await validateWebhookEvent(
-        req.body,
-        signature,
-        process.env.STRIPE_WEBHOOK_SECRET || ''
-      );
+      const validationResult = await validateWebhookEvent(req.body);
 
       if (!validationResult.isValid) {
         logger.warn('Invalid webhook event', {
@@ -61,13 +53,7 @@ export class WebhookController {
         return sendErrorResponse(res, 'Invalid webhook event', 400);
       }
 
-      const webhookRequest: WebhookEventRequest = {
-        stripeEventId: req.body.id,
-        eventType: req.body.type,
-        data: req.body.data
-      };
-
-      const result = await this.webhookService.processWebhookEvent(webhookRequest, requestId);
+      const result = await this.webhookService.processWebhookEvent(payload, signature);
 
       logger.info('Webhook processed successfully', {
         eventId: req.body.id,
@@ -104,7 +90,7 @@ export class WebhookController {
         requestId
       });
 
-      const webhookEvent = await this.webhookService.getWebhookEvent(eventId, requestId);
+      const webhookEvent = await this.webhookService.getWebhookEvent(eventId);
 
       if (!webhookEvent) {
         return sendErrorResponse(res, 'Webhook event not found', 404);
@@ -145,7 +131,7 @@ export class WebhookController {
         offset,
         eventType,
         processed
-      }, requestId);
+      });
 
       sendSuccessResponse(res, 'Webhook events retrieved successfully', webhookEvents);
 
@@ -173,7 +159,7 @@ export class WebhookController {
         requestId
       });
 
-      const retryResult = await this.webhookService.retryWebhookEvent(eventId, requestId);
+      const retryResult = await this.webhookService.retryWebhookEvent(eventId);
 
       logger.info('Webhook event retried successfully', {
         eventId,
@@ -215,7 +201,7 @@ export class WebhookController {
       const stats = await this.webhookService.getWebhookStats({
         startDate,
         endDate
-      }, requestId);
+      });
 
       sendSuccessResponse(res, 'Webhook statistics retrieved successfully', stats);
 

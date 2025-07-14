@@ -4,13 +4,15 @@ import { WebhookRepository, PaymentRepository, RefundRepository, InvoiceReposito
 import { getDbConnection } from '../../shared/database';
 import { 
   WebhookEventType,
-  WebhookProcessingResult,
-  StripeWebhookEvent,
   WebhookEventDatabaseRecord, 
   PaymentStatus, 
   RefundStatus,
   InvoiceStatus
 } from '../../shared/types';
+import {
+  WebhookProcessingResult,
+  StripeWebhookEvent
+} from '../types/webhook.types';
 import { 
   parseWebhookEvent,
   validateWebhookSignature,
@@ -18,16 +20,12 @@ import {
 } from '../utils';
 
 export class WebhookService {
-  private webhookRepository!: WebhookRepository;
-  private paymentRepository!: PaymentRepository;
-  private refundRepository!: RefundRepository;
-  private invoiceRepository!: InvoiceRepository;
+  private webhookRepository: WebhookRepository;
+  private paymentRepository: PaymentRepository;
+  private refundRepository: RefundRepository;
+  private invoiceRepository: InvoiceRepository;
 
   constructor() {
-    this.initializeRepositories();
-  }
-
-  private async initializeRepositories(): Promise<void> {
     const dbConnection = getDbConnection();
     this.webhookRepository = new WebhookRepository(dbConnection);
     this.paymentRepository = new PaymentRepository(dbConnection);
@@ -359,7 +357,7 @@ export class WebhookService {
     }
   }
   
-    private async handleInvoicePaymentFailed(event: StripeWebhookEvent): Promise<{ success: boolean; message: string }> {
+  private async handleInvoicePaymentFailed(event: StripeWebhookEvent): Promise<{ success: boolean; message: string }> {
     try {
       const invoice = event.data.object;
       
@@ -421,8 +419,8 @@ export class WebhookService {
       };
     }
   }
-
-  private async handleRefundUpdated(event: StripeWebhookEvent): Promise<{ success: boolean; message: string }> {
+  
+    private async handleRefundUpdated(event: StripeWebhookEvent): Promise<{ success: boolean; message: string }> {
     try {
       const refund = event.data.object;
       
@@ -555,6 +553,39 @@ export class WebhookService {
       };
     }
     return this.retryFailedWebhookEvent(numericEventId);
+  }
+
+  async getWebhookEvent(eventId: string): Promise<any> {
+    try {
+      const numericEventId = parseInt(eventId);
+      if (isNaN(numericEventId)) {
+        throw new Error('Invalid event ID');
+      }
+
+      const webhookEvent = await this.webhookRepository.findById(numericEventId);
+      
+      if (!webhookEvent) {
+        return null;
+      }
+
+      return {
+        id: webhookEvent.id,
+        stripeEventId: webhookEvent.stripe_event_id,
+        eventType: webhookEvent.event_type,
+        processed: webhookEvent.processed,
+        retryCount: webhookEvent.retry_count,
+        failureReason: webhookEvent.failure_reason || undefined,
+        metadata: webhookEvent.metadata || undefined,
+        createdAt: webhookEvent.created_at.toISOString(),
+        processedAt: webhookEvent.processed_at?.toISOString()
+      };
+    } catch (error) {
+      logger.error('Failed to get webhook event', {
+        eventId,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      throw error;
+    }
   }
 
   async getWebhookEventStatus(eventId: string): Promise<any> {

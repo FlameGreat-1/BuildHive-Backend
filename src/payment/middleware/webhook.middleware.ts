@@ -38,15 +38,10 @@ export const validateWebhookSignature = async (
       ));
     }
 
-    const signatureValidation = await validateSignature(
-      payload,
-      signature,
-      WEBHOOK_CONFIG.SECURITY.SIGNATURE_TOLERANCE
-    );
+    const signatureValidation = validateSignature(payload, signature);
 
-    if (!signatureValidation.isValid) {
+    if (!signatureValidation) {
       logger.warn('Webhook signature validation failed', {
-        errors: signatureValidation.errors,
         requestId: req.requestId,
         ip: req.ip
       });
@@ -144,7 +139,7 @@ export const validateWebhookEventMiddleware = async (
       ));
     }
 
-    const validation = await validateWebhookEvent(JSON.stringify(req.webhookEvent));
+    const validation = await validateWebhookEvent(req.webhookEvent);
 
     if (!validation.isValid) {
       logger.warn('Webhook event validation failed', {
@@ -200,8 +195,7 @@ export const checkWebhookDuplicateMiddleware = async (
     const webhookRepository = new WebhookRepository(dbConnection);
 
     const existingEvent = await webhookRepository.getWebhookEventByStripeId(
-      req.webhookEvent.id,
-      req.requestId || 'unknown'
+      req.webhookEvent.id
     );
 
     if (existingEvent) {
