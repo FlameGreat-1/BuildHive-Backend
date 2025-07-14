@@ -51,8 +51,9 @@ export class ApplePayService {
       if (!validateCurrency(request.currency || 'USD')) {
         throw new Error('Unsupported currency for Apple Pay');
       }
+      
+      const processingFee = calculateProcessingFee(request.amount, request.currency || 'USD', PaymentMethod.APPLE_PAY);
 
-      const processingFee = calculateProcessingFee(request.amount, request.currency || 'USD');
       const totalAmount = request.amount + processingFee;
 
       const applePaySession = {
@@ -196,11 +197,12 @@ export class ApplePayService {
       const sanitizedMetadata = sanitizePaymentMetadata({
         userId: (userId || 1).toString(),
         paymentType: paymentType || PaymentType.ONE_TIME,
-        applePayTransaction: requestPaymentData.transactionIdentifier || generateIdempotencyKey(),
+        
+        applePayTransaction: requestPaymentData.transactionIdentifier || generateIdempotencyKey(userId || 1, amount),
         ...metadata
       });
-
-      const processingFee = calculateProcessingFee(amount, currency);
+      
+      const processingFee = calculateProcessingFee(amount, currency, PaymentMethod.APPLE_PAY);
 
       const stripePaymentIntent = await this.stripeService.createPaymentIntent({
         amount,
@@ -236,7 +238,7 @@ export class ApplePayService {
         stripe_fee: undefined,
         platform_fee: undefined,
         processing_fee: processingFee,
-        failure_reason: confirmResult.error || undefined,
+        failure_reason: confirmResult.error?.message || undefined,
         net_amount: amount - processingFee,
         processed_at: confirmResult.status === PaymentStatus.SUCCEEDED ? new Date() : undefined
       };

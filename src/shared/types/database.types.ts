@@ -104,7 +104,6 @@ export enum PaymentStatus {
   SUCCEEDED = 'succeeded',
   COMPLETED = 'completed',
   FAILED = 'failed',
-  CANCELED = 'canceled',
   CANCELLED = 'cancelled',
   REFUNDED = 'refunded',
   PARTIALLY_REFUNDED = 'partially_refunded',
@@ -284,7 +283,8 @@ export enum InvoiceStatus {
   SENT = 'sent',
   PAID = 'paid',
   OVERDUE = 'overdue',
-  CANCELLED = 'cancelled'
+  CANCELLED = 'cancelled',
+  FAILED = 'failed'  
 }
 
 export enum RefundStatus {

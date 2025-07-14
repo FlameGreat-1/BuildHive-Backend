@@ -70,7 +70,7 @@ export class StripeService {
       const userId = request.userId || parseInt(sanitizedMetadata.userId || '0') || 1;
       
       const idempotencyKey = generateIdempotencyKey(userId, request.amount);
-      const processingFee = calculateProcessingFee(request.amount, request.currency);
+      const processingFee = calculateProcessingFee(request.amount, request.currency, request.paymentMethod);
       const totalAmount = request.amount + processingFee;
 
       const paymentIntentParams: Stripe.PaymentIntentCreateParams = {
@@ -106,7 +106,7 @@ export class StripeService {
         currency: request.currency,
         payment_method: request.paymentMethod as PaymentMethod,
         payment_type: (request.paymentType as PaymentType) || PaymentType.ONE_TIME,
-        status: this.mapStripeStatus(paymentIntent.status) as PaymentStatus,
+        status: this.mapStripeStatus(paymentIntent.status),
         description: request.description || undefined,
         metadata: sanitizedMetadata,
         invoice_id: undefined,
@@ -141,7 +141,7 @@ export class StripeService {
         requiresAction: paymentIntent.status === 'requires_action',
         nextAction: paymentIntent.next_action ? {
           type: paymentIntent.next_action.type as any,
-          redirectUrl: paymentIntent.next_action.redirect_to_url?.url
+          redirectUrl: paymentIntent.next_action.redirect_to_url?.url || undefined
         } : undefined
       };
     } catch (error) {
@@ -181,7 +181,7 @@ export class StripeService {
       );
 
       if (payment) {
-        const mappedStatus = this.mapStripeStatus(paymentIntent.status) as PaymentStatus;
+        const mappedStatus = this.mapStripeStatus(paymentIntent.status);
         const processedAt = mappedStatus === PaymentStatus.SUCCEEDED ? new Date() : undefined;
         
         await this.paymentRepository.updateStatus(
@@ -212,10 +212,13 @@ export class StripeService {
         currency: paymentIntent.currency.toUpperCase(),
         nextAction: paymentIntent.next_action ? {
           type: paymentIntent.next_action.type as any,
-          redirectUrl: paymentIntent.next_action.redirect_to_url?.url
+          redirectUrl: paymentIntent.next_action.redirect_to_url?.url || undefined
         } : undefined,
-        error: paymentIntent.last_payment_error ? 
-          paymentIntent.last_payment_error.message : undefined
+        error: paymentIntent.last_payment_error ? {
+          message: paymentIntent.last_payment_error.message || 'Payment failed',
+          code: paymentIntent.last_payment_error.code || 'unknown',
+          type: paymentIntent.last_payment_error.type || 'api_error'
+        } as PaymentError : undefined
       };
     } catch (error) {
       logger.error('Failed to confirm Stripe payment intent', {
@@ -270,8 +273,10 @@ export class StripeService {
       });
 
       return {
+        id: paymentMethod.id,
         paymentMethodId: paymentMethod.id,
         type: request.type,
+        createdAt: new Date(paymentMethod.created * 1000).toISOString(),
         card: paymentMethod.card ? {
           brand: paymentMethod.card.brand,
           last4: paymentMethod.card.last4,
@@ -306,7 +311,7 @@ export class StripeService {
       }
 
       const sanitizedMetadata = sanitizePaymentMetadata(request.metadata || {});
-      const processingFee = calculateProcessingFee(request.amount, request.currency);
+      const processingFee = calculateProcessingFee(request.amount, request.currency, PaymentMethod.STRIPE_CARD);
       const totalAmount = request.amount + processingFee;
 
       const paymentLink = await this.stripe.paymentLinks.create({
@@ -319,7 +324,7 @@ export class StripeService {
             unit_amount: totalAmount
           },
           quantity: 1
-        }],
+        }] as any,
         metadata: {
           ...sanitizedMetadata,
           originalAmount: request.amount.toString(),
@@ -400,7 +405,7 @@ export class StripeService {
           amount: refund.amount,
           reason: reason || undefined,
           description: `Refund for payment ${payment.id}`,
-          status: this.mapRefundStatus(refund.status) as RefundStatus,
+          status: this.mapRefundStatus(refund.status),
           stripe_refund_id: refund.id,
           failure_reason: undefined,
           metadata: metadata || {},
@@ -608,7 +613,7 @@ export class StripeService {
           exp_year: 2025,
           cvc: '123'
         }
-      });
+      } as any);
 
       logger.info('Google Pay token created', {
         tokenId: token.id
@@ -706,7 +711,7 @@ export class StripeService {
     }
   }
 
-  private mapStripeStatus(status: string): string {
+  private mapStripeStatus(status: string): PaymentStatus {
     switch (status) {
       case 'requires_payment_method':
         return PaymentStatus.PENDING;
@@ -727,7 +732,7 @@ export class StripeService {
     }
   }
 
-  private mapRefundStatus(status: string): string {
+  private mapRefundStatus(status: string): RefundStatus {
     switch (status) {
       case 'pending':
         return RefundStatus.PENDING;

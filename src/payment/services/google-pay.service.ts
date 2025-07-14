@@ -53,8 +53,9 @@ export class GooglePayService {
       if (!validateCurrency(currency)) {
         throw new Error('Unsupported currency for Google Pay');
       }
+      
+      const processingFee = amount > 0 ? calculateProcessingFee(amount, currency, PaymentMethod.GOOGLE_PAY) : 0;
 
-      const processingFee = amount > 0 ? calculateProcessingFee(amount, currency) : 0;
       const totalAmount = amount + processingFee;
 
       const googlePayConfig = {
@@ -107,15 +108,14 @@ export class GooglePayService {
         totalAmount,
         environment: googlePayConfig.environment
       });
-
+      
       return {
         merchantId: googlePayConfig.merchantId,
         merchantName: request.merchantName || 'BuildHive',
         environment: googlePayConfig.environment,
         apiVersionMinor: googlePayConfig.apiVersionMinor,
         allowedPaymentMethods: googlePayConfig.allowedPaymentMethods,
-        merchantInfo: googlePayConfig.merchantInfo,
-        transactionInfo: googlePayConfig.transactionInfo
+         merchantInfo: googlePayConfig.merchantInfo      
       };
     } catch (error) {
       logger.error('Failed to generate Google Pay config', {
@@ -196,8 +196,8 @@ export class GooglePayService {
         googlePayToken: typeof paymentToken === 'string' ? paymentToken : JSON.stringify(paymentToken),
         ...metadata
       });
-
-      const processingFee = calculateProcessingFee(amount, currency);
+      
+      const processingFee = calculateProcessingFee(amount, currency, PaymentMethod.GOOGLE_PAY);
 
       const stripePaymentIntent = await this.stripeService.createPaymentIntent({
         amount,
@@ -233,7 +233,7 @@ export class GooglePayService {
         stripe_fee: undefined,
         platform_fee: undefined,
         processing_fee: processingFee,
-        failure_reason: confirmResult.error || undefined,
+        failure_reason: confirmResult.error?.message || undefined,
         net_amount: amount - processingFee,
         processed_at: confirmResult.status === PaymentStatus.SUCCEEDED ? new Date() : undefined
       };

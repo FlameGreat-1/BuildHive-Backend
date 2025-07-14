@@ -161,8 +161,8 @@ export interface PaymentLinkResponse {
   amount: number;
   currency: string;
   status: 'active' | 'inactive';
-  expiresAt?: Date;
-  created: Date;
+  expiresAt?: string;      
+  createdAt: string;
 }
 
 export interface ApplePaySessionRequest {
