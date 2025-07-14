@@ -1,4 +1,4 @@
-import { PAYMENT_CONSTANTS } from '../../config/payment';
+import { PAYMENT_CONSTANTS } from '../../config/payment/constants';
 import { PaymentMethod } from '../../shared/types';
 import { PaymentFeeCalculation } from '../types';
 

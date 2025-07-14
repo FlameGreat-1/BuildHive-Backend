@@ -147,6 +147,21 @@ export class PaymentModel {
     return result.rows;
   }
   
+  async findByStripePaymentMethodId(stripePaymentMethodId: string): Promise<PaymentDatabaseRecord[]> {
+  try {
+    const query = `
+      SELECT * FROM ${this.tableName} 
+      WHERE stripe_payment_method_id = $1 
+      ORDER BY created_at DESC
+    `;
+    
+    const result = await this.client.query(query, [stripePaymentMethodId]);
+    return result.rows;
+  } catch (error) {
+    throw error;
+  }
+}
+  
   async findByInvoiceId(invoiceId: number): Promise<PaymentDatabaseRecord[]> {
     const query = `SELECT * FROM ${PAYMENT_TABLES.PAYMENTS} WHERE invoice_id = $1`;
     const result = await this.client.query<PaymentDatabaseRecord>(query, [invoiceId]);

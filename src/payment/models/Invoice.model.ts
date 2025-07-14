@@ -162,6 +162,21 @@ export class InvoiceModel {
     const result = await this.client.query<InvoiceDatabaseRecord>(query, [userId, limit, offset]);
     return result.rows;
   }
+  
+  async findByStripeInvoiceId(stripeInvoiceId: string): Promise<InvoiceDatabaseRecord | null> {
+  try {
+    const query = `
+      SELECT * FROM ${this.tableName} 
+      WHERE stripe_invoice_id = $1 
+      LIMIT 1
+    `;
+    
+    const result = await this.client.query(query, [stripeInvoiceId]);
+    return result.rows[0] || null;
+  } catch (error) {
+    throw error;
+  }
+}
 
   async findByDateRange(
     startDate: Date,
