@@ -1,8 +1,8 @@
-import { Pool } from 'pg';
+import { DatabaseConnection } from '../../shared/database/connection';
 import { QuoteData, QuoteWithRelations, QuoteCreateData, QuoteUpdateData } from '../types';
 import { QuoteStatus } from '../../shared/types';
 import { DatabaseRecord } from '../../shared/types';
-import { connection } from '../../shared/database';
+import { connection } from '../../shared/database/connection';
 
 export interface QuoteRecord extends DatabaseRecord {
   id: number;
@@ -41,10 +41,10 @@ export interface QuoteWithRelationsRecord extends QuoteRecord {
 }
 
 export class QuoteModel {
-  private pool: Pool;
+  private db: DatabaseConnection;
 
   constructor() {
-    this.pool = connection;
+    this.db = connection;
   }
 
   static fromRecord(record: QuoteRecord): QuoteData {

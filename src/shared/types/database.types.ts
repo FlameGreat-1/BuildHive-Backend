@@ -458,3 +458,9 @@ export interface SessionDatabaseRecord {
   created_at: Date;
   updated_at: Date;
 }
+
+export interface DatabaseRecord {
+  id: number;
+  created_at: Date;
+  updated_at: Date;
+}

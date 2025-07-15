@@ -1,8 +1,8 @@
-import { Pool } from 'pg';
+import { DatabaseConnection } from '../../shared/database/connection';
 import { QuoteItemData, QuoteItemCreateData, QuoteItemUpdateData } from '../types';
 import { QuoteItemType, MaterialUnit } from '../../shared/types';
 import { DatabaseRecord } from '../../shared/types';
-import { connection } from '../../shared/database';
+import { connection } from '../../shared/database/connection';
 
 export interface QuoteItemRecord extends DatabaseRecord {
   id: number;
@@ -19,10 +19,10 @@ export interface QuoteItemRecord extends DatabaseRecord {
 }
 
 export class QuoteItemModel {
-  private pool: Pool;
+  private db: DatabaseConnection;
 
   constructor() {
-    this.pool = connection;
+    this.db = connection;
   }
 
   static fromRecord(record: QuoteItemRecord): QuoteItemData {

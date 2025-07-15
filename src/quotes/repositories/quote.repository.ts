@@ -1,4 +1,4 @@
-import { Pool, PoolClient } from 'pg';
+import { DatabaseConnection } from '../../shared/database/connection';
 import { 
   QuoteRepository,
   QuoteData, 
@@ -16,24 +16,22 @@ import {
 import { QuoteModel, QuoteRecord, QuoteWithRelationsRecord, QuoteItemModel, QuoteItemRecord } from '../models';
 import { calculateQuoteTotal, generateQuoteNumber, generateQuoteItemSortOrder } from '../utils';
 import { quoteQueries, quoteTableNames, quoteColumnNames } from '../../config/quotes';
-import { connection } from '../../shared/database';
+import { connection } from '../../shared/database/connection';
 import { logger } from '../../shared/utils';
 import { AppError } from '../../shared/utils';
 import { HTTP_STATUS_CODES } from '../../config/auth';
 
 export class QuoteRepositoryImpl implements QuoteRepository {
-  private pool: Pool;
+  private db: DatabaseConnection;
 
   constructor() {
-    this.pool = connection;
+    this.db = connection;
   }
 
   async create(tradieId: number, data: QuoteCreateData): Promise<QuoteData> {
-    const client = await this.pool.connect();
+    const transaction = await this.db.transaction();
     
     try {
-      await client.query('BEGIN');
-
       const calculations = calculateQuoteTotal(data.items, data.gstEnabled);
       const quoteNumber = generateQuoteNumber();
       
@@ -49,7 +47,7 @@ export class QuoteRepositoryImpl implements QuoteRepository {
         );
       }
 
-      const quoteResult = await client.query(quoteQueries.CREATE_QUOTE, [
+      const quoteResult = await transaction.query(quoteQueries.CREATE_QUOTE, [
         sanitizedRecord.tradie_id,
         sanitizedRecord.client_id,
         sanitizedRecord.job_id,
@@ -85,7 +83,7 @@ export class QuoteRepositoryImpl implements QuoteRepository {
           );
         }
 
-        const itemResult = await client.query(quoteQueries.CREATE_QUOTE_ITEM, [
+        const itemResult = await transaction.query(quoteQueries.CREATE_QUOTE_ITEM, [
           sanitizedItemRecord.quote_id,
           sanitizedItemRecord.item_type,
           sanitizedItemRecord.description,
@@ -99,7 +97,7 @@ export class QuoteRepositoryImpl implements QuoteRepository {
         items.push(QuoteItemModel.fromRecord(itemResult.rows[0]));
       }
 
-      await client.query('COMMIT');
+      await transaction.commit();
 
       logger.info('Quote created successfully', {
         quoteId: quote.id,
@@ -112,7 +110,7 @@ export class QuoteRepositoryImpl implements QuoteRepository {
       return { ...quote, items };
 
     } catch (error) {
-      await client.query('ROLLBACK');
+      await transaction.rollback();
       
       logger.error('Failed to create quote', {
         tradieId,
@@ -128,14 +126,12 @@ export class QuoteRepositoryImpl implements QuoteRepository {
         HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR,
         'QUOTE_CREATION_ERROR'
       );
-    } finally {
-      client.release();
     }
   }
 
   async findById(id: number): Promise<QuoteWithRelations | null> {
     try {
-      const result = await this.pool.query(quoteQueries.GET_QUOTE_BY_ID, [id]);
+      const result = await this.db.query(quoteQueries.GET_QUOTE_BY_ID, [id]);
       
       if (result.rows.length === 0) {
         return null;
@@ -162,7 +158,7 @@ export class QuoteRepositoryImpl implements QuoteRepository {
 
   async findByNumber(quoteNumber: string): Promise<QuoteWithRelations | null> {
     try {
-      const result = await this.pool.query(quoteQueries.GET_QUOTE_BY_NUMBER, [quoteNumber]);
+      const result = await this.db.query(quoteQueries.GET_QUOTE_BY_NUMBER, [quoteNumber]);
       
       if (result.rows.length === 0) {
         return null;
@@ -191,7 +187,7 @@ export class QuoteRepositoryImpl implements QuoteRepository {
     try {
       const offset = ((filters.page || 1) - 1) * (filters.limit || 20);
       
-      const result = await this.pool.query(quoteQueries.SEARCH_QUOTES, [
+      const result = await this.db.query(quoteQueries.SEARCH_QUOTES, [
         tradieId,
         filters.status || null,
         filters.clientId || null,
@@ -211,10 +207,10 @@ export class QuoteRepositoryImpl implements QuoteRepository {
         quote.items = await this.getQuoteItems(quote.id);
       }
 
-      const countResult = await this.pool.query(quoteQueries.COUNT_QUOTES_BY_TRADIE, [tradieId]);
+      const countResult = await this.db.query(quoteQueries.COUNT_QUOTES_BY_TRADIE, [tradieId]);
       const total = parseInt(countResult.rows[0].total);
 
-      const summaryResult = await this.pool.query(quoteQueries.COUNT_QUOTES_BY_STATUS, [tradieId]);
+      const summaryResult = await this.db.query(quoteQueries.COUNT_QUOTES_BY_STATUS, [tradieId]);
       const summary = this.buildQuoteSummary(summaryResult.rows, total);
 
       const totalPages = Math.ceil(total / (filters.limit || 20));
@@ -252,7 +248,7 @@ export class QuoteRepositoryImpl implements QuoteRepository {
     try {
       const offset = ((filters.page || 1) - 1) * (filters.limit || 20);
       
-      const result = await this.pool.query(quoteQueries.GET_QUOTES_BY_CLIENT, [
+      const result = await this.db.query(quoteQueries.GET_QUOTES_BY_CLIENT, [
         clientId,
         filters.limit || 20,
         offset
@@ -264,13 +260,13 @@ export class QuoteRepositoryImpl implements QuoteRepository {
         quote.items = await this.getQuoteItems(quote.id);
       }
 
-      const countResult = await this.pool.query(
+      const countResult = await this.db.query(
         'SELECT COUNT(*) as total FROM quotes WHERE client_id = $1',
         [clientId]
       );
       const total = parseInt(countResult.rows[0].total);
 
-      const summaryResult = await this.pool.query(
+      const summaryResult = await this.db.query(
         'SELECT status, COUNT(*) as count FROM quotes WHERE client_id = $1 GROUP BY status',
         [clientId]
       );
@@ -334,7 +330,7 @@ export class QuoteRepositoryImpl implements QuoteRepository {
       query += ` ORDER BY q.created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
       params.push(limit, offset);
 
-      const result = await this.pool.query(query, params);
+      const result = await this.db.query(query, params);
       const quotes = result.rows.map(row => QuoteModel.fromRecordWithRelations(row));
       
       for (const quote of quotes) {
@@ -365,11 +361,9 @@ export class QuoteRepositoryImpl implements QuoteRepository {
   }
 
   async update(id: number, tradieId: number, data: QuoteUpdateData): Promise<QuoteData> {
-    const client = await this.pool.connect();
+    const transaction = await this.db.transaction();
     
     try {
-      await client.query('BEGIN');
-
       let calculations;
       if (data.items) {
         calculations = calculateQuoteTotal(data.items, data.gstEnabled ?? true);
@@ -378,7 +372,7 @@ export class QuoteRepositoryImpl implements QuoteRepository {
       const updateRecord = QuoteModel.toUpdateRecord(data, calculations);
       const sanitizedRecord = QuoteModel.sanitizeRecord(updateRecord);
 
-      const result = await client.query(quoteQueries.UPDATE_QUOTE, [
+      const result = await transaction.query(quoteQueries.UPDATE_QUOTE, [
         id,
         sanitizedRecord.title,
         sanitizedRecord.description,
@@ -403,7 +397,7 @@ export class QuoteRepositoryImpl implements QuoteRepository {
       const quote = QuoteModel.fromRecord(result.rows[0]);
 
       if (data.items) {
-        await client.query(quoteQueries.DELETE_QUOTE_ITEMS, [id]);
+        await transaction.query(quoteQueries.DELETE_QUOTE_ITEMS, [id]);
         
         const items: QuoteItemData[] = [];
         for (let i = 0; i < data.items.length; i++) {
@@ -413,7 +407,7 @@ export class QuoteRepositoryImpl implements QuoteRepository {
           const itemRecord = QuoteItemModel.toCreateRecord(quote.id, item, sortOrder);
           const sanitizedItemRecord = QuoteItemModel.sanitizeRecord(itemRecord);
 
-          const itemResult = await client.query(quoteQueries.CREATE_QUOTE_ITEM, [
+          const itemResult = await transaction.query(quoteQueries.CREATE_QUOTE_ITEM, [
             sanitizedItemRecord.quote_id,
             sanitizedItemRecord.item_type,
             sanitizedItemRecord.description,
@@ -431,7 +425,7 @@ export class QuoteRepositoryImpl implements QuoteRepository {
         quote.items = await this.getQuoteItems(id);
       }
 
-      await client.query('COMMIT');
+      await transaction.commit();
 
       logger.info('Quote updated successfully', {
         quoteId: id,
@@ -442,7 +436,7 @@ export class QuoteRepositoryImpl implements QuoteRepository {
       return quote;
 
     } catch (error) {
-      await client.query('ROLLBACK');
+      await transaction.rollback();
       
       logger.error('Failed to update quote', {
         quoteId: id,
@@ -459,14 +453,12 @@ export class QuoteRepositoryImpl implements QuoteRepository {
         HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR,
         'QUOTE_UPDATE_ERROR'
       );
-    } finally {
-      client.release();
     }
   }
 
   async updateStatus(id: number, tradieId: number, data: QuoteStatusUpdateData): Promise<QuoteData> {
     try {
-      const result = await this.pool.query(quoteQueries.UPDATE_QUOTE_STATUS, [id, data.status]);
+      const result = await this.db.query(quoteQueries.UPDATE_QUOTE_STATUS, [id, data.status]);
 
       if (result.rows.length === 0) {
         throw new AppError(
@@ -510,7 +502,7 @@ export class QuoteRepositoryImpl implements QuoteRepository {
 
   async updatePaymentStatus(quoteId: number, paymentStatus: string, paymentId?: string): Promise<QuoteData> {
     try {
-      const result = await this.pool.query(quoteQueries.UPDATE_PAYMENT_STATUS, [
+      const result = await this.db.query(quoteQueries.UPDATE_PAYMENT_STATUS, [
         quoteId, 
         paymentStatus, 
         paymentId
@@ -555,13 +547,11 @@ export class QuoteRepositoryImpl implements QuoteRepository {
   }
 
   async delete(id: number, tradieId: number): Promise<void> {
-    const client = await this.pool.connect();
+    const transaction = await this.db.transaction();
     
     try {
-      await client.query('BEGIN');
-
-      await client.query(quoteQueries.DELETE_QUOTE_ITEMS, [id]);
-      const result = await client.query(quoteQueries.DELETE_QUOTE, [id, tradieId]);
+      await transaction.query(quoteQueries.DELETE_QUOTE_ITEMS, [id]);
+      const result = await transaction.query(quoteQueries.DELETE_QUOTE, [id, tradieId]);
 
       if (result.rowCount === 0) {
         throw new AppError(
@@ -571,7 +561,7 @@ export class QuoteRepositoryImpl implements QuoteRepository {
         );
       }
 
-      await client.query('COMMIT');
+      await transaction.commit();
 
       logger.info('Quote deleted successfully', {
         quoteId: id,
@@ -579,7 +569,7 @@ export class QuoteRepositoryImpl implements QuoteRepository {
       });
 
     } catch (error) {
-      await client.query('ROLLBACK');
+      await transaction.rollback();
       
       logger.error('Failed to delete quote', {
         quoteId: id,
@@ -596,8 +586,6 @@ export class QuoteRepositoryImpl implements QuoteRepository {
         HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR,
         'QUOTE_DELETE_ERROR'
       );
-    } finally {
-      client.release();
     }
   }
 
@@ -606,7 +594,7 @@ export class QuoteRepositoryImpl implements QuoteRepository {
       const expiryDate = new Date();
       expiryDate.setHours(expiryDate.getHours() + hours);
 
-      const result = await this.pool.query(quoteQueries.GET_EXPIRING_QUOTES, [expiryDate]);
+      const result = await this.db.query(quoteQueries.GET_EXPIRING_QUOTES, [expiryDate]);
 
       return result.rows.map(row => ({
         quoteId: row.id,
@@ -633,7 +621,7 @@ export class QuoteRepositoryImpl implements QuoteRepository {
 
   async expireQuotes(): Promise<number> {
     try {
-      const result = await this.pool.query(quoteQueries.EXPIRE_QUOTES);
+      const result = await this.db.query(quoteQueries.EXPIRE_QUOTES);
       
       logger.info('Expired quotes processed', {
         expiredCount: result.rowCount
@@ -671,7 +659,7 @@ export class QuoteRepositoryImpl implements QuoteRepository {
         WHERE tradie_id = $1 AND created_at BETWEEN $2 AND $3
       `;
 
-      const result = await this.pool.query(analyticsQuery, [tradieId, startDate, endDate]);
+      const result = await this.db.query(analyticsQuery, [tradieId, startDate, endDate]);
       const stats = result.rows[0];
 
       const totalQuotes = parseInt(stats.total_quotes) || 0;
@@ -711,7 +699,7 @@ export class QuoteRepositoryImpl implements QuoteRepository {
   }
 
   private async getQuoteItems(quoteId: number): Promise<QuoteItemData[]> {
-    const result = await this.pool.query(quoteQueries.GET_QUOTE_ITEMS, [quoteId]);
+    const result = await this.db.query(quoteQueries.GET_QUOTE_ITEMS, [quoteId]);
     return result.rows.map(row => QuoteItemModel.fromRecord(row));
   }
 
