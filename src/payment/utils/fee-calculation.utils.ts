@@ -3,10 +3,10 @@ import { PaymentMethod } from '../../shared/types';
 import { PaymentFeeCalculation } from '../types';
 
 export const calculateStripeFee = (amount: number, paymentMethod: PaymentMethod): number => {
-  const STRIPE_PERCENTAGE = PAYMENT_CONSTANTS.STRIPE.PERCENTAGE;
-  const STRIPE_FIXED = PAYMENT_CONSTANTS.STRIPE.FIXED;
-  const APPLE_PAY_PERCENTAGE = PAYMENT_CONSTANTS.STRIPE.PERCENTAGE;
-  const GOOGLE_PAY_PERCENTAGE = PAYMENT_CONSTANTS.STRIPE.PERCENTAGE;
+  const STRIPE_PERCENTAGE = PAYMENT_CONSTANTS.FEES.STRIPE.PERCENTAGE;
+  const STRIPE_FIXED = PAYMENT_CONSTANTS.FEES.STRIPE.FIXED;
+  const APPLE_PAY_PERCENTAGE = PAYMENT_CONSTANTS.FEES.STRIPE.PERCENTAGE;
+  const GOOGLE_PAY_PERCENTAGE = PAYMENT_CONSTANTS.FEES.STRIPE.PERCENTAGE;
   
   let percentage: number;
   
@@ -28,7 +28,7 @@ export const calculateStripeFee = (amount: number, paymentMethod: PaymentMethod)
 };
 
 export const calculatePlatformFee = (amount: number): number => {
-  const PLATFORM_PERCENTAGE = PAYMENT_CONSTANTS.PLATFORM.PERCENTAGE;
+  const PLATFORM_PERCENTAGE = PAYMENT_CONSTANTS.FEES.PLATFORM.PERCENTAGE;
   return Math.round((amount * PLATFORM_PERCENTAGE) / 100);
 };
 
@@ -58,11 +58,11 @@ export const calculateNetAmount = (grossAmount: number, paymentMethod: PaymentMe
 };
 
 export const calculateGrossAmount = (netAmount: number, paymentMethod: PaymentMethod): number => {
-  const STRIPE_PERCENTAGE = PAYMENT_CONSTANTS.STRIPE.PERCENTAGE;
-  const STRIPE_FIXED = PAYMENT_CONSTANTS.STRIPE.FIXED;
-  const PLATFORM_PERCENTAGE = PAYMENT_CONSTANTS.PLATFORM.PERCENTAGE;
-  const APPLE_PAY_PERCENTAGE = PAYMENT_CONSTANTS.STRIPE.PERCENTAGE;
-  const GOOGLE_PAY_PERCENTAGE = PAYMENT_CONSTANTS.STRIPE.PERCENTAGE;
+  const STRIPE_PERCENTAGE = PAYMENT_CONSTANTS.FEES.STRIPE.PERCENTAGE;
+  const STRIPE_FIXED = PAYMENT_CONSTANTS.FEES.STRIPE.FIXED;
+  const PLATFORM_PERCENTAGE = PAYMENT_CONSTANTS.FEES.PLATFORM.PERCENTAGE;
+  const APPLE_PAY_PERCENTAGE = PAYMENT_CONSTANTS.FEES.STRIPE.PERCENTAGE;
+  const GOOGLE_PAY_PERCENTAGE = PAYMENT_CONSTANTS.FEES.STRIPE.PERCENTAGE;
   
   let stripePercentage: number;
   
@@ -91,8 +91,8 @@ export const getFeeBreakdown = (amount: number, paymentMethod: PaymentMethod): {
   totalFees: number;
   netAmount: number;
 } => {
-  const STRIPE_FIXED = PAYMENT_CONSTANTS.STRIPE.FIXED;
-  const PLATFORM_PERCENTAGE = PAYMENT_CONSTANTS.PLATFORM.PERCENTAGE;
+  const STRIPE_FIXED = PAYMENT_CONSTANTS.FEES.STRIPE.FIXED;
+  const PLATFORM_PERCENTAGE = PAYMENT_CONSTANTS.FEES.PLATFORM.PERCENTAGE;
   
   const stripePercentageFee = calculateStripeFee(amount, paymentMethod) - STRIPE_FIXED;
   const stripeFixedFee = STRIPE_FIXED;
@@ -160,7 +160,7 @@ export const formatFeeBreakdown = (feeBreakdown: ReturnType<typeof getFeeBreakdo
     currency: currency.toUpperCase(),
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
-  });
+  };
   
   return {
     amount: formatter.format(feeBreakdown.amount / 100),

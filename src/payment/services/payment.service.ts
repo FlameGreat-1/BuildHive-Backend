@@ -1,4 +1,4 @@
-import { PAYMENT_CONSTANTS } from '../../config/payment';
+import { PAYMENT_CONSTANTS } from '../../config/payment/constants';
 import { logger, createErrorResponse } from '../../shared/utils';
 import { PaymentRepository, PaymentMethodRepository, InvoiceRepository } from '../repositories';
 import { getDbConnection } from '../../shared/database';
@@ -18,8 +18,7 @@ import {
   validatePaymentAmount,
   validateCurrency,
   sanitizePaymentMetadata,
-  calculateProcessingFee,
-  generateIdempotencyKey
+  calculateProcessingFee
 } from '../utils';
 import { StripeService } from './stripe.service';
 import { ApplePayService } from './apple-pay.service';
@@ -32,21 +31,18 @@ import {
 } from '../../shared/types';
 
 export class PaymentService {
-  private paymentRepository: PaymentRepository;
-  private paymentMethodRepository: PaymentMethodRepository;
-  private invoiceRepository: InvoiceRepository;
+  private paymentRepository!: PaymentRepository;
+  private paymentMethodRepository!: PaymentMethodRepository;
+  private invoiceRepository!: InvoiceRepository;
   private stripeService: StripeService;
   private applePayService: ApplePayService;
   private googlePayService: GooglePayService;
-
+  
   constructor() {
     this.stripeService = new StripeService();
     this.applePayService = new ApplePayService();
     this.googlePayService = new GooglePayService();
-    this.initializeRepositories();
-  }
-
-  private async initializeRepositories(): Promise<void> {
+    
     const dbConnection = getDbConnection();
     this.paymentRepository = new PaymentRepository(dbConnection);
     this.paymentMethodRepository = new PaymentMethodRepository(dbConnection);
@@ -143,17 +139,17 @@ export class PaymentService {
         payment_method: request.paymentMethod as PaymentMethod,
         payment_type: (request.paymentType as PaymentType) || PaymentType.ONE_TIME,
         status: paymentResult.status as PaymentStatus,
-        description: request.description || null,
+        description: request.description || undefined,
         metadata: request.metadata || {},
-        invoice_id: null,
-        subscription_id: null,
-        credits_purchased: null,
-        stripe_fee: null,
-        platform_fee: null,
+        invoice_id: undefined,
+        subscription_id: undefined,
+        credits_purchased: undefined,
+        stripe_fee: undefined,
+        platform_fee: undefined,
         processing_fee: processingFee,
-        failure_reason: null,
+        failure_reason: undefined,
         net_amount: request.amount - processingFee,
-        processed_at: null
+        processed_at: undefined
       };
 
       const savedPayment = await this.paymentRepository.create(paymentData);
@@ -350,7 +346,7 @@ export class PaymentService {
     
     return this.getPaymentHistory(historyRequest);
   }
-
+  
   async getPaymentHistory(request: PaymentHistoryRequest): Promise<PaymentHistoryResponse> {
     try {
       const payments = await this.paymentRepository.findByUserId(
@@ -399,8 +395,10 @@ export class PaymentService {
           createdAt: payment.created_at.toISOString()
         })),
         totalCount,
+        page: Math.floor((request.offset || 0) / (request.limit || 50)) + 1,
+        limit: request.limit || 50,
         summary: {
-        totalPayments: paymentStats.total_payments,  
+          totalPayments: paymentStats.total_payments,  
           totalAmount: paymentStats.total_amount,
           successfulPayments: paymentStats.successful_payments,
           failedPayments: paymentStats.failed_payments,
@@ -416,7 +414,7 @@ export class PaymentService {
 
       throw error;
     }
-  }
+  }  
 
   async updatePayment(paymentId: number, updateData: any): Promise<PaymentDatabaseRecord> {
     try {
@@ -479,8 +477,8 @@ export class PaymentService {
       }
       
       if (payment.status === PaymentStatus.CANCELLED) {
-  throw new Error('Payment already cancelled');
-}
+        throw new Error('Payment already cancelled');
+      }
 
       if (payment.stripe_payment_intent_id) {
         try {
@@ -511,7 +509,7 @@ export class PaymentService {
 
       throw error;
     }
-  }
+  }  
   
   async getUserTotalPayments(userId: number): Promise<number> {
     try {

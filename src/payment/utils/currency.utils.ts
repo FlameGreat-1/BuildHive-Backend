@@ -110,7 +110,7 @@ export const getCurrencyName = (currency: string): string => {
 };
 
 export const isSupportedCurrency = (currency: string): boolean => {
-  return PAYMENT_CONSTANTS.STRIPE.CURRENCY.SUPPORTED.includes(currency.toUpperCase());
+  return PAYMENT_CONSTANTS.STRIPE.CURRENCY.SUPPORTED.includes(currency.toUpperCase() as any);
 };
 
 export const getDefaultCurrency = (): string => {

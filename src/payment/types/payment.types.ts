@@ -260,6 +260,22 @@ export interface GooglePayPaymentResponse {
   processingFee?: number;
 }
 
+export interface PaymentHistoryItem {
+  id: number;
+  amount: number;
+  currency: string;
+  status: PaymentStatus;
+  paymentMethod: PaymentMethod;
+  paymentType: PaymentType;
+  description?: string;
+  creditsAwarded?: number;
+  stripeFee?: number;
+  platformFee?: number;
+  netAmount?: number;
+  processedAt?: string;
+  createdAt: string;
+}
+
 export interface GooglePayConfigRequest {
   merchantId: string;
   environment: 'TEST' | 'PRODUCTION';
@@ -534,7 +550,7 @@ export interface PaymentStatusResponse {
 }
 
 export interface PaymentHistoryResponse {
-  payments: PaymentDatabaseRecord[];
+  payments: PaymentHistoryItem[];
   totalCount: number;
   page: number;
   limit: number;
