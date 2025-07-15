@@ -1,5 +1,5 @@
 import { QuoteItemCreateData, QuoteCalculation, QuoteItemData } from '../types';
-import { QUOTE_CONSTANTS, GST_CONSTANTS, QUOTE_STATUS } from '../../config/quotes';
+import { QUOTE_CONSTANTS, GST_CONSTANTS } from '../../config/quotes';
 import { QuoteStatus } from '../../shared/types';
 
 export const calculateQuoteTotal = (
@@ -59,14 +59,14 @@ export const getQuoteValidUntilDate = (days: number = QUOTE_CONSTANTS.DEFAULT_VA
 };
 
 export const validateQuoteStatusTransition = (currentStatus: QuoteStatus, newStatus: QuoteStatus): boolean => {
-  const allowedTransitions = {
-    [QUOTE_STATUS.DRAFT]: [QUOTE_STATUS.SENT, QUOTE_STATUS.CANCELLED],
-    [QUOTE_STATUS.SENT]: [QUOTE_STATUS.VIEWED, QUOTE_STATUS.ACCEPTED, QUOTE_STATUS.REJECTED, QUOTE_STATUS.EXPIRED, QUOTE_STATUS.CANCELLED],
-    [QUOTE_STATUS.VIEWED]: [QUOTE_STATUS.ACCEPTED, QUOTE_STATUS.REJECTED, QUOTE_STATUS.EXPIRED, QUOTE_STATUS.CANCELLED],
-    [QUOTE_STATUS.ACCEPTED]: [],
-    [QUOTE_STATUS.REJECTED]: [],
-    [QUOTE_STATUS.EXPIRED]: [],
-    [QUOTE_STATUS.CANCELLED]: []
+  const allowedTransitions: Record<QuoteStatus, QuoteStatus[]> = {
+    'draft': ['sent', 'cancelled'],
+    'sent': ['viewed', 'accepted', 'rejected', 'expired', 'cancelled'],
+    'viewed': ['accepted', 'rejected', 'expired', 'cancelled'],
+    'accepted': [],
+    'rejected': [],
+    'expired': [],
+    'cancelled': []
   };
 
   return allowedTransitions[currentStatus]?.includes(newStatus) || false;
@@ -140,28 +140,28 @@ export const calculateQuoteAcceptanceRate = (totalQuotes: number, acceptedQuotes
 };
 
 export const getQuoteStatusColor = (status: QuoteStatus): string => {
-  const statusColors = {
-    [QUOTE_STATUS.DRAFT]: '#6B7280',
-    [QUOTE_STATUS.SENT]: '#3B82F6',
-    [QUOTE_STATUS.VIEWED]: '#F59E0B',
-    [QUOTE_STATUS.ACCEPTED]: '#10B981',
-    [QUOTE_STATUS.REJECTED]: '#EF4444',
-    [QUOTE_STATUS.EXPIRED]: '#9CA3AF',
-    [QUOTE_STATUS.CANCELLED]: '#6B7280'
+  const statusColors: Record<QuoteStatus, string> = {
+    'draft': '#6B7280',
+    'sent': '#3B82F6',
+    'viewed': '#F59E0B',
+    'accepted': '#10B981',
+    'rejected': '#EF4444',
+    'expired': '#9CA3AF',
+    'cancelled': '#6B7280'
   };
 
   return statusColors[status] || '#6B7280';
 };
 
 export const getQuoteStatusLabel = (status: QuoteStatus): string => {
-  const statusLabels = {
-    [QUOTE_STATUS.DRAFT]: 'Draft',
-    [QUOTE_STATUS.SENT]: 'Sent',
-    [QUOTE_STATUS.VIEWED]: 'Viewed',
-    [QUOTE_STATUS.ACCEPTED]: 'Accepted',
-    [QUOTE_STATUS.REJECTED]: 'Rejected',
-    [QUOTE_STATUS.EXPIRED]: 'Expired',
-    [QUOTE_STATUS.CANCELLED]: 'Cancelled'
+  const statusLabels: Record<QuoteStatus, string> = {
+    'draft': 'Draft',
+    'sent': 'Sent',
+    'viewed': 'Viewed',
+    'accepted': 'Accepted',
+    'rejected': 'Rejected',
+    'expired': 'Expired',
+    'cancelled': 'Cancelled'
   };
 
   return statusLabels[status] || 'Unknown';
@@ -183,11 +183,11 @@ export const generateQuoteItemSortOrder = (existingItems: QuoteItemData[]): numb
 };
 
 export const isQuoteEditable = (status: QuoteStatus): boolean => {
-  return status === QUOTE_STATUS.DRAFT;
+  return status === 'draft';
 };
 
 export const isQuoteCancellable = (status: QuoteStatus): boolean => {
-  return [QUOTE_STATUS.DRAFT, QUOTE_STATUS.SENT, QUOTE_STATUS.VIEWED].includes(status);
+  return ['draft', 'sent', 'viewed'].includes(status);
 };
 
 export const getQuoteExpiryWarningMessage = (validUntil: Date): string => {
@@ -208,19 +208,25 @@ export const buildQuoteSearchQuery = (searchTerm: string): string => {
   return `%${searchTerm.toLowerCase().trim()}%`;
 };
 
-export const parseQuoteFilters = (filters: any): any => {
-  const parsed: any = {};
+export const parseQuoteFilters = (filters: Record<string, any>): Record<string, any> => {
+  const parsed: Record<string, any> = {};
 
   if (filters.status) {
     parsed.status = filters.status;
   }
 
   if (filters.clientId) {
-    parsed.clientId = parseInt(filters.clientId);
+    const clientId = parseInt(filters.clientId);
+    if (!isNaN(clientId) && clientId > 0) {
+      parsed.clientId = clientId;
+    }
   }
 
   if (filters.jobId) {
-    parsed.jobId = parseInt(filters.jobId);
+    const jobId = parseInt(filters.jobId);
+    if (!isNaN(jobId) && jobId > 0) {
+      parsed.jobId = jobId;
+    }
   }
 
   if (filters.startDate) {
@@ -235,8 +241,12 @@ export const parseQuoteFilters = (filters: any): any => {
     parsed.searchTerm = filters.searchTerm.trim();
   }
 
-  parsed.page = parseInt(filters.page) || QUOTE_CONSTANTS.DEFAULT_PAGE;
-  parsed.limit = Math.min(parseInt(filters.limit) || QUOTE_CONSTANTS.DEFAULT_LIMIT, QUOTE_CONSTANTS.MAX_LIMIT);
+  const page = parseInt(filters.page);
+  parsed.page = (!isNaN(page) && page > 0) ? page : QUOTE_CONSTANTS.DEFAULT_PAGE;
+
+  const limit = parseInt(filters.limit);
+  parsed.limit = (!isNaN(limit) && limit > 0) ? Math.min(limit, QUOTE_CONSTANTS.MAX_LIMIT) : QUOTE_CONSTANTS.DEFAULT_LIMIT;
+
   parsed.sortBy = filters.sortBy || 'created_at';
   parsed.sortOrder = filters.sortOrder === 'asc' ? 'asc' : 'desc';
 

@@ -7,14 +7,15 @@ import {
   AIPricingRequest 
 } from '../types';
 import { validateQuoteItems, sanitizeQuoteInput, validateQuoteStatusTransition } from '../utils';
-import { QUOTE_CONSTANTS, QUOTE_STATUS, DELIVERY_METHOD } from '../../config/quotes';
+import { QUOTE_CONSTANTS } from '../../config/quotes';
 import { ValidationError } from '../../shared/types';
 import { createErrorResponse, logger } from '../../shared/utils';
 import { HTTP_STATUS_CODES } from '../../config/auth/constants';
+import { QuoteStatus, DeliveryMethod } from '../../shared/types';
 
 const sendValidationError = (res: Response, message: string, errors: ValidationError[]): void => {
   res.status(HTTP_STATUS_CODES.BAD_REQUEST).json(
-    createErrorResponse(message, 'VALIDATION_ERROR', { errors })
+    createErrorResponse(message, 'VALIDATION_ERROR')
   );
 };
 
@@ -226,7 +227,14 @@ export const validateUpdateQuote = (
       });
     } else {
       try {
-        const itemErrors = validateQuoteItems(data.items);
+        const createItems = data.items.map(item => ({
+          itemType: item.itemType || 'labour',
+          description: item.description || '',
+          quantity: item.quantity || 0,
+          unit: item.unit || 'piece',
+          unitPrice: item.unitPrice || 0
+        }));
+        const itemErrors = validateQuoteItems(createItems);
         itemErrors.forEach(error => {
           errors.push({
             field: 'items',
@@ -318,13 +326,15 @@ export const validateQuoteStatusUpdate = (
   const errors: ValidationError[] = [];
   const data: QuoteStatusUpdateData = req.body;
 
+  const validStatuses: QuoteStatus[] = ['draft', 'sent', 'viewed', 'accepted', 'rejected', 'expired', 'cancelled'];
+
   if (!data.status) {
     errors.push({
       field: 'status',
       message: 'Quote status is required',
       code: 'REQUIRED_FIELD'
     });
-  } else if (!Object.values(QUOTE_STATUS).includes(data.status as any)) {
+  } else if (!validStatuses.includes(data.status as QuoteStatus)) {
     errors.push({
       field: 'status',
       message: 'Invalid quote status',
@@ -371,8 +381,8 @@ export const validateQuoteDelivery = (
       code: 'REQUIRED_FIELD'
     });
   } else {
-    const validMethods = Object.values(DELIVERY_METHOD);
-    const invalidMethods = data.deliveryMethods.filter(method => !validMethods.includes(method as any));
+    const validMethods: DeliveryMethod[] = ['email', 'sms', 'pdf', 'portal'];
+    const invalidMethods = data.deliveryMethods.filter(method => !validMethods.includes(method as DeliveryMethod));
     
     if (invalidMethods.length > 0) {
       errors.push({
@@ -382,7 +392,7 @@ export const validateQuoteDelivery = (
       });
     }
 
-    if (data.deliveryMethods.includes(DELIVERY_METHOD.EMAIL) && !data.recipientEmail) {
+    if (data.deliveryMethods.includes('email' as DeliveryMethod) && !data.recipientEmail) {
       errors.push({
         field: 'recipientEmail',
         message: 'Recipient email is required for email delivery',
@@ -390,7 +400,7 @@ export const validateQuoteDelivery = (
       });
     }
 
-    if (data.deliveryMethods.includes(DELIVERY_METHOD.SMS) && !data.recipientPhone) {
+    if (data.deliveryMethods.includes('sms' as DeliveryMethod) && !data.recipientPhone) {
       errors.push({
         field: 'recipientPhone',
         message: 'Recipient phone is required for SMS delivery',

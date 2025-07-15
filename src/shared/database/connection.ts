@@ -4,7 +4,7 @@ import { databaseConfig, redisConfig } from '../../config/auth';
 import { DatabaseClient, DatabaseTransaction, QueryResult as CustomQueryResult } from '../types';
 import { logger } from '../utils/logger.util';
 
-class DatabaseConnection implements DatabaseClient {
+export class DatabaseConnection implements DatabaseClient {
   private pool: Pool;
   private redis: Redis;
   private isConnected: boolean = false;

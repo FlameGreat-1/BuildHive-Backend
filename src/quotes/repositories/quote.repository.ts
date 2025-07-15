@@ -201,7 +201,7 @@ export class QuoteRepositoryImpl implements QuoteRepository {
         offset
       ]);
 
-      const quotes = result.rows.map(row => QuoteModel.fromRecordWithRelations(row));
+      const quotes = result.rows.map((row: QuoteWithRelationsRecord) => QuoteModel.fromRecordWithRelations(row));
       
       for (const quote of quotes) {
         quote.items = await this.getQuoteItems(quote.id);
@@ -254,7 +254,7 @@ export class QuoteRepositoryImpl implements QuoteRepository {
         offset
       ]);
 
-      const quotes = result.rows.map(row => QuoteModel.fromRecordWithRelations(row));
+      const quotes = result.rows.map((row: QuoteWithRelationsRecord) => QuoteModel.fromRecordWithRelations(row));
       
       for (const quote of quotes) {
         quote.items = await this.getQuoteItems(quote.id);
@@ -331,7 +331,7 @@ export class QuoteRepositoryImpl implements QuoteRepository {
       params.push(limit, offset);
 
       const result = await this.db.query(query, params);
-      const quotes = result.rows.map(row => QuoteModel.fromRecordWithRelations(row));
+      const quotes = result.rows.map((row: QuoteWithRelationsRecord) => QuoteModel.fromRecordWithRelations(row));
       
       for (const quote of quotes) {
         quote.items = await this.getQuoteItems(quote.id);
@@ -596,7 +596,7 @@ export class QuoteRepositoryImpl implements QuoteRepository {
 
       const result = await this.db.query(quoteQueries.GET_EXPIRING_QUOTES, [expiryDate]);
 
-      return result.rows.map(row => ({
+      return result.rows.map((row: any) => ({
         quoteId: row.id,
         quoteNumber: row.quote_number,
         tradieId: row.tradie_id,
@@ -700,10 +700,10 @@ export class QuoteRepositoryImpl implements QuoteRepository {
 
   private async getQuoteItems(quoteId: number): Promise<QuoteItemData[]> {
     const result = await this.db.query(quoteQueries.GET_QUOTE_ITEMS, [quoteId]);
-    return result.rows.map(row => QuoteItemModel.fromRecord(row));
+    return result.rows.map((row: QuoteItemRecord) => QuoteItemModel.fromRecord(row));
   }
 
-  private buildQuoteSummary(statusCounts: any[], total: number): QuoteSummary {
+  private buildQuoteSummary(statusCounts: Array<{ status: string; count: string }>, total: number): QuoteSummary {
     const summary: QuoteSummary = {
       total,
       draft: 0,
@@ -720,7 +720,7 @@ export class QuoteRepositoryImpl implements QuoteRepository {
       pendingRevenue: 0
     };
 
-    statusCounts.forEach(row => {
+    statusCounts.forEach((row: { status: string; count: string }) => {
       const status = row.status as keyof QuoteSummary;
       const count = parseInt(row.count);
       if (status in summary && typeof summary[status] === 'number') {
