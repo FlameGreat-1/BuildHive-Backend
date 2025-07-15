@@ -150,7 +150,7 @@ export class PaymentModel {
   async findByStripePaymentMethodId(stripePaymentMethodId: string): Promise<PaymentDatabaseRecord[]> {
   try {
     const query = `
-      SELECT * FROM ${this.tableName} 
+      SELECT * FROM payments 
       WHERE stripe_payment_method_id = $1 
       ORDER BY created_at DESC
     `;

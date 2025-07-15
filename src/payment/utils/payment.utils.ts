@@ -69,7 +69,7 @@ export const isPaymentSuccessful = (status: PaymentStatus): boolean => {
 };
 
 export const isPaymentFailed = (status: PaymentStatus): boolean => {
-  return status === PaymentStatus.FAILED || status === PaymentStatus.CANCELED || status === PaymentStatus.CANCELLED;
+  return status === PaymentStatus.FAILED || status === PaymentStatus.CANCELLED;
 };
 
 export const isPaymentPending = (status: PaymentStatus): boolean => {
@@ -83,7 +83,6 @@ export const getPaymentStatusMessage = (status: PaymentStatus): string => {
     [PaymentStatus.SUCCEEDED]: 'Payment completed successfully',
     [PaymentStatus.COMPLETED]: 'Payment completed successfully',
     [PaymentStatus.FAILED]: 'Payment failed',
-    [PaymentStatus.CANCELED]: 'Payment was cancelled',
     [PaymentStatus.CANCELLED]: 'Payment was cancelled',
     [PaymentStatus.REFUNDED]: 'Payment has been refunded',
     [PaymentStatus.PARTIALLY_REFUNDED]: 'Payment has been partially refunded',

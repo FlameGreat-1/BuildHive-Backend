@@ -78,8 +78,8 @@ export class PaymentService {
       if (!validateCurrency(request.currency)) {
         throw new Error('Unsupported currency');
       }
-
-      const processingFee = calculateProcessingFee(request.amount, request.currency);
+      
+      const processingFee = calculateProcessingFee(request.amount, request.currency, PaymentMethod.CARD);
       let paymentResult: CreatePaymentIntentResponse;
 
       switch (request.paymentMethod) {
@@ -323,9 +323,11 @@ export class PaymentService {
         amount: payment.amount,
         currency: payment.currency,
         paymentMethod: payment.payment_method,
+        paymentType: payment.payment_type,
         processedAt: payment.processed_at?.toISOString(),
         failureReason,
-        creditsAwarded: payment.credits_purchased || undefined
+        creditsAwarded: payment.credits_purchased || undefined,
+        createdAt: payment.created_at.toISOString()  
       };
     } catch (error) {
       logger.error('Failed to get payment status', {
@@ -398,10 +400,12 @@ export class PaymentService {
         })),
         totalCount,
         summary: {
+        totalPayments: paymentStats.total_payments,  
           totalAmount: paymentStats.total_amount,
           successfulPayments: paymentStats.successful_payments,
           failedPayments: paymentStats.failed_payments,
-          pendingPayments: paymentStats.total_payments - paymentStats.successful_payments - paymentStats.failed_payments
+          pendingPayments: paymentStats.total_payments - paymentStats.successful_payments - paymentStats.failed_payments,
+          averageAmount: paymentStats.average_amount  
         }
       };
     } catch (error) {
@@ -473,10 +477,10 @@ export class PaymentService {
       if (payment.status === PaymentStatus.SUCCEEDED || payment.status === PaymentStatus.COMPLETED) {
         throw new Error('Cannot cancel completed payment');
       }
-
-      if (payment.status === PaymentStatus.CANCELED || payment.status === PaymentStatus.CANCELLED) {
-        throw new Error('Payment already cancelled');
-      }
+      
+      if (payment.status === PaymentStatus.CANCELLED) {
+  throw new Error('Payment already cancelled');
+}
 
       if (payment.stripe_payment_intent_id) {
         try {

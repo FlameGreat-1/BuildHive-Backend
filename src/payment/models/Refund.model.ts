@@ -124,32 +124,6 @@ export class RefundModel {
     
     return result.rows[0] || null;
   }
-  
-  async findByDateRange(
-  startDate: Date,
-  endDate: Date,
-  userId?: number
-): Promise<RefundDatabaseRecord[]> {
-  try {
-    let query = `
-      SELECT * FROM ${this.tableName} 
-      WHERE created_at >= $1 AND created_at <= $2
-    `;
-    const params: any[] = [startDate, endDate];
-    
-    if (userId) {
-      query += ` AND user_id = $3`;
-      params.push(userId);
-    }
-    
-    query += ` ORDER BY created_at DESC`;
-    
-    const result = await this.client.query(query, params);
-    return result.rows;
-  } catch (error) {
-    throw error;
-  }
-}
 
   async countByUserId(userId: number): Promise<number> {
     const query = `SELECT COUNT(*) as count FROM ${PAYMENT_TABLES.REFUNDS} WHERE user_id = $1`;

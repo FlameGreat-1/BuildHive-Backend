@@ -166,7 +166,7 @@ export class InvoiceModel {
   async findByStripeInvoiceId(stripeInvoiceId: string): Promise<InvoiceDatabaseRecord | null> {
   try {
     const query = `
-      SELECT * FROM ${this.tableName} 
+      SELECT * FROM invoices 
       WHERE stripe_invoice_id = $1 
       LIMIT 1
     `;
