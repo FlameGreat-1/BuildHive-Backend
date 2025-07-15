@@ -160,7 +160,7 @@ export const formatFeeBreakdown = (feeBreakdown: ReturnType<typeof getFeeBreakdo
     currency: currency.toUpperCase(),
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
-  };
+  });
   
   return {
     amount: formatter.format(feeBreakdown.amount / 100),
