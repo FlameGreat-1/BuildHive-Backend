@@ -1,5 +1,12 @@
 import { PaymentStatus, PaymentMethod, PaymentType, RefundStatus } from './database.types';
 
+export type QuoteStatus = 'draft' | 'sent' | 'viewed' | 'accepted' | 'rejected' | 'expired' | 'cancelled';
+export type DeliveryMethod = 'email' | 'sms' | 'pdf' | 'portal';
+export type QuoteItemType = 'labour' | 'material' | 'equipment' | 'other';
+export type Currency = 'AUD' | 'USD';
+export type JobStatus = 'pending' | 'active' | 'completed' | 'cancelled' | 'on_hold';
+export type JobPriority = 'low' | 'medium' | 'high' | 'urgent';
+
 export interface ApiResponse<T = any> {
   success: boolean;
   message: string;
@@ -155,7 +162,7 @@ export interface CreateJobRequest {
   title: string;
   description: string;
   jobType: string;
-  priority?: string;
+  priority?: JobPriority;
   clientName: string;
   clientEmail: string;
   clientPhone: string;
@@ -183,8 +190,8 @@ export interface CreateMaterialRequest {
 export interface UpdateJobRequest {
   title?: string;
   description?: string;
-  status?: string;
-  priority?: string;
+  status?: JobStatus;
+  priority?: JobPriority;
   hoursWorked?: number;
   materials?: UpdateMaterialRequest[];
   notes?: string[];
@@ -207,8 +214,8 @@ export interface JobResponse {
   title: string;
   description: string;
   jobType: string;
-  status: string;
-  priority: string;
+  status: JobStatus;
+  priority: JobPriority;
   clientName: string;
   clientEmail: string;
   clientPhone: string;
@@ -282,9 +289,9 @@ export interface ClientResponse {
 }
 
 export interface JobFilterRequest {
-  status?: string;
+  status?: JobStatus;
   jobType?: string;
-  priority?: string;
+  priority?: JobPriority;
   clientId?: number;
   startDate?: string;
   endDate?: string;
@@ -308,7 +315,7 @@ export interface CreateQuoteRequest {
 }
 
 export interface CreateQuoteItemRequest {
-  itemType: string;
+  itemType: QuoteItemType;
   description: string;
   quantity: number;
   unit: string;
@@ -327,7 +334,7 @@ export interface UpdateQuoteRequest {
 
 export interface UpdateQuoteItemRequest {
   id?: number;
-  itemType?: string;
+  itemType?: QuoteItemType;
   description?: string;
   quantity?: number;
   unit?: string;
@@ -343,7 +350,7 @@ export interface QuoteResponse {
   quoteNumber: string;
   title: string;
   description?: string;
-  status: string;
+  status: QuoteStatus;
   subtotal: number;
   gstAmount: number;
   totalAmount: number;
@@ -362,7 +369,7 @@ export interface QuoteResponse {
 
 export interface QuoteItemResponse {
   id: number;
-  itemType: string;
+  itemType: QuoteItemType;
   description: string;
   quantity: number;
   unit: string;
@@ -384,7 +391,7 @@ export interface QuoteListResponse {
 }
 
 export interface QuoteFilterRequest {
-  status?: string;
+  status?: QuoteStatus;
   clientId?: number;
   jobId?: number;
   startDate?: string;
@@ -417,7 +424,7 @@ export interface AIPricingResponse {
 
 export interface SendQuoteRequest {
   quoteId: number;
-  deliveryMethod: string[];
+  deliveryMethod: DeliveryMethod[];
   recipientEmail?: string;
   recipientPhone?: string;
   customMessage?: string;
@@ -435,9 +442,9 @@ export interface SendQuoteResponse {
 
 export interface CreatePaymentRequest {
   amount: number;
-  currency: string;
-  paymentMethod: string;
-  paymentType: string;
+  currency: Currency;
+  paymentMethod: PaymentMethod;
+  paymentType: PaymentType;
   description?: string;
   metadata?: Record<string, any>;
   invoiceId?: number;
@@ -452,10 +459,10 @@ export interface CreatePaymentResponse {
   paymentId: number;
   stripePaymentIntentId?: string;
   clientSecret?: string;
-  status: string;
+  status: PaymentStatus;
   amount: number;
-  currency: string;
-  paymentMethod: string;
+  currency: Currency;
+  paymentMethod: PaymentMethod;
   requiresAction?: boolean;
   nextAction?: {
     type: string;
@@ -466,9 +473,9 @@ export interface CreatePaymentResponse {
 
 export interface CreatePaymentIntentRequest {
   amount: number;
-  currency: string;
-  paymentMethod: string;
-  paymentType: string;
+  currency: Currency;
+  paymentMethod: PaymentMethod;
+  paymentType: PaymentType;
   description?: string;
   metadata?: Record<string, any>;
   automaticPaymentMethods?: boolean;
@@ -479,9 +486,9 @@ export interface CreatePaymentIntentRequest {
 export interface CreatePaymentIntentResponse {
   paymentIntentId: string;
   clientSecret: string;
-  status: string;
+  status: PaymentStatus;
   amount: number;
-  currency: string;
+  currency: Currency;
   requiresAction: boolean;
   nextAction?: {
     type: string;
@@ -496,10 +503,10 @@ export interface PaymentStatusRequest {
 
 export interface PaymentStatusResponse {
   paymentId: number;
-  status: string;
+  status: PaymentStatus;
   amount: number;
-  currency: string;
-  paymentMethod: string;
+  currency: Currency;
+  paymentMethod: PaymentMethod;
   processedAt?: string;
   failureReason?: string;
   creditsAwarded?: number;
@@ -526,13 +533,13 @@ export interface PaymentHistoryResponse {
 
 export interface CreatePaymentMethodRequest {
   stripePaymentMethodId: string;
-  type: string;
+  type: PaymentMethod;
   setAsDefault?: boolean;
 }
 
 export interface PaymentMethodResponse {
   id: number;
-  type: string;
+  type: PaymentMethod;
   cardLastFour?: string;
   cardBrand?: string;
   cardExpMonth?: number;
@@ -563,13 +570,13 @@ export interface SetDefaultPaymentMethodResponse {
 export interface CreateInvoiceRequest {
   quoteId?: number;
   amount: number;
-  currency: string;
+  currency: Currency;
   dueDate: string;
   description?: string;
   userId?: number;
   metadata?: Record<string, any>;
   invoiceNumber?: string;
-  status?: string;
+  status?: PaymentStatus;
   autoSend?: boolean;
 }
 
@@ -577,8 +584,8 @@ export interface InvoiceResponse {
   id: number;
   invoiceNumber: string;
   amount: number;
-  currency: string;
-  status: string;
+  currency: Currency;
+  status: PaymentStatus;
   dueDate: string;
   description?: string;
   processingFee?: number;
@@ -592,14 +599,14 @@ export interface InvoiceResponse {
 
 export interface UpdateInvoiceStatusRequest {
   invoiceId: number;
-  status: string;
+  status: PaymentStatus;
   reason?: string;
   paidAt?: Date;
 }
 
 export interface UpdateInvoiceStatusResponse {
   invoiceId: number;
-  status: string;
+  status: PaymentStatus;
   updatedAt: string;
   success: boolean;
 }
@@ -615,8 +622,8 @@ export interface InvoiceDetailsResponse {
   id: number;
   invoiceNumber: string;
   amount: number;
-  currency: string;
-  status: string;
+  currency: Currency;
+  status: PaymentStatus;
   dueDate: string;
   description?: string;
   processingFee?: number;
@@ -643,7 +650,7 @@ export interface CreateRefundResponse {
   id: number;
   paymentId: number;
   amount: number;
-  status: string;
+  status: RefundStatus;
   reason?: string;
   description?: string;
   stripeRefundId?: string;
@@ -655,7 +662,7 @@ export interface RefundResponse {
   id: number;
   paymentId: number;
   amount: number;
-  status: string;
+  status: RefundStatus;
   reason?: string;
   description?: string;
   stripeRefundId?: string;
@@ -682,12 +689,12 @@ export interface SubscriptionRequest {
 export interface SubscriptionResponse {
   id: number;
   plan: string;
-  status: string;
+  status: PaymentStatus;
   currentPeriodStart: string;
   currentPeriodEnd: string;
   creditsIncluded: number;
   price: number;
-  currency: string;
+  currency: Currency;
   stripeSubscriptionId: string;
 }
 
@@ -719,7 +726,7 @@ export interface CreditTransactionResponse {
 
 export interface PaymentLinkRequest {
   amount: number;
-  currency: string;
+  currency: Currency;
   description?: string;
   expiresAt?: string;
   metadata?: Record<string, any>;
@@ -729,8 +736,8 @@ export interface PaymentLinkResponse {
   id: string;
   url: string;
   amount: number;
-  currency: string;
-  status: string;
+  currency: Currency;
+  status: PaymentStatus;
   expiresAt?: string;
   createdAt: string;
 }
@@ -740,7 +747,7 @@ export interface ApplePaySessionRequest {
   displayName: string;
   domainName: string;
   amount?: number;
-  currency?: string;
+  currency?: Currency;
   countryCode?: string;
   merchantName?: string;
   description?: string;
@@ -770,19 +777,19 @@ export interface ApplePayValidationResponse {
 export interface ApplePayPaymentRequest {
   paymentData: any;
   amount: number;
-  currency: string;
+  currency: Currency;
   description?: string;
   metadata?: Record<string, any>;
   userId?: number;
-  paymentType?: string;
+  paymentType?: PaymentType;
   returnUrl?: string;
 }
 
 export interface ApplePayPaymentResponse {
   paymentIntentId: string;
-  status: string;
+  status: PaymentStatus;
   amount: number;
-  currency: string;
+  currency: Currency;
   clientSecret?: string;
   requiresAction: boolean;
   nextAction?: {
@@ -797,7 +804,7 @@ export interface ApplePayPaymentResponse {
 export interface GooglePayTokenRequest {
   paymentToken: string;
   amount: number;
-  currency: string;
+  currency: Currency;
 }
 
 export interface GooglePayTokenResponse {
@@ -808,9 +815,9 @@ export interface GooglePayTokenResponse {
 
 export interface GooglePayPaymentRequest {
   paymentToken: string;
-  paymentType?: string;
+  paymentType?: PaymentType;
   amount: number;
-  currency: string;
+  currency: Currency;
   description?: string;
   metadata?: Record<string, any>;
   userId?: number;
@@ -819,9 +826,9 @@ export interface GooglePayPaymentRequest {
 
 export interface GooglePayPaymentResponse {
   paymentIntentId: string;
-  status: string;
+  status: PaymentStatus;
   amount: number;
-  currency: string;
+  currency: Currency;
   clientSecret?: string;
   requiresAction: boolean;
   nextAction?: {
@@ -835,7 +842,7 @@ export interface GooglePayPaymentResponse {
 
 export interface GooglePayConfigRequest {
   amount?: number;
-  currency?: string;
+  currency?: Currency;
   merchantName?: string;
   description?: string;
 }
@@ -871,14 +878,14 @@ export interface GooglePayConfigResponse {
 
 export interface WebhookEventRequest {
   stripeEventId: string;
-  eventType: string;
+  eventType: WebhookEventType;
   data: Record<string, any>;
 }
 
 export interface WebhookEventResponse {
   id: number;
   stripeEventId: string;
-  eventType: string;
+  eventType: WebhookEventType;
   processed: boolean;
   data: Record<string, any>;
   retryCount: number;
@@ -889,9 +896,9 @@ export interface WebhookEventResponse {
 }
 
 export interface PaymentFilterRequest {
-  status?: string;
-  paymentMethod?: string;
-  paymentType?: string;
+  status?: PaymentStatus;
+  paymentMethod?: PaymentMethod;
+  paymentType?: PaymentType;
   startDate?: string;
   endDate?: string;
   page?: number;
@@ -914,10 +921,10 @@ export interface PaymentListResponse {
 export interface PaymentResponse {
   id: number;
   amount: number;
-  currency: string;
-  paymentMethod: string;
-  paymentType: string;
-  status: string;
+  currency: Currency;
+  paymentMethod: PaymentMethod;
+  paymentType: PaymentType;
+  status: PaymentStatus;
   description?: string;
   creditsAwarded?: number;
   stripeFee?: number;
