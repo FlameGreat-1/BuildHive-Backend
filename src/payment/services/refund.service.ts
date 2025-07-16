@@ -40,7 +40,7 @@ export class RefundService {
 
   async createRefund(request: CreateRefundRequest): Promise<CreateRefundResponse> {
     try {
-      const payment = await this.paymentRepository.findById(request.paymentId);
+    const payment = await this.paymentRepository.findById(Number(request.paymentId));
 
       if (!payment) {
         throw new Error('Payment not found');
@@ -55,16 +55,16 @@ export class RefundService {
       }
 
       const refundAmount = request.amount || payment.amount;
-
-      const existingRefunds = await this.refundRepository.findByPaymentId(request.paymentId);
-      const totalRefunded = await this.refundRepository.getTotalRefundedAmount(request.paymentId);
+      
+      const existingRefunds = await this.refundRepository.findByPaymentId(Number(request.paymentId));
+      const totalRefunded = await this.refundRepository.getTotalRefundedAmount(Number(request.paymentId));
 
       if (totalRefunded + refundAmount > payment.amount) {
         throw new Error('Total refund amount cannot exceed payment amount');
       }
 
       const refundData: Omit<RefundDatabaseRecord, 'id' | 'created_at' | 'updated_at'> = {
-        payment_id: request.paymentId,
+      payment_id: Number(request.paymentId),
         user_id: request.userId || payment.user_id,
         amount: refundAmount,
         reason: request.reason || undefined,
@@ -100,7 +100,7 @@ export class RefundService {
         } catch (stripeError) {
           logger.error('Failed to create Stripe refund', {
             refundId: savedRefund.id,
-            paymentId: request.paymentId,
+            paymentId: Number(request.paymentId),
             stripePaymentIntentId: payment.stripe_payment_intent_id,
             error: stripeError instanceof Error ? stripeError.message : 'Unknown error'
           });
@@ -119,7 +119,7 @@ export class RefundService {
 
       logger.info('Refund created', {
         refundId: savedRefund.id,
-        paymentId: request.paymentId,
+        paymentId: Number(request.paymentId),
         amount: refundAmount,
         reason: request.reason,
         status: savedRefund.status

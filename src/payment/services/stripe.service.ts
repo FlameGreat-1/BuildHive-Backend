@@ -401,7 +401,7 @@ export class StripeService {
         const refundData: Omit<RefundDatabaseRecord, 'id' | 'created_at' | 'updated_at'> = {
           payment_id: payment.id,
           user_id: payment.user_id,
-          amount: refund.amount,
+          amount: Number(refund.amount),
           reason: reason || undefined,
           description: `Refund for payment ${payment.id}`,
           status: this.mapRefundStatus(refund.status),
@@ -415,9 +415,9 @@ export class StripeService {
       }
 
       logger.info('Stripe refund created', {
-        refundId: refund.id,
+        refundId: refund.id || '',
         paymentIntentId,
-        amount: refund.amount,
+        amount: Number(refund.amount),
         reason
       });
 

@@ -125,8 +125,9 @@ export class PaymentMethodService {
           {
             card_last_four: stripePaymentMethod.card?.last4,
             card_brand: stripePaymentMethod.card?.brand,
-            card_exp_month: stripePaymentMethod.card?.expMonth,
-            card_exp_year: stripePaymentMethod.card?.expYear
+            card_exp_month: stripePaymentMethod.card?.exp_month,
+            card_exp_year: stripePaymentMethod.card?.exp_year
+            
           }
         );
       }
@@ -550,8 +551,8 @@ export class PaymentMethodService {
         await this.paymentMethodRepository.updateCardDetails(paymentMethodId, {
           card_last_four: stripePaymentMethod.card.last4,
           card_brand: stripePaymentMethod.card.brand,
-          card_exp_month: stripePaymentMethod.card.expMonth,
-          card_exp_year: stripePaymentMethod.card.expYear
+          card_exp_month: stripePaymentMethod.card.exp_month,
+          card_exp_year: stripePaymentMethod.card.exp_year
         });
       }
 
