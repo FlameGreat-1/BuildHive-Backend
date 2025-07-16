@@ -30,17 +30,20 @@ import {
   isQuoteCancellable,
   parseQuoteFilters
 } from '../utils';
-import { QUOTE_STATUS, QUOTE_EVENTS } from '../../config/quotes';
+import { QUOTE_EVENTS } from '../../config/quotes';
 import { logger } from '../../shared/utils';
 import { AppError } from '../../shared/utils';
 import { HTTP_STATUS_CODES } from '../../config/auth';
-import { sendSuccessResponse } from '../../shared/utils';
+import { QuoteStatus, PaymentMethod, PaymentType, PaymentStatus, RefundStatus } from '../../shared/types/database.types';
 
 export class QuoteServiceImpl implements QuoteService {
   private quoteRepository: QuoteRepositoryImpl;
   private aiPricingService: AIPricingServiceImpl;
   private jobService: JobService;
   private userService: UserService;
+  private paymentService: PaymentService;
+  private invoiceService: InvoiceService;
+  private refundService: RefundService;
 
   constructor(
     jobService: JobService,
@@ -50,6 +53,9 @@ export class QuoteServiceImpl implements QuoteService {
     this.aiPricingService = new AIPricingServiceImpl();
     this.jobService = jobService;
     this.userService = userService;
+    this.paymentService = new PaymentService();
+    this.invoiceService = new InvoiceService();
+    this.refundService = new RefundService();
   }
 
   async createQuote(tradieId: number, data: QuoteCreateData): Promise<QuoteData> {
@@ -269,7 +275,7 @@ export class QuoteServiceImpl implements QuoteService {
     }
   }
   
-    async updateQuoteStatus(id: number, tradieId: number, data: QuoteStatusUpdateData): Promise<QuoteData> {
+  async updateQuoteStatus(id: number, tradieId: number, data: QuoteStatusUpdateData): Promise<QuoteData> {
     try {
       const existingQuote = await this.quoteRepository.findById(id);
 
@@ -406,7 +412,7 @@ export class QuoteServiceImpl implements QuoteService {
         );
       }
 
-      if (quote.status !== QUOTE_STATUS.DRAFT) {
+      if (quote.status !== QuoteStatus.DRAFT) {
         throw new AppError(
           'Only draft quotes can be sent',
           HTTP_STATUS_CODES.BAD_REQUEST,
@@ -422,7 +428,7 @@ export class QuoteServiceImpl implements QuoteService {
         );
       }
 
-      await this.quoteRepository.updateStatus(id, tradieId, { status: QUOTE_STATUS.SENT });
+      await this.quoteRepository.updateStatus(id, tradieId, { status: QuoteStatus.SENT });
 
       const deliveryResult = await this.processQuoteDelivery(quote, deliveryData);
 
@@ -455,8 +461,8 @@ export class QuoteServiceImpl implements QuoteService {
       );
     }
   }
-
-  async viewQuote(quoteNumber: string): Promise<QuoteWithRelations> {
+  
+    async viewQuote(quoteNumber: string): Promise<QuoteWithRelations> {
     try {
       const quote = await this.quoteRepository.findByNumber(quoteNumber);
 
@@ -468,11 +474,11 @@ export class QuoteServiceImpl implements QuoteService {
         );
       }
 
-      if (quote.status === QUOTE_STATUS.SENT) {
+      if (quote.status === QuoteStatus.SENT) {
         await this.quoteRepository.updateStatus(quote.id, quote.tradieId, { 
-          status: QUOTE_STATUS.VIEWED 
+          status: QuoteStatus.VIEWED 
         });
-        quote.status = QUOTE_STATUS.VIEWED;
+        quote.status = QuoteStatus.VIEWED;
         quote.viewedAt = new Date();
 
         await this.publishQuoteEvent(QUOTE_EVENTS.QUOTE_VIEWED, quote);
@@ -524,7 +530,7 @@ export class QuoteServiceImpl implements QuoteService {
         );
       }
 
-      if (![QUOTE_STATUS.SENT, QUOTE_STATUS.VIEWED].includes(quote.status)) {
+      if (![QuoteStatus.SENT, QuoteStatus.VIEWED].includes(quote.status)) {
         throw new AppError(
           'Quote cannot be accepted in current status',
           HTTP_STATUS_CODES.BAD_REQUEST,
@@ -541,7 +547,7 @@ export class QuoteServiceImpl implements QuoteService {
       }
 
       const acceptedQuote = await this.quoteRepository.updateStatus(quote.id, quote.tradieId, { 
-        status: QUOTE_STATUS.ACCEPTED 
+        status: QuoteStatus.ACCEPTED 
       });
 
       if (quote.jobId) {
@@ -598,7 +604,7 @@ export class QuoteServiceImpl implements QuoteService {
         );
       }
 
-      if (![QUOTE_STATUS.SENT, QUOTE_STATUS.VIEWED].includes(quote.status)) {
+      if (![QuoteStatus.SENT, QuoteStatus.VIEWED].includes(quote.status)) {
         throw new AppError(
           'Quote cannot be rejected in current status',
           HTTP_STATUS_CODES.BAD_REQUEST,
@@ -607,7 +613,7 @@ export class QuoteServiceImpl implements QuoteService {
       }
 
       const rejectedQuote = await this.quoteRepository.updateStatus(quote.id, quote.tradieId, { 
-        status: QUOTE_STATUS.REJECTED,
+        status: QuoteStatus.REJECTED,
         reason 
       });
 
@@ -752,7 +758,7 @@ export class QuoteServiceImpl implements QuoteService {
         );
       }
 
-      if (![QUOTE_STATUS.SENT, QUOTE_STATUS.VIEWED].includes(quote.status)) {
+      if (![QuoteStatus.SENT, QuoteStatus.VIEWED].includes(quote.status)) {
         throw new AppError(
           'Quote cannot be accepted in current status',
           HTTP_STATUS_CODES.BAD_REQUEST,
@@ -768,14 +774,13 @@ export class QuoteServiceImpl implements QuoteService {
         );
       }
 
-      const paymentService = new PaymentService();
-
       const paymentIntentRequest: CreatePaymentIntentRequest = {
         amount: quote.totalAmount,
         currency: 'AUD',
-        paymentMethod: 'card',
-        paymentType: 'one_time',
+        paymentMethod: PaymentMethod.CARD,
+        paymentType: PaymentType.ONE_TIME,
         description: `Payment for Quote #${quote.quoteNumber}`,
+        userId: clientId,
         metadata: {
           quoteId: quote.id.toString(),
           quoteNumber: quote.quoteNumber,
@@ -785,21 +790,21 @@ export class QuoteServiceImpl implements QuoteService {
         automaticPaymentMethods: true
       };
 
-      const paymentIntent = await paymentService.createPaymentIntent(paymentIntentRequest, requestId);
+      const paymentIntent = await this.paymentService.createPaymentIntent(paymentIntentRequest);
 
       const confirmRequest: ConfirmPaymentRequest = {
         paymentIntentId: paymentIntent.paymentIntentId,
         paymentMethodId: paymentMethodId
       };
 
-      const confirmResult = await paymentService.confirmPayment(confirmRequest, requestId);
+      const confirmResult = await this.paymentService.confirmPayment(confirmRequest);
 
-      if (confirmResult.status === 'succeeded') {
+      if (confirmResult.status === PaymentStatus.SUCCEEDED) {
         const acceptedQuote = await this.quoteRepository.updateStatus(quote.id, quote.tradieId, { 
-          status: QUOTE_STATUS.ACCEPTED 
+          status: QuoteStatus.ACCEPTED 
         });
 
-        await this.quoteRepository.updatePaymentStatus(quote.id, 'succeeded', confirmResult.paymentIntentId);
+        await this.quoteRepository.updatePaymentStatus(quote.id, PaymentStatus.SUCCEEDED, confirmResult.paymentIntentId);
 
         if (quote.jobId) {
           await this.jobService.updateJobStatus(quote.jobId, 'active');
@@ -820,7 +825,7 @@ export class QuoteServiceImpl implements QuoteService {
           paymentResult: confirmResult
         };
       } else {
-        await this.quoteRepository.updatePaymentStatus(quote.id, 'failed');
+        await this.quoteRepository.updatePaymentStatus(quote.id, PaymentStatus.FAILED);
 
         throw new AppError(
           confirmResult.error?.message || 'Payment failed',
@@ -848,8 +853,8 @@ export class QuoteServiceImpl implements QuoteService {
       );
     }
   }
-
-  async createPaymentIntent(quoteNumber: string, clientId: number, requestId: string = 'unknown'): Promise<any> {
+  
+    async createPaymentIntent(quoteNumber: string, clientId: number, requestId: string = 'unknown'): Promise<any> {
     try {
       const quote = await this.quoteRepository.findByNumber(quoteNumber);
 
@@ -869,7 +874,7 @@ export class QuoteServiceImpl implements QuoteService {
         );
       }
 
-      if (![QUOTE_STATUS.SENT, QUOTE_STATUS.VIEWED].includes(quote.status)) {
+      if (![QuoteStatus.SENT, QuoteStatus.VIEWED].includes(quote.status)) {
         throw new AppError(
           'Quote cannot be paid in current status',
           HTTP_STATUS_CODES.BAD_REQUEST,
@@ -885,14 +890,13 @@ export class QuoteServiceImpl implements QuoteService {
         );
       }
 
-      const paymentService = new PaymentService();
-
       const paymentIntentRequest: CreatePaymentIntentRequest = {
         amount: quote.totalAmount,
         currency: 'AUD',
-        paymentMethod: 'card',
-        paymentType: 'one_time',
+        paymentMethod: PaymentMethod.CARD,
+        paymentType: PaymentType.ONE_TIME,
         description: `Payment for Quote #${quote.quoteNumber}`,
+        userId: clientId,
         metadata: {
           quoteId: quote.id.toString(),
           quoteNumber: quote.quoteNumber,
@@ -903,7 +907,7 @@ export class QuoteServiceImpl implements QuoteService {
         automaticPaymentMethods: true
       };
 
-      const paymentIntent = await paymentService.createPaymentIntent(paymentIntentRequest, requestId);
+      const paymentIntent = await this.paymentService.createPaymentIntent(paymentIntentRequest);
 
       logger.info('Payment intent created for quote', {
         quoteId: quote.id,
@@ -957,8 +961,6 @@ export class QuoteServiceImpl implements QuoteService {
         );
       }
 
-      const invoiceService = new InvoiceService();
-
       const invoiceRequest = {
         amount: quote.totalAmount,
         currency: 'AUD',
@@ -978,7 +980,7 @@ export class QuoteServiceImpl implements QuoteService {
         }
       };
 
-      const invoiceResult = await invoiceService.createInvoice(invoiceRequest, requestId);
+      const invoiceResult = await this.invoiceService.createInvoice(invoiceRequest);
 
       await this.quoteRepository.updatePaymentStatus(quote.id, 'invoiced');
 
@@ -1040,8 +1042,6 @@ export class QuoteServiceImpl implements QuoteService {
         );
       }
 
-      const refundService = new RefundService();
-
       const refundRequest = {
         paymentId: quote.paymentId,
         amount,
@@ -1054,10 +1054,10 @@ export class QuoteServiceImpl implements QuoteService {
         }
       };
 
-      const refundResult = await refundService.createRefund(refundRequest, requestId);
+      const refundResult = await this.refundService.createRefund(refundRequest);
 
-      if (refundResult.status === 'succeeded') {
-        await this.quoteRepository.updatePaymentStatus(quote.id, 'refunded');
+      if (refundResult.status === RefundStatus.SUCCEEDED) {
+        await this.quoteRepository.updatePaymentStatus(quote.id, PaymentStatus.REFUNDED);
         
         logger.info('Quote payment refunded successfully', {
           quoteId,
@@ -1231,12 +1231,12 @@ export class QuoteServiceImpl implements QuoteService {
 
   private async publishQuoteStatusEvent(status: string, quote: any): Promise<void> {
     const eventMap = {
-      [QUOTE_STATUS.SENT]: QUOTE_EVENTS.QUOTE_SENT,
-      [QUOTE_STATUS.VIEWED]: QUOTE_EVENTS.QUOTE_VIEWED,
-      [QUOTE_STATUS.ACCEPTED]: QUOTE_EVENTS.QUOTE_ACCEPTED,
-      [QUOTE_STATUS.REJECTED]: QUOTE_EVENTS.QUOTE_REJECTED,
-      [QUOTE_STATUS.EXPIRED]: QUOTE_EVENTS.QUOTE_EXPIRED,
-      [QUOTE_STATUS.CANCELLED]: QUOTE_EVENTS.QUOTE_CANCELLED
+      [QuoteStatus.SENT]: QUOTE_EVENTS.QUOTE_SENT,
+      [QuoteStatus.VIEWED]: QUOTE_EVENTS.QUOTE_VIEWED,
+      [QuoteStatus.ACCEPTED]: QUOTE_EVENTS.QUOTE_ACCEPTED,
+      [QuoteStatus.REJECTED]: QUOTE_EVENTS.QUOTE_REJECTED,
+      [QuoteStatus.EXPIRED]: QUOTE_EVENTS.QUOTE_EXPIRED,
+      [QuoteStatus.CANCELLED]: QUOTE_EVENTS.QUOTE_CANCELLED
     };
 
     const eventType = eventMap[status as keyof typeof eventMap];
@@ -1245,3 +1245,5 @@ export class QuoteServiceImpl implements QuoteService {
     }
   }
 }
+
+
