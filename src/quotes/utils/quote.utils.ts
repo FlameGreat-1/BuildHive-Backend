@@ -1,6 +1,6 @@
 import { QuoteItemCreateData, QuoteCalculation, QuoteItemData } from '../types';
 import { QUOTE_CONSTANTS, GST_CONSTANTS } from '../../config/quotes';
-import { QuoteStatus } from '../../shared/types';
+import { QuoteStatus } from '../../shared/types/database.types';
 
 export const calculateQuoteTotal = (
   items: QuoteItemCreateData[] | QuoteItemData[],
@@ -60,13 +60,13 @@ export const getQuoteValidUntilDate = (days: number = QUOTE_CONSTANTS.DEFAULT_VA
 
 export const validateQuoteStatusTransition = (currentStatus: QuoteStatus, newStatus: QuoteStatus): boolean => {
   const allowedTransitions: Record<QuoteStatus, QuoteStatus[]> = {
-    'draft': ['sent', 'cancelled'],
-    'sent': ['viewed', 'accepted', 'rejected', 'expired', 'cancelled'],
-    'viewed': ['accepted', 'rejected', 'expired', 'cancelled'],
-    'accepted': [],
-    'rejected': [],
-    'expired': [],
-    'cancelled': []
+    [QuoteStatus.DRAFT]: [QuoteStatus.SENT, QuoteStatus.CANCELLED],
+    [QuoteStatus.SENT]: [QuoteStatus.VIEWED, QuoteStatus.ACCEPTED, QuoteStatus.REJECTED, QuoteStatus.EXPIRED, QuoteStatus.CANCELLED],
+    [QuoteStatus.VIEWED]: [QuoteStatus.ACCEPTED, QuoteStatus.REJECTED, QuoteStatus.EXPIRED, QuoteStatus.CANCELLED],
+    [QuoteStatus.ACCEPTED]: [],
+    [QuoteStatus.REJECTED]: [],
+    [QuoteStatus.EXPIRED]: [],
+    [QuoteStatus.CANCELLED]: []
   };
 
   return allowedTransitions[currentStatus]?.includes(newStatus) || false;
@@ -141,13 +141,13 @@ export const calculateQuoteAcceptanceRate = (totalQuotes: number, acceptedQuotes
 
 export const getQuoteStatusColor = (status: QuoteStatus): string => {
   const statusColors: Record<QuoteStatus, string> = {
-    'draft': '#6B7280',
-    'sent': '#3B82F6',
-    'viewed': '#F59E0B',
-    'accepted': '#10B981',
-    'rejected': '#EF4444',
-    'expired': '#9CA3AF',
-    'cancelled': '#6B7280'
+    [QuoteStatus.DRAFT]: '#6B7280',
+    [QuoteStatus.SENT]: '#3B82F6',
+    [QuoteStatus.VIEWED]: '#F59E0B',
+    [QuoteStatus.ACCEPTED]: '#10B981',
+    [QuoteStatus.REJECTED]: '#EF4444',
+    [QuoteStatus.EXPIRED]: '#9CA3AF',
+    [QuoteStatus.CANCELLED]: '#6B7280'
   };
 
   return statusColors[status] || '#6B7280';
@@ -155,13 +155,13 @@ export const getQuoteStatusColor = (status: QuoteStatus): string => {
 
 export const getQuoteStatusLabel = (status: QuoteStatus): string => {
   const statusLabels: Record<QuoteStatus, string> = {
-    'draft': 'Draft',
-    'sent': 'Sent',
-    'viewed': 'Viewed',
-    'accepted': 'Accepted',
-    'rejected': 'Rejected',
-    'expired': 'Expired',
-    'cancelled': 'Cancelled'
+    [QuoteStatus.DRAFT]: 'Draft',
+    [QuoteStatus.SENT]: 'Sent',
+    [QuoteStatus.VIEWED]: 'Viewed',
+    [QuoteStatus.ACCEPTED]: 'Accepted',
+    [QuoteStatus.REJECTED]: 'Rejected',
+    [QuoteStatus.EXPIRED]: 'Expired',
+    [QuoteStatus.CANCELLED]: 'Cancelled'
   };
 
   return statusLabels[status] || 'Unknown';
@@ -183,11 +183,11 @@ export const generateQuoteItemSortOrder = (existingItems: QuoteItemData[]): numb
 };
 
 export const isQuoteEditable = (status: QuoteStatus): boolean => {
-  return status === 'draft';
+  return status === QuoteStatus.DRAFT;
 };
 
 export const isQuoteCancellable = (status: QuoteStatus): boolean => {
-  return ['draft', 'sent', 'viewed'].includes(status);
+  return [QuoteStatus.DRAFT, QuoteStatus.SENT, QuoteStatus.VIEWED].includes(status);
 };
 
 export const getQuoteExpiryWarningMessage = (validUntil: Date): string => {

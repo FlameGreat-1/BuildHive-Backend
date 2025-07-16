@@ -20,6 +20,7 @@ import { connection } from '../../shared/database/connection';
 import { logger } from '../../shared/utils';
 import { AppError } from '../../shared/utils';
 import { HTTP_STATUS_CODES } from '../../config/auth';
+import { QuoteStatus, QuoteItemType, DeliveryMethod } from '../../shared/types/database.types';
 
 export class QuoteRepositoryImpl implements QuoteRepository {
   private db: DatabaseConnection;
@@ -359,8 +360,8 @@ export class QuoteRepositoryImpl implements QuoteRepository {
       );
     }
   }
-
-  async update(id: number, tradieId: number, data: QuoteUpdateData): Promise<QuoteData> {
+  
+    async update(id: number, tradieId: number, data: QuoteUpdateData): Promise<QuoteData> {
     const transaction = await this.db.transaction();
     
     try {
@@ -647,7 +648,7 @@ export class QuoteRepositoryImpl implements QuoteRepository {
       const analyticsQuery = `
         SELECT 
           COUNT(*) as total_quotes,
-          COUNT(CASE WHEN status = 'accepted' THEN 1 END) as accepted_quotes,
+          COUNT(CASE WHEN status = $4 THEN 1 END) as accepted_quotes,
           AVG(total_amount) as average_quote_value,
           AVG(EXTRACT(EPOCH FROM (accepted_at - sent_at))/3600) as average_response_time,
           COUNT(CASE WHEN payment_status = 'paid' THEN 1 END) as paid_quotes,
@@ -659,7 +660,7 @@ export class QuoteRepositoryImpl implements QuoteRepository {
         WHERE tradie_id = $1 AND created_at BETWEEN $2 AND $3
       `;
 
-      const result = await this.db.query(analyticsQuery, [tradieId, startDate, endDate]);
+      const result = await this.db.query(analyticsQuery, [tradieId, startDate, endDate, QuoteStatus.ACCEPTED]);
       const stats = result.rows[0];
 
       const totalQuotes = parseInt(stats.total_quotes) || 0;
@@ -721,13 +722,35 @@ export class QuoteRepositoryImpl implements QuoteRepository {
     };
 
     statusCounts.forEach((row: { status: string; count: string }) => {
-      const status = row.status as keyof QuoteSummary;
+      const status = row.status;
       const count = parseInt(row.count);
-      if (status in summary && typeof summary[status] === 'number') {
-        (summary as any)[status] = count;
+      
+      switch (status) {
+        case QuoteStatus.DRAFT:
+          summary.draft = count;
+          break;
+        case QuoteStatus.SENT:
+          summary.sent = count;
+          break;
+        case QuoteStatus.VIEWED:
+          summary.viewed = count;
+          break;
+        case QuoteStatus.ACCEPTED:
+          summary.accepted = count;
+          break;
+        case QuoteStatus.REJECTED:
+          summary.rejected = count;
+          break;
+        case QuoteStatus.EXPIRED:
+          summary.expired = count;
+          break;
+        case QuoteStatus.CANCELLED:
+          summary.cancelled = count;
+          break;
       }
     });
 
     return summary;
   }
 }
+

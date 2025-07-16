@@ -17,6 +17,7 @@ import { sendSuccessResponse, sendErrorResponse } from '../../shared/utils';
 import { logger } from '../../shared/utils';
 import { AppError } from '../../shared/utils';
 import { HTTP_STATUS_CODES } from '../../config/auth';
+import { QuoteStatus, DeliveryMethod } from '../../shared/types/database.types';
 
 export class QuoteController {
   private quoteService: QuoteServiceImpl;
@@ -53,10 +54,7 @@ export class QuoteController {
         totalAmount: quote.totalAmount
       });
 
-      sendSuccessResponse(res, {
-        message: 'Quote created successfully',
-        data: quote
-      }, HTTP_STATUS_CODES.CREATED);
+      sendSuccessResponse(res, 'Quote created successfully', quote, HTTP_STATUS_CODES.CREATED);
 
     } catch (error) {
       logger.error('Quote creation failed via API', {
@@ -74,6 +72,14 @@ export class QuoteController {
     
     try {
       const quoteId = parseInt(req.params.quoteId);
+      if (isNaN(quoteId) || quoteId <= 0) {
+        throw new AppError(
+          'Invalid quote ID',
+          HTTP_STATUS_CODES.BAD_REQUEST,
+          'INVALID_QUOTE_ID'
+        );
+      }
+
       const userId = req.user?.id;
       const userRole = req.user?.role || 'tradie';
 
@@ -94,10 +100,7 @@ export class QuoteController {
         userRole
       });
 
-      sendSuccessResponse(res, {
-        message: 'Quote retrieved successfully',
-        data: quote
-      });
+      sendSuccessResponse(res, 'Quote retrieved successfully', quote);
 
     } catch (error) {
       logger.error('Quote retrieval failed via API', {
@@ -123,10 +126,7 @@ export class QuoteController {
         quoteNumber
       });
 
-      sendSuccessResponse(res, {
-        message: 'Quote retrieved successfully',
-        data: quote
-      });
+      sendSuccessResponse(res, 'Quote retrieved successfully', quote);
 
     } catch (error) {
       logger.error('Quote retrieval by number failed via API', {
@@ -163,13 +163,9 @@ export class QuoteController {
         limit: filters.limit
       });
 
-      sendSuccessResponse(res, {
-        message: 'Quotes retrieved successfully',
-        data: result.quotes,
-        meta: {
-          summary: result.summary,
-          pagination: result.pagination
-        }
+      sendSuccessResponse(res, 'Quotes retrieved successfully', result.quotes, HTTP_STATUS_CODES.OK, {
+        summary: result.summary,
+        pagination: result.pagination
       });
 
     } catch (error) {
@@ -188,8 +184,15 @@ export class QuoteController {
     
     try {
       const quoteId = parseInt(req.params.quoteId);
-      const tradieId = req.user?.id;
+      if (isNaN(quoteId) || quoteId <= 0) {
+        throw new AppError(
+          'Invalid quote ID',
+          HTTP_STATUS_CODES.BAD_REQUEST,
+          'INVALID_QUOTE_ID'
+        );
+      }
 
+      const tradieId = req.user?.id;
       if (!tradieId) {
         throw new AppError(
           'Authentication required',
@@ -208,10 +211,7 @@ export class QuoteController {
         updatedFields: Object.keys(data)
       });
 
-      sendSuccessResponse(res, {
-        message: 'Quote updated successfully',
-        data: quote
-      });
+      sendSuccessResponse(res, 'Quote updated successfully', quote);
 
     } catch (error) {
       logger.error('Quote update failed via API', {
@@ -230,8 +230,15 @@ export class QuoteController {
     
     try {
       const quoteId = parseInt(req.params.quoteId);
-      const tradieId = req.user?.id;
+      if (isNaN(quoteId) || quoteId <= 0) {
+        throw new AppError(
+          'Invalid quote ID',
+          HTTP_STATUS_CODES.BAD_REQUEST,
+          'INVALID_QUOTE_ID'
+        );
+      }
 
+      const tradieId = req.user?.id;
       if (!tradieId) {
         throw new AppError(
           'Authentication required',
@@ -250,10 +257,7 @@ export class QuoteController {
         newStatus: data.status
       });
 
-      sendSuccessResponse(res, {
-        message: 'Quote status updated successfully',
-        data: quote
-      });
+      sendSuccessResponse(res, 'Quote status updated successfully', quote);
 
     } catch (error) {
       logger.error('Quote status update failed via API', {
@@ -273,8 +277,15 @@ export class QuoteController {
     
     try {
       const quoteId = parseInt(req.params.quoteId);
-      const tradieId = req.user?.id;
+      if (isNaN(quoteId) || quoteId <= 0) {
+        throw new AppError(
+          'Invalid quote ID',
+          HTTP_STATUS_CODES.BAD_REQUEST,
+          'INVALID_QUOTE_ID'
+        );
+      }
 
+      const tradieId = req.user?.id;
       if (!tradieId) {
         throw new AppError(
           'Authentication required',
@@ -291,9 +302,7 @@ export class QuoteController {
         tradieId
       });
 
-      sendSuccessResponse(res, {
-        message: 'Quote deleted successfully'
-      });
+      sendSuccessResponse(res, 'Quote deleted successfully');
 
     } catch (error) {
       logger.error('Quote deletion failed via API', {
@@ -312,8 +321,15 @@ export class QuoteController {
     
     try {
       const quoteId = parseInt(req.params.quoteId);
-      const tradieId = req.user?.id;
+      if (isNaN(quoteId) || quoteId <= 0) {
+        throw new AppError(
+          'Invalid quote ID',
+          HTTP_STATUS_CODES.BAD_REQUEST,
+          'INVALID_QUOTE_ID'
+        );
+      }
 
+      const tradieId = req.user?.id;
       if (!tradieId) {
         throw new AppError(
           'Authentication required',
@@ -337,10 +353,7 @@ export class QuoteController {
         success: result.success
       });
 
-      sendSuccessResponse(res, {
-        message: 'Quote sent successfully',
-        data: result
-      });
+      sendSuccessResponse(res, 'Quote sent successfully', result);
 
     } catch (error) {
       logger.error('Quote sending failed via API', {
@@ -367,10 +380,7 @@ export class QuoteController {
         quoteId: quote.id
       });
 
-      sendSuccessResponse(res, {
-        message: 'Quote retrieved successfully',
-        data: quote
-      });
+      sendSuccessResponse(res, 'Quote retrieved successfully', quote);
 
     } catch (error) {
       logger.error('Quote viewing failed via API', {
@@ -383,7 +393,7 @@ export class QuoteController {
     }
   }
   
-    async acceptQuote(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async acceptQuote(req: Request, res: Response, next: NextFunction): Promise<void> {
     const requestId = res.locals.requestId || 'unknown';
     
     try {
@@ -408,10 +418,7 @@ export class QuoteController {
         totalAmount: quote.totalAmount
       });
 
-      sendSuccessResponse(res, {
-        message: 'Quote accepted successfully',
-        data: quote
-      });
+      sendSuccessResponse(res, 'Quote accepted successfully', quote);
 
     } catch (error) {
       logger.error('Quote acceptance failed via API', {
@@ -451,10 +458,7 @@ export class QuoteController {
         reason
       });
 
-      sendSuccessResponse(res, {
-        message: 'Quote rejected successfully',
-        data: quote
-      });
+      sendSuccessResponse(res, 'Quote rejected successfully', quote);
 
     } catch (error) {
       logger.error('Quote rejection failed via API', {
@@ -491,10 +495,7 @@ export class QuoteController {
         totalAmount: calculation.totalAmount
       });
 
-      sendSuccessResponse(res, {
-        message: 'Quote calculated successfully',
-        data: calculation
-      });
+      sendSuccessResponse(res, 'Quote calculated successfully', calculation);
 
     } catch (error) {
       logger.error('Quote calculation failed via API', {
@@ -530,10 +531,7 @@ export class QuoteController {
         confidence: pricing.confidence
       });
 
-      sendSuccessResponse(res, {
-        message: 'AI pricing suggestion generated successfully',
-        data: pricing
-      });
+      sendSuccessResponse(res, 'AI pricing suggestion generated successfully', pricing);
 
     } catch (error) {
       logger.error('AI pricing generation failed via API', {
@@ -590,10 +588,7 @@ export class QuoteController {
         totalQuotes: analytics.totalQuotes
       });
 
-      sendSuccessResponse(res, {
-        message: 'Quote analytics retrieved successfully',
-        data: analytics
-      });
+      sendSuccessResponse(res, 'Quote analytics retrieved successfully', analytics);
 
     } catch (error) {
       logger.error('Quote analytics retrieval failed via API', {
@@ -617,10 +612,7 @@ export class QuoteController {
         quoteNumber
       });
 
-      sendSuccessResponse(res, {
-        message: 'Quote number generated successfully',
-        data: { quoteNumber }
-      });
+      sendSuccessResponse(res, 'Quote number generated successfully', { quoteNumber });
 
     } catch (error) {
       logger.error('Quote number generation failed via API', {
@@ -654,13 +646,9 @@ export class QuoteController {
         totalQuotes: result.quotes.length
       });
 
-      sendSuccessResponse(res, {
-        message: 'Client quotes retrieved successfully',
-        data: result.quotes,
-        meta: {
-          summary: result.summary,
-          pagination: result.pagination
-        }
+      sendSuccessResponse(res, 'Client quotes retrieved successfully', result.quotes, HTTP_STATUS_CODES.OK, {
+        summary: result.summary,
+        pagination: result.pagination
       });
 
     } catch (error) {
@@ -679,8 +667,15 @@ export class QuoteController {
     
     try {
       const quoteId = parseInt(req.params.quoteId);
-      const tradieId = req.user?.id;
+      if (isNaN(quoteId) || quoteId <= 0) {
+        throw new AppError(
+          'Invalid quote ID',
+          HTTP_STATUS_CODES.BAD_REQUEST,
+          'INVALID_QUOTE_ID'
+        );
+      }
 
+      const tradieId = req.user?.id;
       if (!tradieId) {
         throw new AppError(
           'Authentication required',
@@ -718,10 +713,7 @@ export class QuoteController {
         tradieId
       });
 
-      sendSuccessResponse(res, {
-        message: 'Quote duplicated successfully',
-        data: duplicatedQuote
-      }, HTTP_STATUS_CODES.CREATED);
+      sendSuccessResponse(res, 'Quote duplicated successfully', duplicatedQuote, HTTP_STATUS_CODES.CREATED);
 
     } catch (error) {
       logger.error('Quote duplication failed via API', {
@@ -769,10 +761,7 @@ export class QuoteController {
         amount: result.quote.totalAmount
       });
 
-      sendSuccessResponse(res, {
-        message: 'Quote accepted and payment processed successfully',
-        data: result
-      });
+      sendSuccessResponse(res, 'Quote accepted and payment processed successfully', result);
 
     } catch (error) {
       logger.error('Quote acceptance with payment failed via API', {
@@ -811,10 +800,7 @@ export class QuoteController {
         amount: result.quote.totalAmount
       });
 
-      sendSuccessResponse(res, {
-        message: 'Payment intent created successfully',
-        data: result
-      });
+      sendSuccessResponse(res, 'Payment intent created successfully', result);
 
     } catch (error) {
       logger.error('Payment intent creation failed via API', {
@@ -833,8 +819,15 @@ export class QuoteController {
     
     try {
       const quoteId = parseInt(req.params.quoteId);
-      const tradieId = req.user?.id;
+      if (isNaN(quoteId) || quoteId <= 0) {
+        throw new AppError(
+          'Invalid quote ID',
+          HTTP_STATUS_CODES.BAD_REQUEST,
+          'INVALID_QUOTE_ID'
+        );
+      }
 
+      const tradieId = req.user?.id;
       if (!tradieId) {
         throw new AppError(
           'Authentication required',
@@ -852,10 +845,7 @@ export class QuoteController {
         invoiceId: result.invoiceResult.id
       });
 
-      sendSuccessResponse(res, {
-        message: 'Invoice generated successfully',
-        data: result
-      });
+      sendSuccessResponse(res, 'Invoice generated successfully', result);
 
     } catch (error) {
       logger.error('Quote invoice generation failed via API', {
@@ -874,6 +864,14 @@ export class QuoteController {
     
     try {
       const quoteId = parseInt(req.params.quoteId);
+      if (isNaN(quoteId) || quoteId <= 0) {
+        throw new AppError(
+          'Invalid quote ID',
+          HTTP_STATUS_CODES.BAD_REQUEST,
+          'INVALID_QUOTE_ID'
+        );
+      }
+
       const tradieId = req.user?.id;
       const { amount, reason } = req.body;
 
@@ -911,10 +909,7 @@ export class QuoteController {
         amount: result.refundResult.amount
       });
 
-      sendSuccessResponse(res, {
-        message: 'Payment refunded successfully',
-        data: result
-      });
+      sendSuccessResponse(res, 'Payment refunded successfully', result);
 
     } catch (error) {
       logger.error('Quote payment refund failed via API', {
@@ -928,5 +923,3 @@ export class QuoteController {
     }
   }
 }
-
-

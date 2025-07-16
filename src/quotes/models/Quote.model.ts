@@ -1,6 +1,6 @@
 import { DatabaseConnection } from '../../shared/database/connection';
 import { QuoteData, QuoteWithRelations, QuoteCreateData, QuoteUpdateData } from '../types';
-import { QuoteStatus } from '../../shared/types';
+import { QuoteStatus } from '../../shared/types/database.types';
 import { DatabaseRecord } from '../../shared/types';
 import { connection } from '../../shared/database/connection';
 
@@ -97,7 +97,7 @@ export class QuoteModel {
       quote_number: quoteNumber,
       title: data.title,
       description: data.description,
-      status: 'draft' as QuoteStatus,
+      status: QuoteStatus.DRAFT,
       subtotal: calculations.subtotal,
       gst_amount: calculations.gstAmount,
       total_amount: calculations.totalAmount,
