@@ -5,6 +5,7 @@ import {
   QuoteWithRelations, 
   QuoteCreateData, 
   QuoteUpdateData,
+  QuoteItemCreateData,
   QuoteFilterOptions,
   QuoteListResult,
   QuoteSummary,
@@ -17,10 +18,9 @@ import { QuoteModel, QuoteRecord, QuoteWithRelationsRecord, QuoteItemModel, Quot
 import { calculateQuoteTotal, generateQuoteNumber, generateQuoteItemSortOrder } from '../utils';
 import { quoteQueries, quoteTableNames, quoteColumnNames } from '../../config/quotes';
 import { connection } from '../../shared/database/connection';
-import { logger } from '../../shared/utils';
-import { AppError } from '../../shared/utils';
+import { logger, AppError } from '../../shared/utils';
 import { HTTP_STATUS_CODES } from '../../config/auth';
-import { QuoteStatus, QuoteItemType, DeliveryMethod } from '../../shared/types/database.types';
+import { QuoteStatus, QuoteItemType, DeliveryMethod, MaterialUnit } from '../../shared/types/database.types';
 
 export class QuoteRepositoryImpl implements QuoteRepository {
   private db: DatabaseConnection;
