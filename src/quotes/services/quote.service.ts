@@ -15,6 +15,7 @@ import {
 import { QuoteRepositoryImpl } from '../repositories';
 import { AIPricingServiceImpl } from './ai-pricing.service';
 import { JobService } from '../../jobs/services';
+import { JobStatus } from '../../jobs/types';
 import { UserService } from '../../auth/services';
 import { PaymentService, InvoiceService, RefundService } from '../../payment/services';
 import { 
@@ -551,7 +552,7 @@ export class QuoteServiceImpl implements QuoteService {
       });
 
       if (quote.jobId) {
-        await this.jobService.updateJobStatus(quote.jobId, 'active');
+        await this.jobService.updateJobStatus(quote.jobId, quote.tradieId, JobStatus.ACTIVE);
       }
 
       logger.info('Quote accepted successfully', {
@@ -807,7 +808,7 @@ export class QuoteServiceImpl implements QuoteService {
         await this.quoteRepository.updatePaymentStatus(quote.id, PaymentStatus.SUCCEEDED, confirmResult.paymentIntentId);
 
         if (quote.jobId) {
-          await this.jobService.updateJobStatus(quote.jobId, 'active');
+          await this.jobService.updateJobStatus(quote.jobId, quote.tradieId, JobStatus.ACTIVE);
         }
 
         logger.info('Quote accepted with payment successfully', {
@@ -1055,8 +1056,8 @@ export class QuoteServiceImpl implements QuoteService {
       };
 
       const refundResult = await this.refundService.createRefund(refundRequest);
-
-      if (refundResult.status === RefundStatus.SUCCEEDED) {
+      
+      if (refundResult.status === RefundStatus.PROCESSED) {
         await this.quoteRepository.updatePaymentStatus(quote.id, PaymentStatus.REFUNDED);
         
         logger.info('Quote payment refunded successfully', {

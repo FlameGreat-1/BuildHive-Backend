@@ -360,14 +360,21 @@ export class QuoteRepositoryImpl implements QuoteRepository {
       );
     }
   }
-  
-    async update(id: number, tradieId: number, data: QuoteUpdateData): Promise<QuoteData> {
+
+  async update(id: number, tradieId: number, data: QuoteUpdateData): Promise<QuoteData> {
     const transaction = await this.db.transaction();
     
     try {
       let calculations;
       if (data.items) {
-        calculations = calculateQuoteTotal(data.items, data.gstEnabled ?? true);
+        const createItems: QuoteItemCreateData[] = data.items.map(item => ({
+          itemType: item.itemType || QuoteItemType.LABOUR,
+          description: item.description || '',
+          quantity: item.quantity || 0,
+          unit: item.unit || MaterialUnit.PIECE,
+          unitPrice: item.unitPrice || 0
+        }));
+        calculations = calculateQuoteTotal(createItems, data.gstEnabled ?? true);
       }
 
       const updateRecord = QuoteModel.toUpdateRecord(data, calculations);
@@ -405,7 +412,15 @@ export class QuoteRepositoryImpl implements QuoteRepository {
           const item = data.items[i];
           const sortOrder = i + 1;
           
-          const itemRecord = QuoteItemModel.toCreateRecord(quote.id, item, sortOrder);
+          const createItem: QuoteItemCreateData = {
+            itemType: item.itemType || QuoteItemType.LABOUR,
+            description: item.description || '',
+            quantity: item.quantity || 0,
+            unit: item.unit || MaterialUnit.PIECE,
+            unitPrice: item.unitPrice || 0
+          };
+          
+          const itemRecord = QuoteItemModel.toCreateRecord(quote.id, createItem, sortOrder);
           const sanitizedItemRecord = QuoteItemModel.sanitizeRecord(itemRecord);
 
           const itemResult = await transaction.query(quoteQueries.CREATE_QUOTE_ITEM, [
@@ -455,8 +470,8 @@ export class QuoteRepositoryImpl implements QuoteRepository {
         'QUOTE_UPDATE_ERROR'
       );
     }
-  }
-
+  }  
+    
   async updateStatus(id: number, tradieId: number, data: QuoteStatusUpdateData): Promise<QuoteData> {
     try {
       const result = await this.db.query(quoteQueries.UPDATE_QUOTE_STATUS, [id, data.status]);
@@ -666,6 +681,8 @@ export class QuoteRepositoryImpl implements QuoteRepository {
       const totalQuotes = parseInt(stats.total_quotes) || 0;
       const acceptedQuotes = parseInt(stats.accepted_quotes) || 0;
       const acceptanceRate = totalQuotes > 0 ? (acceptedQuotes / totalQuotes) * 100 : 0;
+      const paidQuotes = parseInt(stats.paid_quotes) || 0;
+      const refundedQuotes = parseInt(stats.refunded_quotes) || 0;
 
       return {
         totalQuotes,
@@ -675,11 +692,11 @@ export class QuoteRepositoryImpl implements QuoteRepository {
         topPerformingServices: [],
         monthlyTrends: [],
         paymentMetrics: {
-          paid: parseInt(stats.paid_quotes) || 0,
-          pendingPayment: parseInt(stats.pending_payment_quotes) || 0,
-          refunded: parseInt(stats.refunded_quotes) || 0,
-          totalRevenue: parseFloat(stats.total_revenue) || 0,
-          pendingRevenue: parseFloat(stats.pending_revenue) || 0
+          totalPaid: paidQuotes,
+          averagePaymentTime: 0,
+          paymentSuccessRate: totalQuotes > 0 ? (paidQuotes / totalQuotes) * 100 : 0,
+          refundRate: paidQuotes > 0 ? (refundedQuotes / paidQuotes) * 100 : 0,
+          totalRefunded: refundedQuotes
         }
       };
 
@@ -698,7 +715,7 @@ export class QuoteRepositoryImpl implements QuoteRepository {
       );
     }
   }
-
+  
   private async getQuoteItems(quoteId: number): Promise<QuoteItemData[]> {
     const result = await this.db.query(quoteQueries.GET_QUOTE_ITEMS, [quoteId]);
     return result.rows.map((row: QuoteItemRecord) => QuoteItemModel.fromRecord(row));

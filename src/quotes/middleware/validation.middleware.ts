@@ -9,15 +9,14 @@ import {
 import { validateQuoteItems, sanitizeQuoteInput, validateQuoteStatusTransition } from '../utils';
 import { QUOTE_CONSTANTS } from '../../config/quotes';
 import { ValidationError } from '../../shared/types';
-import { createErrorResponse, logger } from '../../shared/utils';
+import { createErrorResponse, logger, AppError } from '../../shared/utils';  
 import { HTTP_STATUS_CODES } from '../../config/auth/constants';
 import { QuoteStatus, DeliveryMethod, QuoteItemType, MaterialUnit } from '../../shared/types/database.types';
-import { AppError } from '../../shared/utils/errors';
 
 const sendValidationError = (res: Response, message: string, errors: ValidationError[]): void => {
   const error = new AppError(message, HTTP_STATUS_CODES.BAD_REQUEST, 'VALIDATION_ERROR');
   res.status(HTTP_STATUS_CODES.BAD_REQUEST).json(
-    createErrorResponse(error)
+    createErrorResponse(error, res.locals.requestId || 'unknown')
   );
 };
 
