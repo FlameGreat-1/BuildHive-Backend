@@ -24,11 +24,11 @@ export const validatePaymentAmount = (amount: number, currency: string): boolean
 };
 
 export const validateCurrency = (currency: string): boolean => {
-  return PAYMENT_CONSTANTS.STRIPE.CURRENCY.SUPPORTED.includes(currency.toUpperCase());
+  return (PAYMENT_CONSTANTS.STRIPE.CURRENCY.SUPPORTED as readonly string[]).includes(currency.toUpperCase());
 };
 
 export const validatePaymentMethod = (paymentMethod: string): boolean => {
-  return Object.values(PAYMENT_CONSTANTS.PAYMENT_METHODS).includes(paymentMethod as PaymentMethod);
+  return Object.values(PaymentMethod).includes(paymentMethod as PaymentMethod);
 };
 
 export const generatePaymentReference = (userId: number, timestamp?: Date): string => {

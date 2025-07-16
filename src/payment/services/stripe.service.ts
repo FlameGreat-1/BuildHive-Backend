@@ -330,7 +330,6 @@ export class StripeService {
           originalAmount: request.amount.toString(),
           processingFee: processingFee.toString()
         },
-        expires_at: request.expiresAt ? Math.floor(new Date(request.expiresAt).getTime() / 1000) : undefined,
         after_completion: {
           type: 'redirect',
           redirect: {
@@ -352,8 +351,8 @@ export class StripeService {
         amount: request.amount,
         currency: request.currency,
         status: paymentLink.active ? 'active' : 'inactive',
-        expiresAt: paymentLink.expires_at ? new Date(paymentLink.expires_at * 1000).toISOString() : undefined,
-        createdAt: new Date(paymentLink.created * 1000).toISOString()
+        expiresAt: undefined, 
+        createdAt: new Date().toISOString() 
       };
     } catch (error) {
       logger.error('Failed to create Stripe payment link', {
@@ -406,7 +405,7 @@ export class StripeService {
           reason: reason || undefined,
           description: `Refund for payment ${payment.id}`,
           status: this.mapRefundStatus(refund.status),
-          stripe_refund_id: refund.id,
+          stripe_refund_id: refund.id || '',
           failure_reason: undefined,
           metadata: metadata || {},
           processed_at: refund.status === 'succeeded' ? new Date() : undefined
