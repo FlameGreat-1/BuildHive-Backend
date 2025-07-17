@@ -797,8 +797,7 @@ export class WebhookService {
           'Content-Type': 'application/json',
           'User-Agent': 'BuildHive-Webhook-Validator'
         },
-        body: JSON.stringify(testPayload),
-        timeout: 10000
+        body: JSON.stringify(testPayload)
       });
       
       return {

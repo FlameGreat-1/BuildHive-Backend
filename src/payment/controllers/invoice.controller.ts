@@ -21,7 +21,8 @@ export class InvoiceController {
       const requestId = req.requestId || 'unknown';
 
       if (!userId) {
-        return sendErrorResponse(res, 'User authentication required', 401);
+        sendErrorResponse(res, 'User authentication required', 401);
+        return;
       }
 
       const request: CreateInvoiceRequest = {
@@ -33,7 +34,7 @@ export class InvoiceController {
         }
       };
 
-      const invoice = await this.invoiceService.createInvoice(request, requestId);
+      const invoice = await this.invoiceService.createInvoice(request);
 
       logger.info('Invoice created successfully', {
         invoiceId: invoice.id,
@@ -68,11 +69,13 @@ export class InvoiceController {
       const invoiceId = parseInt(req.params.invoiceId);
 
       if (!userId) {
-        return sendErrorResponse(res, 'User authentication required', 401);
+        sendErrorResponse(res, 'User authentication required', 401);
+        return;
       }
 
       if (isNaN(invoiceId)) {
-        return sendErrorResponse(res, 'Invalid invoice ID', 400);
+        sendErrorResponse(res, 'Invalid invoice ID', 400);
+        return;
       }
 
       const request: UpdateInvoiceStatusRequest = {
@@ -80,7 +83,7 @@ export class InvoiceController {
         ...req.body
       };
 
-      const updateResult = await this.invoiceService.updateInvoiceStatus(request, requestId);
+      const updateResult = await this.invoiceService.updateInvoiceStatus(request);
 
       logger.info('Invoice status updated successfully', {
         invoiceId,
@@ -114,14 +117,16 @@ export class InvoiceController {
       const invoiceId = parseInt(req.params.invoiceId);
 
       if (!userId) {
-        return sendErrorResponse(res, 'User authentication required', 401);
+        sendErrorResponse(res, 'User authentication required', 401);
+        return;
       }
 
       if (isNaN(invoiceId)) {
-        return sendErrorResponse(res, 'Invalid invoice ID', 400);
+        sendErrorResponse(res, 'Invalid invoice ID', 400);
+        return;
       }
 
-      const invoice = await this.invoiceService.getInvoice(invoiceId, requestId);
+      const invoice = await this.invoiceService.getInvoice(invoiceId);
 
       logger.info('Invoice retrieved successfully', {
         invoiceId,
@@ -155,7 +160,8 @@ export class InvoiceController {
       const requestId = req.requestId || 'unknown';
 
       if (!userId) {
-        return sendErrorResponse(res, 'User authentication required', 401);
+        sendErrorResponse(res, 'User authentication required', 401);
+        return;
       }
 
       const request: InvoiceListRequest = {
@@ -165,7 +171,7 @@ export class InvoiceController {
         offset: parseInt(req.query.offset as string) || 0
       };
 
-      const invoices = await this.invoiceService.getUserInvoices(request, requestId);
+      const invoices = await this.invoiceService.getUserInvoices(request);
 
       logger.info('User invoices retrieved successfully', {
         userId,
@@ -198,14 +204,16 @@ export class InvoiceController {
       const invoiceId = parseInt(req.params.invoiceId);
 
       if (!userId) {
-        return sendErrorResponse(res, 'User authentication required', 401);
+        sendErrorResponse(res, 'User authentication required', 401);
+        return;
       }
 
       if (isNaN(invoiceId)) {
-        return sendErrorResponse(res, 'Invalid invoice ID', 400);
+        sendErrorResponse(res, 'Invalid invoice ID', 400);
+        return;
       }
 
-      await this.invoiceService.sendInvoice(invoiceId, requestId);
+      await this.invoiceService.sendInvoice(invoiceId);
 
       logger.info('Invoice sent successfully', {
         invoiceId,
@@ -239,14 +247,16 @@ export class InvoiceController {
       const invoiceId = parseInt(req.params.invoiceId);
 
       if (!userId) {
-        return sendErrorResponse(res, 'User authentication required', 401);
+        sendErrorResponse(res, 'User authentication required', 401);
+        return;
       }
 
       if (isNaN(invoiceId)) {
-        return sendErrorResponse(res, 'Invalid invoice ID', 400);
+        sendErrorResponse(res, 'Invalid invoice ID', 400);
+        return;
       }
 
-      await this.invoiceService.cancelInvoice(invoiceId, requestId);
+      await this.invoiceService.cancelInvoice(invoiceId);
 
       logger.info('Invoice cancelled successfully', {
         invoiceId,
@@ -280,14 +290,16 @@ export class InvoiceController {
       const invoiceId = parseInt(req.params.invoiceId);
 
       if (!userId) {
-        return sendErrorResponse(res, 'User authentication required', 401);
+        sendErrorResponse(res, 'User authentication required', 401);
+        return;
       }
 
       if (isNaN(invoiceId)) {
-        return sendErrorResponse(res, 'Invalid invoice ID', 400);
+        sendErrorResponse(res, 'Invalid invoice ID', 400);
+        return;
       }
 
-      await this.invoiceService.deleteInvoice(invoiceId, requestId);
+      await this.invoiceService.deleteInvoice(invoiceId);
 
       logger.info('Invoice deleted successfully', {
         invoiceId,
