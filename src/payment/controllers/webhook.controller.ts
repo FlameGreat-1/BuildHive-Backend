@@ -55,8 +55,8 @@ export class WebhookController {
         sendErrorResponse(res, 'Invalid webhook event', 400);
         return;
       }
-
-      const result = await this.webhookService.processWebhookEvent(payload, signature);
+      
+      const result = await this.webhookService.processWebhookEvent(payload, signature, requestId);
 
       logger.info('Webhook processed successfully', {
         eventId: req.body.id,

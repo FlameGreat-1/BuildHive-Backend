@@ -32,8 +32,8 @@ export class WebhookService {
     this.refundRepository = new RefundRepository(dbConnection);
     this.invoiceRepository = new InvoiceRepository(dbConnection);
   }
-
-  async processWebhookEvent(payload: string, signature: string): Promise<WebhookProcessingResult> {
+  
+  async processWebhookEvent(payload: string, signature: string, requestId?: string): Promise<WebhookProcessingResult> {
     try {
       if (!validateWebhookSignature(payload, signature, process.env.STRIPE_WEBHOOK_SECRET || '')) {
         throw new Error('Invalid webhook signature');
