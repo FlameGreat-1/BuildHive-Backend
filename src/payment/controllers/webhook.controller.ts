@@ -34,7 +34,7 @@ export class WebhookController {
         requestId
       });
 
-      const signatureValid = validateWebhookSignature(payload, signature);
+      const signatureValid = validateWebhookSignature(payload, signature, process.env.STRIPE_WEBHOOK_SECRET || '');
 
       if (!signatureValid) {
         logger.warn('Invalid webhook signature', {
