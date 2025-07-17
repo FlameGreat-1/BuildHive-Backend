@@ -513,8 +513,21 @@ export interface WebhookRepository {
 }
 
 export interface WebhookService {
-  retryWebhookEvent(eventId: string): Promise<any>;
-  processWebhookEvent(payload: string, signature: string, requestId?: string): Promise<any>;
+  processWebhookEvent(payload: string, signature: string, requestId?: string): Promise<WebhookProcessingResult>;
+  retryFailedWebhookEvent(eventId: number): Promise<WebhookProcessingResult>;
+  retryWebhookEvent(eventId: string): Promise<WebhookProcessingResult>;
+  getWebhookEvent(eventId: string): Promise<any>;
+  getWebhookEventStatus(eventId: string): Promise<any>;
+  listWebhookEvents(filters: any): Promise<any>;
+  getWebhookStats(filters: any): Promise<any>;
+  deleteWebhookEvent(eventId: string): Promise<boolean>;
+  getUnprocessedEvents(limit?: number): Promise<WebhookEventDatabaseRecord[]>;
+  markEventAsProcessed(eventId: number): Promise<WebhookEventDatabaseRecord>;
+  cleanupOldEvents(olderThanDays?: number): Promise<number>;
+  getWebhookHealth(): Promise<any>;
+  validateWebhookEndpoint(endpointUrl: string): Promise<any>;
+  getWebhookConfiguration(): Promise<any>;
+  getEventsByDateRange(startDate: Date, endDate: Date, eventType?: string): Promise<WebhookEventDatabaseRecord[]>;
 }
 
 export interface ApplePayConfig {
