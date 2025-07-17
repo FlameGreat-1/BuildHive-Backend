@@ -8,6 +8,9 @@ import {
   RefundStatus
 } from '../../shared/types';
 
+import { WebhookEventDatabaseRecord } from '../../shared/types/database.types';
+import { WebhookProcessingResult } from './webhook.types';
+
 export interface PaymentIntent {
   id: string;
   amount: number;
