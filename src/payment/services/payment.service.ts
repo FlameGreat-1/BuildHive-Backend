@@ -93,7 +93,7 @@ export class PaymentService {
             currency: request.currency,
             countryCode: 'US',
             merchantName: 'BuildHive',
-            description: request.description,
+            description: request.description || 'BuildHive Payment',
             requiresShipping: false
           });
           
@@ -113,7 +113,7 @@ export class PaymentService {
             amount: request.amount,
             currency: request.currency,
             merchantName: 'BuildHive',
-            description: request.description
+            description: request.description || 'BuildHive Payment'
           });
           
           paymentResult = {

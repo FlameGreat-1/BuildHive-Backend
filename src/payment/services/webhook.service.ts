@@ -766,7 +766,7 @@ export class WebhookService {
     eventType?: string
   ): Promise<WebhookEventDatabaseRecord[]> {
     try {
-      const events = await this.webhookRepository.findByDateRange(startDate, endDate, eventType);
+      const events = await this.webhookRepository.findByDateRange(startDate, endDate, eventType as WebhookEventType);
 
       logger.info('Webhook events by date range retrieved', {
         startDate: startDate.toISOString(),

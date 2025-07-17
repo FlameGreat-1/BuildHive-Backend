@@ -90,7 +90,6 @@ export class RefundService {
           const updatedRefund = await this.refundRepository.update(
             savedRefund.id,
             {
-              stripe_refund_id: stripeRefund.id,
               status: RefundStatus.PENDING
             }
           );
@@ -127,7 +126,7 @@ export class RefundService {
 
       return {
         id: savedRefund.id,
-        paymentId: request.paymentId,
+        paymentId: Number(request.paymentId),
         amount: refundAmount,
         status: savedRefund.status,
         reason: request.reason || undefined,

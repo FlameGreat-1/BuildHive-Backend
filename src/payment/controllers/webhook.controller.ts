@@ -214,4 +214,76 @@ export class WebhookController {
       sendErrorResponse(res, 'Failed to get webhook statistics', 500);
     }
   }
+
+  async getWebhookHealth(req: WebhookRequest, res: Response): Promise<void> {
+    try {
+      const requestId = req.requestId || 'webhook-health-unknown';
+
+      logger.info('Checking webhook health', {
+        requestId
+      });
+
+      const healthStatus = await this.webhookService.getWebhookHealth();
+
+      sendSuccessResponse(res, 'Webhook health retrieved successfully', healthStatus);
+
+    } catch (error) {
+      logger.error('Failed to get webhook health', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        requestId: req.requestId || 'unknown'
+      });
+
+      sendErrorResponse(res, 'Failed to get webhook health', 500);
+    }
+  }
+
+  async validateWebhookEndpoint(req: WebhookRequest, res: Response): Promise<void> {
+    try {
+      const requestId = req.requestId || 'validate-webhook-unknown';
+      const endpointUrl = req.body.endpointUrl || req.query.endpointUrl as string;
+
+      if (!endpointUrl) {
+        return sendErrorResponse(res, 'Endpoint URL is required', 400);
+      }
+
+      logger.info('Validating webhook endpoint', {
+        endpointUrl,
+        requestId
+      });
+
+      const validationResult = await this.webhookService.validateWebhookEndpoint(endpointUrl);
+
+      sendSuccessResponse(res, 'Webhook endpoint validated successfully', validationResult);
+
+    } catch (error) {
+      logger.error('Failed to validate webhook endpoint', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        requestId: req.requestId || 'unknown'
+      });
+
+      sendErrorResponse(res, 'Failed to validate webhook endpoint', 500);
+    }
+  }
+
+  async getWebhookConfiguration(req: WebhookRequest, res: Response): Promise<void> {
+    try {
+      const requestId = req.requestId || 'webhook-config-unknown';
+
+      logger.info('Retrieving webhook configuration', {
+        requestId
+      });
+
+      const configuration = await this.webhookService.getWebhookConfiguration();
+
+      sendSuccessResponse(res, 'Webhook configuration retrieved successfully', configuration);
+
+    } catch (error) {
+      logger.error('Failed to get webhook configuration', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        requestId: req.requestId || 'unknown'
+      });
+
+      sendErrorResponse(res, 'Failed to get webhook configuration', 500);
+    }
+  }
 }
