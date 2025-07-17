@@ -60,7 +60,7 @@ export class PaymentMethodController {
         }
       };
 
-      const paymentMethod = await this.paymentMethodService.createPaymentMethod(request, requestId);
+      const paymentMethod = await this.paymentMethodService.createPaymentMethod(request);
 
       logger.info('Payment method created successfully', {
         paymentMethodId: paymentMethod.id,
@@ -94,7 +94,7 @@ export class PaymentMethodController {
       const requestId = req.requestId || 'unknown';
 
       const request: AttachPaymentMethodRequest = req.body;
-      const attachResult = await this.paymentMethodService.attachPaymentMethod(request, requestId);
+      const attachResult = await this.paymentMethodService.attachPaymentMethod(request);
 
       logger.info('Payment method attached successfully', {
         paymentMethodId: request.paymentMethodId,
@@ -130,11 +130,12 @@ export class PaymentMethodController {
       const paymentMethodId = req.params.paymentMethodId;
 
       if (!paymentMethodId) {
-        return sendErrorResponse(res, 'Payment method ID is required', 400);
+        sendErrorResponse(res, 'Payment method ID is required', 400);
+        return;
       }
 
       const request: DetachPaymentMethodRequest = { paymentMethodId };
-      const detachResult = await this.paymentMethodService.detachPaymentMethod(request, requestId);
+      const detachResult = await this.paymentMethodService.detachPaymentMethod(request);
 
       logger.info('Payment method detached successfully', {
         paymentMethodId,
@@ -170,7 +171,8 @@ export class PaymentMethodController {
       const paymentMethodId = parseInt(req.params.paymentMethodId);
 
       if (isNaN(paymentMethodId)) {
-        return sendErrorResponse(res, 'Invalid payment method ID', 400);
+        sendErrorResponse(res, 'Invalid payment method ID', 400);
+        return;
       }
 
       const request: SetDefaultPaymentMethodRequest = {
@@ -178,7 +180,7 @@ export class PaymentMethodController {
         userId
       };
 
-      const defaultResult = await this.paymentMethodService.setDefaultPaymentMethod(request, requestId);
+      const defaultResult = await this.paymentMethodService.setDefaultPaymentMethod(request);
 
       logger.info('Default payment method set successfully', {
         paymentMethodId,
@@ -218,7 +220,7 @@ export class PaymentMethodController {
         offset: parseInt(req.query.offset as string) || 0
       };
 
-      const paymentMethods = await this.paymentMethodService.getUserPaymentMethods(request, requestId);
+      const paymentMethods = await this.paymentMethodService.getUserPaymentMethods(request);
 
       logger.info('User payment methods retrieved successfully', {
         userId,
@@ -252,10 +254,11 @@ export class PaymentMethodController {
       const paymentMethodId = parseInt(req.params.paymentMethodId);
 
       if (isNaN(paymentMethodId)) {
-        return sendErrorResponse(res, 'Invalid payment method ID', 400);
+        sendErrorResponse(res, 'Invalid payment method ID', 400);
+        return;
       }
 
-      await this.paymentMethodService.deletePaymentMethod(paymentMethodId, userId, requestId);
+      await this.paymentMethodService.deletePaymentMethod(paymentMethodId, userId);
 
       logger.info('Payment method deleted successfully', {
         paymentMethodId,
@@ -290,10 +293,11 @@ export class PaymentMethodController {
 
       const requestId = req.requestId || 'unknown';
 
-      const defaultPaymentMethod = await this.paymentMethodService.getDefaultPaymentMethod(userId, requestId);
+      const defaultPaymentMethod = await this.paymentMethodService.getDefaultPaymentMethod(userId);
 
       if (!defaultPaymentMethod) {
-        return sendErrorResponse(res, 'No default payment method found', 404);
+        sendErrorResponse(res, 'No default payment method found', 404);
+        return;
       }
 
       logger.info('Default payment method retrieved successfully', {

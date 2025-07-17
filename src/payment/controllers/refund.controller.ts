@@ -59,7 +59,7 @@ export class RefundController {
         }
       };
 
-      const refund = await this.refundService.createRefund(request, requestId);
+      const refund = await this.refundService.createRefund(request);
 
       logger.info('Refund created successfully', {
         refundId: refund.id,
@@ -98,7 +98,8 @@ export class RefundController {
       const refundId = parseInt(req.params.refundId);
 
       if (isNaN(refundId)) {
-        return sendErrorResponse(res, 'Invalid refund ID', 400);
+        sendErrorResponse(res, 'Invalid refund ID', 400);
+        return;
       }
 
       const request: UpdateRefundStatusRequest = {
@@ -106,7 +107,7 @@ export class RefundController {
         ...req.body
       };
 
-      const updateResult = await this.refundService.updateRefundStatus(request, requestId);
+      const updateResult = await this.refundService.updateRefundStatus(request);
 
       logger.info('Refund status updated successfully', {
         refundId,
@@ -142,10 +143,11 @@ export class RefundController {
       const refundId = parseInt(req.params.refundId);
 
       if (isNaN(refundId)) {
-        return sendErrorResponse(res, 'Invalid refund ID', 400);
+        sendErrorResponse(res, 'Invalid refund ID', 400);
+        return;
       }
 
-      const refund = await this.refundService.getRefund(refundId, requestId);
+      const refund = await this.refundService.getRefund(refundId);
 
       logger.info('Refund retrieved successfully', {
         refundId,
@@ -187,7 +189,7 @@ export class RefundController {
         offset: parseInt(req.query.offset as string) || 0
       };
 
-      const refunds = await this.refundService.getUserRefunds(request, requestId);
+      const refunds = await this.refundService.getUserRefunds(request);
 
       logger.info('User refunds retrieved successfully', {
         userId,
@@ -222,10 +224,11 @@ export class RefundController {
       const paymentId = parseInt(req.params.paymentId);
 
       if (isNaN(paymentId)) {
-        return sendErrorResponse(res, 'Invalid payment ID', 400);
+        sendErrorResponse(res, 'Invalid payment ID', 400);
+        return;
       }
 
-      const refunds = await this.refundService.getPaymentRefunds(paymentId, requestId);
+      const refunds = await this.refundService.getPaymentRefunds(paymentId);
 
       logger.info('Payment refunds retrieved successfully', {
         paymentId,
@@ -260,10 +263,11 @@ export class RefundController {
       const refundId = parseInt(req.params.refundId);
 
       if (isNaN(refundId)) {
-        return sendErrorResponse(res, 'Invalid refund ID', 400);
+        sendErrorResponse(res, 'Invalid refund ID', 400);
+        return;
       }
 
-      await this.refundService.cancelRefund(refundId, requestId);
+      await this.refundService.cancelRefund(refundId);
 
       logger.info('Refund cancelled successfully', {
         refundId,

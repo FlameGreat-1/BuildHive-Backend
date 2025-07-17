@@ -23,7 +23,8 @@ export class WebhookController {
       const payload = req.rawBody || JSON.stringify(req.body);
 
       if (!signature) {
-        return sendErrorResponse(res, 'Missing stripe-signature header', 400);
+        sendErrorResponse(res, 'Missing stripe-signature header', 400);
+        return;
       }
 
       logger.info('Processing Stripe webhook', {
@@ -39,7 +40,8 @@ export class WebhookController {
           eventId: req.body?.id,
           requestId
         });
-        return sendErrorResponse(res, 'Invalid webhook signature', 400);
+        sendErrorResponse(res, 'Invalid webhook signature', 400);
+        return;
       }
 
       const validationResult = await validateWebhookEvent(req.body);
@@ -50,7 +52,8 @@ export class WebhookController {
           eventId: req.body?.id,
           requestId
         });
-        return sendErrorResponse(res, 'Invalid webhook event', 400);
+        sendErrorResponse(res, 'Invalid webhook event', 400);
+        return;
       }
 
       const result = await this.webhookService.processWebhookEvent(payload, signature);
@@ -82,7 +85,8 @@ export class WebhookController {
       const eventId = req.params.eventId;
 
       if (!eventId) {
-        return sendErrorResponse(res, 'Event ID is required', 400);
+        sendErrorResponse(res, 'Event ID is required', 400);
+        return;
       }
 
       logger.info('Retrieving webhook event', {
@@ -93,7 +97,8 @@ export class WebhookController {
       const webhookEvent = await this.webhookService.getWebhookEvent(eventId);
 
       if (!webhookEvent) {
-        return sendErrorResponse(res, 'Webhook event not found', 404);
+        sendErrorResponse(res, 'Webhook event not found', 404);
+        return;
       }
 
       sendSuccessResponse(res, 'Webhook event retrieved successfully', webhookEvent);
@@ -151,7 +156,8 @@ export class WebhookController {
       const eventId = req.params.eventId;
 
       if (!eventId) {
-        return sendErrorResponse(res, 'Event ID is required', 400);
+        sendErrorResponse(res, 'Event ID is required', 400);
+        return;
       }
 
       logger.info('Retrying webhook event', {
@@ -243,7 +249,8 @@ export class WebhookController {
       const endpointUrl = req.body.endpointUrl || req.query.endpointUrl as string;
 
       if (!endpointUrl) {
-        return sendErrorResponse(res, 'Endpoint URL is required', 400);
+        sendErrorResponse(res, 'Endpoint URL is required', 400);
+        return;
       }
 
       logger.info('Validating webhook endpoint', {

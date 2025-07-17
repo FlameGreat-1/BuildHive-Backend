@@ -33,7 +33,7 @@ export class PaymentController {
         requestId
       });
 
-      const payment = await this.paymentService.createPayment(userId, paymentData, requestId);
+      const payment = await this.paymentService.createPayment(userId, paymentData);
 
       logger.info('Payment created successfully', {
         paymentId: payment.paymentId,
@@ -72,7 +72,7 @@ export class PaymentController {
         requestId
       });
 
-      const paymentIntent = await this.paymentService.createPaymentIntent(userId, paymentData, requestId);
+      const paymentIntent = await this.paymentService.createPaymentIntent(paymentData);
 
       logger.info('Payment intent created successfully', {
         paymentIntentId: paymentIntent.paymentIntentId,
@@ -110,7 +110,7 @@ export class PaymentController {
         requestId
       });
 
-      const paymentLink = await this.paymentService.createPaymentLink(userId, linkData, requestId);
+      const paymentLink = await this.paymentService.createPaymentLink(linkData);
 
       logger.info('Payment link created successfully', {
         linkId: paymentLink.id,
@@ -140,21 +140,12 @@ export class PaymentController {
         return sendErrorResponse(res, 'User ID is required', 401);
       }
 
-      const request: PaymentMethodListRequest = {
-        userId,
-        limit: parseInt(req.query.limit as string) || 50,
-        offset: parseInt(req.query.offset as string) || 0,
-        type: req.query.type as string
-      };
-
       logger.info('Retrieving payment methods', {
         userId,
-        limit: request.limit,
-        offset: request.offset,
         requestId
       });
 
-      const paymentMethods = await this.paymentService.getPaymentMethods(request, requestId);
+      const paymentMethods = await this.paymentService.getPaymentMethods(userId);
 
       return sendSuccessResponse(res, 'Payment methods retrieved successfully', paymentMethods);
 
@@ -193,7 +184,7 @@ export class PaymentController {
         requestId
       });
 
-      const paymentHistory = await this.paymentService.getPaymentHistory(request, requestId);
+      const paymentHistory = await this.paymentService.getPaymentHistory(request);
 
       return sendSuccessResponse(res, 'Payment history retrieved successfully', paymentHistory);
 
@@ -222,7 +213,8 @@ export class PaymentController {
         requestId
       });
 
-      const payment = await this.paymentService.getPaymentStatus(paymentId, requestId);
+      const request: PaymentStatusRequest = { paymentId };
+      const payment = await this.paymentService.getPaymentStatus(request);
 
       if (!payment) {
         return sendErrorResponse(res, 'Payment not found', 404);
@@ -257,7 +249,8 @@ export class PaymentController {
         requestId
       });
 
-      const result = await this.paymentService.confirmPayment(paymentId, paymentMethodId, requestId);
+      const request = { paymentIntentId: paymentId.toString(), paymentMethodId };
+      const result = await this.paymentService.confirmPayment(request);
 
       return sendSuccessResponse(res, 'Payment confirmed successfully', result);
 
@@ -276,7 +269,6 @@ export class PaymentController {
     try {
       const requestId = req.requestId || 'cancel-unknown';
       const paymentId = parseInt(req.params.paymentId);
-      const { reason } = req.body;
 
       if (isNaN(paymentId)) {
         return sendErrorResponse(res, 'Invalid payment ID', 400);
@@ -284,13 +276,12 @@ export class PaymentController {
 
       logger.info('Canceling payment', {
         paymentId,
-        reason,
         requestId
       });
 
-      const result = await this.paymentService.cancelPayment(paymentId, reason, requestId);
+      await this.paymentService.cancelPayment(paymentId);
 
-      return sendSuccessResponse(res, 'Payment canceled successfully', result);
+      return sendSuccessResponse(res, 'Payment canceled successfully', { paymentId, status: 'cancelled' });
 
     } catch (error) {
       logger.error('Payment cancellation error', {
@@ -327,7 +318,7 @@ export class PaymentController {
         limit,
         offset,
         status
-      }, requestId);
+      });
 
       return sendSuccessResponse(res, 'Payments retrieved successfully', payments);
 
