@@ -35,7 +35,7 @@ export class QuoteController {
     const requestId = res.locals.requestId || 'unknown';
     
     try {
-      const tradieId = req.user?.id;
+      const tradieId = req.user?.id ? parseInt(req.user.id) : null;
       if (!tradieId) {
         throw new AppError(
           'Authentication required',
@@ -80,7 +80,7 @@ export class QuoteController {
         );
       }
 
-      const userId = req.user?.id;
+      const userId = req.user?.id ? parseInt(req.user.id) : null;
       const userRole = req.user?.role || 'tradie';
 
       if (!userId) {
@@ -143,7 +143,7 @@ export class QuoteController {
     const requestId = res.locals.requestId || 'unknown';
     
     try {
-      const tradieId = req.user?.id;
+      const tradieId = req.user?.id ? parseInt(req.user.id) : null;
       if (!tradieId) {
         throw new AppError(
           'Authentication required',
@@ -192,7 +192,7 @@ export class QuoteController {
         );
       }
 
-      const tradieId = req.user?.id;
+      const tradieId = req.user?.id ? parseInt(req.user.id) : null;
       if (!tradieId) {
         throw new AppError(
           'Authentication required',
@@ -238,7 +238,7 @@ export class QuoteController {
         );
       }
 
-      const tradieId = req.user?.id;
+      const tradieId = req.user?.id ? parseInt(req.user.id) : null;
       if (!tradieId) {
         throw new AppError(
           'Authentication required',
@@ -285,7 +285,7 @@ export class QuoteController {
         );
       }
 
-      const tradieId = req.user?.id;
+      const tradieId = req.user?.id ? parseInt(req.user.id) : null;
       if (!tradieId) {
         throw new AppError(
           'Authentication required',
@@ -329,7 +329,7 @@ export class QuoteController {
         );
       }
 
-      const tradieId = req.user?.id;
+      const tradieId = req.user?.id ? parseInt(req.user.id) : null;
       if (!tradieId) {
         throw new AppError(
           'Authentication required',
@@ -392,13 +392,13 @@ export class QuoteController {
       next(error);
     }
   }
-  
+
   async acceptQuote(req: Request, res: Response, next: NextFunction): Promise<void> {
     const requestId = res.locals.requestId || 'unknown';
     
     try {
       const quoteNumber = req.params.quoteNumber;
-      const clientId = req.user?.id;
+      const clientId = req.user?.id ? parseInt(req.user.id) : null;
 
       if (!clientId) {
         throw new AppError(
@@ -437,7 +437,7 @@ export class QuoteController {
     
     try {
       const quoteNumber = req.params.quoteNumber;
-      const clientId = req.user?.id;
+      const clientId = req.user?.id ? parseInt(req.user.id) : null;
       const { reason } = req.body;
 
       if (!clientId) {
@@ -511,7 +511,7 @@ export class QuoteController {
     const requestId = res.locals.requestId || 'unknown';
     
     try {
-      const tradieId = req.user?.id;
+      const tradieId = req.user?.id ? parseInt(req.user.id) : null;
       if (!tradieId) {
         throw new AppError(
           'Authentication required',
@@ -548,7 +548,7 @@ export class QuoteController {
     const requestId = res.locals.requestId || 'unknown';
     
     try {
-      const tradieId = req.user?.id;
+      const tradieId = req.user?.id ? parseInt(req.user.id) : null;
       if (!tradieId) {
         throw new AppError(
           'Authentication required',
@@ -628,7 +628,7 @@ export class QuoteController {
     const requestId = res.locals.requestId || 'unknown';
     
     try {
-      const clientId = req.user?.id;
+      const clientId = req.user?.id ? parseInt(req.user.id) : null;
       if (!clientId) {
         throw new AppError(
           'Authentication required',
@@ -675,7 +675,7 @@ export class QuoteController {
         );
       }
 
-      const tradieId = req.user?.id;
+      const tradieId = req.user?.id ? parseInt(req.user.id) : null;
       if (!tradieId) {
         throw new AppError(
           'Authentication required',
@@ -732,7 +732,7 @@ export class QuoteController {
     
     try {
       const quoteNumber = req.params.quoteNumber;
-      const clientId = req.user?.id;
+      const clientId = req.user?.id ? parseInt(req.user.id) : null;
       const { paymentMethodId } = req.body;
 
       if (!clientId) {
@@ -780,7 +780,7 @@ export class QuoteController {
     
     try {
       const quoteNumber = req.params.quoteNumber;
-      const clientId = req.user?.id;
+      const clientId = req.user?.id ? parseInt(req.user.id) : null;
 
       if (!clientId) {
         throw new AppError(
@@ -827,7 +827,7 @@ export class QuoteController {
         );
       }
 
-      const tradieId = req.user?.id;
+      const tradieId = req.user?.id ? parseInt(req.user.id) : null;
       if (!tradieId) {
         throw new AppError(
           'Authentication required',
@@ -872,7 +872,7 @@ export class QuoteController {
         );
       }
 
-      const tradieId = req.user?.id;
+      const tradieId = req.user?.id ? parseInt(req.user.id) : null;
       const { amount, reason } = req.body;
 
       if (!tradieId) {

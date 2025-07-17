@@ -514,6 +514,7 @@ export interface WebhookRepository {
 
 export interface WebhookService {
   retryWebhookEvent(eventId: string): Promise<any>;
+  processWebhookEvent(payload: string, signature: string, requestId?: string): Promise<any>;
 }
 
 export interface ApplePayConfig {
