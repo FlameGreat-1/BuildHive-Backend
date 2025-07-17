@@ -138,7 +138,7 @@ export class RefundService {
       };
     } catch (error) {
       logger.error('Failed to create refund', {
-        paymentId: request.paymentId,
+        paymentId: Number(request.paymentId),
         amount: request.amount,
         reason: request.reason,
         error: error instanceof Error ? error.message : 'Unknown error'

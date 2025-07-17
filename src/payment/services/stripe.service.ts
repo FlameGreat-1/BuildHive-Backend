@@ -273,7 +273,7 @@ export class StripeService {
       });
 
       return {
-        id: paymentMethod.id,
+        id: Number(paymentMethod.id),
         paymentMethodId: paymentMethod.id,
         type: request.type,
         createdAt: new Date(paymentMethod.created * 1000).toISOString(),
@@ -404,7 +404,7 @@ export class StripeService {
           amount: Number(refund.amount),
           reason: reason || undefined,
           description: `Refund for payment ${payment.id}`,
-          status: this.mapRefundStatus(refund.status),
+          status: this.mapRefundStatus(refund.status || 'pending'),
           stripe_refund_id: refund.id || '',
           failure_reason: undefined,
           metadata: metadata || {},
