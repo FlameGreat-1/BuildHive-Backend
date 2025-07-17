@@ -760,6 +760,101 @@ export class WebhookService {
     }
   }
 
+  async getWebhookHealth(): Promise<any> {
+    try {
+      const unprocessedEvents = await this.getUnprocessedEvents(10);
+      const recentStats = await this.getWebhookStats({});
+      
+      return {
+        status: 'healthy',
+        unprocessedEventsCount: unprocessedEvents.length,
+        totalEvents: recentStats.totalEvents,
+        processedEvents: recentStats.processedEvents,
+        failedEvents: recentStats.failedEvents,
+        processingRate: recentStats.processingRate,
+        lastCheckedAt: new Date().toISOString()
+      };
+    } catch (error) {
+      logger.error('Failed to get webhook health', {
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      throw error;
+    }
+  }
+
+  async validateWebhookEndpoint(endpointUrl: string): Promise<any> {
+    try {
+      const testPayload = {
+        id: 'test_event',
+        type: 'test.webhook',
+        data: { test: true },
+        created: Math.floor(Date.now() / 1000)
+      };
+
+      const response = await fetch(endpointUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'BuildHive-Webhook-Validator'
+        },
+        body: JSON.stringify(testPayload),
+        timeout: 10000
+      });
+      
+      return {
+        valid: response.ok,
+        status: response.status,
+        statusText: response.statusText,
+        endpointUrl,
+        responseTime: Date.now(),
+        testedAt: new Date().toISOString()
+      };
+    } catch (error) {
+      logger.error('Failed to validate webhook endpoint', {
+        endpointUrl,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      
+      return {
+        valid: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        endpointUrl,
+        testedAt: new Date().toISOString()
+      };
+    }
+  }
+
+  async getWebhookConfiguration(): Promise<any> {
+    try {
+      const supportedEvents = [
+        'payment_intent.succeeded',
+        'payment_intent.payment_failed',
+        'payment_intent.canceled',
+        'payment_method.attached',
+        'charge.dispute.created',
+        'invoice.payment_succeeded',
+        'invoice.payment_failed',
+        'refund.created',
+        'refund.updated'
+      ];
+
+      return {
+        webhookUrl: process.env.STRIPE_WEBHOOK_URL || process.env.WEBHOOK_URL || '',
+        webhookSecret: process.env.STRIPE_WEBHOOK_SECRET ? '***configured***' : 'not configured',
+        supportedEvents,
+        maxRetryAttempts: 3,
+        timeoutMs: 30000,
+        environment: process.env.NODE_ENV || 'development',
+        configuredAt: new Date().toISOString()
+      };
+    } catch (error) {
+      logger.error('Failed to get webhook configuration', {
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      throw error;
+    }
+  }
+
   async getEventsByDateRange(
     startDate: Date,
     endDate: Date,

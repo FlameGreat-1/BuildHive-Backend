@@ -113,7 +113,10 @@ export class PaymentService {
             amount: request.amount,
             currency: request.currency,
             merchantName: 'BuildHive',
-            description: request.description || 'BuildHive Payment'
+            description: request.description || 'BuildHive Payment',
+            merchantId: process.env.GOOGLE_PAY_MERCHANT_ID || 'default-merchant-id',
+            environment: process.env.NODE_ENV === 'production' ? 'PRODUCTION' : 'TEST'
+ 
           });
           
           paymentResult = {
