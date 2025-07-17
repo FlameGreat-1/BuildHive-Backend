@@ -162,11 +162,12 @@ export class QuoteController {
         page: filters.page,
         limit: filters.limit
       });
-
-      sendSuccessResponse(res, 'Quotes retrieved successfully', result.quotes, HTTP_STATUS_CODES.OK, {
-        summary: result.summary,
-        pagination: result.pagination
-      });
+      
+      sendSuccessResponse(res, 'Quotes retrieved successfully', {
+  quotes: result.quotes,
+  summary: result.summary,
+  pagination: result.pagination
+}, HTTP_STATUS_CODES.OK);
 
     } catch (error) {
       logger.error('Quotes list retrieval failed via API', {
@@ -645,11 +646,12 @@ export class QuoteController {
         clientId,
         totalQuotes: result.quotes.length
       });
-
-      sendSuccessResponse(res, 'Client quotes retrieved successfully', result.quotes, HTTP_STATUS_CODES.OK, {
-        summary: result.summary,
-        pagination: result.pagination
-      });
+      
+      sendSuccessResponse(res, 'Client quotes retrieved successfully', {
+  quotes: result.quotes,
+  summary: result.summary,
+  pagination: result.pagination
+}, HTTP_STATUS_CODES.OK);
 
     } catch (error) {
       logger.error('Client quotes retrieval failed via API', {

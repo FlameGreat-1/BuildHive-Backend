@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { logger, sendSuccessResponse, sendErrorResponse } from '../../shared/utils';
-import { WebhookService } from '../services';
+import { WebhookService as WebhookServiceImpl } from '../services';
+import { WebhookService as IWebhookService } from '../types';
 import { validateWebhookEvent, validateWebhookSignature } from '../validators/webhook.validator';
 import { WebhookEventRequest } from '../types';
 
@@ -10,10 +11,10 @@ interface WebhookRequest extends Request {
 }
 
 export class WebhookController {
-  private webhookService: WebhookService;
+  private webhookService: IWebhookService;
 
   constructor() {
-    this.webhookService = new WebhookService();
+    this.webhookService = new WebhookServiceImpl();
   }
 
   async handleStripeWebhook(req: WebhookRequest, res: Response): Promise<void> {
