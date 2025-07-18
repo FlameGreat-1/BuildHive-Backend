@@ -6,6 +6,7 @@ import { authRoutes, profileRoutes, validationRoutes } from '../auth/routes';
 import { jobRoutes, clientRoutes, materialRoutes, attachmentRoutes } from '../jobs/routes';
 import { quoteRoutes } from '../quotes/routes';
 import { paymentRoutes, paymentMethodRoutes, invoiceRoutes, refundRoutes, webhookRoutes } from '../payment/routes';
+import { creditRoutes, creditPurchaseRoutes, creditTransactionRoutes } from '../credits/routes';
 import { generalApiRateLimit } from '../shared/middleware';
 
 const router = Router();
@@ -26,6 +27,9 @@ router.use('/api/v1/payment-methods', paymentMethodRoutes);
 router.use('/api/v1/invoices', invoiceRoutes);
 router.use('/api/v1/refunds', refundRoutes);
 router.use('/api/v1/webhooks', webhookRoutes);
+router.use('/api/v1/credits', creditRoutes);
+router.use('/api/v1/credits/purchases', creditPurchaseRoutes);
+router.use('/api/v1/credits/transactions', creditTransactionRoutes);
 
 router.get('/', (req, res) => {
   const routeData = {
@@ -48,7 +52,10 @@ router.get('/', (req, res) => {
       paymentMethods: '/api/v1/payment-methods',
       invoices: '/api/v1/invoices',
       refunds: '/api/v1/refunds',
-      webhooks: '/api/v1/webhooks'
+      webhooks: '/api/v1/webhooks',
+      credits: '/api/v1/credits',
+      creditPurchases: '/api/v1/credits/purchases',
+      creditTransactions: '/api/v1/credits/transactions'
     },
     endpoints: {
       authentication: [
@@ -191,6 +198,47 @@ router.get('/', (req, res) => {
         'GET /api/v1/webhooks/health',
         'GET /api/v1/webhooks/validate',
         'GET /api/v1/webhooks/config'
+      ],
+      credits: [
+        'GET /api/v1/credits/balance',
+        'GET /api/v1/credits/dashboard',
+        'GET /api/v1/credits/limits',
+        'POST /api/v1/credits/check-sufficiency',
+        'GET /api/v1/credits/expiring',
+        'POST /api/v1/credits/auto-topup/setup',
+        'GET /api/v1/credits/auto-topup/settings',
+        'PUT /api/v1/credits/auto-topup/enable',
+        'PUT /api/v1/credits/auto-topup/disable',
+        'PUT /api/v1/credits/auto-topup/payment-method',
+        'GET /api/v1/credits/auto-topup/history',
+        'POST /api/v1/credits/validate-operation',
+        'POST /api/v1/credits/award-trial'
+      ],
+      creditPurchases: [
+        'POST /api/v1/credits/purchases/initiate',
+        'POST /api/v1/credits/purchases/:purchaseId/complete',
+        'POST /api/v1/credits/purchases/:purchaseId/cancel',
+        'POST /api/v1/credits/purchases/:purchaseId/refund',
+        'GET /api/v1/credits/purchases/:purchaseId',
+        'GET /api/v1/credits/purchases/history',
+        'POST /api/v1/credits/purchases/calculate',
+        'GET /api/v1/credits/purchases/:purchaseId/receipt',
+        'POST /api/v1/credits/purchases/apple-pay',
+        'POST /api/v1/credits/purchases/google-pay',
+        'GET /api/v1/credits/purchases/packages/available',
+        'POST /api/v1/credits/purchases/promo-code/validate'
+      ],
+      creditTransactions: [
+        'POST /api/v1/credits/transactions/create',
+        'POST /api/v1/credits/transactions/job-application',
+        'POST /api/v1/credits/transactions/profile-boost',
+        'POST /api/v1/credits/transactions/premium-job-unlock',
+        'GET /api/v1/credits/transactions/:transactionId',
+        'GET /api/v1/credits/transactions/history',
+        'GET /api/v1/credits/transactions/summary',
+        'POST /api/v1/credits/transactions/:transactionId/cancel',
+        'POST /api/v1/credits/transactions/:transactionId/refund',
+        'POST /api/v1/credits/transactions/validate-request'
       ]
     },
     features: {
@@ -211,7 +259,14 @@ router.get('/', (req, res) => {
       paymentProcessing: 'enabled',
       invoiceManagement: 'enabled',
       refundProcessing: 'enabled',
-      webhookHandling: 'enabled'
+      webhookHandling: 'enabled',
+      creditSystem: 'enabled',
+      creditPurchases: 'enabled',
+      creditTransactions: 'enabled',
+      autoTopup: 'enabled',
+      trialCredits: 'enabled',
+      creditNotifications: 'enabled',
+      multiplePaymentMethods: 'enabled'
     },
     security: {
       rateLimiting: 'active',
@@ -223,7 +278,11 @@ router.get('/', (req, res) => {
       jobOwnershipValidation: 'enforced',
       fileUploadSecurity: 'enforced',
       paymentSecurity: 'pci-compliant',
-      webhookSecurity: 'signature-verified'
+      webhookSecurity: 'signature-verified',
+      creditOwnershipValidation: 'enforced',
+      creditUsageLimits: 'enforced',
+      creditPurchaseLimits: 'enforced',
+      autoTopupSecurity: 'enforced'
     }
   };
 
@@ -231,14 +290,16 @@ router.get('/', (req, res) => {
 });
 
 logger.info('Main routes initialized', {
-  routes: ['health', 'auth', 'profile', 'validation', 'jobs', 'clients', 'materials', 'attachments', 'quotes', 'payments', 'payment-methods', 'invoices', 'refunds', 'webhooks'],
+  routes: ['health', 'auth', 'profile', 'validation', 'jobs', 'clients', 'materials', 'attachments', 'quotes', 'payments', 'payment-methods', 'invoices', 'refunds', 'webhooks', 'credits', 'credit-purchases', 'credit-transactions'],
   environment: environment.NODE_ENV,
   authenticationEnabled: true,
   rateLimitingEnabled: true,
   jobManagementEnabled: true,
   quoteManagementEnabled: true,
   paymentProcessingEnabled: true,
-  totalEndpoints: 99
+  creditSystemEnabled: true,
+  autoTopupEnabled: true,
+  totalEndpoints: 133
 });
 
 export default router;

@@ -12,6 +12,8 @@ WORKDIR /app
 FROM base AS builder
 ENV NODE_ENV=production
 
+RUN npm install -g firebase-tools
+
 COPY package*.json ./
 
 RUN if [ -f package-lock.json ]; then \
@@ -27,6 +29,14 @@ COPY . .
 
 RUN echo "🏗️  Building application..." && \
     npm run build && \
+    echo "🔥 Deploying Firebase rules and indexes..." && \
+    if [ -n "$FIREBASE_TOKEN" ]; then \
+        firebase deploy --only firestore:rules --token "$FIREBASE_TOKEN" --non-interactive; \
+        firebase deploy --only firestore:indexes --token "$FIREBASE_TOKEN" --non-interactive; \
+        echo "✅ Firebase deployment completed"; \
+    else \
+        echo "⚠️  FIREBASE_TOKEN not provided - skipping Firebase deployment"; \
+    fi && \
     echo "🧹 Cleaning up dev dependencies..." && \
     npm prune --production && \
     npm cache clean --force && \

@@ -870,3 +870,386 @@ export const validatePaymentMethodData = (
 
   next();
 };
+
+export const validateCreditAccess = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const userId = req.user?.id;
+  const userRole = req.user?.role;
+
+  if (!userId) {
+    res.status(401).json({
+      success: false,
+      message: 'Authentication required',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  if (userRole !== 'tradie' && userRole !== 'enterprise' && userRole !== 'client') {
+    res.status(403).json({
+      success: false,
+      message: 'Insufficient permissions for credit operations',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  next();
+};
+
+export const validateCreditPurchaseData = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const { packageType, paymentMethodId } = req.body;
+  const validPackageTypes = ['starter', 'standard', 'premium', 'enterprise'];
+
+  if (!packageType || !validPackageTypes.includes(packageType)) {
+    res.status(400).json({
+      success: false,
+      message: 'Valid credit package type is required',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  if (paymentMethodId && typeof paymentMethodId !== 'number') {
+    res.status(400).json({
+      success: false,
+      message: 'Payment method ID must be a valid number',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  next();
+};
+
+export const validateCreditUsageData = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const { usageType, creditsToUse, description } = req.body;
+  const validUsageTypes = ['job_application', 'profile_boost', 'premium_job_unlock', 'direct_message', 'featured_listing'];
+
+  if (!usageType || !validUsageTypes.includes(usageType)) {
+    res.status(400).json({
+      success: false,
+      message: 'Valid credit usage type is required',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  if (!creditsToUse || typeof creditsToUse !== 'number' || creditsToUse <= 0) {
+    res.status(400).json({
+      success: false,
+      message: 'Valid credit amount is required',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  if (creditsToUse > 100) {
+    res.status(400).json({
+      success: false,
+      message: 'Credit usage exceeds maximum limit per transaction',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  if (!description || typeof description !== 'string' || description.trim().length < 3) {
+    res.status(400).json({
+      success: false,
+      message: 'Valid usage description is required',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  next();
+};
+
+export const validateAutoTopupData = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const { enabled, triggerBalance, topupAmount, packageType, paymentMethodId } = req.body;
+  const validPackageTypes = ['starter', 'standard', 'premium', 'enterprise'];
+
+  if (typeof enabled !== 'boolean') {
+    res.status(400).json({
+      success: false,
+      message: 'Auto topup enabled status must be a boolean',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  if (enabled) {
+    if (!triggerBalance || typeof triggerBalance !== 'number' || triggerBalance < 0) {
+      res.status(400).json({
+        success: false,
+        message: 'Valid trigger balance is required',
+        timestamp: new Date().toISOString(),
+        requestId: res.locals.requestId || 'unknown'
+      });
+      return;
+    }
+
+    if (!topupAmount || typeof topupAmount !== 'number' || topupAmount <= 0) {
+      res.status(400).json({
+        success: false,
+        message: 'Valid topup amount is required',
+        timestamp: new Date().toISOString(),
+        requestId: res.locals.requestId || 'unknown'
+      });
+      return;
+    }
+
+    if (!packageType || !validPackageTypes.includes(packageType)) {
+      res.status(400).json({
+        success: false,
+        message: 'Valid package type is required',
+        timestamp: new Date().toISOString(),
+        requestId: res.locals.requestId || 'unknown'
+      });
+      return;
+    }
+
+    if (!paymentMethodId || typeof paymentMethodId !== 'number') {
+      res.status(400).json({
+        success: false,
+        message: 'Valid payment method ID is required',
+        timestamp: new Date().toISOString(),
+        requestId: res.locals.requestId || 'unknown'
+      });
+      return;
+    }
+  }
+
+  next();
+};
+
+export const validateCreditRefundData = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const { transactionId, reason } = req.body;
+
+  if (!transactionId || typeof transactionId !== 'number') {
+    res.status(400).json({
+      success: false,
+      message: 'Valid transaction ID is required',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  if (!reason || typeof reason !== 'string' || reason.trim().length < 5) {
+    res.status(400).json({
+      success: false,
+      message: 'Valid refund reason is required (minimum 5 characters)',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  if (reason.length > 500) {
+    res.status(400).json({
+      success: false,
+      message: 'Refund reason cannot exceed 500 characters',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  next();
+};
+
+export const validateJobApplicationCreditData = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const { jobId, creditsRequired } = req.body;
+
+  if (!jobId || typeof jobId !== 'number') {
+    res.status(400).json({
+      success: false,
+      message: 'Valid job ID is required',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  if (!creditsRequired || typeof creditsRequired !== 'number' || creditsRequired <= 0) {
+    res.status(400).json({
+      success: false,
+      message: 'Valid credits required amount is needed',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  if (creditsRequired > 10) {
+    res.status(400).json({
+      success: false,
+      message: 'Job application credits exceed maximum limit',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  next();
+};
+
+export const validateProfileBoostData = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const { boostType, duration, creditsRequired } = req.body;
+  const validBoostTypes = ['basic', 'premium', 'featured'];
+
+  if (!boostType || !validBoostTypes.includes(boostType)) {
+    res.status(400).json({
+      success: false,
+      message: 'Valid boost type is required',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  if (!duration || typeof duration !== 'number' || duration <= 0) {
+    res.status(400).json({
+      success: false,
+      message: 'Valid boost duration is required',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  if (duration > 30) {
+    res.status(400).json({
+      success: false,
+      message: 'Boost duration cannot exceed 30 days',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  if (!creditsRequired || typeof creditsRequired !== 'number' || creditsRequired <= 0) {
+    res.status(400).json({
+      success: false,
+      message: 'Valid credits required amount is needed',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  next();
+};
+
+export const validatePremiumJobUnlockData = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const { jobId, creditsRequired } = req.body;
+
+  if (!jobId || typeof jobId !== 'number') {
+    res.status(400).json({
+      success: false,
+      message: 'Valid job ID is required',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  if (!creditsRequired || typeof creditsRequired !== 'number' || creditsRequired <= 0) {
+    res.status(400).json({
+      success: false,
+      message: 'Valid credits required amount is needed',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  if (creditsRequired > 20) {
+    res.status(400).json({
+      success: false,
+      message: 'Premium unlock credits exceed maximum limit',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  next();
+};
+
+export const sanitizeCreditInput = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  if (req.body) {
+    const sanitizeString = (str: string): string => {
+      return str.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+                .replace(/javascript:/gi, '')
+                .replace(/on\w+\s*=/gi, '');
+    };
+
+    if (req.body.description && typeof req.body.description === 'string') {
+      req.body.description = sanitizeString(req.body.description.trim());
+    }
+
+    if (req.body.reason && typeof req.body.reason === 'string') {
+      req.body.reason = sanitizeString(req.body.reason.trim());
+    }
+
+    if (req.body.boostType && typeof req.body.boostType === 'string') {
+      req.body.boostType = sanitizeString(req.body.boostType.trim());
+    }
+
+    if (req.body.metadata && typeof req.body.metadata === 'object') {
+      Object.keys(req.body.metadata).forEach(key => {
+        if (typeof req.body.metadata[key] === 'string') {
+          req.body.metadata[key] = sanitizeString(req.body.metadata[key]);
+        }
+      });
+    }
+  }
+
+  next();
+};

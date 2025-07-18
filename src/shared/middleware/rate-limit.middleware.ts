@@ -508,3 +508,146 @@ export const rateLimitMiddleware = (config: {
     }
   });
 };
+
+export const creditTransactionRateLimit = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  max: 30,
+  message: 'Too many credit transaction requests, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: createRateLimitHandler('Too many credit transaction requests, please try again after 5 minutes'),
+  keyGenerator: (req: Request): string => {
+    const userId = req.user?.id;
+    return userId ? `credit-transaction-${userId}` : req.ip || 'unknown';
+  }
+});
+
+export const creditUsageRateLimit = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 50,
+  message: 'Too many credit usage attempts, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: createRateLimitHandler('Too many credit usage attempts, please try again after 1 minute'),
+  keyGenerator: (req: Request): string => {
+    const userId = req.user?.id;
+    return userId ? `credit-usage-${userId}` : req.ip || 'unknown';
+  }
+});
+
+export const creditBalanceRateLimit = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 60,
+  message: 'Too many credit balance requests, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: createRateLimitHandler('Too many credit balance requests, please try again after 1 minute'),
+  keyGenerator: (req: Request): string => {
+    const userId = req.user?.id;
+    return userId ? `credit-balance-${userId}` : req.ip || 'unknown';
+  }
+});
+
+export const autoTopupRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: 'Too many auto topup requests, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: createRateLimitHandler('Too many auto topup requests, please try again after 15 minutes'),
+  keyGenerator: (req: Request): string => {
+    const userId = req.user?.id;
+    return userId ? `auto-topup-${userId}` : req.ip || 'unknown';
+  }
+});
+
+export const creditRefundRateLimit = rateLimit({
+  windowMs: 30 * 60 * 1000,
+  max: 5,
+  message: 'Too many credit refund requests, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: createRateLimitHandler('Too many credit refund requests, please try again after 30 minutes'),
+  keyGenerator: (req: Request): string => {
+    const userId = req.user?.id;
+    return userId ? `credit-refund-${userId}` : req.ip || 'unknown';
+  }
+});
+
+export const jobApplicationCreditRateLimit = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 20,
+  message: 'Too many job application attempts, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: createRateLimitHandler('Too many job application attempts, please try again after 1 minute'),
+  keyGenerator: (req: Request): string => {
+    const userId = req.user?.id;
+    return userId ? `job-application-${userId}` : req.ip || 'unknown';
+  }
+});
+
+export const profileBoostRateLimit = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 10,
+  message: 'Too many profile boost requests, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: createRateLimitHandler('Too many profile boost requests, please try again after 10 minutes'),
+  keyGenerator: (req: Request): string => {
+    const userId = req.user?.id;
+    return userId ? `profile-boost-${userId}` : req.ip || 'unknown';
+  }
+});
+
+export const premiumJobUnlockRateLimit = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  max: 15,
+  message: 'Too many premium job unlock attempts, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: createRateLimitHandler('Too many premium job unlock attempts, please try again after 5 minutes'),
+  keyGenerator: (req: Request): string => {
+    const userId = req.user?.id;
+    return userId ? `premium-unlock-${userId}` : req.ip || 'unknown';
+  }
+});
+
+export const creditPackageRateLimit = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 30,
+  message: 'Too many credit package requests, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: createRateLimitHandler('Too many credit package requests, please try again after 1 minute'),
+  keyGenerator: (req: Request): string => {
+    const userId = req.user?.id;
+    return userId ? `credit-package-${userId}` : req.ip || 'unknown';
+  }
+});
+
+export const creditDashboardRateLimit = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 40,
+  message: 'Too many credit dashboard requests, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: createRateLimitHandler('Too many credit dashboard requests, please try again after 1 minute'),
+  keyGenerator: (req: Request): string => {
+    const userId = req.user?.id;
+    return userId ? `credit-dashboard-${userId}` : req.ip || 'unknown';
+  }
+});
+
+export const creditNotificationRateLimit = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 20,
+  message: 'Too many credit notification requests, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: createRateLimitHandler('Too many credit notification requests, please try again after 10 minutes'),
+  keyGenerator: (req: Request): string => {
+    const userId = req.user?.id;
+    return userId ? `credit-notification-${userId}` : req.ip || 'unknown';
+  }
+});

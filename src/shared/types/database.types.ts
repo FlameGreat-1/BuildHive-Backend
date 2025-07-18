@@ -388,11 +388,16 @@ export interface CreditTransactionDatabaseRecord {
   id: number;
   user_id: number;
   payment_id?: number;
+  transaction_type: CreditTransactionType;
   credits: number;
-  transaction_type: 'purchase' | 'usage' | 'refund' | 'bonus';
-  description?: string;
-  job_application_id?: number;
+  status: CreditTransactionStatus;
+  description: string;
+  reference_id?: number;
+  reference_type?: string;
+  expires_at?: Date;
+  metadata?: Record<string, any>;
   created_at: Date;
+  updated_at: Date;
 }
 
 export interface WebhookEventDatabaseRecord {
@@ -463,4 +468,108 @@ export interface DatabaseRecord {
   id: number;
   created_at: Date;
   updated_at: Date;
+}
+
+export enum CreditTransactionType {
+  PURCHASE = 'purchase',
+  USAGE = 'usage',
+  REFUND = 'refund',
+  BONUS = 'bonus',
+  TRIAL = 'trial',
+  SUBSCRIPTION = 'subscription',
+  EXPIRY = 'expiry'
+}
+
+export enum CreditTransactionStatus {
+  PENDING = 'pending',
+  COMPLETED = 'completed',
+  FAILED = 'failed',
+  CANCELLED = 'cancelled'
+}
+
+export enum CreditUsageType {
+  JOB_APPLICATION = 'job_application',
+  PROFILE_BOOST = 'profile_boost',
+  PREMIUM_JOB_UNLOCK = 'premium_job_unlock',
+  DIRECT_MESSAGE = 'direct_message',
+  FEATURED_LISTING = 'featured_listing'
+}
+
+export enum CreditPackageType {
+  STARTER = 'starter',
+  STANDARD = 'standard',
+  PREMIUM = 'premium',
+  ENTERPRISE = 'enterprise'
+}
+
+export enum AutoTopupStatus {
+  ENABLED = 'enabled',
+  DISABLED = 'disabled',
+  SUSPENDED = 'suspended'
+}
+
+export interface CreditBalanceDatabaseRecord {
+  id: number;
+  user_id: number;
+  current_balance: number;
+  total_purchased: number;
+  total_used: number;
+  total_refunded: number;
+  last_purchase_at?: Date;
+  last_usage_at?: Date;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface CreditPurchaseDatabaseRecord {
+  id: number;
+  user_id: number;
+  payment_id: number;
+  package_type: CreditPackageType;
+  credits_amount: number;
+  purchase_price: number;
+  currency: string;
+  bonus_credits: number;
+  status: CreditTransactionStatus;
+  expires_at?: Date;
+  metadata?: Record<string, any>;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface CreditUsageDatabaseRecord {
+  id: number;
+  user_id: number;
+  transaction_id: number;
+  usage_type: CreditUsageType;
+  credits_used: number;
+  reference_id?: number;
+  reference_type?: string;
+  description: string;
+  metadata?: Record<string, any>;
+  created_at: Date;
+}
+
+export interface AutoTopupDatabaseRecord {
+  id: number;
+  user_id: number;
+  status: AutoTopupStatus;
+  trigger_balance: number;
+  topup_amount: number;
+  package_type: CreditPackageType;
+  payment_method_id: number;
+  last_triggered_at?: Date;
+  failure_count: number;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface CreditNotificationDatabaseRecord {
+  id: number;
+  user_id: number;
+  notification_type: string;
+  threshold_balance: number;
+  is_sent: boolean;
+  sent_at?: Date;
+  created_at: Date;
 }

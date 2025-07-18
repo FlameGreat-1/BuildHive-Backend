@@ -1,5 +1,5 @@
-import { PaymentStatus, PaymentMethod, PaymentType, RefundStatus, QuoteStatus, QuoteItemType, DeliveryMethod } from './database.types';
 
+import { PaymentStatus, PaymentMethod, PaymentType, RefundStatus, QuoteStatus, QuoteItemType, DeliveryMethod, CreditTransactionType, CreditTransactionStatus, CreditUsageType, CreditPackageType, AutoTopupStatus } from './database.types';
 export interface ApiResponse<T = any> {
   success: boolean;
   message: string;
@@ -691,24 +691,6 @@ export interface SubscriptionResponse {
   stripeSubscriptionId: string;
 }
 
-export interface CreditPurchaseRequest {
-  credits: number;
-  paymentMethodId?: string;
-}
-
-export interface CreditBalanceResponse {
-  userId: number;
-  currentBalance: number;
-  totalPurchased: number;
-  totalUsed: number;
-  lastTransaction?: {
-    credits: number;
-    type: string;
-    description?: string;
-    createdAt: string;
-  };
-}
-
 export interface CreditTransactionResponse {
   id: number;
   credits: number;
@@ -936,4 +918,276 @@ export enum WebhookEventType {
   REFUND_CREATED = 'refund_created',
   CHARGE_DISPUTE_CREATED = 'charge_dispute_created',
   CHARGE_FAILED = 'charge_failed'
+}
+
+export interface CreditBalanceRequest {
+  userId?: number;
+}
+
+export interface CreditBalanceResponse {
+  userId: number;
+  currentBalance: number;
+  totalPurchased: number;
+  totalUsed: number;
+  totalRefunded: number;
+  lastPurchaseAt?: string;
+  lastUsageAt?: string;
+  autoTopupEnabled: boolean;
+  lowBalanceThreshold?: number;
+}
+
+export interface CreditPurchaseRequest {
+  packageType: CreditPackageType;
+  paymentMethodId?: string;
+  autoTopup?: boolean;
+  metadata?: Record<string, any>;
+}
+
+export interface CreditPurchaseResponse {
+  id: number;
+  packageType: CreditPackageType;
+  creditsAmount: number;
+  bonusCredits: number;
+  totalCredits: number;
+  purchasePrice: number;
+  currency: string;
+  status: CreditTransactionStatus;
+  paymentId: number;
+  expiresAt?: string;
+  createdAt: string;
+}
+
+export interface CreditUsageRequest {
+  usageType: CreditUsageType;
+  creditsToUse: number;
+  referenceId?: number;
+  referenceType?: string;
+  description: string;
+  metadata?: Record<string, any>;
+}
+
+export interface CreditUsageResponse {
+  id: number;
+  usageType: CreditUsageType;
+  creditsUsed: number;
+  remainingBalance: number;
+  referenceId?: number;
+  referenceType?: string;
+  description: string;
+  success: boolean;
+  createdAt: string;
+}
+
+export interface CreditTransactionRequest {
+  transactionType?: CreditTransactionType;
+  status?: CreditTransactionStatus;
+  startDate?: string;
+  endDate?: string;
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+}
+
+export interface CreditTransactionResponse {
+  id: number;
+  transactionType: CreditTransactionType;
+  credits: number;
+  status: CreditTransactionStatus;
+  description: string;
+  referenceId?: number;
+  referenceType?: string;
+  expiresAt?: string;
+  metadata?: Record<string, any>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreditTransactionListResponse {
+  transactions: CreditTransactionResponse[];
+  summary: {
+    total: number;
+    totalCredits: number;
+    purchased: number;
+    used: number;
+    refunded: number;
+    bonus: number;
+  };
+}
+
+export interface CreditPackageResponse {
+  packageType: CreditPackageType;
+  creditsAmount: number;
+  bonusCredits: number;
+  totalCredits: number;
+  price: number;
+  currency: string;
+  savings?: number;
+  popular?: boolean;
+  description: string;
+}
+
+export interface CreditPackageListResponse {
+  packages: CreditPackageResponse[];
+  currentBalance: number;
+  recommendedPackage?: CreditPackageType;
+}
+
+export interface AutoTopupRequest {
+  enabled: boolean;
+  triggerBalance: number;
+  topupAmount: number;
+  packageType: CreditPackageType;
+  paymentMethodId: number;
+}
+
+export interface AutoTopupResponse {
+  id: number;
+  status: AutoTopupStatus;
+  triggerBalance: number;
+  topupAmount: number;
+  packageType: CreditPackageType;
+  paymentMethodId: number;
+  lastTriggeredAt?: string;
+  failureCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreditNotificationRequest {
+  lowBalanceThreshold: number;
+  emailEnabled: boolean;
+  smsEnabled: boolean;
+  pushEnabled: boolean;
+}
+
+export interface CreditNotificationResponse {
+  lowBalanceThreshold: number;
+  emailEnabled: boolean;
+  smsEnabled: boolean;
+  pushEnabled: boolean;
+  lastNotificationSent?: string;
+}
+
+export interface CreditDashboardResponse {
+  currentBalance: number;
+  totalPurchased: number;
+  totalUsed: number;
+  monthlyUsage: {
+    month: string;
+    creditsUsed: number;
+    jobApplications: number;
+    profileBoosts: number;
+    premiumUnlocks: number;
+  }[];
+  recentTransactions: CreditTransactionResponse[];
+  autoTopupStatus: AutoTopupResponse;
+  usageBreakdown: {
+    jobApplications: number;
+    profileBoosts: number;
+    premiumUnlocks: number;
+    directMessages: number;
+    other: number;
+  };
+  projectedDepletion?: string;
+}
+
+export interface CreditRefundRequest {
+  transactionId: number;
+  reason: string;
+  description?: string;
+  metadata?: Record<string, any>;
+}
+
+export interface CreditRefundResponse {
+  id: number;
+  transactionId: number;
+  creditsRefunded: number;
+  reason: string;
+  status: CreditTransactionStatus;
+  processedAt?: string;
+  createdAt: string;
+}
+
+export interface JobApplicationCreditRequest {
+  jobId: number;
+  creditsRequired: number;
+  applicationData?: Record<string, any>;
+}
+
+export interface JobApplicationCreditResponse {
+  success: boolean;
+  creditsUsed: number;
+  remainingBalance: number;
+  applicationId: number;
+  jobId: number;
+  transactionId: number;
+}
+
+export interface ProfileBoostRequest {
+  boostType: string;
+  duration: number;
+  creditsRequired: number;
+}
+
+export interface ProfileBoostResponse {
+  success: boolean;
+  boostType: string;
+  duration: number;
+  creditsUsed: number;
+  remainingBalance: number;
+  expiresAt: string;
+  transactionId: number;
+}
+
+export interface PremiumJobUnlockRequest {
+  jobId: number;
+  creditsRequired: number;
+}
+
+export interface PremiumJobUnlockResponse {
+  success: boolean;
+  jobId: number;
+  creditsUsed: number;
+  remainingBalance: number;
+  jobDetails: Record<string, any>;
+  transactionId: number;
+}
+
+export interface CreditFilterRequest {
+  transactionType?: CreditTransactionType;
+  usageType?: CreditUsageType;
+  status?: CreditTransactionStatus;
+  startDate?: string;
+  endDate?: string;
+  minCredits?: number;
+  maxCredits?: number;
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+}
+
+export interface CreditAnalyticsResponse {
+  totalUsers: number;
+  totalCreditsIssued: number;
+  totalCreditsUsed: number;
+  totalRevenue: number;
+  averageCreditsPerUser: number;
+  topUsageTypes: {
+    type: CreditUsageType;
+    count: number;
+    percentage: number;
+  }[];
+  monthlyTrends: {
+    month: string;
+    purchases: number;
+    usage: number;
+    revenue: number;
+  }[];
+  packagePopularity: {
+    packageType: CreditPackageType;
+    purchases: number;
+    revenue: number;
+  }[];
 }

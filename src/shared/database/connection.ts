@@ -3,11 +3,17 @@ import Redis from 'ioredis';
 import { databaseConfig, redisConfig } from '../../config/auth';
 import { DatabaseClient, DatabaseTransaction, QueryResult as CustomQueryResult } from '../types';
 import { logger } from '../utils/logger.util';
+import { initializeApp, cert, App } from 'firebase-admin/app';
+import { getFirestore, Firestore } from 'firebase-admin/firestore';
+import { environment } from '../../config/auth';
 
 export class DatabaseConnection implements DatabaseClient {
   private pool: Pool;
   private redis: Redis;
   private isConnected: boolean = false;
+  private firebaseApp: App | null = null;
+  private firestore: Firestore | null = null;
+  private isFirestoreConnected: boolean = false;
 
   constructor() {
     this.pool = new Pool({
@@ -28,7 +34,37 @@ export class DatabaseConnection implements DatabaseClient {
       lazyConnect: redisConfig.lazyConnect
     });
 
+    this.initializeFirebase();
     this.setupEventHandlers();
+  }
+
+  private initializeFirebase(): void {
+    try {
+      const serviceAccount = {
+        type: 'service_account',
+        project_id: environment.FIREBASE_PROJECT_ID,
+        private_key_id: '',
+        private_key: environment.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+        client_email: environment.FIREBASE_CLIENT_EMAIL,
+        client_id: '',
+        auth_uri: 'https://accounts.google.com/o/oauth2/auth',
+        token_uri: 'https://oauth2.googleapis.com/token',
+        auth_provider_x509_cert_url: 'https://www.googleapis.com/oauth2/v1/certs'
+      };
+
+      this.firebaseApp = initializeApp({
+        credential: cert(serviceAccount),
+        databaseURL: environment.FIREBASE_DATABASE_URL
+      });
+
+      this.firestore = getFirestore(this.firebaseApp);
+      this.isFirestoreConnected = true;
+      
+      logger.info('Firebase/Firestore connection established');
+    } catch (error) {
+      logger.error('Firebase/Firestore connection error:', error);
+      this.isFirestoreConnected = false;
+    }
   }
 
   private setupEventHandlers(): void {
@@ -318,7 +354,7 @@ export class DatabaseConnection implements DatabaseClient {
         );
       `;
       
-            const createSubscriptionsTable = `
+      const createSubscriptionsTable = `
         CREATE TABLE IF NOT EXISTS subscriptions (
           id SERIAL PRIMARY KEY,
           user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
@@ -334,17 +370,22 @@ export class DatabaseConnection implements DatabaseClient {
           updated_at TIMESTAMP DEFAULT NOW()
         );
       `;
-
+      
       const createCreditTransactionsTable = `
         CREATE TABLE IF NOT EXISTS credit_transactions (
           id SERIAL PRIMARY KEY,
           user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
           payment_id INTEGER REFERENCES payments(id) ON DELETE SET NULL,
-          credits INTEGER NOT NULL,
           transaction_type VARCHAR(20) NOT NULL,
-          description TEXT,
-          job_application_id INTEGER,
-          created_at TIMESTAMP DEFAULT NOW()
+          credits INTEGER NOT NULL,
+          status VARCHAR(20) NOT NULL DEFAULT 'completed',
+          description TEXT NOT NULL,
+          reference_id INTEGER,
+          reference_type VARCHAR(50),
+          expires_at TIMESTAMP,
+          metadata JSONB DEFAULT '{}',
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW()
         );
       `;
 
@@ -363,6 +404,82 @@ export class DatabaseConnection implements DatabaseClient {
         );
       `;
 
+      const createCreditBalancesTable = `
+        CREATE TABLE IF NOT EXISTS credit_balances (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER REFERENCES users(id) ON DELETE CASCADE UNIQUE,
+          current_balance INTEGER NOT NULL DEFAULT 0,
+          total_purchased INTEGER NOT NULL DEFAULT 0,
+          total_used INTEGER NOT NULL DEFAULT 0,
+          total_refunded INTEGER NOT NULL DEFAULT 0,
+          last_purchase_at TIMESTAMP,
+          last_usage_at TIMESTAMP,
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW()
+        );
+      `;
+
+      const createCreditPurchasesTable = `
+        CREATE TABLE IF NOT EXISTS credit_purchases (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+          payment_id INTEGER REFERENCES payments(id) ON DELETE CASCADE,
+          package_type VARCHAR(20) NOT NULL,
+          credits_amount INTEGER NOT NULL,
+          purchase_price DECIMAL(10,2) NOT NULL,
+          currency VARCHAR(3) NOT NULL DEFAULT 'AUD',
+          bonus_credits INTEGER DEFAULT 0,
+          status VARCHAR(20) NOT NULL DEFAULT 'pending',
+          expires_at TIMESTAMP,
+          metadata JSONB DEFAULT '{}',
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW()
+        );
+      `;
+
+      const createCreditUsagesTable = `
+        CREATE TABLE IF NOT EXISTS credit_usages (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+          transaction_id INTEGER REFERENCES credit_transactions(id) ON DELETE CASCADE,
+          usage_type VARCHAR(30) NOT NULL,
+          credits_used INTEGER NOT NULL,
+          reference_id INTEGER,
+          reference_type VARCHAR(50),
+          description TEXT NOT NULL,
+          metadata JSONB DEFAULT '{}',
+          created_at TIMESTAMP DEFAULT NOW()
+        );
+      `;
+
+      const createAutoTopupsTable = `
+        CREATE TABLE IF NOT EXISTS auto_topups (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER REFERENCES users(id) ON DELETE CASCADE UNIQUE,
+          status VARCHAR(20) NOT NULL DEFAULT 'disabled',
+          trigger_balance INTEGER NOT NULL,
+          topup_amount INTEGER NOT NULL,
+          package_type VARCHAR(20) NOT NULL,
+          payment_method_id INTEGER REFERENCES payment_methods(id) ON DELETE CASCADE,
+          last_triggered_at TIMESTAMP,
+          failure_count INTEGER DEFAULT 0,
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW()
+        );
+      `;
+
+      const createCreditNotificationsTable = `
+        CREATE TABLE IF NOT EXISTS credit_notifications (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+          notification_type VARCHAR(30) NOT NULL,
+          threshold_balance INTEGER NOT NULL,
+          is_sent BOOLEAN DEFAULT FALSE,
+          sent_at TIMESTAMP,
+          created_at TIMESTAMP DEFAULT NOW()
+        );
+      `;
+      
       await this.query(createPaymentsTable);
       logger.info('Payments table created/verified');
 
@@ -383,6 +500,21 @@ export class DatabaseConnection implements DatabaseClient {
 
       await this.query(createWebhookEventsTable);
       logger.info('Webhook events table created/verified');
+      
+      await this.query(createCreditBalancesTable);
+      logger.info('Credit balances table created/verified');
+
+      await this.query(createCreditPurchasesTable);
+      logger.info('Credit purchases table created/verified');
+
+      await this.query(createCreditUsagesTable);
+      logger.info('Credit usages table created/verified');
+
+      await this.query(createAutoTopupsTable);
+      logger.info('Auto topups table created/verified');
+
+      await this.query(createCreditNotificationsTable);
+      logger.info('Credit notifications table created/verified');
 
       await this.createPaymentIndexes();
 
@@ -392,8 +524,8 @@ export class DatabaseConnection implements DatabaseClient {
       throw error;
     }
   }
-
-  async createPaymentIndexes(): Promise<void> {
+  
+    async createPaymentIndexes(): Promise<void> {
     try {
       logger.info('Creating payment indexes...');
 
@@ -425,7 +557,23 @@ export class DatabaseConnection implements DatabaseClient {
         'CREATE INDEX IF NOT EXISTS idx_webhook_events_stripe_event_id ON webhook_events(stripe_event_id);',
         'CREATE INDEX IF NOT EXISTS idx_webhook_events_processed ON webhook_events(processed);',
         'CREATE INDEX IF NOT EXISTS idx_webhook_events_event_type ON webhook_events(event_type);',
-        'CREATE INDEX IF NOT EXISTS idx_webhook_events_retry_count ON webhook_events(retry_count);'
+        'CREATE INDEX IF NOT EXISTS idx_webhook_events_retry_count ON webhook_events(retry_count);',
+        'CREATE INDEX IF NOT EXISTS idx_credit_balances_user_id ON credit_balances(user_id);',
+        'CREATE INDEX IF NOT EXISTS idx_credit_purchases_user_id ON credit_purchases(user_id);',
+        'CREATE INDEX IF NOT EXISTS idx_credit_purchases_payment_id ON credit_purchases(payment_id);',
+        'CREATE INDEX IF NOT EXISTS idx_credit_purchases_package_type ON credit_purchases(package_type);',
+        'CREATE INDEX IF NOT EXISTS idx_credit_purchases_status ON credit_purchases(status);',
+        'CREATE INDEX IF NOT EXISTS idx_credit_usages_user_id ON credit_usages(user_id);',
+        'CREATE INDEX IF NOT EXISTS idx_credit_usages_transaction_id ON credit_usages(transaction_id);',
+        'CREATE INDEX IF NOT EXISTS idx_credit_usages_usage_type ON credit_usages(usage_type);',
+        'CREATE INDEX IF NOT EXISTS idx_credit_usages_reference ON credit_usages(reference_id, reference_type);',
+        'CREATE INDEX IF NOT EXISTS idx_auto_topups_user_id ON auto_topups(user_id);',
+        'CREATE INDEX IF NOT EXISTS idx_auto_topups_status ON auto_topups(status);',
+        'CREATE INDEX IF NOT EXISTS idx_credit_notifications_user_id ON credit_notifications(user_id);',
+        'CREATE INDEX IF NOT EXISTS idx_credit_notifications_type ON credit_notifications(notification_type);',
+        'CREATE INDEX IF NOT EXISTS idx_credit_transactions_status ON credit_transactions(status);',
+        'CREATE INDEX IF NOT EXISTS idx_credit_transactions_reference ON credit_transactions(reference_id, reference_type);',
+        'CREATE INDEX IF NOT EXISTS idx_credit_transactions_expires_at ON credit_transactions(expires_at);'
       ];
 
       for (const indexQuery of paymentIndexes) {
@@ -660,6 +808,11 @@ export class DatabaseConnection implements DatabaseClient {
       await this.query('DROP TABLE IF EXISTS sessions CASCADE');
       await this.query('DROP TABLE IF EXISTS profiles CASCADE');
       await this.query('DROP TABLE IF EXISTS users CASCADE');
+      await this.query('DROP TABLE IF EXISTS credit_notifications CASCADE');
+      await this.query('DROP TABLE IF EXISTS auto_topups CASCADE');
+      await this.query('DROP TABLE IF EXISTS credit_usages CASCADE');
+      await this.query('DROP TABLE IF EXISTS credit_purchases CASCADE');
+      await this.query('DROP TABLE IF EXISTS credit_balances CASCADE');
 
       await this.createTables();
       
@@ -678,6 +831,17 @@ export class DatabaseConnection implements DatabaseClient {
       } catch (redisError) {
         logger.warn('Redis disconnect failed (expected if Redis unavailable):', redisError);
       }
+      
+      if (this.firebaseApp) {
+        try {
+          await this.firebaseApp.delete();
+          this.isFirestoreConnected = false;
+          logger.info('Firebase/Firestore connection closed');
+        } catch (firebaseError) {
+          logger.warn('Firebase disconnect failed:', firebaseError);
+        }
+      }
+      
       this.isConnected = false;
       logger.info('Database connections closed');
     } catch (error) {
@@ -694,12 +858,34 @@ export class DatabaseConnection implements DatabaseClient {
     return this.redis;
   }
 
+  getFirestoreClient(): Firestore | null {
+    return this.firestore;
+  }
+
   async healthCheck(): Promise<boolean> {
     try {
       await this.query('SELECT 1');
       return true;
     } catch (error) {
       logger.error('Database health check failed:', error);
+      return false;
+    }
+  }
+
+  async firestoreHealthCheck(): Promise<boolean> {
+    try {
+      if (!this.firestore) {
+        return false;
+      }
+      
+      await this.firestore.collection('_health').doc('check').set({
+        timestamp: new Date(),
+        status: 'connected'
+      });
+      
+      return true;
+    } catch (error) {
+      logger.error('Firestore health check failed:', error);
       return false;
     }
   }
@@ -721,6 +907,12 @@ export const connectDatabase = async (): Promise<void> => {
     if (!isHealthy) {
       throw new Error('Database health check failed');
     }
+    
+    const isFirestoreHealthy = await database.firestoreHealthCheck();
+    if (!isFirestoreHealthy) {
+      logger.warn('Firestore health check failed - continuing without Firestore');
+    }
+    
     logger.info('Database connected successfully');
   } catch (error) {
     logger.error('Failed to connect to database:', error);
@@ -736,6 +928,13 @@ export const initializeDatabase = async (): Promise<void> => {
     }
     
     await database.createTables();
+    
+    const isFirestoreHealthy = await database.firestoreHealthCheck();
+    if (isFirestoreHealthy) {
+      logger.info('Firestore initialized successfully');
+    } else {
+      logger.warn('Firestore initialization failed - continuing without Firestore');
+    }
     
     logger.info('Database initialized successfully');
   } catch (error) {
@@ -771,3 +970,6 @@ export const closeDatabase = async (): Promise<void> => {
 };
 
 export const connection = database;
+
+export const db = database.getFirestoreClient();
+

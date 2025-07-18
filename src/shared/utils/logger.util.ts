@@ -474,16 +474,24 @@ export const logStripeWebhook = (
 
 export const logCreditTransaction = (
   userId: number,
-  credits: number,
+  transactionId: number,
   transactionType: string,
+  credits: number,
+  status: string,
   paymentId: number | null,
+  referenceId: number | null,
+  referenceType: string | null,
   requestId: string
 ): void => {
   logger.info('Credit transaction', {
     userId,
-    credits,
+    transactionId,
     transactionType,
+    credits,
+    status,
     paymentId,
+    referenceId,
+    referenceType,
     requestId,
     timestamp: new Date().toISOString()
   });
@@ -581,6 +589,205 @@ export const logPaymentError = (
     paymentId,
     operation,
     error,
+    requestId,
+    timestamp: new Date().toISOString()
+  });
+};
+
+
+export const logCreditPurchase = (
+  userId: number,
+  purchaseId: number,
+  packageType: string,
+  creditsAmount: number,
+  bonusCredits: number,
+  purchasePrice: number,
+  paymentId: number,
+  success: boolean,
+  requestId: string
+): void => {
+  logger.info('Credit purchase attempt', {
+    userId,
+    purchaseId,
+    packageType,
+    creditsAmount,
+    bonusCredits,
+    purchasePrice,
+    paymentId,
+    success,
+    requestId,
+    timestamp: new Date().toISOString()
+  });
+};
+
+export const logCreditUsage = (
+  userId: number,
+  usageId: number,
+  usageType: string,
+  creditsUsed: number,
+  remainingBalance: number,
+  referenceId: number | null,
+  referenceType: string | null,
+  success: boolean,
+  requestId: string
+): void => {
+  logger.info('Credit usage attempt', {
+    userId,
+    usageId,
+    usageType,
+    creditsUsed,
+    remainingBalance,
+    referenceId,
+    referenceType,
+    success,
+    requestId,
+    timestamp: new Date().toISOString()
+  });
+};
+
+export const logCreditRefund = (
+  userId: number,
+  transactionId: number,
+  creditsRefunded: number,
+  reason: string,
+  success: boolean,
+  requestId: string
+): void => {
+  logger.info('Credit refund attempt', {
+    userId,
+    transactionId,
+    creditsRefunded,
+    reason,
+    success,
+    requestId,
+    timestamp: new Date().toISOString()
+  });
+};
+
+export const logAutoTopup = (
+  userId: number,
+  topupId: number,
+  triggerBalance: number,
+  topupAmount: number,
+  packageType: string,
+  success: boolean,
+  requestId: string
+): void => {
+  logger.info('Auto topup triggered', {
+    userId,
+    topupId,
+    triggerBalance,
+    topupAmount,
+    packageType,
+    success,
+    requestId,
+    timestamp: new Date().toISOString()
+  });
+};
+
+export const logCreditBalanceAlert = (
+  userId: number,
+  currentBalance: number,
+  threshold: number,
+  alertType: string,
+  notificationSent: boolean,
+  requestId: string
+): void => {
+  logger.info('Credit balance alert', {
+    userId,
+    currentBalance,
+    threshold,
+    alertType,
+    notificationSent,
+    requestId,
+    timestamp: new Date().toISOString()
+  });
+};
+
+export const logJobApplicationCredit = (
+  userId: number,
+  jobId: number,
+  applicationId: number,
+  creditsUsed: number,
+  success: boolean,
+  requestId: string
+): void => {
+  logger.info('Job application credit usage', {
+    userId,
+    jobId,
+    applicationId,
+    creditsUsed,
+    success,
+    requestId,
+    timestamp: new Date().toISOString()
+  });
+};
+
+export const logProfileBoostCredit = (
+  userId: number,
+  boostType: string,
+  duration: number,
+  creditsUsed: number,
+  success: boolean,
+  requestId: string
+): void => {
+  logger.info('Profile boost credit usage', {
+    userId,
+    boostType,
+    duration,
+    creditsUsed,
+    success,
+    requestId,
+    timestamp: new Date().toISOString()
+  });
+};
+
+export const logPremiumJobUnlock = (
+  userId: number,
+  jobId: number,
+  creditsUsed: number,
+  success: boolean,
+  requestId: string
+): void => {
+  logger.info('Premium job unlock credit usage', {
+    userId,
+    jobId,
+    creditsUsed,
+    success,
+    requestId,
+    timestamp: new Date().toISOString()
+  });
+};
+
+export const logCreditExpiry = (
+  userId: number,
+  transactionId: number,
+  expiredCredits: number,
+  expiryDate: string,
+  requestId: string
+): void => {
+  logger.info('Credit expiry processed', {
+    userId,
+    transactionId,
+    expiredCredits,
+    expiryDate,
+    requestId,
+    timestamp: new Date().toISOString()
+  });
+};
+
+export const logCreditError = (
+  userId: number,
+  operation: string,
+  error: string,
+  metadata: Record<string, any>,
+  requestId: string
+): void => {
+  logger.error('Credit operation failed', {
+    userId,
+    operation,
+    error,
+    metadata,
     requestId,
     timestamp: new Date().toISOString()
   });

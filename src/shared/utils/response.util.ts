@@ -414,3 +414,159 @@ export const sendPaymentLinkResponse = <T = any>(
 ): Response => {
   return sendSuccess(res, message, data);
 };
+
+export const sendCreditSuccess = <T = any>(
+  res: Response,
+  message: string,
+  data?: T,
+  statusCode: number = HTTP_STATUS_CODES.OK
+): Response => {
+  return sendSuccess(res, message, data, statusCode);
+};
+
+export const sendCreditCreated = <T = any>(
+  res: Response,
+  message: string,
+  data?: T
+): Response => {
+  return sendCreated(res, message, data);
+};
+
+export const sendCreditNotFound = (
+  res: Response,
+  message: string = 'Credit record not found'
+): Response => {
+  return sendError(res, message, HTTP_STATUS_CODES.NOT_FOUND);
+};
+
+export const sendCreditValidationError = (
+  res: Response,
+  message: string,
+  errors: ValidationError[]
+): Response => {
+  return sendValidationError(res, message, errors);
+};
+
+export const sendCreditTransactionError = (
+  res: Response,
+  message: string = 'Credit transaction failed'
+): Response => {
+  return sendError(res, message, HTTP_STATUS_CODES.BAD_REQUEST);
+};
+
+export const sendCreditPurchaseError = (
+  res: Response,
+  message: string = 'Credit purchase failed'
+): Response => {
+  return sendError(res, message, HTTP_STATUS_CODES.BAD_REQUEST);
+};
+
+export const sendCreditUsageError = (
+  res: Response,
+  message: string = 'Credit usage failed'
+): Response => {
+  return sendError(res, message, HTTP_STATUS_CODES.BAD_REQUEST);
+};
+
+export const sendCreditRefundError = (
+  res: Response,
+  message: string = 'Credit refund failed'
+): Response => {
+  return sendError(res, message, HTTP_STATUS_CODES.BAD_REQUEST);
+};
+
+export const sendCreditExpiredError = (
+  res: Response,
+  message: string = 'Credits have expired'
+): Response => {
+  return sendError(res, message, HTTP_STATUS_CODES.BAD_REQUEST);
+};
+
+export const sendAutoTopupError = (
+  res: Response,
+  message: string = 'Auto topup failed'
+): Response => {
+  return sendError(res, message, HTTP_STATUS_CODES.BAD_REQUEST);
+};
+
+export const sendCreditPackageNotFound = (
+  res: Response,
+  message: string = 'Credit package not found'
+): Response => {
+  return sendError(res, message, HTTP_STATUS_CODES.NOT_FOUND);
+};
+
+export const sendCreditBalanceError = (
+  res: Response,
+  message: string = 'Credit balance operation failed'
+): Response => {
+  return sendError(res, message, HTTP_STATUS_CODES.BAD_REQUEST);
+};
+
+export const sendCreditDashboardResponse = <T = any>(
+  res: Response,
+  message: string,
+  data?: T
+): Response => {
+  return sendSuccess(res, message, data);
+};
+
+export const sendCreditTransactionListResponse = <T = any>(
+  res: Response,
+  message: string,
+  transactions: T[],
+  summary: any
+): Response => {
+  return sendSuccess(res, message, { transactions, summary });
+};
+
+export const sendPaginatedCreditResponse = <T = any>(
+  res: Response,
+  message: string,
+  transactions: T[],
+  meta: any
+): Response => {
+  return sendSuccess(res, message, { transactions, meta });
+};
+
+export const sendCreditPackageListResponse = <T = any>(
+  res: Response,
+  message: string,
+  packages: T[],
+  currentBalance: number,
+  recommendedPackage?: string
+): Response => {
+  return sendSuccess(res, message, { packages, currentBalance, recommendedPackage });
+};
+
+export const sendAutoTopupResponse = <T = any>(
+  res: Response,
+  message: string,
+  data?: T
+): Response => {
+  return sendSuccess(res, message, data);
+};
+
+export const sendJobApplicationCreditResponse = <T = any>(
+  res: Response,
+  message: string,
+  data?: T
+): Response => {
+  return sendSuccess(res, message, data);
+};
+
+export const sendProfileBoostResponse = <T = any>(
+  res: Response,
+  message: string,
+  data?: T
+): Response => {
+  return sendSuccess(res, message, data);
+};
+
+export const sendPremiumJobUnlockResponse = <T = any>(
+  res: Response,
+  message: string,
+  data?: T
+): Response => {
+  return sendSuccess(res, message, data);
+};

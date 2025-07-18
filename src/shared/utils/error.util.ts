@@ -246,3 +246,63 @@ export class SubscriptionStatusError extends AppError {
     super(message, HTTP_STATUS_CODES.BAD_REQUEST, 'INVALID_SUBSCRIPTION_STATUS', true, requestId);
   }
 }
+
+export class CreditNotFoundError extends AppError {
+  constructor(message: string = 'Credit record not found', requestId?: string) {
+    super(message, HTTP_STATUS_CODES.NOT_FOUND, 'CREDIT_NOT_FOUND', true, requestId);
+  }
+}
+
+export class CreditValidationError extends ValidationAppError {
+  constructor(message: string, errors: ValidationError[], requestId?: string) {
+    super(message, errors, requestId);
+  }
+}
+
+export class CreditTransactionError extends AppError {
+  constructor(message: string = 'Credit transaction failed', requestId?: string) {
+    super(message, HTTP_STATUS_CODES.BAD_REQUEST, 'CREDIT_TRANSACTION_ERROR', true, requestId);
+  }
+}
+
+export class CreditPurchaseError extends AppError {
+  constructor(message: string = 'Credit purchase failed', requestId?: string) {
+    super(message, HTTP_STATUS_CODES.BAD_REQUEST, 'CREDIT_PURCHASE_ERROR', true, requestId);
+  }
+}
+
+export class CreditUsageError extends AppError {
+  constructor(message: string = 'Credit usage failed', requestId?: string) {
+    super(message, HTTP_STATUS_CODES.BAD_REQUEST, 'CREDIT_USAGE_ERROR', true, requestId);
+  }
+}
+
+export class CreditRefundError extends AppError {
+  constructor(message: string = 'Credit refund failed', requestId?: string) {
+    super(message, HTTP_STATUS_CODES.BAD_REQUEST, 'CREDIT_REFUND_ERROR', true, requestId);
+  }
+}
+
+export class CreditExpiredError extends AppError {
+  constructor(message: string = 'Credits have expired', requestId?: string) {
+    super(message, HTTP_STATUS_CODES.BAD_REQUEST, 'CREDIT_EXPIRED', true, requestId);
+  }
+}
+
+export class AutoTopupError extends AppError {
+  constructor(message: string = 'Auto topup failed', requestId?: string) {
+    super(message, HTTP_STATUS_CODES.BAD_REQUEST, 'AUTO_TOPUP_ERROR', true, requestId);
+  }
+}
+
+export class CreditPackageNotFoundError extends AppError {
+  constructor(message: string = 'Credit package not found', requestId?: string) {
+    super(message, HTTP_STATUS_CODES.NOT_FOUND, 'CREDIT_PACKAGE_NOT_FOUND', true, requestId);
+  }
+}
+
+export class CreditBalanceError extends AppError {
+  constructor(message: string = 'Credit balance operation failed', requestId?: string) {
+    super(message, HTTP_STATUS_CODES.BAD_REQUEST, 'CREDIT_BALANCE_ERROR', true, requestId);
+  }
+}

@@ -1,0 +1,55 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Credit Balances - User can only read their own
+    match /credit_balances/{document} {
+      allow read: if request.auth != null && resource.data.user_id == request.auth.uid;
+      allow write: if false; // Only backend can write
+    }
+    
+    // Credit Transactions - User can only read their own
+    match /credit_transactions/{document} {
+      allow read: if request.auth != null && resource.data.user_id == request.auth.uid;
+      allow write: if false; // Only backend can write
+    }
+    
+    // Credit Purchases - User can only read their own
+    match /credit_purchases/{document} {
+      allow read: if request.auth != null && resource.data.user_id == request.auth.uid;
+      allow write: if false; // Only backend can write
+    }
+    
+    // Credit Usage - User can only read their own
+    match /credit_usages/{document} {
+      allow read: if request.auth != null && resource.data.user_id == request.auth.uid;
+      allow write: if false; // Only backend can write
+    }
+    
+    // Auto Topup Settings - User can read/write their own
+    match /auto_topups/{document} {
+      allow read, write: if request.auth != null && resource.data.user_id == request.auth.uid;
+    }
+    
+    // Credit Notifications - User can only read their own
+    match /credit_notifications/{document} {
+      allow read: if request.auth != null && resource.data.user_id == request.auth.uid;
+      allow write: if false; // Only backend can write
+    }
+    
+    // Health check collection for system monitoring
+    match /_health/{document} {
+      allow read, write: if true; // Allow health checks
+    }
+    
+    // Admin access for backend operations
+    match /{document=**} {
+      allow read, write: if request.auth.token.admin == true;
+    }
+    
+    // Default deny all other access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

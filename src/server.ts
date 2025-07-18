@@ -37,14 +37,51 @@ async function startServer(): Promise<void> {
           'input-validation',
           'rate-limiting',
           'security-headers',
-          'comprehensive-logging'
+          'comprehensive-logging',
+          'job-management',
+          'client-management',
+          'material-tracking',
+          'file-attachments',
+          'quote-management',
+          'ai-pricing',
+          'payment-processing',
+          'invoice-management',
+          'refund-processing',
+          'webhook-handling',
+          'credit-system',
+          'credit-purchases',
+          'credit-transactions',
+          'auto-topup',
+          'trial-credits',
+          'credit-notifications'
         ],
         endpoints: {
-          total: 25,
+          total: 151,
           authentication: 12,
-          profile: 10,
-          validation: 11,
-          health: 4
+          profile: 13,
+          validation: 12,
+          jobs: 15,
+          clients: 5,
+          materials: 3,
+          attachments: 2,
+          quotes: 21,
+          payments: 7,
+          paymentMethods: 7,
+          invoices: 7,
+          refunds: 6,
+          webhooks: 5,
+          credits: 13,
+          creditPurchases: 12,
+          creditTransactions: 10,
+          health: 1
+        },
+        routeGroups: {
+          coreAuth: ['auth', 'profile', 'validation'],
+          jobManagement: ['jobs', 'clients', 'materials', 'attachments'],
+          quoteSystem: ['quotes'],
+          paymentSystem: ['payments', 'payment-methods', 'invoices', 'refunds', 'webhooks'],
+          creditSystem: ['credits', 'credit-purchases', 'credit-transactions'],
+          monitoring: ['health']
         }
       });
     });

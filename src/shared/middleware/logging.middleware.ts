@@ -94,6 +94,18 @@ export const sensitiveDataFilter = (
       filteredBody.gstAmount = '[FILTERED]';
     }
 
+    if (filteredBody.creditsAmount) {
+      filteredBody.creditsAmount = '[FILTERED]';
+    }
+
+    if (filteredBody.creditBalance) {
+      filteredBody.creditBalance = '[FILTERED]';
+    }
+
+    if (filteredBody.bonusCredits) {
+      filteredBody.bonusCredits = '[FILTERED]';
+    }
+
     req.body = filteredBody;
   }
 
@@ -483,13 +495,20 @@ export const creditTransactionLogger = (
 ): void => {
   const requestId = res.locals.requestId || 'unknown';
   const userId = req.user?.id;
+  const transactionId = req.params.transactionId;
 
   if (req.path.includes('/credits')) {
-    logger.info('Credit transaction initiated', {
+    const operation = req.method === 'POST' ? 'create' : 
+                     req.method === 'PUT' ? 'update' : 
+                     req.method === 'DELETE' ? 'delete' : 'read';
+
+    logger.info('Credit transaction operation initiated', {
       requestId,
       userId,
+      transactionId,
+      operation,
+      transactionType: req.body.transactionType,
       credits: req.body.credits,
-      transactionType: req.body.transactionType || 'purchase',
       method: req.method,
       path: req.path,
       timestamp: new Date().toISOString()
@@ -656,5 +675,238 @@ export const googlePayLogger = (
 
   next();
 };
+
+export const creditPurchaseLogger = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const requestId = res.locals.requestId || 'unknown';
+  const userId = req.user?.id;
+
+  if (req.path.includes('/credits/purchase')) {
+    logger.info('Credit purchase initiated', {
+      requestId,
+      userId,
+      packageType: req.body.packageType,
+      paymentMethodId: req.body.paymentMethodId ? '[FILTERED]' : undefined,
+      autoTopup: req.body.autoTopup,
+      method: req.method,
+      path: req.path,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  next();
+};
+
+export const creditUsageLogger = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const requestId = res.locals.requestId || 'unknown';
+  const userId = req.user?.id;
+
+  if (req.path.includes('/credits/use')) {
+    logger.info('Credit usage initiated', {
+      requestId,
+      userId,
+      usageType: req.body.usageType,
+      creditsToUse: req.body.creditsToUse,
+      referenceId: req.body.referenceId,
+      referenceType: req.body.referenceType,
+      method: req.method,
+      path: req.path,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  next();
+};
+
+export const creditBalanceLogger = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const requestId = res.locals.requestId || 'unknown';
+  const userId = req.user?.id;
+
+  if (req.path.includes('/credits/balance')) {
+    logger.info('Credit balance check initiated', {
+      requestId,
+      userId,
+      method: req.method,
+      path: req.path,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  next();
+};
+
+export const autoTopupLogger = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const requestId = res.locals.requestId || 'unknown';
+  const userId = req.user?.id;
+
+  if (req.path.includes('/credits/auto-topup')) {
+    const operation = req.method === 'POST' ? 'setup' : 
+                     req.method === 'PUT' ? 'update' : 
+                     req.method === 'DELETE' ? 'disable' : 'read';
+
+    logger.info('Auto topup operation initiated', {
+      requestId,
+      userId,
+      operation,
+      enabled: req.body.enabled,
+      triggerBalance: req.body.triggerBalance,
+      topupAmount: req.body.topupAmount,
+      packageType: req.body.packageType,
+      method: req.method,
+      path: req.path,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  next();
+};
+
+export const creditRefundLogger = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const requestId = res.locals.requestId || 'unknown';
+  const userId = req.user?.id;
+
+  if (req.path.includes('/credits/refund')) {
+    logger.info('Credit refund initiated', {
+      requestId,
+      userId,
+      transactionId: req.body.transactionId,
+      reason: req.body.reason,
+      method: req.method,
+      path: req.path,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  next();
+};
+
+export const jobApplicationCreditLogger = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const requestId = res.locals.requestId || 'unknown';
+  const userId = req.user?.id;
+
+  if (req.path.includes('/credits/job-application')) {
+    logger.info('Job application credit usage initiated', {
+      requestId,
+      userId,
+      jobId: req.body.jobId,
+      creditsRequired: req.body.creditsRequired,
+      method: req.method,
+      path: req.path,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  next();
+};
+
+export const profileBoostLogger = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const requestId = res.locals.requestId || 'unknown';
+  const userId = req.user?.id;
+
+  if (req.path.includes('/credits/profile-boost')) {
+    logger.info('Profile boost credit usage initiated', {
+      requestId,
+      userId,
+      boostType: req.body.boostType,
+      duration: req.body.duration,
+      creditsRequired: req.body.creditsRequired,
+      method: req.method,
+      path: req.path,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  next();
+};
+
+export const premiumJobUnlockLogger = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const requestId = res.locals.requestId || 'unknown';
+  const userId = req.user?.id;
+
+  if (req.path.includes('/credits/premium-unlock')) {
+    logger.info('Premium job unlock credit usage initiated', {
+      requestId,
+      userId,
+      jobId: req.body.jobId,
+      creditsRequired: req.body.creditsRequired,
+      method: req.method,
+      path: req.path,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  next();
+};
+
+export const creditSensitiveDataFilter = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const originalBody = req.body;
+  
+  if (originalBody && req.path.includes('/credits')) {
+    const filteredBody = { ...originalBody };
+    
+    if (filteredBody.paymentMethodId) {
+      filteredBody.paymentMethodId = '[FILTERED]';
+    }
+    
+    if (filteredBody.purchasePrice) {
+      filteredBody.purchasePrice = '[FILTERED]';
+    }
+    
+    if (filteredBody.currentBalance) {
+      filteredBody.currentBalance = '[FILTERED]';
+    }
+
+    if (filteredBody.totalPurchased) {
+      filteredBody.totalPurchased = '[FILTERED]';
+    }
+
+    if (filteredBody.totalUsed) {
+      filteredBody.totalUsed = '[FILTERED]';
+    }
+
+    req.body = filteredBody;
+  }
+
+  next();
+};
+
+
+
+
 
 

@@ -653,3 +653,201 @@ export const paymentMethodErrorHandler = (
 
   return errorHandler(error, req, res, next);
 };
+
+export const creditErrorHandler = (
+  error: Error,
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Response | void => {
+  const requestId = res.locals.requestId || 'unknown';
+  const userId = req.user?.id;
+
+  if (error.message.includes('Credit record not found')) {
+    logger.warn('Credit not found error', {
+      requestId,
+      userId,
+      path: req.path,
+      method: req.method,
+      creditId: req.params.creditId
+    });
+
+    const creditError = new AppError(
+      'Credit record not found',
+      HTTP_STATUS_CODES.NOT_FOUND,
+      'CREDIT_NOT_FOUND',
+      true,
+      requestId
+    );
+
+    const errorResponse = createErrorResponse(creditError, requestId);
+    return res.status(HTTP_STATUS_CODES.NOT_FOUND).json(errorResponse);
+  }
+
+  if (error.message.includes('Credit transaction failed')) {
+    logger.warn('Credit transaction error', {
+      requestId,
+      userId,
+      path: req.path,
+      method: req.method,
+      transactionId: req.params.transactionId
+    });
+
+    const transactionError = new AppError(
+      'Credit transaction failed',
+      HTTP_STATUS_CODES.BAD_REQUEST,
+      'CREDIT_TRANSACTION_ERROR',
+      true,
+      requestId
+    );
+
+    const errorResponse = createErrorResponse(transactionError, requestId);
+    return res.status(HTTP_STATUS_CODES.BAD_REQUEST).json(errorResponse);
+  }
+
+  if (error.message.includes('Credit purchase failed')) {
+    logger.warn('Credit purchase error', {
+      requestId,
+      userId,
+      path: req.path,
+      method: req.method,
+      packageType: req.body?.packageType
+    });
+
+    const purchaseError = new AppError(
+      'Credit purchase failed',
+      HTTP_STATUS_CODES.BAD_REQUEST,
+      'CREDIT_PURCHASE_ERROR',
+      true,
+      requestId
+    );
+
+    const errorResponse = createErrorResponse(purchaseError, requestId);
+    return res.status(HTTP_STATUS_CODES.BAD_REQUEST).json(errorResponse);
+  }
+
+  if (error.message.includes('Credit usage failed')) {
+    logger.warn('Credit usage error', {
+      requestId,
+      userId,
+      path: req.path,
+      method: req.method,
+      usageType: req.body?.usageType
+    });
+
+    const usageError = new AppError(
+      'Credit usage failed',
+      HTTP_STATUS_CODES.BAD_REQUEST,
+      'CREDIT_USAGE_ERROR',
+      true,
+      requestId
+    );
+
+    const errorResponse = createErrorResponse(usageError, requestId);
+    return res.status(HTTP_STATUS_CODES.BAD_REQUEST).json(errorResponse);
+  }
+
+  if (error.message.includes('Credit refund failed')) {
+    logger.warn('Credit refund error', {
+      requestId,
+      userId,
+      path: req.path,
+      method: req.method,
+      transactionId: req.params.transactionId
+    });
+
+    const refundError = new AppError(
+      'Credit refund failed',
+      HTTP_STATUS_CODES.BAD_REQUEST,
+      'CREDIT_REFUND_ERROR',
+      true,
+      requestId
+    );
+
+    const errorResponse = createErrorResponse(refundError, requestId);
+    return res.status(HTTP_STATUS_CODES.BAD_REQUEST).json(errorResponse);
+  }
+
+  if (error.message.includes('Credits have expired')) {
+    logger.warn('Credit expired error', {
+      requestId,
+      userId,
+      path: req.path,
+      method: req.method
+    });
+
+    const expiredError = new AppError(
+      'Credits have expired',
+      HTTP_STATUS_CODES.BAD_REQUEST,
+      'CREDIT_EXPIRED',
+      true,
+      requestId
+    );
+
+    const errorResponse = createErrorResponse(expiredError, requestId);
+    return res.status(HTTP_STATUS_CODES.BAD_REQUEST).json(errorResponse);
+  }
+
+  if (error.message.includes('Auto topup failed')) {
+    logger.warn('Auto topup error', {
+      requestId,
+      userId,
+      path: req.path,
+      method: req.method
+    });
+
+    const topupError = new AppError(
+      'Auto topup failed',
+      HTTP_STATUS_CODES.BAD_REQUEST,
+      'AUTO_TOPUP_ERROR',
+      true,
+      requestId
+    );
+
+    const errorResponse = createErrorResponse(topupError, requestId);
+    return res.status(HTTP_STATUS_CODES.BAD_REQUEST).json(errorResponse);
+  }
+
+  if (error.message.includes('Credit package not found')) {
+    logger.warn('Credit package not found error', {
+      requestId,
+      userId,
+      path: req.path,
+      method: req.method,
+      packageType: req.params.packageType
+    });
+
+    const packageError = new AppError(
+      'Credit package not found',
+      HTTP_STATUS_CODES.NOT_FOUND,
+      'CREDIT_PACKAGE_NOT_FOUND',
+      true,
+      requestId
+    );
+
+    const errorResponse = createErrorResponse(packageError, requestId);
+    return res.status(HTTP_STATUS_CODES.NOT_FOUND).json(errorResponse);
+  }
+
+  if (error.message.includes('Credit balance operation failed')) {
+    logger.warn('Credit balance error', {
+      requestId,
+      userId,
+      path: req.path,
+      method: req.method
+    });
+
+    const balanceError = new AppError(
+      'Credit balance operation failed',
+      HTTP_STATUS_CODES.BAD_REQUEST,
+      'CREDIT_BALANCE_ERROR',
+      true,
+      requestId
+    );
+
+    const errorResponse = createErrorResponse(balanceError, requestId);
+    return res.status(HTTP_STATUS_CODES.BAD_REQUEST).json(errorResponse);
+  }
+
+  return errorHandler(error, req, res, next);
+};
