@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
-import { authenticateToken } from '../../auth/middleware/auth.middleware';
+import { authenticate } from '../../auth/middleware/auth.middleware';
 import { UserRole } from '../../shared/types';
-import { sendUnauthorizedError, sendForbiddenError } from '../../shared/utils';
+import { sendError } from '../../shared/utils';
 import { logger } from '../../shared/utils';
 import { validateUserRole } from '../utils';
 
@@ -12,7 +12,7 @@ export const authenticateCreditAccess = async (
 ): Promise<void> => {
   try {
     await new Promise<void>((resolve, reject) => {
-      authenticateToken(req, res, (error) => {
+      authenticate(req, res, (error) => {
         if (error) reject(error);
         else resolve();
       });
@@ -29,7 +29,7 @@ export const authenticateCreditAccess = async (
         path: req.path,
         method: req.method
       });
-      return sendUnauthorizedError(res, 'Authentication required for credit operations');
+      return sendError(res, 401, 'Authentication required for credit operations');
     }
 
     const roleValidation = validateUserRole(userRole, [
@@ -48,7 +48,7 @@ export const authenticateCreditAccess = async (
         path: req.path,
         method: req.method
       });
-      return sendForbiddenError(res, roleValidation.reason || 'Insufficient permissions for credit operations');
+      return sendError(res, 403, roleValidation.reason || 'Insufficient permissions for credit operations');
     }
 
     next();
@@ -61,7 +61,7 @@ export const authenticateCreditAccess = async (
       path: req.path,
       method: req.method
     });
-    return sendUnauthorizedError(res, 'Authentication failed');
+    return sendError(res, 401, 'Authentication failed');
   }
 };
 
@@ -88,7 +88,7 @@ export const requireTradieOrEnterprise = (
       path: req.path,
       method: req.method
     });
-    return sendForbiddenError(res, 'Tradie or Enterprise access required');
+    return sendError(res, 403, 'Tradie or Enterprise access required');
   }
 
   next();
@@ -112,7 +112,7 @@ export const requireEnterpriseAccess = (
       path: req.path,
       method: req.method
     });
-    return sendForbiddenError(res, 'Enterprise access required');
+    return sendError(res, 403, 'Enterprise access required');
   }
 
   next();
@@ -134,10 +134,10 @@ export const validateCreditOwnership = (
       path: req.path,
       method: req.method
     });
-    return sendUnauthorizedError(res, 'Authentication required');
+    return sendError(res, 401, 'Authentication required');
   }
 
-  if (targetUserId && parseInt(targetUserId) !== userId && req.user?.role !== UserRole.ENTERPRISE) {
+  if (targetUserId && targetUserId !== userId && req.user?.role !== UserRole.ENTERPRISE) {
     const requestId = res.locals.requestId || 'unknown';
     logger.warn('Credit ownership validation failed - access denied', {
       requestId,
@@ -148,7 +148,7 @@ export const validateCreditOwnership = (
       path: req.path,
       method: req.method
     });
-    return sendForbiddenError(res, 'Access denied - can only access own credit data');
+    return sendError(res, 403, 'Access denied - can only access own credit data');
   }
 
   next();
@@ -170,7 +170,7 @@ export const validateCreditPurchaseAccess = (
       path: req.path,
       method: req.method
     });
-    return sendUnauthorizedError(res, 'Authentication required for credit purchases');
+    return sendError(res, 401, 'Authentication required for credit purchases');
   }
 
   const roleValidation = validateUserRole(userRole, [
@@ -189,7 +189,7 @@ export const validateCreditPurchaseAccess = (
       path: req.path,
       method: req.method
     });
-    return sendForbiddenError(res, 'Insufficient permissions for credit purchases');
+    return sendError(res, 403, 'Insufficient permissions for credit purchases');
   }
 
   next();
@@ -211,7 +211,7 @@ export const validateCreditUsageAccess = (
       path: req.path,
       method: req.method
     });
-    return sendUnauthorizedError(res, 'Authentication required for credit usage');
+    return sendError(res, 401, 'Authentication required for credit usage');
   }
 
   const roleValidation = validateUserRole(userRole, [
@@ -229,7 +229,7 @@ export const validateCreditUsageAccess = (
       path: req.path,
       method: req.method
     });
-    return sendForbiddenError(res, 'Only tradies and enterprises can use credits');
+    return sendError(res, 403, 'Only tradies and enterprises can use credits');
   }
 
   next();
@@ -251,7 +251,7 @@ export const validateAutoTopupAccess = (
       path: req.path,
       method: req.method
     });
-    return sendUnauthorizedError(res, 'Authentication required for auto topup');
+    return sendError(res, 401, 'Authentication required for auto topup');
   }
 
   const roleValidation = validateUserRole(userRole, [
@@ -269,7 +269,7 @@ export const validateAutoTopupAccess = (
       path: req.path,
       method: req.method
     });
-    return sendForbiddenError(res, 'Auto topup is only available for tradies and enterprises');
+    return sendError(res, 403, 'Auto topup is only available for tradies and enterprises');
   }
 
   next();
@@ -291,7 +291,7 @@ export const validateCreditRefundAccess = (
       path: req.path,
       method: req.method
     });
-    return sendUnauthorizedError(res, 'Authentication required for credit refunds');
+    return sendError(res, 401, 'Authentication required for credit refunds');
   }
 
   const roleValidation = validateUserRole(userRole, [
@@ -310,7 +310,7 @@ export const validateCreditRefundAccess = (
       path: req.path,
       method: req.method
     });
-    return sendForbiddenError(res, 'Insufficient permissions for credit refunds');
+    return sendError(res, 403, 'Insufficient permissions for credit refunds');
   }
 
   next();

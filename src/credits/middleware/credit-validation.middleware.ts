@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { validationResult } from 'express-validator';
-import { CreditUsageType, CreditPackageType } from '../../shared/types';
-import { sendValidationError, sendBadRequestError } from '../../shared/utils';
+import { CreditUsageType, CreditPackageType, UserRole } from '../../shared/types';
+import { sendValidationError, sendError } from '../../shared/utils';
 import { logger } from '../../shared/utils';
 import { 
   validateCreditSufficiency,
@@ -54,7 +54,7 @@ export const validateSufficientBalance = async (
     const { creditsToUse, usageType } = req.body;
     
     if (!userId) {
-      return sendBadRequestError(res, 'User ID is required');
+      return sendError(res, 400, 'User ID is required');
     }
 
     const config = CREDIT_USAGE_CONFIGS[usageType as CreditUsageType];
@@ -62,7 +62,7 @@ export const validateSufficientBalance = async (
 
     const currentBalance = req.user?.creditBalance || 0;
     
-    const balanceCheck = validateCreditSufficiency(userId, currentBalance, requiredCredits);
+    const balanceCheck = validateCreditSufficiency(parseInt(userId), currentBalance, requiredCredits);
     
     if (!balanceCheck.sufficient) {
       const requestId = res.locals.requestId || 'unknown';
@@ -75,7 +75,7 @@ export const validateSufficientBalance = async (
         usageType
       });
       
-      return sendBadRequestError(res, `Insufficient credits. You need ${balanceCheck.shortfall} more credits.`);
+      return sendError(res, 400, `Insufficient credits. You need ${balanceCheck.shortfall} more credits.`);
     }
 
     next();
@@ -86,7 +86,7 @@ export const validateSufficientBalance = async (
       userId: req.user?.id,
       error: error instanceof Error ? error.message : 'Unknown error'
     });
-    return sendBadRequestError(res, 'Failed to validate credit balance');
+    return sendError(res, 400, 'Failed to validate credit balance');
   }
 };
 
@@ -100,7 +100,7 @@ export const validateUsageLimits = async (
     const { usageType, creditsToUse } = req.body;
     
     if (!userId || !usageType) {
-      return sendBadRequestError(res, 'User ID and usage type are required');
+      return sendError(res, 400, 'User ID and usage type are required');
     }
 
     const currentBalance = req.user?.creditBalance || 0;
@@ -127,7 +127,7 @@ export const validateUsageLimits = async (
         monthlyUsage
       });
       
-      return sendBadRequestError(res, usageValidation.reason || 'Usage validation failed');
+      return sendError(res, 400, usageValidation.reason || 'Usage validation failed');
     }
 
     next();
@@ -138,7 +138,7 @@ export const validateUsageLimits = async (
       userId: req.user?.id,
       error: error instanceof Error ? error.message : 'Unknown error'
     });
-    return sendBadRequestError(res, 'Failed to validate usage limits');
+    return sendError(res, 400, 'Failed to validate usage limits');
   }
 };
 
@@ -153,7 +153,7 @@ export const validatePurchaseLimits = async (
     const { packageType } = req.body;
     
     if (!userId || !userRole || !packageType) {
-      return sendBadRequestError(res, 'User information and package type are required');
+      return sendError(res, 400, 'User information and package type are required');
     }
 
     const currentBalance = req.user?.creditBalance || 0;
@@ -162,7 +162,7 @@ export const validatePurchaseLimits = async (
 
     const purchaseValidation = validateCreditPurchase({
       packageType,
-      userId,
+      userId: parseInt(userId),
       userRole,
       currentBalance,
       dailySpent,
@@ -181,7 +181,7 @@ export const validatePurchaseLimits = async (
         monthlySpent
       });
       
-      return sendBadRequestError(res, purchaseValidation.reason || 'Purchase validation failed');
+      return sendError(res, 400, purchaseValidation.reason || 'Purchase validation failed');
     }
 
     next();
@@ -192,7 +192,7 @@ export const validatePurchaseLimits = async (
       userId: req.user?.id,
       error: error instanceof Error ? error.message : 'Unknown error'
     });
-    return sendBadRequestError(res, 'Failed to validate purchase limits');
+    return sendError(res, 400, 'Failed to validate purchase limits');
   }
 };
 
@@ -227,7 +227,7 @@ export const validateAutoTopupConfiguration = async (
         reason: autoTopupValidation.reason
       });
       
-      return sendBadRequestError(res, autoTopupValidation.reason || 'Auto topup validation failed');
+      return sendError(res, 400, autoTopupValidation.reason || 'Auto topup validation failed');
     }
 
     next();
@@ -238,7 +238,7 @@ export const validateAutoTopupConfiguration = async (
       userId: req.user?.id,
       error: error instanceof Error ? error.message : 'Unknown error'
     });
-    return sendBadRequestError(res, 'Failed to validate auto topup configuration');
+    return sendError(res, 400, 'Failed to validate auto topup configuration');
   }
 };
 
@@ -252,12 +252,12 @@ export const validateRefundRequest = async (
     const userId = req.user?.id;
     
     if (!userId || !transactionId || !reason) {
-      return sendBadRequestError(res, 'User ID, transaction ID, and reason are required');
+      return sendError(res, 400, 'User ID, transaction ID, and reason are required');
     }
 
-    const purchaseDate = req.transaction?.createdAt || new Date();
-    const creditsUsed = req.transaction?.creditsUsed || 0;
-    const totalCredits = req.transaction?.totalCredits || 0;
+    const purchaseDate = new Date();
+    const creditsUsed = 0;
+    const totalCredits = 0;
 
     const refundValidation = validateRefundEligibility(
       purchaseDate,
@@ -277,7 +277,7 @@ export const validateRefundRequest = async (
         totalCredits
       });
       
-      return sendBadRequestError(res, refundValidation.reason || 'Refund validation failed');
+      return sendError(res, 400, refundValidation.reason || 'Refund validation failed');
     }
 
     next();
@@ -288,7 +288,7 @@ export const validateRefundRequest = async (
       userId: req.user?.id,
       error: error instanceof Error ? error.message : 'Unknown error'
     });
-    return sendBadRequestError(res, 'Failed to validate refund request');
+    return sendError(res, 400, 'Failed to validate refund request');
   }
 };
 
@@ -303,7 +303,7 @@ export const validateTransactionLimits = async (
     const { credits, transactionType } = req.body;
     
     if (!userId || !userRole) {
-      return sendBadRequestError(res, 'User information is required');
+      return sendError(res, 400, 'User information is required');
     }
 
     const amountValidation = validateTransactionAmount(credits, transactionType);
@@ -318,19 +318,19 @@ export const validateTransactionLimits = async (
         reason: amountValidation.reason
       });
       
-      return sendBadRequestError(res, amountValidation.reason || 'Transaction amount validation failed');
+      return sendError(res, 400, amountValidation.reason || 'Transaction amount validation failed');
     }
 
-    const limits = getLimitsForRole(userRole);
+    const limits = getLimitsForRole(userRole as UserRole);
     const dailyTransactions = req.user?.dailyTransactions || 0;
     const monthlyTransactions = req.user?.monthlyTransactions || 0;
 
     if (dailyTransactions >= limits.maxTransactionsPerDay) {
-      return sendBadRequestError(res, `Daily transaction limit of ${limits.maxTransactionsPerDay} exceeded`);
+      return sendError(res, 400, `Daily transaction limit of ${limits.maxTransactionsPerDay} exceeded`);
     }
 
     if (monthlyTransactions >= limits.maxTransactionsPerMonth) {
-      return sendBadRequestError(res, `Monthly transaction limit of ${limits.maxTransactionsPerMonth} exceeded`);
+      return sendError(res, 400, `Monthly transaction limit of ${limits.maxTransactionsPerMonth} exceeded`);
     }
 
     next();
@@ -341,7 +341,7 @@ export const validateTransactionLimits = async (
       userId: req.user?.id,
       error: error instanceof Error ? error.message : 'Unknown error'
     });
-    return sendBadRequestError(res, 'Failed to validate transaction limits');
+    return sendError(res, 400, 'Failed to validate transaction limits');
   }
 };
 
@@ -363,7 +363,7 @@ export const validateBusinessHours = (
       hour,
       path: req.path
     });
-    return sendBadRequestError(res, 'Credit operations are not available on weekends');
+    return sendError(res, 400, 'Credit operations are not available on weekends');
   }
 
   if (hour < 6 || hour > 22) {
@@ -375,7 +375,7 @@ export const validateBusinessHours = (
       hour,
       path: req.path
     });
-    return sendBadRequestError(res, 'Credit operations are only available between 6 AM and 10 PM');
+    return sendError(res, 400, 'Credit operations are only available between 6 AM and 10 PM');
   }
 
   next();

@@ -4,12 +4,12 @@ export interface ApiResponse<T = any> {
   success: boolean;
   message: string;
   data?: T;
-  errors?: ApiValidationError[];
+  errors?: ValidationError[];
   timestamp: string;
   requestId: string;
 }
 
-export interface ApiValidationError {
+export interface ValidationError {
   field: string;
   message: string;
   code: string;
@@ -154,7 +154,7 @@ export interface LogoutResponse {
 export interface ErrorResponse {
   success: false;
   message: string;
-  errors?: ApiValidationError[];
+  errors?: ValidationError[];
   timestamp: string;
   requestId: string;
   statusCode: number;
