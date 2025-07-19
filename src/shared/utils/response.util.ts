@@ -570,3 +570,24 @@ export const sendPremiumJobUnlockResponse = <T = any>(
 ): Response => {
   return sendSuccess(res, message, data);
 };
+
+export const sendNotFoundError = (
+  res: Response,
+  message: string = 'Resource not found'
+): Response => {
+  return sendError(res, message, HTTP_STATUS_CODES.NOT_FOUND);
+};
+
+export const sendBadRequestError = (
+  res: Response,
+  message: string = 'Bad request'
+): Response => {
+  return sendError(res, message, HTTP_STATUS_CODES.BAD_REQUEST);
+};
+
+export const sendInternalServerError = (
+  res: Response,
+  message: string = 'Internal server error'
+): Response => {
+  return sendError(res, message, HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR);
+};

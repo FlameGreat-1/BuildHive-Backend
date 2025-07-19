@@ -651,3 +651,5 @@ export const creditNotificationRateLimit = rateLimit({
     return userId ? `credit-notification-${userId}` : req.ip || 'unknown';
   }
 });
+
+export { default as rateLimit } from 'express-rate-limit';
