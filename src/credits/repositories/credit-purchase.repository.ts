@@ -30,7 +30,7 @@ export class CreditPurchaseRepository {
         currency: purchase.currency,
         bonus_credits: purchase.bonusCredits,
         status: purchase.status,
-        expires_at: purchase.expiresAt || null,
+        expires_at: purchase.expiresAt,
         metadata: purchase.metadata,
         created_at: now,
         updated_at: now
@@ -146,7 +146,7 @@ export class CreditPurchaseRepository {
     }
   }
   
-    async getPurchaseHistory(
+  async getPurchaseHistory(
     userId: number,
     page: number = 1,
     limit: number = 10,

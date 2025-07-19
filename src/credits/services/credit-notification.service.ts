@@ -39,7 +39,7 @@ export class CreditNotificationService {
         await this.emailService.sendCreditLowBalanceAlert(user.email, user.username, currentBalance);
       }
 
-      if (profile?.phone && profile.preferences.smsNotifications && this.smsService.isServiceEnabled()) {
+      if (profile?.phone && profile?.preferences?.smsNotifications && this.smsService.isServiceEnabled()) {
         await this.smsService.sendCreditLowBalanceAlert(profile.phone, user.username, currentBalance);
       }
 
@@ -148,7 +148,7 @@ export class CreditNotificationService {
         await this.emailService.sendCreditPurchaseConfirmation(user.email, user.username, purchaseData);
       }
 
-      if (profile?.phone && profile.preferences.smsNotifications && this.smsService.isServiceEnabled()) {
+      if (profile?.phone && profile?.preferences?.smsNotifications && this.smsService.isServiceEnabled()) {
         await this.smsService.sendCreditPurchaseConfirmation(profile.phone, user.username, totalCredits);
       }
 
@@ -175,7 +175,7 @@ export class CreditNotificationService {
         return;
       }
 
-      if (profile?.phone && profile.preferences.smsNotifications && this.smsService.isServiceEnabled()) {
+      if (profile?.phone && profile?.preferences?.smsNotifications && this.smsService.isServiceEnabled()) {
         const smsMessage = `BuildHive: Transaction completed - ${transaction.transactionType}: ${formatCreditAmount(transaction.credits)} credits. ${transaction.description}`;
         await this.smsService.sendSMS(profile.phone, smsMessage);
       }
@@ -261,7 +261,7 @@ export class CreditNotificationService {
         await this.emailService.sendCreditAutoTopupNotification(user.email, user.username, creditsAdded, amount);
       }
 
-      if (profile?.phone && profile.preferences.smsNotifications && this.smsService.isServiceEnabled()) {
+      if (profile?.phone && profile?.preferences?.smsNotifications && this.smsService.isServiceEnabled()) {
         await this.smsService.sendCreditAutoTopupNotification(profile.phone, user.username, creditsAdded);
       }
 
@@ -293,12 +293,7 @@ export class CreditNotificationService {
         throw new Error('User not found');
       }
 
-      if (!profile || profile.preferences.emailNotifications) {
-        const smsMessage = `BuildHive: Transaction cancelled - ${transaction.transactionType}: ${formatCreditAmount(transaction.credits)} credits. Reason: ${reason}`;
-        await this.smsService.sendSMS(profile.phone, smsMessage);
-      }
-
-      if (profile?.phone && profile.preferences.smsNotifications && this.smsService.isServiceEnabled()) {
+      if (profile?.phone && profile?.preferences?.smsNotifications && this.smsService.isServiceEnabled()) {
         const smsMessage = `BuildHive: Transaction cancelled - ${transaction.transactionType}: ${formatCreditAmount(transaction.credits)} credits. Reason: ${reason}`;
         await this.smsService.sendSMS(profile.phone, smsMessage);
       }
@@ -331,12 +326,7 @@ export class CreditNotificationService {
         throw new Error('User not found');
       }
 
-      if (!profile || profile.preferences.emailNotifications) {
-        const smsMessage = `BuildHive: Purchase cancelled - ${formatCurrency(purchase.purchasePrice, purchase.currency)}. Reason: ${reason}`;
-        await this.smsService.sendSMS(profile.phone, smsMessage);
-      }
-
-      if (profile?.phone && profile.preferences.smsNotifications && this.smsService.isServiceEnabled()) {
+      if (profile?.phone && profile?.preferences?.smsNotifications && this.smsService.isServiceEnabled()) {
         const smsMessage = `BuildHive: Purchase cancelled - ${formatCurrency(purchase.purchasePrice, purchase.currency)}. Reason: ${reason}`;
         await this.smsService.sendSMS(profile.phone, smsMessage);
       }

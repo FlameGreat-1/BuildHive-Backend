@@ -7,6 +7,7 @@ import {
 export interface CreditTransaction {
   id: number;
   userId: number;
+  paymentId?: number;
   transactionType: CreditTransactionType;
   credits: number;
   status: CreditTransactionStatus;

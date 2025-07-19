@@ -29,7 +29,7 @@ export class CreditTransactionRepository {
         description: transaction.description,
         reference_id: transaction.referenceId,
         reference_type: transaction.referenceType,
-        expires_at: transaction.expiresAt || null,
+        expires_at: transaction.expiresAt,
         metadata: transaction.metadata,
         created_at: now,
         updated_at: now
@@ -135,7 +135,7 @@ export class CreditTransactionRepository {
     }
   }
   
-    async getTransactionHistory(
+  async getTransactionHistory(
     userId: number,
     filter?: CreditTransactionFilter
   ): Promise<CreditTransactionHistory> {

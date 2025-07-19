@@ -20,6 +20,7 @@ import {
 export class CreditTransactionModel implements CreditTransaction {
   public id: number;
   public userId: number;
+  public paymentId?: number;
   public transactionType: CreditTransactionType;
   public credits: number;
   public status: CreditTransactionStatus;
@@ -34,6 +35,7 @@ export class CreditTransactionModel implements CreditTransaction {
   constructor(data: Partial<CreditTransaction>) {
     this.id = data.id || 0;
     this.userId = data.userId || 0;
+    this.paymentId = data.paymentId;
     this.transactionType = data.transactionType || CreditTransactionType.PURCHASE;
     this.credits = data.credits || 0;
     this.status = data.status || CreditTransactionStatus.PENDING;
@@ -204,6 +206,7 @@ export class CreditTransactionModel implements CreditTransaction {
     return {
       id: this.id,
       userId: this.userId,
+      paymentId: this.paymentId,
       transactionType: this.transactionType,
       credits: this.credits,
       status: this.status,

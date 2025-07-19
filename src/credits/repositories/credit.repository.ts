@@ -70,8 +70,8 @@ export class CreditRepository {
         total_purchased: initialCredits,
         total_used: 0,
         total_refunded: 0,
-        last_purchase_at: initialCredits > 0 ? now : null,
-        last_usage_at: null,
+        last_purchase_at: initialCredits > 0 ? now : undefined,
+        last_usage_at: undefined,
         created_at: now,
         updated_at: now
       };
@@ -289,7 +289,7 @@ export class CreditRepository {
         topup_amount: settings.topupAmount,
         package_type: settings.packageType,
         payment_method_id: settings.paymentMethodId,
-        last_triggered_at: settings.lastTriggeredAt || null,
+        last_triggered_at: settings.lastTriggeredAt,
         failure_count: settings.failureCount,
         created_at: now,
         updated_at: now
@@ -416,7 +416,7 @@ export class CreditRepository {
         notification_type: notification.notificationType,
         threshold_balance: notification.thresholdBalance,
         is_sent: notification.isSent,
-        sent_at: notification.sentAt || null,
+        sent_at: notification.sentAt,
         created_at: now
       };
 
