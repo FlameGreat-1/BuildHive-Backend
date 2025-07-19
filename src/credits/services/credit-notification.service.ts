@@ -80,7 +80,7 @@ export class CreditNotificationService {
       }
 
       if (profile?.phone && this.smsService.isServiceEnabled()) {
-        await this.smsService.sendCriticalBalanceAlert(profile.phone, user.username, currentBalance);
+        await this.smsService.sendCreditCriticalBalanceAlert(profile.phone, user.username, currentBalance);
       }
 
       await this.creditRepository.markNotificationAsSent(notification.id);
@@ -295,7 +295,7 @@ export class CreditNotificationService {
 
       if (!profile || profile.preferences.emailNotifications) {
         const smsMessage = `BuildHive: Transaction cancelled - ${transaction.transactionType}: ${formatCreditAmount(transaction.credits)} credits. Reason: ${reason}`;
-        await this.emailService.sendSMS(user.email, smsMessage);
+        await this.smsService.sendSMS(profile.phone, smsMessage);
       }
 
       if (profile?.phone && profile.preferences.smsNotifications && this.smsService.isServiceEnabled()) {
@@ -333,7 +333,7 @@ export class CreditNotificationService {
 
       if (!profile || profile.preferences.emailNotifications) {
         const smsMessage = `BuildHive: Purchase cancelled - ${formatCurrency(purchase.purchasePrice, purchase.currency)}. Reason: ${reason}`;
-        await this.emailService.sendSMS(user.email, smsMessage);
+        await this.smsService.sendSMS(profile.phone, smsMessage);
       }
 
       if (profile?.phone && profile.preferences.smsNotifications && this.smsService.isServiceEnabled()) {
