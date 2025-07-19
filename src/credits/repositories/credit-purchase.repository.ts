@@ -22,21 +22,21 @@ export class CreditPurchaseRepository {
     try {
       const now = new Date();
       const purchaseData: Omit<CreditPurchaseDatabaseRecord, 'id'> = {
-        userId: purchase.userId,
-        paymentId: purchase.paymentId,
-        packageType: purchase.packageType,
-        creditsAmount: purchase.creditsAmount,
-        purchasePrice: purchase.purchasePrice,
+        user_id: purchase.userId,
+        payment_id: purchase.paymentId,
+        package_type: purchase.packageType,
+        credits_amount: purchase.creditsAmount,
+        purchase_price: purchase.purchasePrice,
         currency: purchase.currency,
-        bonusCredits: purchase.bonusCredits,
+        bonus_credits: purchase.bonusCredits,
         status: purchase.status,
-        expiresAt: purchase.expiresAt || null,
+        expires_at: purchase.expiresAt || null,
         metadata: purchase.metadata,
-        createdAt: now,
-        updatedAt: now
+        created_at: now,
+        updated_at: now
       };
 
-      const docRef = await db.collection(this.purchasesCollection).add(purchaseData);
+      const docRef = await db!.collection(this.purchasesCollection).add(purchaseData);
       
       return new CreditPurchaseModel({
         id: parseInt(docRef.id),
@@ -55,7 +55,7 @@ export class CreditPurchaseRepository {
 
   async getPurchaseById(purchaseId: number): Promise<CreditPurchaseModel | null> {
     try {
-      const doc = await db.collection(this.purchasesCollection).doc(purchaseId.toString()).get();
+      const doc = await db!.collection(this.purchasesCollection).doc(purchaseId.toString()).get();
       
       if (!doc.exists) {
         return null;
@@ -65,18 +65,18 @@ export class CreditPurchaseRepository {
       
       return new CreditPurchaseModel({
         id: parseInt(doc.id),
-        userId: data.userId,
-        paymentId: data.paymentId,
-        packageType: data.packageType,
-        creditsAmount: data.creditsAmount,
-        purchasePrice: data.purchasePrice,
+        userId: data.user_id,
+        paymentId: data.payment_id,
+        packageType: data.package_type,
+        creditsAmount: data.credits_amount,
+        purchasePrice: data.purchase_price,
         currency: data.currency,
-        bonusCredits: data.bonusCredits,
+        bonusCredits: data.bonus_credits,
         status: data.status,
-        expiresAt: data.expiresAt?.toDate(),
+        expiresAt: data.expires_at,
         metadata: data.metadata,
-        createdAt: data.createdAt.toDate(),
-        updatedAt: data.updatedAt.toDate()
+        createdAt: data.created_at,
+        updatedAt: data.updated_at
       });
     } catch (error) {
       logger.error('Failed to get purchase by ID', {
@@ -94,7 +94,7 @@ export class CreditPurchaseRepository {
     metadata?: Record<string, any>
   ): Promise<CreditPurchaseModel> {
     try {
-      const doc = await db.collection(this.purchasesCollection).doc(purchaseId.toString()).get();
+      const doc = await db!.collection(this.purchasesCollection).doc(purchaseId.toString()).get();
       
       if (!doc.exists) {
         throw new Error('Purchase not found');
@@ -102,11 +102,11 @@ export class CreditPurchaseRepository {
 
       const updateData: Partial<CreditPurchaseDatabaseRecord> = {
         status,
-        updatedAt: new Date()
+        updated_at: new Date()
       };
 
       if (paymentId) {
-        updateData.paymentId = paymentId;
+        updateData.payment_id = paymentId;
       }
 
       if (metadata) {
@@ -121,18 +121,18 @@ export class CreditPurchaseRepository {
       
       return new CreditPurchaseModel({
         id: parseInt(doc.id),
-        userId: data.userId,
-        paymentId: data.paymentId,
-        packageType: data.packageType,
-        creditsAmount: data.creditsAmount,
-        purchasePrice: data.purchasePrice,
+        userId: data.user_id,
+        paymentId: data.payment_id,
+        packageType: data.package_type,
+        creditsAmount: data.credits_amount,
+        purchasePrice: data.purchase_price,
         currency: data.currency,
-        bonusCredits: data.bonusCredits,
+        bonusCredits: data.bonus_credits,
         status: data.status,
-        expiresAt: data.expiresAt?.toDate(),
+        expiresAt: data.expires_at,
         metadata: data.metadata,
-        createdAt: data.createdAt.toDate(),
-        updatedAt: data.updatedAt.toDate()
+        createdAt: data.created_at,
+        updatedAt: data.updated_at
       });
     } catch (error) {
       logger.error('Failed to update purchase status', {
@@ -156,30 +156,30 @@ export class CreditPurchaseRepository {
     dateTo?: Date
   ): Promise<CreditPurchaseHistory> {
     try {
-      let query = db.collection(this.purchasesCollection)
-        .where('userId', '==', userId);
+      let query = db!.collection(this.purchasesCollection)
+        .where('user_id', '==', userId);
 
       if (status) {
         query = query.where('status', '==', status);
       }
 
       if (packageType) {
-        query = query.where('packageType', '==', packageType);
+        query = query.where('package_type', '==', packageType);
       }
 
       if (dateFrom) {
-        query = query.where('createdAt', '>=', dateFrom);
+        query = query.where('created_at', '>=', dateFrom);
       }
 
       if (dateTo) {
-        query = query.where('createdAt', '<=', dateTo);
+        query = query.where('created_at', '<=', dateTo);
       }
 
       const totalQuery = query;
       const totalSnapshot = await totalQuery.get();
       const totalPurchases = totalSnapshot.size;
 
-      query = query.orderBy('createdAt', 'desc');
+      query = query.orderBy('created_at', 'desc');
       
       const offset = (page - 1) * limit;
       query = query.offset(offset).limit(limit);
@@ -190,27 +190,27 @@ export class CreditPurchaseRepository {
         const data = doc.data() as CreditPurchaseDatabaseRecord;
         return {
           id: parseInt(doc.id),
-          packageType: data.packageType,
-          creditsAmount: data.creditsAmount,
-          bonusCredits: data.bonusCredits,
-          totalCredits: data.creditsAmount + data.bonusCredits,
-          purchasePrice: data.purchasePrice,
+          packageType: data.package_type,
+          creditsAmount: data.credits_amount,
+          bonusCredits: data.bonus_credits,
+          totalCredits: data.credits_amount + data.bonus_credits,
+          purchasePrice: data.purchase_price,
           currency: data.currency,
           status: data.status,
           paymentMethod: data.metadata?.paymentMethod || 'Card',
-          purchaseDate: data.createdAt.toDate(),
-          expiryDate: data.expiresAt?.toDate()
+          purchaseDate: data.created_at,
+          expiryDate: data.expires_at
         };
       });
 
       const totalSpent = totalSnapshot.docs.reduce((sum, doc) => {
         const data = doc.data() as CreditPurchaseDatabaseRecord;
-        return sum + data.purchasePrice;
+        return sum + data.purchase_price;
       }, 0);
 
       const totalCreditsReceived = totalSnapshot.docs.reduce((sum, doc) => {
         const data = doc.data() as CreditPurchaseDatabaseRecord;
-        return sum + data.creditsAmount + data.bonusCredits;
+        return sum + data.credits_amount + data.bonus_credits;
       }, 0);
 
       const averagePurchaseAmount = totalPurchases > 0 ? totalSpent / totalPurchases : 0;
@@ -218,8 +218,8 @@ export class CreditPurchaseRepository {
       const packageCounts = new Map<CreditPackageType, number>();
       totalSnapshot.docs.forEach(doc => {
         const data = doc.data() as CreditPurchaseDatabaseRecord;
-        const count = packageCounts.get(data.packageType) || 0;
-        packageCounts.set(data.packageType, count + 1);
+        const count = packageCounts.get(data.package_type) || 0;
+        packageCounts.set(data.package_type, count + 1);
       });
 
       const mostPopularPackage = Array.from(packageCounts.entries())
@@ -254,31 +254,31 @@ export class CreditPurchaseRepository {
     groupBy?: 'packageType' | 'userRole' | 'paymentMethod'
   ): Promise<CreditPurchaseMetrics> {
     try {
-      let query = db.collection(this.purchasesCollection)
+      let query = db!.collection(this.purchasesCollection)
         .where('status', '==', CreditTransactionStatus.COMPLETED);
 
       if (startDate) {
-        query = query.where('createdAt', '>=', startDate);
+        query = query.where('created_at', '>=', startDate);
       }
 
       if (endDate) {
-        query = query.where('createdAt', '<=', endDate);
+        query = query.where('created_at', '<=', endDate);
       }
 
       const snapshot = await query.get();
       const purchases = snapshot.docs.map(doc => doc.data() as CreditPurchaseDatabaseRecord);
 
       const totalPurchases = purchases.length;
-      const totalRevenue = purchases.reduce((sum, p) => sum + p.purchasePrice, 0);
+      const totalRevenue = purchases.reduce((sum, p) => sum + p.purchase_price, 0);
       const averageOrderValue = totalPurchases > 0 ? totalRevenue / totalPurchases : 0;
 
-      const uniqueUsers = new Set(purchases.map(p => p.userId)).size;
+      const uniqueUsers = new Set(purchases.map(p => p.user_id)).size;
       const conversionRate = uniqueUsers > 0 ? (totalPurchases / uniqueUsers) * 100 : 0;
 
       const packagePopularity: PackagePopularity[] = Object.values(CreditPackageType).map(packageType => {
-        const packagePurchases = purchases.filter(p => p.packageType === packageType);
+        const packagePurchases = purchases.filter(p => p.package_type === packageType);
         const purchaseCount = packagePurchases.length;
-        const revenue = packagePurchases.reduce((sum, p) => sum + p.purchasePrice, 0);
+        const revenue = packagePurchases.reduce((sum, p) => sum + p.purchase_price, 0);
         const percentage = totalPurchases > 0 ? Math.round((purchaseCount / totalPurchases) * 100) : 0;
 
         return {
@@ -321,10 +321,10 @@ export class CreditPurchaseRepository {
     favoritePackage?: CreditPackageType;
   }> {
     try {
-      const snapshot = await db.collection(this.purchasesCollection)
-        .where('userId', '==', userId)
+      const snapshot = await db!.collection(this.purchasesCollection)
+        .where('user_id', '==', userId)
         .where('status', '==', CreditTransactionStatus.COMPLETED)
-        .orderBy('createdAt', 'asc')
+        .orderBy('created_at', 'asc')
         .get();
 
       const purchases = snapshot.docs.map(doc => doc.data() as CreditPurchaseDatabaseRecord);
@@ -339,16 +339,16 @@ export class CreditPurchaseRepository {
       }
 
       const totalPurchases = purchases.length;
-      const totalSpent = purchases.reduce((sum, p) => sum + p.purchasePrice, 0);
-      const totalCreditsReceived = purchases.reduce((sum, p) => sum + p.creditsAmount + p.bonusCredits, 0);
+      const totalSpent = purchases.reduce((sum, p) => sum + p.purchase_price, 0);
+      const totalCreditsReceived = purchases.reduce((sum, p) => sum + p.credits_amount + p.bonus_credits, 0);
       const averageOrderValue = totalSpent / totalPurchases;
-      const firstPurchaseDate = purchases[0].createdAt.toDate();
-      const lastPurchaseDate = purchases[purchases.length - 1].createdAt.toDate();
+      const firstPurchaseDate = purchases[0].created_at;
+      const lastPurchaseDate = purchases[purchases.length - 1].created_at;
 
       const packageCounts = new Map<CreditPackageType, number>();
       purchases.forEach(p => {
-        const count = packageCounts.get(p.packageType) || 0;
-        packageCounts.set(p.packageType, count + 1);
+        const count = packageCounts.get(p.package_type) || 0;
+        packageCounts.set(p.package_type, count + 1);
       });
 
       const favoritePackage = Array.from(packageCounts.entries())
@@ -374,14 +374,14 @@ export class CreditPurchaseRepository {
 
   async getFailedPurchases(userId?: number, limit: number = 50): Promise<CreditPurchaseModel[]> {
     try {
-      let query = db.collection(this.purchasesCollection)
+      let query = db!.collection(this.purchasesCollection)
         .where('status', '==', CreditTransactionStatus.FAILED);
 
       if (userId) {
-        query = query.where('userId', '==', userId);
+        query = query.where('user_id', '==', userId);
       }
 
-      query = query.orderBy('createdAt', 'desc').limit(limit);
+      query = query.orderBy('created_at', 'desc').limit(limit);
 
       const snapshot = await query.get();
 
@@ -389,18 +389,18 @@ export class CreditPurchaseRepository {
         const data = doc.data() as CreditPurchaseDatabaseRecord;
         return new CreditPurchaseModel({
           id: parseInt(doc.id),
-          userId: data.userId,
-          paymentId: data.paymentId,
-          packageType: data.packageType,
-          creditsAmount: data.creditsAmount,
-          purchasePrice: data.purchasePrice,
+          userId: data.user_id,
+          paymentId: data.payment_id,
+          packageType: data.package_type,
+          creditsAmount: data.credits_amount,
+          purchasePrice: data.purchase_price,
           currency: data.currency,
-          bonusCredits: data.bonusCredits,
+          bonusCredits: data.bonus_credits,
           status: data.status,
-          expiresAt: data.expiresAt?.toDate(),
+          expiresAt: data.expires_at,
           metadata: data.metadata,
-          createdAt: data.createdAt.toDate(),
-          updatedAt: data.updatedAt.toDate()
+          createdAt: data.created_at,
+          updatedAt: data.updated_at
         });
       });
     } catch (error) {
@@ -415,7 +415,7 @@ export class CreditPurchaseRepository {
 
   async deletePurchase(purchaseId: number): Promise<void> {
     try {
-      await db.collection(this.purchasesCollection).doc(purchaseId.toString()).delete();
+      await db!.collection(this.purchasesCollection).doc(purchaseId.toString()).delete();
     } catch (error) {
       logger.error('Failed to delete purchase', {
         purchaseId,
@@ -432,7 +432,7 @@ export class CreditPurchaseRepository {
     }>();
 
     purchases.forEach(purchase => {
-      const date = purchase.createdAt.toDate();
+      const date = purchase.created_at;
       const monthKey = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
       
       const existing = monthlyMap.get(monthKey) || {
@@ -441,7 +441,7 @@ export class CreditPurchaseRepository {
       };
 
       existing.totalPurchases += 1;
-      existing.totalRevenue += purchase.purchasePrice;
+      existing.totalRevenue += purchase.purchase_price;
 
       monthlyMap.set(monthKey, existing);
     });
@@ -463,4 +463,3 @@ export class CreditPurchaseRepository {
     });
   }
 }
-

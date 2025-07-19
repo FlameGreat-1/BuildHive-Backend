@@ -30,6 +30,10 @@ export const DEFAULT_LIMITS: CreditLimitsConfig = {
   cooldownPeriodMinutes: 5
 };
 
+export const CREDIT_LIMITS = DEFAULT_LIMITS;
+
+export const TRIAL_CREDITS_AMOUNT = 50;
+
 export const ROLE_LIMITS: Record<UserRole, RoleLimitsConfig> = {
   [UserRole.CLIENT]: {
     role: UserRole.CLIENT,

@@ -596,12 +596,6 @@ export interface CreditTransactionFilter {
   sortOrder: 'asc' | 'desc';
 }
 
-export interface CreditTransactionSummary {
-  totalTransactions: number;
-  totalCreditsIn: number;
-  totalCreditsOut: number;
-}
-
 export interface AutoTopupSettings {
   enabled: boolean;
   triggerBalance: number;

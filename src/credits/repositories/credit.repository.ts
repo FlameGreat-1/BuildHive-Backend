@@ -28,8 +28,8 @@ export class CreditRepository {
 
   async getCreditBalance(userId: number): Promise<CreditBalanceModel | null> {
     try {
-      const snapshot = await db.collection(this.creditBalancesCollection)
-        .where('userId', '==', userId)
+      const snapshot = await db!.collection(this.creditBalancesCollection)
+        .where('user_id', '==', userId)
         .limit(1)
         .get();
 
@@ -42,15 +42,15 @@ export class CreditRepository {
       
       return new CreditBalanceModel({
         id: parseInt(doc.id),
-        userId: data.userId,
-        currentBalance: data.currentBalance,
-        totalPurchased: data.totalPurchased,
-        totalUsed: data.totalUsed,
-        totalRefunded: data.totalRefunded,
-        lastPurchaseAt: data.lastPurchaseAt?.toDate(),
-        lastUsageAt: data.lastUsageAt?.toDate(),
-        createdAt: data.createdAt.toDate(),
-        updatedAt: data.updatedAt.toDate()
+        userId: data.user_id,
+        currentBalance: data.current_balance,
+        totalPurchased: data.total_purchased,
+        totalUsed: data.total_used,
+        totalRefunded: data.total_refunded,
+        lastPurchaseAt: data.last_purchase_at,
+        lastUsageAt: data.last_usage_at,
+        createdAt: data.created_at,
+        updatedAt: data.updated_at
       });
     } catch (error) {
       logger.error('Failed to get credit balance', {
@@ -65,18 +65,18 @@ export class CreditRepository {
     try {
       const now = new Date();
       const balanceData: Omit<CreditBalanceDatabaseRecord, 'id'> = {
-        userId,
-        currentBalance: initialCredits,
-        totalPurchased: initialCredits,
-        totalUsed: 0,
-        totalRefunded: 0,
-        lastPurchaseAt: initialCredits > 0 ? now : null,
-        lastUsageAt: null,
-        createdAt: now,
-        updatedAt: now
+        user_id: userId,
+        current_balance: initialCredits,
+        total_purchased: initialCredits,
+        total_used: 0,
+        total_refunded: 0,
+        last_purchase_at: initialCredits > 0 ? now : null,
+        last_usage_at: null,
+        created_at: now,
+        updated_at: now
       };
 
-      const docRef = await db.collection(this.creditBalancesCollection).add(balanceData);
+      const docRef = await db!.collection(this.creditBalancesCollection).add(balanceData);
       
       return new CreditBalanceModel({
         id: parseInt(docRef.id),
@@ -101,8 +101,8 @@ export class CreditRepository {
 
   async updateCreditBalance(userId: number, balance: Partial<CreditBalance>): Promise<CreditBalanceModel> {
     try {
-      const snapshot = await db.collection(this.creditBalancesCollection)
-        .where('userId', '==', userId)
+      const snapshot = await db!.collection(this.creditBalancesCollection)
+        .where('user_id', '==', userId)
         .limit(1)
         .get();
 
@@ -111,10 +111,28 @@ export class CreditRepository {
       }
 
       const doc = snapshot.docs[0];
-      const updateData = {
-        ...balance,
-        updatedAt: new Date()
+      const updateData: Partial<CreditBalanceDatabaseRecord> = {
+        updated_at: new Date()
       };
+
+      if (balance.currentBalance !== undefined) {
+        updateData.current_balance = balance.currentBalance;
+      }
+      if (balance.totalPurchased !== undefined) {
+        updateData.total_purchased = balance.totalPurchased;
+      }
+      if (balance.totalUsed !== undefined) {
+        updateData.total_used = balance.totalUsed;
+      }
+      if (balance.totalRefunded !== undefined) {
+        updateData.total_refunded = balance.totalRefunded;
+      }
+      if (balance.lastPurchaseAt !== undefined) {
+        updateData.last_purchase_at = balance.lastPurchaseAt;
+      }
+      if (balance.lastUsageAt !== undefined) {
+        updateData.last_usage_at = balance.lastUsageAt;
+      }
 
       await doc.ref.update(updateData);
       
@@ -123,15 +141,15 @@ export class CreditRepository {
       
       return new CreditBalanceModel({
         id: parseInt(doc.id),
-        userId: data.userId,
-        currentBalance: data.currentBalance,
-        totalPurchased: data.totalPurchased,
-        totalUsed: data.totalUsed,
-        totalRefunded: data.totalRefunded,
-        lastPurchaseAt: data.lastPurchaseAt?.toDate(),
-        lastUsageAt: data.lastUsageAt?.toDate(),
-        createdAt: data.createdAt.toDate(),
-        updatedAt: data.updatedAt.toDate()
+        userId: data.user_id,
+        currentBalance: data.current_balance,
+        totalPurchased: data.total_purchased,
+        totalUsed: data.total_used,
+        totalRefunded: data.total_refunded,
+        lastPurchaseAt: data.last_purchase_at,
+        lastUsageAt: data.last_usage_at,
+        createdAt: data.created_at,
+        updatedAt: data.updated_at
       });
     } catch (error) {
       logger.error('Failed to update credit balance', {
@@ -148,19 +166,19 @@ export class CreditRepository {
     filter?: Partial<CreditTransactionFilter>
   ): Promise<CreditUsageModel[]> {
     try {
-      let query = db.collection(this.creditUsagesCollection)
-        .where('userId', '==', userId);
+      let query = db!.collection(this.creditUsagesCollection)
+        .where('user_id', '==', userId);
 
       if (filter?.dateFrom) {
-        query = query.where('createdAt', '>=', filter.dateFrom);
+        query = query.where('created_at', '>=', filter.dateFrom);
       }
 
       if (filter?.dateTo) {
-        query = query.where('createdAt', '<=', filter.dateTo);
+        query = query.where('created_at', '<=', filter.dateTo);
       }
 
       if (filter?.sortBy === 'createdAt') {
-        query = query.orderBy('createdAt', filter.sortOrder === 'asc' ? 'asc' : 'desc');
+        query = query.orderBy('created_at', filter.sortOrder === 'asc' ? 'asc' : 'desc');
       }
 
       if (filter?.limit) {
@@ -173,15 +191,15 @@ export class CreditRepository {
         const data = doc.data() as CreditUsageDatabaseRecord;
         return new CreditUsageModel({
           id: parseInt(doc.id),
-          userId: data.userId,
-          transactionId: data.transactionId,
-          usageType: data.usageType,
-          creditsUsed: data.creditsUsed,
-          referenceId: data.referenceId,
-          referenceType: data.referenceType,
+          userId: data.user_id,
+          transactionId: data.transaction_id,
+          usageType: data.usage_type,
+          creditsUsed: data.credits_used,
+          referenceId: data.reference_id,
+          referenceType: data.reference_type,
           description: data.description,
           metadata: data.metadata,
-          createdAt: data.createdAt.toDate()
+          createdAt: data.created_at
         });
       });
     } catch (error) {
@@ -198,18 +216,18 @@ export class CreditRepository {
     try {
       const now = new Date();
       const usageData: Omit<CreditUsageDatabaseRecord, 'id'> = {
-        userId: usage.userId,
-        transactionId: usage.transactionId,
-        usageType: usage.usageType,
-        creditsUsed: usage.creditsUsed,
-        referenceId: usage.referenceId,
-        referenceType: usage.referenceType,
+        user_id: usage.userId,
+        transaction_id: usage.transactionId,
+        usage_type: usage.usageType,
+        credits_used: usage.creditsUsed,
+        reference_id: usage.referenceId,
+        reference_type: usage.referenceType,
         description: usage.description,
         metadata: usage.metadata,
-        createdAt: now
+        created_at: now
       };
 
-      const docRef = await db.collection(this.creditUsagesCollection).add(usageData);
+      const docRef = await db!.collection(this.creditUsagesCollection).add(usageData);
       
       return new CreditUsageModel({
         id: parseInt(docRef.id),
@@ -227,8 +245,8 @@ export class CreditRepository {
 
   async getAutoTopupSettings(userId: number): Promise<AutoTopupModel | null> {
     try {
-      const snapshot = await db.collection(this.autoTopupsCollection)
-        .where('userId', '==', userId)
+      const snapshot = await db!.collection(this.autoTopupsCollection)
+        .where('user_id', '==', userId)
         .limit(1)
         .get();
 
@@ -241,16 +259,16 @@ export class CreditRepository {
       
       return new AutoTopupModel({
         id: parseInt(doc.id),
-        userId: data.userId,
+        userId: data.user_id,
         status: data.status,
-        triggerBalance: data.triggerBalance,
-        topupAmount: data.topupAmount,
-        packageType: data.packageType,
-        paymentMethodId: data.paymentMethodId,
-        lastTriggeredAt: data.lastTriggeredAt?.toDate(),
-        failureCount: data.failureCount,
-        createdAt: data.createdAt.toDate(),
-        updatedAt: data.updatedAt.toDate()
+        triggerBalance: data.trigger_balance,
+        topupAmount: data.topup_amount,
+        packageType: data.package_type,
+        paymentMethodId: data.payment_method_id,
+        lastTriggeredAt: data.last_triggered_at,
+        failureCount: data.failure_count,
+        createdAt: data.created_at,
+        updatedAt: data.updated_at
       });
     } catch (error) {
       logger.error('Failed to get auto topup settings', {
@@ -265,19 +283,19 @@ export class CreditRepository {
     try {
       const now = new Date();
       const settingsData: Omit<AutoTopupDatabaseRecord, 'id'> = {
-        userId: settings.userId,
+        user_id: settings.userId,
         status: settings.status,
-        triggerBalance: settings.triggerBalance,
-        topupAmount: settings.topupAmount,
-        packageType: settings.packageType,
-        paymentMethodId: settings.paymentMethodId,
-        lastTriggeredAt: settings.lastTriggeredAt || null,
-        failureCount: settings.failureCount,
-        createdAt: now,
-        updatedAt: now
+        trigger_balance: settings.triggerBalance,
+        topup_amount: settings.topupAmount,
+        package_type: settings.packageType,
+        payment_method_id: settings.paymentMethodId,
+        last_triggered_at: settings.lastTriggeredAt || null,
+        failure_count: settings.failureCount,
+        created_at: now,
+        updated_at: now
       };
 
-      const docRef = await db.collection(this.autoTopupsCollection).add(settingsData);
+      const docRef = await db!.collection(this.autoTopupsCollection).add(settingsData);
       
       return new AutoTopupModel({
         id: parseInt(docRef.id),
@@ -296,8 +314,8 @@ export class CreditRepository {
 
   async updateAutoTopupSettings(userId: number, settings: Partial<AutoTopup>): Promise<AutoTopupModel> {
     try {
-      const snapshot = await db.collection(this.autoTopupsCollection)
-        .where('userId', '==', userId)
+      const snapshot = await db!.collection(this.autoTopupsCollection)
+        .where('user_id', '==', userId)
         .limit(1)
         .get();
 
@@ -306,10 +324,31 @@ export class CreditRepository {
       }
 
       const doc = snapshot.docs[0];
-      const updateData = {
-        ...settings,
-        updatedAt: new Date()
+      const updateData: Partial<AutoTopupDatabaseRecord> = {
+        updated_at: new Date()
       };
+
+      if (settings.status !== undefined) {
+        updateData.status = settings.status;
+      }
+      if (settings.triggerBalance !== undefined) {
+        updateData.trigger_balance = settings.triggerBalance;
+      }
+      if (settings.topupAmount !== undefined) {
+        updateData.topup_amount = settings.topupAmount;
+      }
+      if (settings.packageType !== undefined) {
+        updateData.package_type = settings.packageType;
+      }
+      if (settings.paymentMethodId !== undefined) {
+        updateData.payment_method_id = settings.paymentMethodId;
+      }
+      if (settings.lastTriggeredAt !== undefined) {
+        updateData.last_triggered_at = settings.lastTriggeredAt;
+      }
+      if (settings.failureCount !== undefined) {
+        updateData.failure_count = settings.failureCount;
+      }
 
       await doc.ref.update(updateData);
       
@@ -318,16 +357,16 @@ export class CreditRepository {
       
       return new AutoTopupModel({
         id: parseInt(doc.id),
-        userId: data.userId,
+        userId: data.user_id,
         status: data.status,
-        triggerBalance: data.triggerBalance,
-        topupAmount: data.topupAmount,
-        packageType: data.packageType,
-        paymentMethodId: data.paymentMethodId,
-        lastTriggeredAt: data.lastTriggeredAt?.toDate(),
-        failureCount: data.failureCount,
-        createdAt: data.createdAt.toDate(),
-        updatedAt: data.updatedAt.toDate()
+        triggerBalance: data.trigger_balance,
+        topupAmount: data.topup_amount,
+        packageType: data.package_type,
+        paymentMethodId: data.payment_method_id,
+        lastTriggeredAt: data.last_triggered_at,
+        failureCount: data.failure_count,
+        createdAt: data.created_at,
+        updatedAt: data.updated_at
       });
     } catch (error) {
       logger.error('Failed to update auto topup settings', {
@@ -341,9 +380,9 @@ export class CreditRepository {
 
   async getCreditNotifications(userId: number, limit: number = 10): Promise<CreditNotificationModel[]> {
     try {
-      const snapshot = await db.collection(this.creditNotificationsCollection)
-        .where('userId', '==', userId)
-        .orderBy('createdAt', 'desc')
+      const snapshot = await db!.collection(this.creditNotificationsCollection)
+        .where('user_id', '==', userId)
+        .orderBy('created_at', 'desc')
         .limit(limit)
         .get();
 
@@ -351,12 +390,12 @@ export class CreditRepository {
         const data = doc.data() as CreditNotificationDatabaseRecord;
         return new CreditNotificationModel({
           id: parseInt(doc.id),
-          userId: data.userId,
-          notificationType: data.notificationType,
-          thresholdBalance: data.thresholdBalance,
-          isSent: data.isSent,
-          sentAt: data.sentAt?.toDate(),
-          createdAt: data.createdAt.toDate()
+          userId: data.user_id,
+          notificationType: data.notification_type,
+          thresholdBalance: data.threshold_balance,
+          isSent: data.is_sent,
+          sentAt: data.sent_at,
+          createdAt: data.created_at
         });
       });
     } catch (error) {
@@ -373,15 +412,15 @@ export class CreditRepository {
     try {
       const now = new Date();
       const notificationData: Omit<CreditNotificationDatabaseRecord, 'id'> = {
-        userId: notification.userId,
-        notificationType: notification.notificationType,
-        thresholdBalance: notification.thresholdBalance,
-        isSent: notification.isSent,
-        sentAt: notification.sentAt || null,
-        createdAt: now
+        user_id: notification.userId,
+        notification_type: notification.notificationType,
+        threshold_balance: notification.thresholdBalance,
+        is_sent: notification.isSent,
+        sent_at: notification.sentAt || null,
+        created_at: now
       };
 
-      const docRef = await db.collection(this.creditNotificationsCollection).add(notificationData);
+      const docRef = await db!.collection(this.creditNotificationsCollection).add(notificationData);
       
       return new CreditNotificationModel({
         id: parseInt(docRef.id),
@@ -399,15 +438,15 @@ export class CreditRepository {
 
   async markNotificationAsSent(notificationId: number): Promise<void> {
     try {
-      const doc = await db.collection(this.creditNotificationsCollection).doc(notificationId.toString()).get();
+      const doc = await db!.collection(this.creditNotificationsCollection).doc(notificationId.toString()).get();
       
       if (!doc.exists) {
         throw new Error('Notification not found');
       }
 
       await doc.ref.update({
-        isSent: true,
-        sentAt: new Date()
+        is_sent: true,
+        sent_at: new Date()
       });
     } catch (error) {
       logger.error('Failed to mark notification as sent', {
@@ -420,13 +459,13 @@ export class CreditRepository {
 
   async getUsersWithLowBalance(threshold: number): Promise<number[]> {
     try {
-      const snapshot = await db.collection(this.creditBalancesCollection)
-        .where('currentBalance', '<=', threshold)
+      const snapshot = await db!.collection(this.creditBalancesCollection)
+        .where('current_balance', '<=', threshold)
         .get();
 
       return snapshot.docs.map(doc => {
         const data = doc.data() as CreditBalanceDatabaseRecord;
-        return data.userId;
+        return data.user_id;
       });
     } catch (error) {
       logger.error('Failed to get users with low balance', {

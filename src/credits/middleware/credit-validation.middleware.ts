@@ -1,8 +1,9 @@
-import { Request, Response, NextFunction } from 'express';
+import { Response, NextFunction } from 'express';
 import { validationResult } from 'express-validator';
 import { CreditUsageType, CreditPackageType, UserRole, ValidationError } from '../../shared/types';
 import { sendValidationError, sendError } from '../../shared/utils';
 import { logger } from '../../shared/utils';
+import { AuthenticatedRequest } from '../../auth/middleware';
 import { 
   validateCreditSufficiency,
   validateCreditUsage,
@@ -19,7 +20,7 @@ import {
 } from '../../config/credits';
 
 export const handleValidationErrors = (
-  req: Request,
+  req: AuthenticatedRequest,
   res: Response,
   next: NextFunction
 ): void => {
@@ -52,7 +53,7 @@ export const handleValidationErrors = (
 };
 
 export const validateSufficientBalance = async (
-  req: Request,
+  req: AuthenticatedRequest,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -101,7 +102,7 @@ export const validateSufficientBalance = async (
 };
 
 export const validateUsageLimits = async (
-  req: Request,
+  req: AuthenticatedRequest,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -156,7 +157,7 @@ export const validateUsageLimits = async (
 };
 
 export const validatePurchaseLimits = async (
-  req: Request,
+  req: AuthenticatedRequest,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -213,7 +214,7 @@ export const validatePurchaseLimits = async (
 };
 
 export const validateAutoTopupConfiguration = async (
-  req: Request,
+  req: AuthenticatedRequest,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -261,7 +262,7 @@ export const validateAutoTopupConfiguration = async (
 };
 
 export const validateRefundRequest = async (
-  req: Request,
+  req: AuthenticatedRequest,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -314,7 +315,7 @@ export const validateRefundRequest = async (
 };
 
 export const validateTransactionLimits = async (
-  req: Request,
+  req: AuthenticatedRequest,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -372,7 +373,7 @@ export const validateTransactionLimits = async (
 };
 
 export const validateBusinessHours = (
-  req: Request,
+  req: AuthenticatedRequest,
   res: Response,
   next: NextFunction
 ): void => {

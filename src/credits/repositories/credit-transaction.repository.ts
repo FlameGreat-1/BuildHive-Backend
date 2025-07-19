@@ -21,20 +21,21 @@ export class CreditTransactionRepository {
     try {
       const now = new Date();
       const transactionData: Omit<CreditTransactionDatabaseRecord, 'id'> = {
-        userId: transaction.userId,
-        transactionType: transaction.transactionType,
+        user_id: transaction.userId,
+        payment_id: transaction.paymentId,
+        transaction_type: transaction.transactionType,
         credits: transaction.credits,
         status: transaction.status,
         description: transaction.description,
-        referenceId: transaction.referenceId,
-        referenceType: transaction.referenceType,
-        expiresAt: transaction.expiresAt || null,
+        reference_id: transaction.referenceId,
+        reference_type: transaction.referenceType,
+        expires_at: transaction.expiresAt || null,
         metadata: transaction.metadata,
-        createdAt: now,
-        updatedAt: now
+        created_at: now,
+        updated_at: now
       };
 
-      const docRef = await db.collection(this.transactionsCollection).add(transactionData);
+      const docRef = await db!.collection(this.transactionsCollection).add(transactionData);
       
       return new CreditTransactionModel({
         id: parseInt(docRef.id),
@@ -53,7 +54,7 @@ export class CreditTransactionRepository {
 
   async getTransactionById(transactionId: number): Promise<CreditTransactionModel | null> {
     try {
-      const doc = await db.collection(this.transactionsCollection).doc(transactionId.toString()).get();
+      const doc = await db!.collection(this.transactionsCollection).doc(transactionId.toString()).get();
       
       if (!doc.exists) {
         return null;
@@ -63,17 +64,18 @@ export class CreditTransactionRepository {
       
       return new CreditTransactionModel({
         id: parseInt(doc.id),
-        userId: data.userId,
-        transactionType: data.transactionType,
+        userId: data.user_id,
+        paymentId: data.payment_id,
+        transactionType: data.transaction_type,
         credits: data.credits,
         status: data.status,
         description: data.description,
-        referenceId: data.referenceId,
-        referenceType: data.referenceType,
-        expiresAt: data.expiresAt?.toDate(),
+        referenceId: data.reference_id,
+        referenceType: data.reference_type,
+        expiresAt: data.expires_at,
         metadata: data.metadata,
-        createdAt: data.createdAt.toDate(),
-        updatedAt: data.updatedAt.toDate()
+        createdAt: data.created_at,
+        updatedAt: data.updated_at
       });
     } catch (error) {
       logger.error('Failed to get transaction by ID', {
@@ -86,7 +88,7 @@ export class CreditTransactionRepository {
 
   async updateTransactionStatus(transactionId: number, status: CreditTransactionStatus, metadata?: Record<string, any>): Promise<CreditTransactionModel> {
     try {
-      const doc = await db.collection(this.transactionsCollection).doc(transactionId.toString()).get();
+      const doc = await db!.collection(this.transactionsCollection).doc(transactionId.toString()).get();
       
       if (!doc.exists) {
         throw new Error('Transaction not found');
@@ -94,7 +96,7 @@ export class CreditTransactionRepository {
 
       const updateData: Partial<CreditTransactionDatabaseRecord> = {
         status,
-        updatedAt: new Date()
+        updated_at: new Date()
       };
 
       if (metadata) {
@@ -109,17 +111,18 @@ export class CreditTransactionRepository {
       
       return new CreditTransactionModel({
         id: parseInt(doc.id),
-        userId: data.userId,
-        transactionType: data.transactionType,
+        userId: data.user_id,
+        paymentId: data.payment_id,
+        transactionType: data.transaction_type,
         credits: data.credits,
         status: data.status,
         description: data.description,
-        referenceId: data.referenceId,
-        referenceType: data.referenceType,
-        expiresAt: data.expiresAt?.toDate(),
+        referenceId: data.reference_id,
+        referenceType: data.reference_type,
+        expiresAt: data.expires_at,
         metadata: data.metadata,
-        createdAt: data.createdAt.toDate(),
-        updatedAt: data.updatedAt.toDate()
+        createdAt: data.created_at,
+        updatedAt: data.updated_at
       });
     } catch (error) {
       logger.error('Failed to update transaction status', {
@@ -137,11 +140,11 @@ export class CreditTransactionRepository {
     filter?: CreditTransactionFilter
   ): Promise<CreditTransactionHistory> {
     try {
-      let query = db.collection(this.transactionsCollection)
-        .where('userId', '==', userId);
+      let query = db!.collection(this.transactionsCollection)
+        .where('user_id', '==', userId);
 
       if (filter?.transactionType) {
-        query = query.where('transactionType', '==', filter.transactionType);
+        query = query.where('transaction_type', '==', filter.transactionType);
       }
 
       if (filter?.status) {
@@ -149,11 +152,11 @@ export class CreditTransactionRepository {
       }
 
       if (filter?.dateFrom) {
-        query = query.where('createdAt', '>=', filter.dateFrom);
+        query = query.where('created_at', '>=', filter.dateFrom);
       }
 
       if (filter?.dateTo) {
-        query = query.where('createdAt', '<=', filter.dateTo);
+        query = query.where('created_at', '<=', filter.dateTo);
       }
 
       if (filter?.minCredits) {
@@ -165,13 +168,13 @@ export class CreditTransactionRepository {
       }
 
       if (filter?.referenceType) {
-        query = query.where('referenceType', '==', filter.referenceType);
+        query = query.where('reference_type', '==', filter.referenceType);
       }
 
       if (filter?.sortBy) {
         query = query.orderBy(filter.sortBy, filter.sortOrder || 'desc');
       } else {
-        query = query.orderBy('createdAt', 'desc');
+        query = query.orderBy('created_at', 'desc');
       }
 
       const totalQuery = query;
@@ -191,15 +194,15 @@ export class CreditTransactionRepository {
         const data = doc.data() as CreditTransactionDatabaseRecord;
         return {
           id: parseInt(doc.id),
-          transactionType: data.transactionType,
+          transactionType: data.transaction_type,
           credits: data.credits,
           status: data.status,
           description: data.description,
           balanceAfter: 0,
-          createdAt: data.createdAt.toDate(),
-          expiresAt: data.expiresAt?.toDate(),
-          referenceType: data.referenceType,
-          referenceId: data.referenceId
+          createdAt: data.created_at,
+          expiresAt: data.expires_at,
+          referenceType: data.reference_type,
+          referenceId: data.reference_id
         };
       });
 
@@ -212,7 +215,7 @@ export class CreditTransactionRepository {
             CreditTransactionType.REFUND,
             CreditTransactionType.TRIAL,
             CreditTransactionType.SUBSCRIPTION
-          ].includes(data.transactionType);
+          ].includes(data.transaction_type);
         })
         .reduce((sum, doc) => {
           const data = doc.data() as CreditTransactionDatabaseRecord;
@@ -225,7 +228,7 @@ export class CreditTransactionRepository {
           return [
             CreditTransactionType.USAGE,
             CreditTransactionType.EXPIRY
-          ].includes(data.transactionType);
+          ].includes(data.transaction_type);
         })
         .reduce((sum, doc) => {
           const data = doc.data() as CreditTransactionDatabaseRecord;
@@ -263,15 +266,15 @@ export class CreditTransactionRepository {
 
   async getTransactionSummary(userId: number, dateFrom?: Date, dateTo?: Date): Promise<CreditTransactionSummary> {
     try {
-      let query = db.collection(this.transactionsCollection)
-        .where('userId', '==', userId);
+      let query = db!.collection(this.transactionsCollection)
+        .where('user_id', '==', userId);
 
       if (dateFrom) {
-        query = query.where('createdAt', '>=', dateFrom);
+        query = query.where('created_at', '>=', dateFrom);
       }
 
       if (dateTo) {
-        query = query.where('createdAt', '<=', dateTo);
+        query = query.where('created_at', '<=', dateTo);
       }
 
       const snapshot = await query.get();
@@ -285,18 +288,18 @@ export class CreditTransactionRepository {
           CreditTransactionType.REFUND,
           CreditTransactionType.TRIAL,
           CreditTransactionType.SUBSCRIPTION
-        ].includes(t.transactionType))
+        ].includes(t.transaction_type))
         .reduce((sum, t) => sum + t.credits, 0);
 
       const totalCreditsOut = transactions
         .filter(t => [
           CreditTransactionType.USAGE,
           CreditTransactionType.EXPIRY
-        ].includes(t.transactionType))
+        ].includes(t.transaction_type))
         .reduce((sum, t) => sum + t.credits, 0);
 
       const transactionsByType = Object.values(CreditTransactionType).map(type => {
-        const typeTransactions = transactions.filter(t => t.transactionType === type);
+        const typeTransactions = transactions.filter(t => t.transaction_type === type);
         const count = typeTransactions.length;
         const totalCredits = typeTransactions.reduce((sum, t) => sum + t.credits, 0);
         
@@ -346,9 +349,9 @@ export class CreditTransactionRepository {
       const now = new Date();
       const thresholdDate = new Date(now.getTime() + (daysThreshold * 24 * 60 * 60 * 1000));
 
-      const snapshot = await db.collection(this.transactionsCollection)
-        .where('expiresAt', '<=', thresholdDate)
-        .where('expiresAt', '>', now)
+      const snapshot = await db!.collection(this.transactionsCollection)
+        .where('expires_at', '<=', thresholdDate)
+        .where('expires_at', '>', now)
         .where('status', '==', CreditTransactionStatus.COMPLETED)
         .get();
 
@@ -356,17 +359,18 @@ export class CreditTransactionRepository {
         const data = doc.data() as CreditTransactionDatabaseRecord;
         return new CreditTransactionModel({
           id: parseInt(doc.id),
-          userId: data.userId,
-          transactionType: data.transactionType,
+          userId: data.user_id,
+          paymentId: data.payment_id,
+          transactionType: data.transaction_type,
           credits: data.credits,
           status: data.status,
           description: data.description,
-          referenceId: data.referenceId,
-          referenceType: data.referenceType,
-          expiresAt: data.expiresAt?.toDate(),
+          referenceId: data.reference_id,
+          referenceType: data.reference_type,
+          expiresAt: data.expires_at,
           metadata: data.metadata,
-          createdAt: data.createdAt.toDate(),
-          updatedAt: data.updatedAt.toDate()
+          createdAt: data.created_at,
+          updatedAt: data.updated_at
         });
       });
     } catch (error) {
@@ -380,7 +384,7 @@ export class CreditTransactionRepository {
 
   async deleteTransaction(transactionId: number): Promise<void> {
     try {
-      await db.collection(this.transactionsCollection).doc(transactionId.toString()).delete();
+      await db!.collection(this.transactionsCollection).doc(transactionId.toString()).delete();
     } catch (error) {
       logger.error('Failed to delete transaction', {
         transactionId,
@@ -398,7 +402,7 @@ export class CreditTransactionRepository {
     }>();
 
     transactions.forEach(transaction => {
-      const date = transaction.createdAt.toDate();
+      const date = transaction.created_at;
       const monthKey = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
       
       const existing = monthlyMap.get(monthKey) || {
@@ -415,12 +419,12 @@ export class CreditTransactionRepository {
         CreditTransactionType.REFUND,
         CreditTransactionType.TRIAL,
         CreditTransactionType.SUBSCRIPTION
-      ].includes(transaction.transactionType)) {
+      ].includes(transaction.transaction_type)) {
         existing.totalCreditsIn += transaction.credits;
       } else if ([
         CreditTransactionType.USAGE,
         CreditTransactionType.EXPIRY
-      ].includes(transaction.transactionType)) {
+      ].includes(transaction.transaction_type)) {
         existing.totalCreditsOut += transaction.credits;
       }
 
@@ -443,4 +447,3 @@ export class CreditTransactionRepository {
     });
   }
 }
-
