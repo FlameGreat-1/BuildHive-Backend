@@ -1,28 +1,28 @@
 import { CreditRepository } from '../repositories';
 import { CreditTransaction, CreditPurchase, CreditNotification } from '../types';
-import { CreditNotificationModel } from '../models';
-import { EmailService } from '../../auth/services/email.service';
-import { SMSService } from '../../auth/services/sms.service';
-import { UserService } from '../../auth/services';
+import { EmailService, SmsService, UserService, ProfileService } from '../../auth/services';
 import { logger } from '../../shared/utils';
 import { formatCreditAmount, formatCurrency } from '../utils';
 
 export class CreditNotificationService {
   private creditRepository: CreditRepository;
   private emailService: EmailService;
-  private smsService: SMSService;
+  private smsService: SmsService;
   private userService: UserService;
+  private profileService: ProfileService;
 
   constructor() {
     this.creditRepository = new CreditRepository();
     this.emailService = new EmailService();
-    this.smsService = new SMSService();
+    this.smsService = new SmsService();
     this.userService = new UserService();
+    this.profileService = new ProfileService();
   }
 
   async sendLowBalanceAlert(userId: number, currentBalance: number): Promise<void> {
     try {
-      const user = await this.userService.getUserById(userId);
+      const user = await this.userService.getUserById(userId.toString());
+      const profile = await this.profileService.getProfileByUserId(userId.toString());
       
       if (!user) {
         throw new Error('User not found');
@@ -35,23 +35,12 @@ export class CreditNotificationService {
         isSent: false
       });
 
-      const emailData = {
-        to: user.email,
-        subject: 'Low Credit Balance Alert - BuildHire',
-        template: 'credit-low-balance',
-        data: {
-          userName: user.firstName,
-          currentBalance: formatCreditAmount(currentBalance),
-          recommendedTopup: formatCreditAmount(25),
-          dashboardUrl: `${process.env.FRONTEND_URL}/dashboard/credits`
-        }
-      };
+      if (!profile || profile.preferences.emailNotifications) {
+        await this.emailService.sendCreditLowBalanceAlert(user.email, user.username, currentBalance);
+      }
 
-      await this.emailService.sendEmail(emailData);
-
-      if (user.phone && user.smsNotifications) {
-        const smsMessage = `BuildHire Alert: Your credit balance is low (${formatCreditAmount(currentBalance)}). Top up now to continue applying for jobs.`;
-        await this.smsService.sendSMS(user.phone, smsMessage);
+      if (profile?.phone && profile.preferences.smsNotifications && this.smsService.isServiceEnabled()) {
+        await this.smsService.sendCreditLowBalanceAlert(profile.phone, user.username, currentBalance);
       }
 
       await this.creditRepository.markNotificationAsSent(notification.id);
@@ -72,7 +61,8 @@ export class CreditNotificationService {
 
   async sendCriticalBalanceAlert(userId: number, currentBalance: number): Promise<void> {
     try {
-      const user = await this.userService.getUserById(userId);
+      const user = await this.userService.getUserById(userId.toString());
+      const profile = await this.profileService.getProfileByUserId(userId.toString());
       
       if (!user) {
         throw new Error('User not found');
@@ -85,24 +75,12 @@ export class CreditNotificationService {
         isSent: false
       });
 
-      const emailData = {
-        to: user.email,
-        subject: 'URGENT: Critical Credit Balance - BuildHire',
-        template: 'credit-critical-balance',
-        data: {
-          userName: user.firstName,
-          currentBalance: formatCreditAmount(currentBalance),
-          urgentTopup: formatCreditAmount(25),
-          dashboardUrl: `${process.env.FRONTEND_URL}/dashboard/credits`,
-          topupUrl: `${process.env.FRONTEND_URL}/credits/purchase`
-        }
-      };
+      if (!profile || profile.preferences.emailNotifications) {
+        await this.emailService.sendCreditCriticalBalanceAlert(user.email, user.username, currentBalance);
+      }
 
-      await this.emailService.sendEmail(emailData);
-
-      if (user.phone) {
-        const smsMessage = `URGENT - BuildHire: Critical credit balance (${formatCreditAmount(currentBalance)}). Top up immediately to avoid service interruption.`;
-        await this.smsService.sendSMS(user.phone, smsMessage);
+      if (profile?.phone && this.smsService.isServiceEnabled()) {
+        await this.smsService.sendCriticalBalanceAlert(profile.phone, user.username, currentBalance);
       }
 
       await this.creditRepository.markNotificationAsSent(notification.id);
@@ -123,26 +101,16 @@ export class CreditNotificationService {
 
   async sendTrialCreditsNotification(userId: number, creditsAwarded: number): Promise<void> {
     try {
-      const user = await this.userService.getUserById(userId);
+      const user = await this.userService.getUserById(userId.toString());
+      const profile = await this.profileService.getProfileByUserId(userId.toString());
       
       if (!user) {
         throw new Error('User not found');
       }
 
-      const emailData = {
-        to: user.email,
-        subject: 'Welcome! Your Free Credits Are Ready - BuildHire',
-        template: 'credit-trial-awarded',
-        data: {
-          userName: user.firstName,
-          creditsAwarded: formatCreditAmount(creditsAwarded),
-          dashboardUrl: `${process.env.FRONTEND_URL}/dashboard/credits`,
-          jobsUrl: `${process.env.FRONTEND_URL}/jobs`,
-          howToUseUrl: `${process.env.FRONTEND_URL}/help/credits`
-        }
-      };
-
-      await this.emailService.sendEmail(emailData);
+      if (!profile || profile.preferences.emailNotifications) {
+        await this.emailService.sendCreditTrialNotification(user.email, user.username, creditsAwarded);
+      }
 
       logger.info('Trial credits notification sent', {
         userId,
@@ -159,7 +127,8 @@ export class CreditNotificationService {
 
   async sendPurchaseConfirmationNotification(userId: number, purchase: CreditPurchase): Promise<void> {
     try {
-      const user = await this.userService.getUserById(userId);
+      const user = await this.userService.getUserById(userId.toString());
+      const profile = await this.profileService.getProfileByUserId(userId.toString());
       
       if (!user) {
         throw new Error('User not found');
@@ -167,27 +136,20 @@ export class CreditNotificationService {
 
       const totalCredits = purchase.creditsAmount + purchase.bonusCredits;
 
-      const emailData = {
-        to: user.email,
-        subject: 'Credit Purchase Confirmed - BuildHire',
-        template: 'credit-purchase-confirmation',
-        data: {
-          userName: user.firstName,
-          purchaseId: purchase.id,
-          creditsAmount: formatCreditAmount(purchase.creditsAmount),
-          bonusCredits: formatCreditAmount(purchase.bonusCredits),
-          totalCredits: formatCreditAmount(totalCredits),
-          amount: formatCurrency(purchase.purchasePrice, purchase.currency),
-          receiptUrl: `${process.env.FRONTEND_URL}/credits/receipt/${purchase.id}`,
-          dashboardUrl: `${process.env.FRONTEND_URL}/dashboard/credits`
-        }
+      const purchaseData = {
+        id: purchase.id,
+        creditsAmount: purchase.creditsAmount,
+        bonusCredits: purchase.bonusCredits,
+        purchasePrice: purchase.purchasePrice,
+        currency: purchase.currency
       };
 
-      await this.emailService.sendEmail(emailData);
+      if (!profile || profile.preferences.emailNotifications) {
+        await this.emailService.sendCreditPurchaseConfirmation(user.email, user.username, purchaseData);
+      }
 
-      if (user.phone && user.smsNotifications) {
-        const smsMessage = `BuildHire: Credit purchase confirmed! ${formatCreditAmount(totalCredits)} added to your account. Start applying for jobs now.`;
-        await this.smsService.sendSMS(user.phone, smsMessage);
+      if (profile?.phone && profile.preferences.smsNotifications && this.smsService.isServiceEnabled()) {
+        await this.smsService.sendCreditPurchaseConfirmation(profile.phone, user.username, totalCredits);
       }
 
       logger.info('Purchase confirmation notification sent', {
@@ -206,27 +168,17 @@ export class CreditNotificationService {
 
   async sendTransactionNotification(userId: number, transaction: CreditTransaction): Promise<void> {
     try {
-      const user = await this.userService.getUserById(userId);
+      const user = await this.userService.getUserById(userId.toString());
+      const profile = await this.profileService.getProfileByUserId(userId.toString());
       
-      if (!user || !user.transactionNotifications) {
+      if (!user) {
         return;
       }
 
-      const emailData = {
-        to: user.email,
-        subject: 'Credit Transaction Completed - BuildHire',
-        template: 'credit-transaction',
-        data: {
-          userName: user.firstName,
-          transactionId: transaction.id,
-          transactionType: transaction.transactionType,
-          credits: formatCreditAmount(transaction.credits),
-          description: transaction.description,
-          dashboardUrl: `${process.env.FRONTEND_URL}/dashboard/credits`
-        }
-      };
-
-      await this.emailService.sendEmail(emailData);
+      if (profile?.phone && profile.preferences.smsNotifications && this.smsService.isServiceEnabled()) {
+        const smsMessage = `BuildHive: Transaction completed - ${transaction.transactionType}: ${formatCreditAmount(transaction.credits)} credits. ${transaction.description}`;
+        await this.smsService.sendSMS(profile.phone, smsMessage);
+      }
 
       logger.info('Transaction notification sent', {
         userId,
@@ -244,26 +196,16 @@ export class CreditNotificationService {
 
   async sendRefundNotification(userId: number, creditsRefunded: number, reason: string): Promise<void> {
     try {
-      const user = await this.userService.getUserById(userId);
+      const user = await this.userService.getUserById(userId.toString());
+      const profile = await this.profileService.getProfileByUserId(userId.toString());
       
       if (!user) {
         throw new Error('User not found');
       }
 
-      const emailData = {
-        to: user.email,
-        subject: 'Credit Refund Processed - BuildHire',
-        template: 'credit-refund',
-        data: {
-          userName: user.firstName,
-          creditsRefunded: formatCreditAmount(creditsRefunded),
-          reason,
-          dashboardUrl: `${process.env.FRONTEND_URL}/dashboard/credits`,
-          supportUrl: `${process.env.FRONTEND_URL}/support`
-        }
-      };
-
-      await this.emailService.sendEmail(emailData);
+      if (!profile || profile.preferences.emailNotifications) {
+        await this.emailService.sendCreditRefundNotification(user.email, user.username, creditsRefunded, reason);
+      }
 
       logger.info('Refund notification sent', {
         userId,
@@ -282,25 +224,16 @@ export class CreditNotificationService {
 
   async sendCreditExpiryNotification(userId: number, creditsExpired: number): Promise<void> {
     try {
-      const user = await this.userService.getUserById(userId);
+      const user = await this.userService.getUserById(userId.toString());
+      const profile = await this.profileService.getProfileByUserId(userId.toString());
       
       if (!user) {
         throw new Error('User not found');
       }
 
-      const emailData = {
-        to: user.email,
-        subject: 'Credits Expired - BuildHire',
-        template: 'credit-expiry',
-        data: {
-          userName: user.firstName,
-          creditsExpired: formatCreditAmount(creditsExpired),
-          topupUrl: `${process.env.FRONTEND_URL}/credits/purchase`,
-          dashboardUrl: `${process.env.FRONTEND_URL}/dashboard/credits`
-        }
-      };
-
-      await this.emailService.sendEmail(emailData);
+      if (!profile || profile.preferences.emailNotifications) {
+        await this.emailService.sendCreditExpiryNotification(user.email, user.username, creditsExpired);
+      }
 
       logger.info('Credit expiry notification sent', {
         userId,
@@ -317,26 +250,20 @@ export class CreditNotificationService {
 
   async sendAutoTopupNotification(userId: number, creditsAdded: number, amount: number): Promise<void> {
     try {
-      const user = await this.userService.getUserById(userId);
+      const user = await this.userService.getUserById(userId.toString());
+      const profile = await this.profileService.getProfileByUserId(userId.toString());
       
       if (!user) {
         throw new Error('User not found');
       }
 
-      const emailData = {
-        to: user.email,
-        subject: 'Auto Top-up Completed - BuildHire',
-        template: 'credit-auto-topup',
-        data: {
-          userName: user.firstName,
-          creditsAdded: formatCreditAmount(creditsAdded),
-          amount: formatCurrency(amount),
-          dashboardUrl: `${process.env.FRONTEND_URL}/dashboard/credits`,
-          settingsUrl: `${process.env.FRONTEND_URL}/settings/auto-topup`
-        }
-      };
+      if (!profile || profile.preferences.emailNotifications) {
+        await this.emailService.sendCreditAutoTopupNotification(user.email, user.username, creditsAdded, amount);
+      }
 
-      await this.emailService.sendEmail(emailData);
+      if (profile?.phone && profile.preferences.smsNotifications && this.smsService.isServiceEnabled()) {
+        await this.smsService.sendCreditAutoTopupNotification(profile.phone, user.username, creditsAdded);
+      }
 
       logger.info('Auto topup notification sent', {
         userId,
@@ -359,27 +286,22 @@ export class CreditNotificationService {
     reason: string
   ): Promise<void> {
     try {
-      const user = await this.userService.getUserById(userId);
+      const user = await this.userService.getUserById(userId.toString());
+      const profile = await this.profileService.getProfileByUserId(userId.toString());
       
       if (!user) {
         throw new Error('User not found');
       }
 
-      const emailData = {
-        to: user.email,
-        subject: 'Transaction Cancelled - BuildHire',
-        template: 'credit-transaction-cancelled',
-        data: {
-          userName: user.firstName,
-          transactionId: transaction.id,
-          credits: formatCreditAmount(transaction.credits),
-          reason,
-          dashboardUrl: `${process.env.FRONTEND_URL}/dashboard/credits`,
-          supportUrl: `${process.env.FRONTEND_URL}/support`
-        }
-      };
+      if (!profile || profile.preferences.emailNotifications) {
+        const smsMessage = `BuildHive: Transaction cancelled - ${transaction.transactionType}: ${formatCreditAmount(transaction.credits)} credits. Reason: ${reason}`;
+        await this.emailService.sendSMS(user.email, smsMessage);
+      }
 
-      await this.emailService.sendEmail(emailData);
+      if (profile?.phone && profile.preferences.smsNotifications && this.smsService.isServiceEnabled()) {
+        const smsMessage = `BuildHive: Transaction cancelled - ${transaction.transactionType}: ${formatCreditAmount(transaction.credits)} credits. Reason: ${reason}`;
+        await this.smsService.sendSMS(profile.phone, smsMessage);
+      }
 
       logger.info('Transaction cancellation notification sent', {
         userId,
@@ -402,27 +324,22 @@ export class CreditNotificationService {
     reason: string
   ): Promise<void> {
     try {
-      const user = await this.userService.getUserById(userId);
+      const user = await this.userService.getUserById(userId.toString());
+      const profile = await this.profileService.getProfileByUserId(userId.toString());
       
       if (!user) {
         throw new Error('User not found');
       }
 
-      const emailData = {
-        to: user.email,
-        subject: 'Purchase Cancelled - BuildHire',
-        template: 'credit-purchase-cancelled',
-        data: {
-          userName: user.firstName,
-          purchaseId: purchase.id,
-          amount: formatCurrency(purchase.purchasePrice, purchase.currency),
-          reason,
-          topupUrl: `${process.env.FRONTEND_URL}/credits/purchase`,
-          supportUrl: `${process.env.FRONTEND_URL}/support`
-        }
-      };
+      if (!profile || profile.preferences.emailNotifications) {
+        const smsMessage = `BuildHive: Purchase cancelled - ${formatCurrency(purchase.purchasePrice, purchase.currency)}. Reason: ${reason}`;
+        await this.emailService.sendSMS(user.email, smsMessage);
+      }
 
-      await this.emailService.sendEmail(emailData);
+      if (profile?.phone && profile.preferences.smsNotifications && this.smsService.isServiceEnabled()) {
+        const smsMessage = `BuildHive: Purchase cancelled - ${formatCurrency(purchase.purchasePrice, purchase.currency)}. Reason: ${reason}`;
+        await this.smsService.sendSMS(profile.phone, smsMessage);
+      }
 
       logger.info('Purchase cancellation notification sent', {
         userId,

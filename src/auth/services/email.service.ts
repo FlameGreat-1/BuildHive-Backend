@@ -8,7 +8,7 @@ export class EmailService {
   private transporter: nodemailer.Transporter;
 
   constructor() {
-    this.transporter = nodemailer.createTransport({
+    this.transporter = nodemailer.createTransporter({
       service: environment.EMAIL_SERVICE,
       auth: {
         user: environment.EMAIL_USER,
@@ -129,6 +129,134 @@ export class EmailService {
       logger.info('Account locked notification sent successfully', { email, username });
     } catch (error: any) {
       logger.error('Failed to send account locked notification', { email, error: error.message });
+    }
+  }
+
+  async sendCreditLowBalanceAlert(email: string, username: string, currentBalance: number): Promise<void> {
+    const mailOptions = {
+      from: environment.EMAIL_FROM,
+      to: email,
+      subject: 'Low Credit Balance Alert - BuildHive',
+      html: this.getCreditLowBalanceTemplate(username, currentBalance)
+    };
+
+    try {
+      await this.transporter.sendMail(mailOptions);
+      logger.info('Credit low balance alert sent successfully', { email, username });
+    } catch (error: any) {
+      logger.error('Failed to send credit low balance alert', { email, error: error.message });
+    }
+  }
+
+  async sendCreditCriticalBalanceAlert(email: string, username: string, currentBalance: number): Promise<void> {
+    const mailOptions = {
+      from: environment.EMAIL_FROM,
+      to: email,
+      subject: 'URGENT: Critical Credit Balance - BuildHive',
+      html: this.getCreditCriticalBalanceTemplate(username, currentBalance)
+    };
+
+    try {
+      await this.transporter.sendMail(mailOptions);
+      logger.info('Credit critical balance alert sent successfully', { email, username });
+    } catch (error: any) {
+      logger.error('Failed to send credit critical balance alert', { email, error: error.message });
+    }
+  }
+
+  async sendCreditTrialNotification(email: string, username: string, creditsAwarded: number): Promise<void> {
+    const mailOptions = {
+      from: environment.EMAIL_FROM,
+      to: email,
+      subject: 'Welcome! Your Free Credits Are Ready - BuildHive',
+      html: this.getCreditTrialTemplate(username, creditsAwarded)
+    };
+
+    try {
+      await this.transporter.sendMail(mailOptions);
+      logger.info('Credit trial notification sent successfully', { email, username });
+    } catch (error: any) {
+      logger.error('Failed to send credit trial notification', { email, error: error.message });
+    }
+  }
+
+  async sendCreditPurchaseConfirmation(email: string, username: string, purchaseData: {
+    id: number;
+    creditsAmount: number;
+    bonusCredits: number;
+    purchasePrice: number;
+    currency: string;
+  }): Promise<void> {
+    const mailOptions = {
+      from: environment.EMAIL_FROM,
+      to: email,
+      subject: 'Credit Purchase Confirmed - BuildHive',
+      html: this.getCreditPurchaseConfirmationTemplate(username, purchaseData)
+    };
+
+    try {
+      await this.transporter.sendMail(mailOptions);
+      logger.info('Credit purchase confirmation sent successfully', { email, username });
+    } catch (error: any) {
+      logger.error('Failed to send credit purchase confirmation', { email, error: error.message });
+    }
+  }
+
+  async sendCreditRefundNotification(email: string, username: string, creditsRefunded: number, reason: string): Promise<void> {
+    const mailOptions = {
+      from: environment.EMAIL_FROM,
+      to: email,
+      subject: 'Credit Refund Processed - BuildHive',
+      html: this.getCreditRefundTemplate(username, creditsRefunded, reason)
+    };
+
+    try {
+      await this.transporter.sendMail(mailOptions);
+      logger.info('Credit refund notification sent successfully', { email, username });
+    } catch (error: any) {
+      logger.error('Failed to send credit refund notification', { email, error: error.message });
+    }
+  }
+
+  async sendCreditExpiryNotification(email: string, username: string, creditsExpired: number): Promise<void> {
+    const mailOptions = {
+      from: environment.EMAIL_FROM,
+      to: email,
+      subject: 'Credits Expired - BuildHive',
+      html: this.getCreditExpiryTemplate(username, creditsExpired)
+    };
+
+    try {
+      await this.transporter.sendMail(mailOptions);
+      logger.info('Credit expiry notification sent successfully', { email, username });
+    } catch (error: any) {
+      logger.error('Failed to send credit expiry notification', { email, error: error.message });
+    }
+  }
+
+  async sendCreditAutoTopupNotification(email: string, username: string, creditsAdded: number, amount: number): Promise<void> {
+    const mailOptions = {
+      from: environment.EMAIL_FROM,
+      to: email,
+      subject: 'Auto Top-up Completed - BuildHive',
+      html: this.getCreditAutoTopupTemplate(username, creditsAdded, amount)
+    };
+
+    try {
+      await this.transporter.sendMail(mailOptions);
+      logger.info('Credit auto topup notification sent successfully', { email, username });
+    } catch (error: any) {
+      logger.error('Failed to send credit auto topup notification', { email, error: error.message });
+    }
+  }
+
+  async testConnection(): Promise<boolean> {
+    try {
+      await this.transporter.verify();
+      return true;
+    } catch (error) {
+      logger.error('Email service connection test failed', { error });
+      return false;
     }
   }
 
@@ -368,13 +496,235 @@ export class EmailService {
     }
   }
 
-  async testConnection(): Promise<boolean> {
-    try {
-      await this.transporter.verify();
-      return true;
-    } catch (error) {
-      logger.error('Email service connection test failed', { error });
-      return false;
-    }
+  private getCreditLowBalanceTemplate(username: string, currentBalance: number): string {
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Low Credit Balance Alert</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h1 style="color: #ffc107;">Low Credit Balance Alert</h1>
+          <p>Hi ${username},</p>
+          <p>Your BuildHive credit balance is running low.</p>
+          <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #ffc107;">
+            <p><strong>Current Balance:</strong> ${currentBalance} credits</p>
+          </div>
+          <p>To continue applying for jobs and accessing premium features, consider topping up your credits.</p>
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${environment.CORS_ORIGIN}/credits/purchase" style="background-color: #28a745; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">Top Up Credits</a>
+          </div>
+          <p>Need help? Contact our support team anytime.</p>
+          <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+          <p style="font-size: 12px; color: #666;">
+            This is an automated notification from BuildHive.
+          </p>
+        </div>
+      </body>
+      </html>
+    `;
   }
+
+  private getCreditCriticalBalanceTemplate(username: string, currentBalance: number): string {
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Critical Credit Balance Alert</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h1 style="color: #dc3545;">URGENT: Critical Credit Balance</h1>
+          <p>Hi ${username},</p>
+          <p>Your BuildHive credit balance is critically low and requires immediate attention.</p>
+          <div style="background-color: #f8d7da; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #dc3545;">
+            <p><strong>Current Balance:</strong> ${currentBalance} credits</p>
+            <p><strong>Status:</strong> Critical - Service interruption imminent</p>
+          </div>
+          <p><strong>Action Required:</strong> Top up your credits immediately to avoid service interruption.</p>
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${environment.CORS_ORIGIN}/credits/purchase" style="background-color: #dc3545; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">Top Up Now</a>
+          </div>
+          <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+          <p style="font-size: 12px; color: #666;">
+            This is an urgent automated notification from BuildHive.
+          </p>
+        </div>
+      </body>
+      </html>
+    `;
+  }
+
+  private getCreditTrialTemplate(username: string, creditsAwarded: number): string {
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Welcome! Your Free Credits Are Ready</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h1 style="color: #28a745;">Welcome! Your Free Credits Are Ready</h1>
+          <p>Hi ${username},</p>
+          <p>Congratulations! Your BuildHive account has been activated and we've added free trial credits to get you started.</p>
+          <div style="background-color: #d4edda; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #28a745;">
+            <p><strong>Free Credits Awarded:</strong> ${creditsAwarded} credits</p>
+          </div>
+          <p>You can now start applying for jobs and exploring all the features BuildHive has to offer!</p>
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${environment.CORS_ORIGIN}/jobs" style="background-color: #2c5aa0; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">Browse Jobs</a>
+          </div>
+          <p>Need help getting started? Check out our <a href="${environment.CORS_ORIGIN}/help/credits">credits guide</a>.</p>
+          <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+          <p style="font-size: 12px; color: #666;">
+            Welcome to BuildHive!
+          </p>
+        </div>
+      </body>
+      </html>
+    `;
+  }
+
+  private getCreditPurchaseConfirmationTemplate(username: string, purchaseData: {
+    id: number;
+    creditsAmount: number;
+    bonusCredits: number;
+    purchasePrice: number;
+    currency: string;
+  }): string {
+    const totalCredits = purchaseData.creditsAmount + purchaseData.bonusCredits;
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Credit Purchase Confirmed</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h1 style="color: #28a745;">Credit Purchase Confirmed</h1>
+          <p>Hi ${username},</p>
+          <p>Your credit purchase has been successfully processed and added to your account.</p>
+          <div style="background-color: #d4edda; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #28a745;">
+            <p><strong>Purchase ID:</strong> #${purchaseData.id}</p>
+            <p><strong>Credits Purchased:</strong> ${purchaseData.creditsAmount} credits</p>
+            <p><strong>Bonus Credits:</strong> ${purchaseData.bonusCredits} credits</p>
+            <p><strong>Total Credits Added:</strong> ${totalCredits} credits</p>
+            <p><strong>Amount Paid:</strong> ${purchaseData.currency} ${purchaseData.purchasePrice}</p>
+          </div>
+          <p>Your credits are now available and ready to use!</p>
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${environment.CORS_ORIGIN}/dashboard/credits" style="background-color: #2c5aa0; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">View Credits</a>
+          </div>
+          <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+          <p style="font-size: 12px; color: #666;">
+            Thank you for your purchase!
+          </p>
+        </div>
+      </body>
+      </html>
+    `;
+  }
+
+  private getCreditRefundTemplate(username: string, creditsRefunded: number, reason: string): string {
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Credit Refund Processed</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h1 style="color: #2c5aa0;">Credit Refund Processed</h1>
+          <p>Hi ${username},</p>
+          <p>A credit refund has been processed for your account.</p>
+          <div style="background-color: #d1ecf1; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #17a2b8;">
+            <p><strong>Credits Refunded:</strong> ${creditsRefunded} credits</p>
+            <p><strong>Reason:</strong> ${reason}</p>
+          </div>
+          <p>The refunded credits have been added back to your account balance.</p>
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${environment.CORS_ORIGIN}/dashboard/credits" style="background-color: #2c5aa0; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">View Balance</a>
+          </div>
+          <p>If you have any questions, please contact our support team.</p>
+          <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+          <p style="font-size: 12px; color: #666;">
+            This is an automated notification from BuildHive.
+          </p>
+        </div>
+      </body>
+      </html>
+    `;
+  }
+
+  private getCreditExpiryTemplate(username: string, creditsExpired: number): string {
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Credits Expired</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h1 style="color: #ffc107;">Credits Expired</h1>
+          <p>Hi ${username},</p>
+          <p>Some of your BuildHive credits have expired and have been removed from your account.</p>
+          <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #ffc107;">
+            <p><strong>Credits Expired:</strong> ${creditsExpired} credits</p>
+          </div>
+          <p>To avoid future credit expiry, consider purchasing credits more frequently or enabling auto top-up.</p>
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${environment.CORS_ORIGIN}/credits/purchase" style="background-color: #28a745; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">Purchase Credits</a>
+          </div>
+          <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+          <p style="font-size: 12px; color: #666;">
+            This is an automated notification from BuildHive.
+          </p>
+        </div>
+      </body>
+      </html>
+    `;
+  }
+
+  private getCreditAutoTopupTemplate(username: string, creditsAdded: number, amount: number): string {
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Auto Top-up Completed</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h1 style="color: #28a745;">Auto Top-up Completed</h1>
+          <p>Hi ${username},</p>
+          <p>Your auto top-up has been successfully processed and credits have been added to your account.</p>
+          <div style="background-color: #d4edda; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #28a745;">
+            <p><strong>Credits Added:</strong> ${creditsAdded} credits</p>
+            <p><strong>Amount Charged:</strong> $${amount}</p>
+          </div>
+          <p>Your account balance has been automatically topped up to ensure uninterrupted service.</p>
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${environment.CORS_ORIGIN}/dashboard/credits" style="background-color: #2c5aa0; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">View Balance</a>
+          </div>
+          <p>You can manage your auto top-up settings anytime in your account dashboard.</p>
+          <div style="text-align: center; margin: 20px 0;">
+            <a href="${environment.CORS_ORIGIN}/settings/auto-topup" style="background-color: #6c757d; color: white; padding: 10px 25px; text-decoration: none; border-radius: 5px; display: inline-block;">Manage Auto Top-up</a>
+          </div>
+          <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+          <p style="font-size: 12px; color: #666;">
+            This is an automated notification from BuildHive.
+          </p>
+        </div>
+      </body>
+      </html>
+    `;
+  }
+
 }

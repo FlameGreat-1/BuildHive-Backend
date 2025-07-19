@@ -73,6 +73,124 @@ export class SmsService {
     }
   }
 
+  async sendSMS(phone: string, message: string): Promise<void> {
+    if (!this.isEnabled) {
+      logger.warn('SMS service is not configured, skipping SMS');
+      return;
+    }
+
+    try {
+      await this.twilioClient.messages.create({
+        body: message,
+        from: process.env.TWILIO_PHONE_NUMBER,
+        to: phone
+      });
+
+      logger.info('SMS sent successfully', { phone: this.maskPhoneNumber(phone) });
+    } catch (error: any) {
+      logger.error('Failed to send SMS', { 
+        phone: this.maskPhoneNumber(phone), 
+        error: error.message 
+      });
+    }
+  }
+
+  async sendCreditLowBalanceAlert(phone: string, username: string, currentBalance: number): Promise<void> {
+    if (!this.isEnabled) {
+      logger.warn('SMS service is not configured, skipping credit low balance SMS');
+      return;
+    }
+
+    const message = `BuildHive Alert: Hi ${username}, your credit balance is low (${currentBalance} credits). Top up now to continue applying for jobs.`;
+
+    try {
+      await this.twilioClient.messages.create({
+        body: message,
+        from: process.env.TWILIO_PHONE_NUMBER,
+        to: phone
+      });
+
+      logger.info('Credit low balance SMS sent successfully', { phone: this.maskPhoneNumber(phone) });
+    } catch (error: any) {
+      logger.error('Failed to send credit low balance SMS', { 
+        phone: this.maskPhoneNumber(phone), 
+        error: error.message 
+      });
+    }
+  }
+
+  async sendCreditCriticalBalanceAlert(phone: string, username: string, currentBalance: number): Promise<void> {
+    if (!this.isEnabled) {
+      logger.warn('SMS service is not configured, skipping credit critical balance SMS');
+      return;
+    }
+
+    const message = `URGENT - BuildHive: Hi ${username}, critical credit balance (${currentBalance} credits). Top up immediately to avoid service interruption.`;
+
+    try {
+      await this.twilioClient.messages.create({
+        body: message,
+        from: process.env.TWILIO_PHONE_NUMBER,
+        to: phone
+      });
+
+      logger.info('Credit critical balance SMS sent successfully', { phone: this.maskPhoneNumber(phone) });
+    } catch (error: any) {
+      logger.error('Failed to send credit critical balance SMS', { 
+        phone: this.maskPhoneNumber(phone), 
+        error: error.message 
+      });
+    }
+  }
+
+  async sendCreditPurchaseConfirmation(phone: string, username: string, totalCredits: number): Promise<void> {
+    if (!this.isEnabled) {
+      logger.warn('SMS service is not configured, skipping credit purchase confirmation SMS');
+      return;
+    }
+
+    const message = `BuildHive: Hi ${username}, credit purchase confirmed! ${totalCredits} credits added to your account. Start applying for jobs now.`;
+
+    try {
+      await this.twilioClient.messages.create({
+        body: message,
+        from: process.env.TWILIO_PHONE_NUMBER,
+        to: phone
+      });
+
+      logger.info('Credit purchase confirmation SMS sent successfully', { phone: this.maskPhoneNumber(phone) });
+    } catch (error: any) {
+      logger.error('Failed to send credit purchase confirmation SMS', { 
+        phone: this.maskPhoneNumber(phone), 
+        error: error.message 
+      });
+    }
+  }
+
+  async sendCreditAutoTopupNotification(phone: string, username: string, creditsAdded: number): Promise<void> {
+    if (!this.isEnabled) {
+      logger.warn('SMS service is not configured, skipping credit auto topup SMS');
+      return;
+    }
+
+    const message = `BuildHive: Hi ${username}, auto top-up completed! ${creditsAdded} credits added to your account automatically.`;
+
+    try {
+      await this.twilioClient.messages.create({
+        body: message,
+        from: process.env.TWILIO_PHONE_NUMBER,
+        to: phone
+      });
+
+      logger.info('Credit auto topup SMS sent successfully', { phone: this.maskPhoneNumber(phone) });
+    } catch (error: any) {
+      logger.error('Failed to send credit auto topup SMS', { 
+        phone: this.maskPhoneNumber(phone), 
+        error: error.message 
+      });
+    }
+  }
+
   generateVerificationCode(): string {
     return Math.floor(100000 + Math.random() * 900000).toString();
   }
