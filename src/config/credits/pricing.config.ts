@@ -54,6 +54,15 @@ export const PRICING_CONFIG: PricingConfig = {
   promotionalOffers: []
 };
 
+export const BUSINESS_DETAILS = {
+  name: 'BuildHive',
+  address: 'Australia',
+  email: 'support@buildhive.com',
+  phone: '+61 XXX XXX XXX',
+  website: 'https://buildhive.com',
+  abn: 'TBD'
+};
+
 export const CREDIT_COST_PER_UNIT = 0.99; // Base cost per credit
 
 export const BULK_PRICING_TIERS = {

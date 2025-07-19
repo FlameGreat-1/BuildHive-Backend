@@ -47,6 +47,18 @@ export interface AutoTopup {
   updatedAt: Date;
 }
 
+export interface AutoTopupSettings {
+  enabled: boolean;
+  triggerBalance: number;
+  topupAmount: number;
+  packageType: CreditPackageType;
+  paymentMethodId: number;
+  maxTopupsPerDay?: number;
+  maxTopupsPerMonth?: number;
+  notifyOnTopup?: boolean;
+  lastModified?: Date;
+}
+
 export interface CreditNotification {
   id: number;
   userId: number;

@@ -13,11 +13,11 @@ import {
 import { 
   generatePurchaseId,
   generateReceiptNumber,
-  formatCurrency 
+  formatCurrency,
+  calculateCreditPurchase 
 } from '../utils';
 import { 
-  CREDIT_PACKAGES,
-  calculateCreditPurchase 
+  CREDIT_PACKAGES
 } from '../../config/credits';
 
 export class CreditPurchaseModel implements CreditPurchase {

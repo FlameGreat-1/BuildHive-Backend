@@ -11,6 +11,13 @@ export interface AuthenticatedRequest extends Request {
     email: string;
     role: string;
     emailVerified: boolean;
+    creditBalance?: number;
+    dailyUsage?: number;
+    monthlyUsage?: number;
+    dailySpent?: number;
+    monthlySpent?: number;
+    dailyTransactions?: number;
+    monthlyTransactions?: number;
   };
   requestId?: string;
 }
