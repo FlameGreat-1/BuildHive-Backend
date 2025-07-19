@@ -4,12 +4,12 @@ export interface ApiResponse<T = any> {
   success: boolean;
   message: string;
   data?: T;
-  errors?: ValidationError[];
+  errors?: ApiValidationError[];
   timestamp: string;
   requestId: string;
 }
 
-export interface ValidationError {
+export interface ApiValidationError {
   field: string;
   message: string;
   code: string;
@@ -72,6 +72,13 @@ export interface LoginResponse {
     role: string;
     status: string;
     emailVerified: boolean;
+    creditBalance: number;
+    dailyUsage: number;
+    monthlyUsage: number;
+    dailySpent: number;
+    monthlySpent: number;
+    dailyTransactions: number;
+    monthlyTransactions: number;
   };
   tokens: {
     accessToken: string;
@@ -82,6 +89,8 @@ export interface LoginResponse {
     firstName?: string;
     lastName?: string;
     avatar?: string;
+    phone?: string;
+    smsNotifications?: boolean;
   };
 }
 
@@ -145,7 +154,7 @@ export interface LogoutResponse {
 export interface ErrorResponse {
   success: false;
   message: string;
-  errors?: ValidationError[];
+  errors?: ApiValidationError[];
   timestamp: string;
   requestId: string;
   statusCode: number;

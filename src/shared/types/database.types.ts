@@ -432,6 +432,12 @@ export interface UserDatabaseRecord {
   last_login_at?: Date;
   stripe_customer_id?: string;
   credit_balance: number;
+  daily_usage: number;
+  monthly_usage: number;
+  daily_spent: number;
+  monthly_spent: number;
+  daily_transactions: number;
+  monthly_transactions: number;
   subscription_id?: number;
   subscription_status?: string;
   created_at: Date;
@@ -505,7 +511,8 @@ export enum CreditPackageType {
 export enum AutoTopupStatus {
   ENABLED = 'enabled',
   DISABLED = 'disabled',
-  SUSPENDED = 'suspended'
+  SUSPENDED = 'suspended',
+  PROCESSING = 'processing'
 }
 
 export interface CreditBalanceDatabaseRecord {
@@ -572,4 +579,33 @@ export interface CreditNotificationDatabaseRecord {
   is_sent: boolean;
   sent_at?: Date;
   created_at: Date;
+}
+
+export interface CreditTransactionFilter {
+  userId: number;
+  page: number;
+  limit: number;
+  transactionType?: CreditTransactionType;
+  status?: CreditTransactionStatus;
+  dateFrom?: Date;
+  dateTo?: Date;
+  minCredits?: number;
+  maxCredits?: number;
+  referenceType?: string;
+  sortBy?: string;
+  sortOrder: 'asc' | 'desc';
+}
+
+export interface CreditTransactionSummary {
+  totalTransactions: number;
+  totalCreditsIn: number;
+  totalCreditsOut: number;
+}
+
+export interface AutoTopupSettings {
+  enabled: boolean;
+  triggerBalance: number;
+  topupAmount: number;
+  packageType: CreditPackageType;
+  paymentMethodId: number;
 }
