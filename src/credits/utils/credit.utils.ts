@@ -133,7 +133,7 @@ export const buildCreditDashboard = (
   usageData: CreditUsage[],
   autoTopupStatus: AutoTopupStatus
 ): CreditDashboard => {
-  const transactionSummary: CreditTransactionSummary[] = recentTransactions
+  const transactionSummary: CreditTransactionOverview[] = recentTransactions
     .slice(0, 10)
     .map(t => ({
       id: t.id,

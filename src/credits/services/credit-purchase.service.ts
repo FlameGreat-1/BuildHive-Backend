@@ -295,7 +295,7 @@ export class CreditPurchaseService {
       }
 
       const refund = await this.stripeService.createRefund({
-        payment_intent: paymentIntentId,
+        paymentIntentId: paymentIntentId,
         amount: Math.round(refundAmount * 100),
         reason: 'requested_by_customer',
         metadata: {
@@ -439,7 +439,14 @@ export class CreditPurchaseService {
         throw new Error('Receipt can only be generated for completed purchases');
       }
 
-      return purchase.toReceipt(BUSINESS_DETAILS);
+      return purchase.toReceipt({
+        businessName: BUSINESS_DETAILS.name,
+        abn: BUSINESS_DETAILS.abn,
+        address: BUSINESS_DETAILS.address,
+        email: BUSINESS_DETAILS.email,
+        phone: BUSINESS_DETAILS.phone
+      });
+
     } catch (error) {
       logger.error('Failed to generate receipt', {
         purchaseId,
@@ -460,7 +467,7 @@ export class CreditPurchaseService {
       const purchase = CreditPurchaseModel.fromRequest(userId, request);
       const createdPurchase = await this.purchaseRepository.createPurchase(purchase.toJSON());
 
-      const applePayResult = await this.applePayService.processPayment({
+      const applePayResult = await this.applePayService.processApplePayPayment({
         amount: calculation.finalAmount,
         currency: 'AUD',
         token: applePayToken,
@@ -509,7 +516,7 @@ export class CreditPurchaseService {
       const purchase = CreditPurchaseModel.fromRequest(userId, request);
       const createdPurchase = await this.purchaseRepository.createPurchase(purchase.toJSON());
 
-      const googlePayResult = await this.googlePayService.processPayment({
+      const googlePayResult = await this.googlePayService.processGooglePayPayment({
         amount: calculation.finalAmount,
         currency: 'AUD',
         token: googlePayToken,

@@ -3,7 +3,7 @@ import Redis from 'ioredis';
 import { databaseConfig, redisConfig } from '../../config/auth';
 import { DatabaseClient, DatabaseTransaction, QueryResult as CustomQueryResult } from '../types';
 import { logger } from '../utils/logger.util';
-import { initializeApp, cert, App } from 'firebase-admin/app';
+import { initializeApp, cert, App, ServiceAccount, deleteApp } from 'firebase-admin/app';
 import { getFirestore, Firestore } from 'firebase-admin/firestore';
 import { environment } from '../../config/auth';
 
@@ -40,7 +40,7 @@ export class DatabaseConnection implements DatabaseClient {
 
   private initializeFirebase(): void {
     try {
-      const serviceAccount = {
+      const serviceAccount: ServiceAccount = {
         type: 'service_account',
         project_id: environment.FIREBASE_PROJECT_ID,
         private_key_id: '',

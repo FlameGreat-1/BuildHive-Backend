@@ -269,7 +269,7 @@ export class CreditService {
 
   async getExpiringCredits(userId: number, daysThreshold: number = 7): Promise<CreditExpiry[]> {
     try {
-      const transactions = [];
+      const transactions: CreditTransaction[] = [];
       
       return getExpiringCredits(transactions, daysThreshold);
     } catch (error) {
@@ -284,7 +284,7 @@ export class CreditService {
 
   async processExpiredCredits(): Promise<void> {
     try {
-      const expiredTransactions = [];
+      const expiredTransactions: CreditTransaction[] = [];
       
       for (const transaction of expiredTransactions) {
         await this.deductCredits(
