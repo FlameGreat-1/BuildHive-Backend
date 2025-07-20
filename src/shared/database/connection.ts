@@ -41,7 +41,6 @@ export class DatabaseConnection implements DatabaseClient {
   private initializeFirebase(): void {
     try {
       const serviceAccount: ServiceAccount = {
-        type: 'service_account',
         project_id: environment.FIREBASE_PROJECT_ID,
         private_key_id: '',
         private_key: environment.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),

@@ -155,7 +155,7 @@ export const validateTransactionHistory = (): ValidationChain[] => [
     .isISO8601()
     .withMessage('Date to must be a valid ISO 8601 date')
     .custom((value, { req }) => {
-      if (req.query.dateFrom && new Date(value) <= new Date(req.query.dateFrom)) {
+      if (req.query?.dateFrom && new Date(value) <= new Date(req.query.dateFrom as string)) {
         throw new Error('Date to must be after date from');
       }
       return true;
@@ -171,7 +171,7 @@ export const validateTransactionHistory = (): ValidationChain[] => [
     .isInt({ min: 1 })
     .withMessage('Max credits must be a positive integer')
     .custom((value, { req }) => {
-      if (req.query.minCredits && parseInt(value) <= parseInt(req.query.minCredits)) {
+      if (req.query?.minCredits && parseInt(value) <= parseInt(req.query.minCredits as string)) {
         throw new Error('Max credits must be greater than min credits');
       }
       return true;
@@ -235,7 +235,7 @@ export const validateTransactionSummary = (): ValidationChain[] => [
     .isISO8601()
     .withMessage('End date must be a valid ISO 8601 date')
     .custom((value, { req }) => {
-      if (req.query.startDate && new Date(value) <= new Date(req.query.startDate)) {
+      if (req.query?.startDate && new Date(value) <= new Date(req.query.startDate as string)) {
         throw new Error('End date must be after start date');
       }
       return true;

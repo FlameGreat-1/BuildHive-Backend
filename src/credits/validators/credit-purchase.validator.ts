@@ -74,7 +74,7 @@ export const validateCreditPurchaseHistory = (): ValidationChain[] => [
     .isISO8601()
     .withMessage('Date to must be a valid ISO 8601 date')
     .custom((value, { req }) => {
-      if (req.query.dateFrom && new Date(value) <= new Date(req.query.dateFrom)) {
+      if (req.query?.dateFrom && new Date(value) <= new Date(req.query.dateFrom as string)) {
         throw new Error('Date to must be after date from');
       }
       return true;
@@ -97,21 +97,21 @@ export const validateAutoTopupSettings = (): ValidationChain[] => [
     .withMessage('Enabled must be a boolean value'),
 
   body('triggerBalance')
-    .if(body('enabled').equals(true))
+    .if(body('enabled').equals('true'))
     .notEmpty()
     .withMessage('Trigger balance is required when auto topup is enabled')
     .isInt({ min: 0, max: 50 })
     .withMessage('Trigger balance must be between 0 and 50'),
 
   body('topupAmount')
-    .if(body('enabled').equals(true))
+    .if(body('enabled').equals('true'))
     .notEmpty()
     .withMessage('Topup amount is required when auto topup is enabled')
     .isInt({ min: 10, max: 100 })
     .withMessage('Topup amount must be between 10 and 100'),
 
   body('packageType')
-    .if(body('enabled').equals(true))
+    .if(body('enabled').equals('true'))
     .notEmpty()
     .withMessage('Package type is required when auto topup is enabled')
     .custom((value) => {
@@ -122,7 +122,7 @@ export const validateAutoTopupSettings = (): ValidationChain[] => [
     }),
 
   body('paymentMethodId')
-    .if(body('enabled').equals(true))
+    .if(body('enabled').equals('true'))
     .notEmpty()
     .withMessage('Payment method ID is required when auto topup is enabled')
     .isInt({ min: 1 })
@@ -200,7 +200,7 @@ export const validatePurchaseMetrics = (): ValidationChain[] => [
     .isISO8601()
     .withMessage('End date must be a valid ISO 8601 date')
     .custom((value, { req }) => {
-      if (req.query.startDate && new Date(value) <= new Date(req.query.startDate)) {
+      if (req.query?.startDate && new Date(value) <= new Date(req.query.startDate as string)) {
         throw new Error('End date must be after start date');
       }
       return true;
