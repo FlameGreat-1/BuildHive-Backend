@@ -25,7 +25,9 @@ import { logger } from '../../shared/utils';
 import { 
   CreditPackageType,
   CreditTransactionStatus,
-  CreditTransactionType
+  CreditTransactionType,
+  PaymentMethod,
+  PaymentType
 } from '../../shared/types';
 import { 
   CREDIT_PACKAGES,
@@ -90,6 +92,8 @@ export class CreditPurchaseService {
       const paymentIntent = await this.stripeService.createPaymentIntent({
         amount: Math.round(calculation.finalAmount * 100),
         currency: 'aud',
+        paymentMethod: PaymentMethod.STRIPE_CARD,
+        paymentType: PaymentType.CREDIT_PURCHASE,
         metadata: {
           purchaseId: createdPurchase.id.toString(),
           userId: userId.toString(),
@@ -103,8 +107,8 @@ export class CreditPurchaseService {
         CreditTransactionStatus.PENDING,
         undefined,
         {
-          paymentIntentId: paymentIntent.id,
-          clientSecret: paymentIntent.client_secret
+          paymentIntentId: paymentIntent.paymentIntentId,
+          clientSecret: paymentIntent.clientSecret
         }
       );
 
@@ -113,10 +117,10 @@ export class CreditPurchaseService {
         purchaseId: createdPurchase.id,
         packageType: request.packageType,
         amount: calculation.finalAmount,
-        paymentIntentId: paymentIntent.id
+        paymentIntentId: paymentIntent.paymentIntentId
       });
 
-      return createdPurchase.toResponse(paymentIntent.id, paymentIntent.client_secret || '');
+      return createdPurchase.toResponse(paymentIntent.paymentIntentId, paymentIntent.clientSecret || '');
     } catch (error) {
       logger.error('Failed to initiate credit purchase', {
         userId,

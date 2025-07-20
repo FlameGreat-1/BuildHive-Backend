@@ -33,7 +33,7 @@ export const authenticateCreditAccess = async (
       return;
     }
 
-    const roleValidation = validateUserRole(userRole, [
+    const roleValidation = validateUserRole(userRole || '', [
       UserRole.CLIENT,
       UserRole.TRADIE,
       UserRole.ENTERPRISE
@@ -76,7 +76,7 @@ export const requireTradieOrEnterprise = (
   const userRole = req.user?.role;
   const userId = req.user?.id;
 
-  const roleValidation = validateUserRole(userRole, [
+  const roleValidation = validateUserRole(userRole || '', [
     UserRole.TRADIE,
     UserRole.ENTERPRISE
   ]);
@@ -181,7 +181,7 @@ export const validateCreditPurchaseAccess = (
     return;
   }
 
-  const roleValidation = validateUserRole(userRole, [
+  const roleValidation = validateUserRole(userRole || '', [
     UserRole.CLIENT,
     UserRole.TRADIE,
     UserRole.ENTERPRISE
@@ -224,7 +224,7 @@ export const validateCreditUsageAccess = (
     return;
   }
 
-  const roleValidation = validateUserRole(userRole, [
+  const roleValidation = validateUserRole(userRole || '', [
     UserRole.TRADIE,
     UserRole.ENTERPRISE
   ]);
@@ -266,7 +266,7 @@ export const validateAutoTopupAccess = (
     return;
   }
 
-  const roleValidation = validateUserRole(userRole, [
+  const roleValidation = validateUserRole(userRole || '', [
     UserRole.TRADIE,
     UserRole.ENTERPRISE
   ]);
@@ -308,7 +308,7 @@ export const validateCreditRefundAccess = (
     return;
   }
 
-  const roleValidation = validateUserRole(userRole, [
+  const roleValidation = validateUserRole(userRole || '', [
     UserRole.CLIENT,
     UserRole.TRADIE,
     UserRole.ENTERPRISE

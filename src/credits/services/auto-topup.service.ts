@@ -15,7 +15,9 @@ import { logger } from '../../shared/utils';
 import { 
   AutoTopupStatus,
   CreditPackageType,
-  CreditTransactionStatus
+  CreditTransactionStatus,
+  PaymentMethod,
+  PaymentType
 } from '../../shared/types';
 import { 
   AUTO_TOPUP_LIMITS,
@@ -51,7 +53,7 @@ export class AutoTopupService {
         throw new Error(validation.reason);
       }
 
-      const user = await this.userService.getUserById(userId);
+      const user = await this.userService.getUserById(userId.toString());
       if (!user) {
         throw new Error('User not found');
       }
@@ -203,8 +205,8 @@ export class AutoTopupService {
         const paymentIntent = await this.stripeService.createPaymentIntent({
           amount: Math.round(packageInfo.price * 100),
           currency: 'aud',
-          payment_method: settings.paymentMethodId.toString(),
-          confirm: true,
+          paymentMethod: PaymentMethod.STRIPE_CARD,
+          paymentType: PaymentType.CREDIT_PURCHASE,
           metadata: {
             userId: userId.toString(),
             autoTopup: 'true',
@@ -236,7 +238,7 @@ export class AutoTopupService {
             userId,
             credits: packageInfo.totalCredits,
             amount: packageInfo.price,
-            paymentIntentId: paymentIntent.id
+            paymentIntentId: paymentIntent.paymentIntentId
           });
         } else {
           throw new Error(`Payment failed with status: ${paymentIntent.status}`);
@@ -348,7 +350,7 @@ export class AutoTopupService {
     reason?: string;
   }> {
     try {
-      const user = await this.userService.getUserById(userId);
+      const user = await this.userService.getUserById(userId.toString());
       
       if (!user) {
         return {
@@ -406,13 +408,13 @@ export class AutoTopupService {
       });
 
       if (shouldSuspend) {
-        const user = await this.userService.getUserById(userId);
+        const user = await this.userService.getUserById(userId.toString());
         
         if (user) {
-          await this.notificationService.sendAutoTopupFailureNotification(
+          await this.notificationService.sendAutoTopupNotification(
             userId,
-            errorMessage,
-            'suspended'
+            0,
+            0
           );
         }
 

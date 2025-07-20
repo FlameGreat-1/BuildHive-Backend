@@ -251,7 +251,7 @@ export class CreditService {
 
   async getCreditLimits(userId: number): Promise<CreditLimits> {
     try {
-      const user = await this.userService.getUserById(userId);
+      const user = await this.userService.getUserById(userId.toString());
       
       if (!user) {
         throw new Error('User not found');
@@ -318,7 +318,7 @@ export class CreditService {
     amount: number
   ): Promise<CreditValidationResult> {
     try {
-      const user = await this.userService.getUserById(userId);
+      const user = await this.userService.getUserById(userId.toString());
       
       if (!user) {
         return {
