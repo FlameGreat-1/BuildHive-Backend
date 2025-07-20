@@ -44,7 +44,6 @@ export class DatabaseConnection implements DatabaseClient {
         projectId: environment.FIREBASE_PROJECT_ID,
         privateKey: environment.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
         clientEmail: environment.FIREBASE_CLIENT_EMAIL,
-        clientId: '',
         authUri: 'https://accounts.google.com/oauth2/auth',
         tokenUri: 'https://oauth2.googleapis.com/token',
         authProviderX509CertUrl: 'https://www.googleapis.com/oauth2/v1/certs'
