@@ -74,13 +74,13 @@ export interface CreditDashboard {
   totalPurchased: number;
   totalUsed: number;
   totalRefunded: number;
-  recentTransactions: CreditTransactionRecord[];
+  recentTransactions: CreditTransactionSummary[];
   usageBreakdown: CreditUsageBreakdown[];
   autoTopupStatus: AutoTopupStatus;
   lowBalanceAlert: boolean;
 }
 
-export interface CreditTransactionRecord {
+export interface CreditTransactionSummary {
   id: number;
   type: CreditTransactionType;
   credits: number;

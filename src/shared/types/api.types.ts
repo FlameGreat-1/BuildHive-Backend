@@ -1,5 +1,6 @@
-
 import { PaymentStatus, PaymentMethod, PaymentType, RefundStatus, QuoteStatus, QuoteItemType, DeliveryMethod, CreditTransactionType, CreditTransactionStatus, CreditUsageType, CreditPackageType, AutoTopupStatus } from './database.types';
+import { CreditTransactionResponse } from '../../credits/types';
+
 export interface ApiResponse<T = any> {
   success: boolean;
   message: string;
@@ -700,14 +701,6 @@ export interface SubscriptionResponse {
   stripeSubscriptionId: string;
 }
 
-export interface CreditTransactionResponse {
-  id: number;
-  credits: number;
-  transactionType: string;
-  description?: string;
-  createdAt: string;
-}
-
 export interface PaymentLinkRequest {
   amount: number;
   currency: string;
@@ -996,20 +989,6 @@ export interface CreditTransactionRequest {
   limit?: number;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
-}
-
-export interface CreditTransactionResponse {
-  id: number;
-  transactionType: CreditTransactionType;
-  credits: number;
-  status: CreditTransactionStatus;
-  description: string;
-  referenceId?: number;
-  referenceType?: string;
-  expiresAt?: string;
-  metadata?: Record<string, any>;
-  createdAt: string;
-  updatedAt: string;
 }
 
 export interface CreditTransactionListResponse {
