@@ -41,16 +41,15 @@ export class DatabaseConnection implements DatabaseClient {
   private initializeFirebase(): void {
     try {
       const serviceAccount: ServiceAccount = {
-        project_id: environment.FIREBASE_PROJECT_ID,
-        private_key_id: '',
-        private_key: environment.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-        client_email: environment.FIREBASE_CLIENT_EMAIL,
-        client_id: '',
-        auth_uri: 'https://accounts.google.com/o/oauth2/auth',
-        token_uri: 'https://oauth2.googleapis.com/token',
-        auth_provider_x509_cert_url: 'https://www.googleapis.com/oauth2/v1/certs'
+        projectId: environment.FIREBASE_PROJECT_ID,
+        privateKeyId: '',
+        privateKey: environment.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+        clientEmail: environment.FIREBASE_CLIENT_EMAIL,
+        clientId: '',
+        authUri: 'https://accounts.google.com/oauth2/auth',
+        tokenUri: 'https://oauth2.googleapis.com/token',
+        authProviderX509CertUrl: 'https://www.googleapis.com/oauth2/v1/certs'
       };
-
       this.firebaseApp = initializeApp({
         credential: cert(serviceAccount),
         databaseURL: environment.FIREBASE_DATABASE_URL

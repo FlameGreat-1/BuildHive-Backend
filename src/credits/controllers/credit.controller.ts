@@ -29,11 +29,12 @@ export class CreditController {
 
   async getCreditBalance(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.user?.id;
+      const userId = req.user?.id ? parseInt(req.user.id) : undefined;
       const requestId = res.locals.requestId;
 
       if (!userId) {
-        return sendBadRequestError(res, 'User ID is required');
+        sendBadRequestError(res, 'User ID is required');
+        return;
       }
 
       const balance = await this.creditService.getCreditBalance(userId);
@@ -60,11 +61,12 @@ export class CreditController {
 
   async getCreditDashboard(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.user?.id;
+      const userId = req.user?.id ? parseInt(req.user.id) : undefined;
       const requestId = res.locals.requestId;
 
       if (!userId) {
-        return sendBadRequestError(res, 'User ID is required');
+        sendBadRequestError(res, 'User ID is required');
+        return;
       }
 
       const dashboard = await this.creditService.getCreditDashboard(userId);
@@ -91,11 +93,12 @@ export class CreditController {
 
   async getCreditLimits(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.user?.id;
+      const userId = req.user?.id ? parseInt(req.user.id) : undefined;
       const requestId = res.locals.requestId;
 
       if (!userId) {
-        return sendBadRequestError(res, 'User ID is required');
+        sendBadRequestError(res, 'User ID is required');
+        return;
       }
 
       const limits = await this.creditService.getCreditLimits(userId);
@@ -122,16 +125,18 @@ export class CreditController {
 
   async checkCreditSufficiency(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.user?.id;
+      const userId = req.user?.id ? parseInt(req.user.id) : undefined;
       const { requiredCredits } = req.body;
       const requestId = res.locals.requestId;
 
       if (!userId) {
-        return sendBadRequestError(res, 'User ID is required');
+        sendBadRequestError(res, 'User ID is required');
+        return;
       }
 
       if (!requiredCredits || requiredCredits <= 0) {
-        return sendBadRequestError(res, 'Valid required credits amount is needed');
+        sendBadRequestError(res, 'Valid required credits amount is needed');
+        return;
       }
 
       const balanceCheck = await this.creditService.checkCreditSufficiency(userId, requiredCredits);
@@ -160,12 +165,13 @@ export class CreditController {
 
   async getExpiringCredits(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.user?.id;
+      const userId = req.user?.id ? parseInt(req.user.id) : undefined;
       const { daysThreshold = 7 } = req.query;
       const requestId = res.locals.requestId;
 
       if (!userId) {
-        return sendBadRequestError(res, 'User ID is required');
+        sendBadRequestError(res, 'User ID is required');
+        return;
       }
 
       const expiringCredits = await this.creditService.getExpiringCredits(
@@ -196,12 +202,13 @@ export class CreditController {
 
   async setupAutoTopup(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.user?.id;
+      const userId = req.user?.id ? parseInt(req.user.id) : undefined;
       const { enabled, triggerBalance, topupAmount, packageType, paymentMethodId } = req.body;
       const requestId = res.locals.requestId;
 
       if (!userId) {
-        return sendBadRequestError(res, 'User ID is required');
+        sendBadRequestError(res, 'User ID is required');
+        return;
       }
 
       const settings: AutoTopupSettings = {
@@ -239,17 +246,19 @@ export class CreditController {
 
   async getAutoTopupSettings(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.user?.id;
+      const userId = req.user?.id ? parseInt(req.user.id) : undefined;
       const requestId = res.locals.requestId;
 
       if (!userId) {
-        return sendBadRequestError(res, 'User ID is required');
+        sendBadRequestError(res, 'User ID is required');
+        return;
       }
 
       const settings = await this.autoTopupService.getAutoTopupSettings(userId);
 
       if (!settings) {
-        return sendNotFoundError(res, 'Auto topup settings not found');
+        sendNotFoundError(res, 'Auto topup settings not found');
+        return;
       }
 
       logger.info('Auto topup settings retrieved', {
@@ -274,11 +283,12 @@ export class CreditController {
 
   async enableAutoTopup(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.user?.id;
+      const userId = req.user?.id ? parseInt(req.user.id) : undefined;
       const requestId = res.locals.requestId;
 
       if (!userId) {
-        return sendBadRequestError(res, 'User ID is required');
+        sendBadRequestError(res, 'User ID is required');
+        return;
       }
 
       const settings = await this.autoTopupService.enableAutoTopup(userId);
@@ -304,11 +314,12 @@ export class CreditController {
 
   async disableAutoTopup(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.user?.id;
+      const userId = req.user?.id ? parseInt(req.user.id) : undefined;
       const requestId = res.locals.requestId;
 
       if (!userId) {
-        return sendBadRequestError(res, 'User ID is required');
+        sendBadRequestError(res, 'User ID is required');
+        return;
       }
 
       const settings = await this.autoTopupService.disableAutoTopup(userId);
@@ -334,16 +345,18 @@ export class CreditController {
 
   async updateAutoTopupPaymentMethod(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.user?.id;
+      const userId = req.user?.id ? parseInt(req.user.id) : undefined;
       const { paymentMethodId } = req.body;
       const requestId = res.locals.requestId;
 
       if (!userId) {
-        return sendBadRequestError(res, 'User ID is required');
+        sendBadRequestError(res, 'User ID is required');
+        return;
       }
 
       if (!paymentMethodId) {
-        return sendBadRequestError(res, 'Payment method ID is required');
+        sendBadRequestError(res, 'Payment method ID is required');
+        return;
       }
 
       const settings = await this.autoTopupService.updatePaymentMethod(userId, paymentMethodId);
@@ -370,12 +383,13 @@ export class CreditController {
 
   async getAutoTopupHistory(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.user?.id;
+      const userId = req.user?.id ? parseInt(req.user.id) : undefined;
       const { limit = 10 } = req.query;
       const requestId = res.locals.requestId;
 
       if (!userId) {
-        return sendBadRequestError(res, 'User ID is required');
+        sendBadRequestError(res, 'User ID is required');
+        return;
       }
 
       const history = await this.autoTopupService.getAutoTopupHistory(
@@ -405,16 +419,18 @@ export class CreditController {
 
   async validateCreditOperation(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.user?.id;
+      const userId = req.user?.id ? parseInt(req.user.id) : undefined;
       const { operation, amount } = req.body;
       const requestId = res.locals.requestId;
 
       if (!userId) {
-        return sendBadRequestError(res, 'User ID is required');
+        sendBadRequestError(res, 'User ID is required');
+        return;
       }
 
       if (!operation || !amount) {
-        return sendBadRequestError(res, 'Operation and amount are required');
+        sendBadRequestError(res, 'Operation and amount are required');
+        return;
       }
 
       const validation = await this.creditService.validateCreditOperation(userId, operation, amount);
@@ -443,11 +459,12 @@ export class CreditController {
 
   async awardTrialCredits(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.user?.id;
+      const userId = req.user?.id ? parseInt(req.user.id) : undefined;
       const requestId = res.locals.requestId;
 
       if (!userId) {
-        return sendBadRequestError(res, 'User ID is required');
+        sendBadRequestError(res, 'User ID is required');
+        return;
       }
 
       const balance = await this.creditService.awardTrialCredits(userId);

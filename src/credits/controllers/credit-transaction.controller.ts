@@ -24,12 +24,13 @@ export class CreditTransactionController {
 
   async createTransaction(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.user?.id;
+      const userId = req.user?.id ? parseInt(req.user.id) : undefined;
       const { transactionType, credits, description, referenceId, referenceType, usageType, metadata } = req.body;
       const requestId = res.locals.requestId;
 
       if (!userId) {
-        return sendBadRequestError(res, 'User ID is required');
+        sendBadRequestError(res, 'User ID is required');
+        return;
       }
 
       const transactionRequest: CreditTransactionRequest = {
@@ -69,16 +70,18 @@ export class CreditTransactionController {
 
   async processJobApplicationCredit(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.user?.id;
+      const userId = req.user?.id ? parseInt(req.user.id) : undefined;
       const { jobId, creditsRequired } = req.body;
       const requestId = res.locals.requestId;
 
       if (!userId) {
-        return sendBadRequestError(res, 'User ID is required');
+        sendBadRequestError(res, 'User ID is required');
+        return;
       }
 
       if (!jobId || !creditsRequired) {
-        return sendBadRequestError(res, 'Job ID and credits required are needed');
+        sendBadRequestError(res, 'Job ID and credits required are needed');
+        return;
       }
 
       const transactionResponse = await this.transactionService.processJobApplicationCredit(
@@ -113,16 +116,18 @@ export class CreditTransactionController {
 
   async processProfileBoostCredit(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.user?.id;
+      const userId = req.user?.id ? parseInt(req.user.id) : undefined;
       const { boostType, duration, creditsRequired } = req.body;
       const requestId = res.locals.requestId;
 
       if (!userId) {
-        return sendBadRequestError(res, 'User ID is required');
+        sendBadRequestError(res, 'User ID is required');
+        return;
       }
 
       if (!boostType || !duration || !creditsRequired) {
-        return sendBadRequestError(res, 'Boost type, duration, and credits required are needed');
+        sendBadRequestError(res, 'Boost type, duration, and credits required are needed');
+        return;
       }
 
       const transactionResponse = await this.transactionService.processProfileBoostCredit(
@@ -158,16 +163,18 @@ export class CreditTransactionController {
 
   async processPremiumJobUnlock(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.user?.id;
+      const userId = req.user?.id ? parseInt(req.user.id) : undefined;
       const { jobId, creditsRequired } = req.body;
       const requestId = res.locals.requestId;
 
       if (!userId) {
-        return sendBadRequestError(res, 'User ID is required');
+        sendBadRequestError(res, 'User ID is required');
+        return;
       }
 
       if (!jobId || !creditsRequired) {
-        return sendBadRequestError(res, 'Job ID and credits required are needed');
+        sendBadRequestError(res, 'Job ID and credits required are needed');
+        return;
       }
 
       const transactionResponse = await this.transactionService.processPremiumJobUnlock(
@@ -206,13 +213,15 @@ export class CreditTransactionController {
       const requestId = res.locals.requestId;
 
       if (!transactionId) {
-        return sendBadRequestError(res, 'Transaction ID is required');
+        sendBadRequestError(res, 'Transaction ID is required');
+        return;
       }
 
       const transaction = await this.transactionService.getTransactionById(parseInt(transactionId));
 
       if (!transaction) {
-        return sendNotFoundError(res, 'Transaction not found');
+        sendNotFoundError(res, 'Transaction not found');
+        return;
       }
 
       logger.info('Credit transaction retrieved', {
@@ -237,7 +246,7 @@ export class CreditTransactionController {
 
   async getTransactionHistory(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.user?.id;
+      const userId = req.user?.id ? parseInt(req.user.id) : undefined;
       const { 
         page = 1,
         limit = 10,
@@ -254,10 +263,12 @@ export class CreditTransactionController {
       const requestId = res.locals.requestId;
 
       if (!userId) {
-        return sendBadRequestError(res, 'User ID is required');
+        sendBadRequestError(res, 'User ID is required');
+        return;
       }
 
       const filter: CreditTransactionFilter = {
+        userId: userId,
         page: parseInt(page as string),
         limit: parseInt(limit as string),
         transactionType: transactionType as CreditTransactionType,
@@ -297,12 +308,13 @@ export class CreditTransactionController {
 
   async getTransactionSummary(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.user?.id;
+      const userId = req.user?.id ? parseInt(req.user.id) : undefined;
       const { dateFrom, dateTo } = req.query;
       const requestId = res.locals.requestId;
 
       if (!userId) {
-        return sendBadRequestError(res, 'User ID is required');
+        sendBadRequestError(res, 'User ID is required');
+        return;
       }
 
       const summary = await this.transactionService.getTransactionSummary(
@@ -340,11 +352,13 @@ export class CreditTransactionController {
       const requestId = res.locals.requestId;
 
       if (!transactionId) {
-        return sendBadRequestError(res, 'Transaction ID is required');
+        sendBadRequestError(res, 'Transaction ID is required');
+        return;
       }
 
       if (!reason) {
-        return sendBadRequestError(res, 'Cancellation reason is required');
+        sendBadRequestError(res, 'Cancellation reason is required');
+        return;
       }
 
       const cancelledTransaction = await this.transactionService.cancelTransaction(
@@ -380,11 +394,13 @@ export class CreditTransactionController {
       const requestId = res.locals.requestId;
 
       if (!transactionId) {
-        return sendBadRequestError(res, 'Transaction ID is required');
+        sendBadRequestError(res, 'Transaction ID is required');
+        return;
       }
 
       if (!refundAmount || !reason) {
-        return sendBadRequestError(res, 'Refund amount and reason are required');
+        sendBadRequestError(res, 'Refund amount and reason are required');
+        return;
       }
 
       const refundResponse = await this.transactionService.refundTransaction(
@@ -417,12 +433,13 @@ export class CreditTransactionController {
 
   async validateTransactionRequest(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.user?.id;
+      const userId = req.user?.id ? parseInt(req.user.id) : undefined;
       const { transactionType, credits, description, usageType } = req.body;
       const requestId = res.locals.requestId;
 
       if (!userId) {
-        return sendBadRequestError(res, 'User ID is required');
+        sendBadRequestError(res, 'User ID is required');
+        return;
       }
 
       const transactionRequest: CreditTransactionRequest = {

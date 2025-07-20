@@ -26,12 +26,13 @@ export class CreditPurchaseController {
 
   async initiatePurchase(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.user?.id;
+      const userId = req.user?.id ? parseInt(req.user.id) : undefined;
       const { packageType, paymentMethodId, autoTopup, promoCode } = req.body;
       const requestId = res.locals.requestId;
 
       if (!userId) {
-        return sendBadRequestError(res, 'User ID is required');
+        sendBadRequestError(res, 'User ID is required');
+        return;
       }
 
       const purchaseRequest: CreditPurchaseRequest = {
@@ -73,11 +74,13 @@ export class CreditPurchaseController {
       const requestId = res.locals.requestId;
 
       if (!purchaseId) {
-        return sendBadRequestError(res, 'Purchase ID is required');
+        sendBadRequestError(res, 'Purchase ID is required');
+        return;
       }
 
       if (!paymentId || !paymentIntentId) {
-        return sendBadRequestError(res, 'Payment ID and Payment Intent ID are required');
+        sendBadRequestError(res, 'Payment ID and Payment Intent ID are required');
+        return;
       }
 
       const completedPurchase = await this.purchaseService.completePurchase(
@@ -115,11 +118,13 @@ export class CreditPurchaseController {
       const requestId = res.locals.requestId;
 
       if (!purchaseId) {
-        return sendBadRequestError(res, 'Purchase ID is required');
+        sendBadRequestError(res, 'Purchase ID is required');
+        return;
       }
 
       if (!reason) {
-        return sendBadRequestError(res, 'Cancellation reason is required');
+        sendBadRequestError(res, 'Cancellation reason is required');
+        return;
       }
 
       const cancelledPurchase = await this.purchaseService.cancelPurchase(
@@ -155,11 +160,13 @@ export class CreditPurchaseController {
       const requestId = res.locals.requestId;
 
       if (!purchaseId) {
-        return sendBadRequestError(res, 'Purchase ID is required');
+        sendBadRequestError(res, 'Purchase ID is required');
+        return;
       }
 
       if (!refundAmount || !reason) {
-        return sendBadRequestError(res, 'Refund amount and reason are required');
+        sendBadRequestError(res, 'Refund amount and reason are required');
+        return;
       }
 
       await this.purchaseService.refundPurchase(
@@ -193,13 +200,15 @@ export class CreditPurchaseController {
       const requestId = res.locals.requestId;
 
       if (!purchaseId) {
-        return sendBadRequestError(res, 'Purchase ID is required');
+        sendBadRequestError(res, 'Purchase ID is required');
+        return;
       }
 
       const purchase = await this.purchaseService.getPurchaseById(parseInt(purchaseId));
 
       if (!purchase) {
-        return sendNotFoundError(res, 'Purchase not found');
+        sendNotFoundError(res, 'Purchase not found');
+        return;
       }
 
       logger.info('Credit purchase retrieved', {
@@ -224,7 +233,7 @@ export class CreditPurchaseController {
 
   async getPurchaseHistory(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.user?.id;
+      const userId = req.user?.id ? parseInt(req.user.id) : undefined;
       const { 
         page = 1, 
         limit = 10, 
@@ -236,7 +245,8 @@ export class CreditPurchaseController {
       const requestId = res.locals.requestId;
 
       if (!userId) {
-        return sendBadRequestError(res, 'User ID is required');
+        sendBadRequestError(res, 'User ID is required');
+        return;
       }
 
       const history = await this.purchaseService.getPurchaseHistory(
@@ -277,7 +287,8 @@ export class CreditPurchaseController {
       const requestId = res.locals.requestId;
 
       if (!packageType) {
-        return sendBadRequestError(res, 'Package type is required');
+        sendBadRequestError(res, 'Package type is required');
+        return;
       }
 
       const calculation = await this.purchaseService.calculatePurchase(packageType, promoCode);
@@ -309,7 +320,8 @@ export class CreditPurchaseController {
       const requestId = res.locals.requestId;
 
       if (!purchaseId) {
-        return sendBadRequestError(res, 'Purchase ID is required');
+        sendBadRequestError(res, 'Purchase ID is required');
+        return;
       }
 
       const receipt = await this.purchaseService.generateReceipt(parseInt(purchaseId));
@@ -336,16 +348,18 @@ export class CreditPurchaseController {
 
   async processApplePayPurchase(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.user?.id;
+      const userId = req.user?.id ? parseInt(req.user.id) : undefined;
       const { packageType, applePayToken, promoCode } = req.body;
       const requestId = res.locals.requestId;
 
       if (!userId) {
-        return sendBadRequestError(res, 'User ID is required');
+        sendBadRequestError(res, 'User ID is required');
+        return;
       }
 
       if (!packageType || !applePayToken) {
-        return sendBadRequestError(res, 'Package type and Apple Pay token are required');
+        sendBadRequestError(res, 'Package type and Apple Pay token are required');
+        return;
       }
 
       const purchaseRequest: CreditPurchaseRequest = {
@@ -383,16 +397,18 @@ export class CreditPurchaseController {
 
   async processGooglePayPurchase(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.user?.id;
+      const userId = req.user?.id ? parseInt(req.user.id) : undefined;
       const { packageType, googlePayToken, promoCode } = req.body;
       const requestId = res.locals.requestId;
 
       if (!userId) {
-        return sendBadRequestError(res, 'User ID is required');
+        sendBadRequestError(res, 'User ID is required');
+        return;
       }
 
       if (!packageType || !googlePayToken) {
-        return sendBadRequestError(res, 'Package type and Google Pay token are required');
+        sendBadRequestError(res, 'Package type and Google Pay token are required');
+        return;
       }
 
       const purchaseRequest: CreditPurchaseRequest = {
@@ -461,15 +477,17 @@ export class CreditPurchaseController {
   async validatePromoCode(req: Request, res: Response): Promise<void> {
     try {
       const { promoCode, packageType } = req.body;
-      const userId = req.user?.id;
+      const userId = req.user?.id ? parseInt(req.user.id) : undefined;
       const requestId = res.locals.requestId;
 
       if (!promoCode || !packageType) {
-        return sendBadRequestError(res, 'Promo code and package type are required');
+        sendBadRequestError(res, 'Promo code and package type are required');
+        return;
       }
 
       if (!userId) {
-        return sendBadRequestError(res, 'User ID is required');
+        sendBadRequestError(res, 'User ID is required');
+        return;
       }
 
       const calculation = await this.purchaseService.calculatePurchase(packageType, promoCode);
