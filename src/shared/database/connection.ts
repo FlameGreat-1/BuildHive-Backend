@@ -834,7 +834,7 @@ export class DatabaseConnection implements DatabaseClient {
       
       if (this.firebaseApp) {
         try {
-          await this.firebaseApp.delete();
+          await deleteApp(this.firebaseApp);
           this.isFirestoreConnected = false;
           logger.info('Firebase/Firestore connection closed');
         } catch (firebaseError) {

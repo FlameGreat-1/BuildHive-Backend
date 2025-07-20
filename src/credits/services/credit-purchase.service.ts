@@ -30,9 +30,9 @@ import {
   PaymentType
 } from '../../shared/types';
 import { 
-  CREDIT_PACKAGES,
-  BUSINESS_DETAILS
+  CREDIT_PACKAGES
 } from '../../config/credits';
+import { BUSINESS_DETAILS } from '../../config/credits/pricing.config';
 
 export class CreditPurchaseService {
   private purchaseRepository: CreditPurchaseRepository;
@@ -468,9 +468,11 @@ export class CreditPurchaseService {
       const createdPurchase = await this.purchaseRepository.createPurchase(purchase.toJSON());
 
       const applePayResult = await this.applePayService.processApplePayPayment({
+        paymentData: applePayToken,
         amount: calculation.finalAmount,
         currency: 'AUD',
-        token: applePayToken,
+        paymentType: PaymentType.CREDIT_PURCHASE,
+        returnUrl: `${process.env.APP_URL}/payment/apple-pay/return`,
         metadata: {
           purchaseId: createdPurchase.id.toString(),
           userId: userId.toString(),
@@ -481,20 +483,20 @@ export class CreditPurchaseService {
       if (applePayResult.success) {
         await this.completePurchase(
           createdPurchase.id,
-          applePayResult.paymentId!,
-          applePayResult.transactionId!
+          parseInt(applePayResult.transactionId),
+          applePayResult.transactionId
         );
       } else {
         await this.purchaseRepository.updatePurchaseStatus(
           createdPurchase.id,
           CreditTransactionStatus.FAILED,
           undefined,
-          { failureReason: applePayResult.error }
+          { failureReason: 'Apple Pay payment failed' }
         );
-        throw new Error(applePayResult.error);
+        throw new Error('Apple Pay payment failed');
       }
 
-      return createdPurchase.toResponse(applePayResult.transactionId!, '');
+      return createdPurchase.toResponse(applePayResult.transactionId, '');
     } catch (error) {
       logger.error('Failed to process Apple Pay purchase', {
         userId,
@@ -517,9 +519,12 @@ export class CreditPurchaseService {
       const createdPurchase = await this.purchaseRepository.createPurchase(purchase.toJSON());
 
       const googlePayResult = await this.googlePayService.processGooglePayPayment({
+        token: googlePayToken,
+        paymentToken: googlePayToken,
         amount: calculation.finalAmount,
         currency: 'AUD',
-        token: googlePayToken,
+        paymentType: PaymentType.CREDIT_PURCHASE,
+        returnUrl: `${process.env.APP_URL}/payment/google-pay/return`,
         metadata: {
           purchaseId: createdPurchase.id.toString(),
           userId: userId.toString(),
@@ -530,20 +535,20 @@ export class CreditPurchaseService {
       if (googlePayResult.success) {
         await this.completePurchase(
           createdPurchase.id,
-          googlePayResult.paymentId!,
-          googlePayResult.transactionId!
+          parseInt(googlePayResult.transactionId),
+          googlePayResult.transactionId
         );
       } else {
         await this.purchaseRepository.updatePurchaseStatus(
           createdPurchase.id,
           CreditTransactionStatus.FAILED,
           undefined,
-          { failureReason: googlePayResult.error }
+          { failureReason: 'Google Pay payment failed' }
         );
-        throw new Error(googlePayResult.error);
+        throw new Error('Google Pay payment failed');
       }
 
-      return createdPurchase.toResponse(googlePayResult.transactionId!, '');
+      return createdPurchase.toResponse(googlePayResult.transactionId, '');
     } catch (error) {
       logger.error('Failed to process Google Pay purchase', {
         userId,

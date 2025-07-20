@@ -5,7 +5,8 @@ import {
   CreditBalanceCheck,
   CreditValidationResult,
   CreditLimits,
-  CreditExpiry
+  CreditExpiry,
+  CreditTransaction
 } from '../types';
 import { 
   CreditBalanceModel,
