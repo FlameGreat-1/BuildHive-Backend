@@ -38,13 +38,19 @@ export class CreditService {
   private creditRepository: CreditRepository;
   private userService: UserService;
   private notificationService: CreditNotificationService;
-  private autoTopupService: AutoTopupService;
+  private _autoTopupService?: AutoTopupService;
 
   constructor() {
     this.creditRepository = new CreditRepository();
     this.userService = new UserService();
     this.notificationService = new CreditNotificationService();
-    this.autoTopupService = new AutoTopupService();
+  }
+
+  private get autoTopupService(): AutoTopupService {
+    if (!this._autoTopupService) {
+      this._autoTopupService = new AutoTopupService();
+    }
+    return this._autoTopupService;
   }
 
   async getCreditBalance(userId: number): Promise<CreditBalanceModel> {

@@ -26,7 +26,7 @@ import {
 
 export class AutoTopupService {
   private creditRepository: CreditRepository;
-  private creditService: CreditService;
+  private _creditService?: CreditService;
   private purchaseService: CreditPurchaseService;
   private notificationService: CreditNotificationService;
   private userService: UserService;
@@ -34,11 +34,17 @@ export class AutoTopupService {
 
   constructor() {
     this.creditRepository = new CreditRepository();
-    this.creditService = new CreditService();
     this.purchaseService = new CreditPurchaseService();
     this.notificationService = new CreditNotificationService();
     this.userService = new UserService();
     this.stripeService = new StripeService();
+  }
+
+  private get creditService(): CreditService {
+    if (!this._creditService) {
+      this._creditService = new CreditService();
+    }
+    return this._creditService;
   }
 
   async setupAutoTopup(userId: number, settings: AutoTopupSettings): Promise<AutoTopupModel> {
