@@ -40,10 +40,6 @@ Dockerfile*
 docker-compose*
 .dockerignore
 
-# Documentation
-docs
-*.md
-
 # OS generated files
 .DS_Store
 .DS_Store?
