@@ -7,6 +7,7 @@ import { jobRoutes, clientRoutes, materialRoutes, attachmentRoutes } from '../jo
 import { quoteRoutes } from '../quotes/routes';
 import { paymentRoutes, paymentMethodRoutes, invoiceRoutes, refundRoutes, webhookRoutes } from '../payment/routes';
 import { creditRoutes, creditPurchaseRoutes, creditTransactionRoutes } from '../credits/routes';
+import feedsRoutes from '../feeds/routes';
 import { generalApiRateLimit } from '../shared/middleware';
 
 const router = Router();
@@ -30,6 +31,7 @@ router.use('/api/v1/webhooks', webhookRoutes);
 router.use('/api/v1/credits', creditRoutes);
 router.use('/api/v1/credits/purchases', creditPurchaseRoutes);
 router.use('/api/v1/credits/transactions', creditTransactionRoutes);
+router.use('/api/v1/feeds', feedsRoutes);
 
 router.get('/', (req, res) => {
   const routeData = {
@@ -55,7 +57,9 @@ router.get('/', (req, res) => {
       webhooks: '/api/v1/webhooks',
       credits: '/api/v1/credits',
       creditPurchases: '/api/v1/credits/purchases',
-      creditTransactions: '/api/v1/credits/transactions'
+      creditTransactions: '/api/v1/credits/transactions',
+      marketplace: '/api/v1/feeds/marketplace',
+      applications: '/api/v1/feeds/applications'
     },
     endpoints: {
       authentication: [
@@ -239,6 +243,38 @@ router.get('/', (req, res) => {
         'POST /api/v1/credits/transactions/:transactionId/cancel',
         'POST /api/v1/credits/transactions/:transactionId/refund',
         'POST /api/v1/credits/transactions/validate-request'
+      ],
+      marketplace: [
+        'POST /api/v1/feeds/marketplace',
+        'POST /api/v1/feeds/marketplace/authenticated',
+        'GET /api/v1/feeds/marketplace/search',
+        'GET /api/v1/feeds/marketplace/stats',
+        'GET /api/v1/feeds/marketplace/recommended',
+        'GET /api/v1/feeds/marketplace/client/jobs',
+        'POST /api/v1/feeds/marketplace/process-expired',
+        'POST /api/v1/feeds/marketplace/bulk/status',
+        'GET /api/v1/feeds/marketplace/:jobId',
+        'PUT /api/v1/feeds/marketplace/:jobId',
+        'PATCH /api/v1/feeds/marketplace/:jobId/status',
+        'DELETE /api/v1/feeds/marketplace/:jobId',
+        'GET /api/v1/feeds/marketplace/:jobId/credit-cost',
+        'GET /api/v1/feeds/marketplace/:jobId/applications',
+        'GET /api/v1/feeds/marketplace/:jobId/analytics'
+      ],
+      applications: [
+        'POST /api/v1/feeds/applications',
+        'GET /api/v1/feeds/applications/search',
+        'GET /api/v1/feeds/applications/tradie/history',
+        'GET /api/v1/feeds/applications/tradie/applications',
+        'GET /api/v1/feeds/applications/analytics',
+        'GET /api/v1/feeds/applications/status/:status',
+        'POST /api/v1/feeds/applications/bulk/status',
+        'GET /api/v1/feeds/applications/job/:jobId',
+        'GET /api/v1/feeds/applications/:applicationId',
+        'PUT /api/v1/feeds/applications/:applicationId',
+        'PATCH /api/v1/feeds/applications/:applicationId/status',
+        'POST /api/v1/feeds/applications/:applicationId/withdraw',
+        'GET /api/v1/feeds/applications/:applicationId/metrics'
       ]
     },
     features: {
@@ -266,7 +302,13 @@ router.get('/', (req, res) => {
       autoTopup: 'enabled',
       trialCredits: 'enabled',
       creditNotifications: 'enabled',
-      multiplePaymentMethods: 'enabled'
+      multiplePaymentMethods: 'enabled',
+      leadsMarketplace: 'enabled',
+      jobApplications: 'enabled',
+      marketplaceSearch: 'enabled',
+      applicationTracking: 'enabled',
+      creditBasedApplications: 'enabled',
+      realTimeNotifications: 'enabled'
     },
     security: {
       rateLimiting: 'active',
@@ -282,7 +324,11 @@ router.get('/', (req, res) => {
       creditOwnershipValidation: 'enforced',
       creditUsageLimits: 'enforced',
       creditPurchaseLimits: 'enforced',
-      autoTopupSecurity: 'enforced'
+      autoTopupSecurity: 'enforced',
+      marketplaceJobValidation: 'enforced',
+      applicationOwnershipValidation: 'enforced',
+      duplicateApplicationPrevention: 'enforced',
+      marketplaceRateLimiting: 'enforced'
     }
   };
 
@@ -290,7 +336,7 @@ router.get('/', (req, res) => {
 });
 
 logger.info('Main routes initialized', {
-  routes: ['health', 'auth', 'profile', 'validation', 'jobs', 'clients', 'materials', 'attachments', 'quotes', 'payments', 'payment-methods', 'invoices', 'refunds', 'webhooks', 'credits', 'credit-purchases', 'credit-transactions'],
+  routes: ['health', 'auth', 'profile', 'validation', 'jobs', 'clients', 'materials', 'attachments', 'quotes', 'payments', 'payment-methods', 'invoices', 'refunds', 'webhooks', 'credits', 'credit-purchases', 'credit-transactions', 'feeds-marketplace', 'feeds-applications'],
   environment: environment.NODE_ENV,
   authenticationEnabled: true,
   rateLimitingEnabled: true,
@@ -299,7 +345,9 @@ logger.info('Main routes initialized', {
   paymentProcessingEnabled: true,
   creditSystemEnabled: true,
   autoTopupEnabled: true,
-  totalEndpoints: 133
+  leadsMarketplaceEnabled: true,
+  jobApplicationsEnabled: true,
+  totalEndpoints: 159
 });
 
 export default router;

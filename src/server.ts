@@ -53,10 +53,16 @@ async function startServer(): Promise<void> {
           'credit-transactions',
           'auto-topup',
           'trial-credits',
-          'credit-notifications'
+          'credit-notifications',
+          'leads-marketplace',
+          'job-applications',
+          'marketplace-search',
+          'application-tracking',
+          'credit-based-applications',
+          'real-time-notifications'
         ],
         endpoints: {
-          total: 151,
+          total: 159,
           authentication: 12,
           profile: 13,
           validation: 12,
@@ -73,6 +79,8 @@ async function startServer(): Promise<void> {
           credits: 13,
           creditPurchases: 12,
           creditTransactions: 10,
+          marketplace: 15,
+          applications: 13,
           health: 1
         },
         routeGroups: {
@@ -81,6 +89,7 @@ async function startServer(): Promise<void> {
           quoteSystem: ['quotes'],
           paymentSystem: ['payments', 'payment-methods', 'invoices', 'refunds', 'webhooks'],
           creditSystem: ['credits', 'credit-purchases', 'credit-transactions'],
+          leadsMarketplace: ['marketplace', 'applications'],
           monitoring: ['health']
         }
       });

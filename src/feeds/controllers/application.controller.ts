@@ -1,1 +1,495 @@
-  
+import { Request, Response } from 'express';
+import { ApplicationService, MarketplaceService } from '../services';
+import { 
+  applicationMiddleware,
+  validateApplicationCreation,
+  validateApplicationUpdate,
+  validateApplicationSearch,
+  validateApplicationStatusUpdate,
+  checkApplicationOwnership,
+  checkApplicationWithdrawal,
+  rateLimitApplicationCreation,
+  rateLimitApplicationSearch,
+  logApplicationActivity,
+  validateTradieRole,
+  validateClientRole,
+  sanitizeApplicationData,
+  validatePagination,
+  validateApplicationFilters,
+  checkDuplicateApplication,
+  validateJobApplicationAccess,
+  cacheApplicationData,
+  trackApplicationViews,
+  requireApplicationAccess,
+  validateBulkApplicationOperations,
+  validateWithdrawalData,
+  checkApplicationLimit
+} from '../middleware';
+import { 
+  JobApplicationCreateData,
+  JobApplicationUpdateData,
+  JobApplicationSearchParams,
+  ApplicationStatusUpdate,
+  ApplicationWithdrawal
+} from '../types';
+import { authenticate, authorize } from '../../shared/middleware';
+import { logger, createApiResponse, validateRequest } from '../../shared/utils';
+import { ApiResponse } from '../../shared/types';
+
+export class ApplicationController {
+  private applicationService: ApplicationService;
+  private marketplaceService: MarketplaceService;
+
+  constructor() {
+    this.applicationService = new ApplicationService();
+    this.marketplaceService = new MarketplaceService();
+  }
+
+  createApplication = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const applicationData: JobApplicationCreateData = req.body;
+      const tradieId = req.user?.id;
+
+      if (!tradieId) {
+        const response = createApiResponse(false, 'Authentication required', null);
+        res.status(401).json(response);
+        return;
+      }
+
+      const result = await this.applicationService.createApplication(applicationData, tradieId);
+
+      if (result.success) {
+        logger.info('Job application created successfully', {
+          applicationId: result.data?.id,
+          tradieId,
+          marketplaceJobId: applicationData.marketplaceJobId,
+          creditsUsed: result.data?.creditsUsed
+        });
+      }
+
+      res.status(result.success ? 201 : 400).json(result);
+    } catch (error) {
+      logger.error('Error in createApplication controller', { error, userId: req.user?.id });
+      const response = createApiResponse(false, 'Failed to create application', null, [error]);
+      res.status(500).json(response);
+    }
+  };
+
+  getApplication = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { applicationId } = req.params;
+      const userId = req.user?.id;
+
+      if (!applicationId || isNaN(parseInt(applicationId))) {
+        const response = createApiResponse(false, 'Valid application ID is required', null);
+        res.status(400).json(response);
+        return;
+      }
+
+      const result = await this.applicationService.getApplication(parseInt(applicationId), userId);
+
+      res.status(result.success ? 200 : 404).json(result);
+    } catch (error) {
+      logger.error('Error in getApplication controller', { 
+        error, 
+        applicationId: req.params.applicationId 
+      });
+      const response = createApiResponse(false, 'Failed to retrieve application', null, [error]);
+      res.status(500).json(response);
+    }
+  };
+
+  getApplicationsByJob = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { jobId } = req.params;
+      const clientId = req.user?.id;
+
+      if (!jobId || isNaN(parseInt(jobId))) {
+        const response = createApiResponse(false, 'Valid job ID is required', null);
+        res.status(400).json(response);
+        return;
+      }
+
+      const result = await this.applicationService.getApplicationsByJob(parseInt(jobId), clientId);
+
+      res.status(result.success ? 200 : 403).json(result);
+    } catch (error) {
+      logger.error('Error in getApplicationsByJob controller', { 
+        error, 
+        jobId: req.params.jobId,
+        userId: req.user?.id 
+      });
+      const response = createApiResponse(false, 'Failed to retrieve applications', null, [error]);
+      res.status(500).json(response);
+    }
+  };
+
+  getTradieApplications = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const tradieId = req.user?.id;
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 20;
+      const status = req.query.status as string;
+
+      if (!tradieId) {
+        const response = createApiResponse(false, 'Authentication required', null);
+        res.status(401).json(response);
+        return;
+      }
+
+      const result = await this.applicationService.getTradieApplications(tradieId, {
+        page,
+        limit,
+        status
+      });
+
+      res.status(result.success ? 200 : 400).json(result);
+    } catch (error) {
+      logger.error('Error in getTradieApplications controller', { error, userId: req.user?.id });
+      const response = createApiResponse(false, 'Failed to retrieve tradie applications', null, [error]);
+      res.status(500).json(response);
+    }
+  };
+
+  searchApplications = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const searchParams: JobApplicationSearchParams = {
+        page: parseInt(req.query.page as string) || 1,
+        limit: parseInt(req.query.limit as string) || 20,
+        status: req.query.status as string,
+        tradieId: req.query.tradieId ? parseInt(req.query.tradieId as string) : undefined,
+        marketplaceJobId: req.query.marketplaceJobId ? parseInt(req.query.marketplaceJobId as string) : undefined,
+        dateRange: req.query.dateRange as string,
+        minQuote: req.query.minQuote ? parseFloat(req.query.minQuote as string) : undefined,
+        maxQuote: req.query.maxQuote ? parseFloat(req.query.maxQuote as string) : undefined
+      };
+
+      const result = await this.applicationService.searchApplications(searchParams);
+
+      res.status(result.success ? 200 : 400).json(result);
+    } catch (error) {
+      logger.error('Error in searchApplications controller', { error, query: req.query });
+      const response = createApiResponse(false, 'Failed to search applications', null, [error]);
+      res.status(500).json(response);
+    }
+  };
+
+  updateApplication = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { applicationId } = req.params;
+      const updateData: JobApplicationUpdateData = req.body;
+      const tradieId = req.user?.id;
+
+      if (!applicationId || isNaN(parseInt(applicationId))) {
+        const response = createApiResponse(false, 'Valid application ID is required', null);
+        res.status(400).json(response);
+        return;
+      }
+
+      if (!tradieId) {
+        const response = createApiResponse(false, 'Authentication required', null);
+        res.status(401).json(response);
+        return;
+      }
+
+      const result = await this.applicationService.updateApplication(
+        parseInt(applicationId),
+        updateData,
+        tradieId
+      );
+
+      res.status(result.success ? 200 : 400).json(result);
+    } catch (error) {
+      logger.error('Error in updateApplication controller', { 
+        error, 
+        applicationId: req.params.applicationId,
+        userId: req.user?.id 
+      });
+      const response = createApiResponse(false, 'Failed to update application', null, [error]);
+      res.status(500).json(response);
+    }
+  };
+
+  updateApplicationStatus = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { applicationId } = req.params;
+      const statusUpdate: ApplicationStatusUpdate = req.body;
+      const clientId = req.user?.id;
+
+      if (!applicationId || isNaN(parseInt(applicationId))) {
+        const response = createApiResponse(false, 'Valid application ID is required', null);
+        res.status(400).json(response);
+        return;
+      }
+
+      const result = await this.applicationService.updateApplicationStatus(
+        parseInt(applicationId),
+        statusUpdate,
+        clientId
+      );
+
+      res.status(result.success ? 200 : 400).json(result);
+    } catch (error) {
+      logger.error('Error in updateApplicationStatus controller', { 
+        error, 
+        applicationId: req.params.applicationId,
+        userId: req.user?.id 
+      });
+      const response = createApiResponse(false, 'Failed to update application status', null, [error]);
+      res.status(500).json(response);
+    }
+  };
+
+  withdrawApplication = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { applicationId } = req.params;
+      const withdrawalData: ApplicationWithdrawal = req.body;
+      const tradieId = req.user?.id;
+
+      if (!applicationId || isNaN(parseInt(applicationId))) {
+        const response = createApiResponse(false, 'Valid application ID is required', null);
+        res.status(400).json(response);
+        return;
+      }
+
+      if (!tradieId) {
+        const response = createApiResponse(false, 'Authentication required', null);
+        res.status(401).json(response);
+        return;
+      }
+
+      const result = await this.applicationService.withdrawApplication(
+        parseInt(applicationId),
+        tradieId,
+        withdrawalData
+      );
+
+      res.status(result.success ? 200 : 400).json(result);
+    } catch (error) {
+      logger.error('Error in withdrawApplication controller', { 
+        error, 
+        applicationId: req.params.applicationId,
+        userId: req.user?.id 
+      });
+      const response = createApiResponse(false, 'Failed to withdraw application', null, [error]);
+      res.status(500).json(response);
+    }
+  };
+
+  getTradieApplicationHistory = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const tradieId = req.user?.id;
+
+      if (!tradieId) {
+        const response = createApiResponse(false, 'Authentication required', null);
+        res.status(401).json(response);
+        return;
+      }
+
+      const result = await this.applicationService.getTradieApplicationHistory(tradieId);
+
+      res.status(result.success ? 200 : 400).json(result);
+    } catch (error) {
+      logger.error('Error in getTradieApplicationHistory controller', { error, userId: req.user?.id });
+      const response = createApiResponse(false, 'Failed to retrieve application history', null, [error]);
+      res.status(500).json(response);
+    }
+  };
+
+  getApplicationAnalytics = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const tradieId = req.query.tradieId ? parseInt(req.query.tradieId as string) : req.user?.id;
+      const startDate = req.query.startDate ? new Date(req.query.startDate as string) : undefined;
+      const endDate = req.query.endDate ? new Date(req.query.endDate as string) : undefined;
+      const groupBy = req.query.groupBy as 'day' | 'week' | 'month' | 'status';
+
+      const params = {
+        tradieId,
+        startDate,
+        endDate,
+        groupBy
+      };
+
+      const result = await this.applicationService.getApplicationAnalytics(params);
+
+      res.status(result.success ? 200 : 400).json(result);
+    } catch (error) {
+      logger.error('Error in getApplicationAnalytics controller', { error, query: req.query });
+      const response = createApiResponse(false, 'Failed to retrieve analytics', null, [error]);
+      res.status(500).json(response);
+    }
+  };
+
+  bulkUpdateApplicationStatus = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { applicationIds, status, reason, feedback } = req.body;
+      const clientId = req.user?.id;
+
+      if (!clientId) {
+        const response = createApiResponse(false, 'Authentication required', null);
+        res.status(401).json(response);
+        return;
+      }
+
+      const results = [];
+      for (const applicationId of applicationIds) {
+        try {
+          const result = await this.applicationService.updateApplicationStatus(
+            parseInt(applicationId),
+            { status, reason, feedback },
+            clientId
+          );
+          results.push({ 
+            applicationId, 
+            success: result.success, 
+            message: result.message 
+          });
+        } catch (error) {
+          results.push({ 
+            applicationId, 
+            success: false, 
+            message: 'Failed to update application status' 
+          });
+        }
+      }
+
+      const successCount = results.filter(r => r.success).length;
+      const response = createApiResponse(
+        true,
+        `Updated ${successCount} of ${applicationIds.length} applications`,
+        { results, successCount, totalCount: applicationIds.length }
+      );
+
+      res.status(200).json(response);
+    } catch (error) {
+      logger.error('Error in bulkUpdateApplicationStatus controller', { error, userId: req.user?.id });
+      const response = createApiResponse(false, 'Failed to bulk update application status', null, [error]);
+      res.status(500).json(response);
+    }
+  };
+
+  getApplicationsByStatus = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { status } = req.params;
+      const userId = req.user?.id;
+      const userRole = req.user?.role;
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 20;
+
+      if (!userId) {
+        const response = createApiResponse(false, 'Authentication required', null);
+        res.status(401).json(response);
+        return;
+      }
+
+      const searchParams: JobApplicationSearchParams = {
+        page,
+        limit,
+        status,
+        tradieId: userRole === 'tradie' ? userId : undefined
+      };
+
+      const result = await this.applicationService.searchApplications(searchParams);
+
+      res.status(result.success ? 200 : 400).json(result);
+    } catch (error) {
+      logger.error('Error in getApplicationsByStatus controller', { 
+        error, 
+        status: req.params.status,
+        userId: req.user?.id 
+      });
+      const response = createApiResponse(false, 'Failed to retrieve applications by status', null, [error]);
+      res.status(500).json(response);
+    }
+  };
+
+  getApplicationMetrics = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { applicationId } = req.params;
+      const userId = req.user?.id;
+
+      if (!applicationId || isNaN(parseInt(applicationId))) {
+        const response = createApiResponse(false, 'Valid application ID is required', null);
+        res.status(400).json(response);
+        return;
+      }
+
+      const applicationResult = await this.applicationService.getApplication(parseInt(applicationId), userId);
+      if (!applicationResult.success || !applicationResult.data) {
+        const response = createApiResponse(false, 'Application not found', null);
+        res.status(404).json(response);
+        return;
+      }
+
+      const application = applicationResult.data;
+      const metrics = {
+        applicationId: parseInt(applicationId),
+        submissionDate: application.applicationTimestamp,
+        status: application.status,
+        creditsUsed: application.creditsUsed,
+        customQuote: application.customQuote,
+        proposedTimeline: application.proposedTimeline,
+        competitorCount: application.job.applicationCount || 0,
+        averageQuote: 0,
+        rankPosition: 0,
+        responseTime: application.job.applications ? 
+          Math.min(...application.job.applications.map(app => 
+            new Date(app.applicationTimestamp).getTime() - new Date(application.job.createdAt).getTime()
+          )) : 0
+      };
+
+      if (application.job.applications && application.job.applications.length > 0) {
+        const quotes = application.job.applications
+          .map(app => app.customQuote || 0)
+          .filter(quote => quote > 0);
+        
+        metrics.averageQuote = quotes.reduce((sum, quote) => sum + quote, 0) / quotes.length;
+        
+        const sortedByQuote = application.job.applications
+          .filter(app => app.customQuote && app.customQuote > 0)
+          .sort((a, b) => (a.customQuote || 0) - (b.customQuote || 0));
+        
+        metrics.rankPosition = sortedByQuote.findIndex(app => app.id === application.id) + 1;
+      }
+
+      const response = createApiResponse(true, 'Application metrics retrieved successfully', metrics);
+      res.status(200).json(response);
+    } catch (error) {
+      logger.error('Error in getApplicationMetrics controller', { 
+        error, 
+        applicationId: req.params.applicationId,
+        userId: req.user?.id 
+      });
+      const response = createApiResponse(false, 'Failed to retrieve application metrics', null, [error]);
+      res.status(500).json(response);
+    }
+  };
+
+  async destroy(): Promise<void> {
+    try {
+      await this.applicationService.destroy();
+      await this.marketplaceService.destroy();
+      logger.info('ApplicationController destroyed successfully');
+    } catch (error) {
+      logger.error('Error destroying ApplicationController', { error });
+    }
+  }
+}
+
+export const applicationController = new ApplicationController();
+
+export const {
+  createApplication,
+  getApplication,
+  getApplicationsByJob,
+  getTradieApplications,
+  searchApplications,
+  updateApplication,
+  updateApplicationStatus,
+  withdrawApplication,
+  getTradieApplicationHistory,
+  getApplicationAnalytics,
+  bulkUpdateApplicationStatus,
+  getApplicationsByStatus,
+  getApplicationMetrics
+} = applicationController;

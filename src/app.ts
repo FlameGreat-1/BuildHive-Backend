@@ -80,7 +80,9 @@ export async function createApp(): Promise<Application> {
           webhooks: '/api/v1/webhooks',
           credits: '/api/v1/credits',
           creditPurchases: '/api/v1/credits/purchases',
-          creditTransactions: '/api/v1/credits/transactions'
+          creditTransactions: '/api/v1/credits/transactions',
+          marketplace: '/api/v1/feeds/marketplace',
+          applications: '/api/v1/feeds/applications'
         },
         features: {
           authentication: {
@@ -270,6 +272,40 @@ export async function createApp(): Promise<Application> {
               refund: '/api/v1/credits/transactions/:transactionId/refund',
               validateRequest: '/api/v1/credits/transactions/validate-request'
             }
+          },
+          leadsMarketplace: {
+            marketplace: {
+              create: '/api/v1/feeds/marketplace',
+              createAuthenticated: '/api/v1/feeds/marketplace/authenticated',
+              search: '/api/v1/feeds/marketplace/search',
+              stats: '/api/v1/feeds/marketplace/stats',
+              recommended: '/api/v1/feeds/marketplace/recommended',
+              clientJobs: '/api/v1/feeds/marketplace/client/jobs',
+              processExpired: '/api/v1/feeds/marketplace/process-expired',
+              bulkStatus: '/api/v1/feeds/marketplace/bulk/status',
+              view: '/api/v1/feeds/marketplace/:jobId',
+              update: '/api/v1/feeds/marketplace/:jobId',
+              updateStatus: '/api/v1/feeds/marketplace/:jobId/status',
+              delete: '/api/v1/feeds/marketplace/:jobId',
+              creditCost: '/api/v1/feeds/marketplace/:jobId/credit-cost',
+              applications: '/api/v1/feeds/marketplace/:jobId/applications',
+              analytics: '/api/v1/feeds/marketplace/:jobId/analytics'
+            },
+            applications: {
+              create: '/api/v1/feeds/applications',
+              search: '/api/v1/feeds/applications/search',
+              tradieHistory: '/api/v1/feeds/applications/tradie/history',
+              tradieApplications: '/api/v1/feeds/applications/tradie/applications',
+              analytics: '/api/v1/feeds/applications/analytics',
+              byStatus: '/api/v1/feeds/applications/status/:status',
+              bulkStatus: '/api/v1/feeds/applications/bulk/status',
+              byJob: '/api/v1/feeds/applications/job/:jobId',
+              view: '/api/v1/feeds/applications/:applicationId',
+              update: '/api/v1/feeds/applications/:applicationId',
+              updateStatus: '/api/v1/feeds/applications/:applicationId/status',
+              withdraw: '/api/v1/feeds/applications/:applicationId/withdraw',
+              metrics: '/api/v1/feeds/applications/:applicationId/metrics'
+            }
           }
         },
         security: {
@@ -288,7 +324,11 @@ export async function createApp(): Promise<Application> {
           creditOwnershipValidation: 'enforced',
           creditUsageLimits: 'enforced',
           creditPurchaseLimits: 'enforced',
-          autoTopupSecurity: 'enforced'
+          autoTopupSecurity: 'enforced',
+          marketplaceJobValidation: 'enforced',
+          applicationOwnershipValidation: 'enforced',
+          duplicateApplicationPrevention: 'enforced',
+          marketplaceRateLimiting: 'enforced'
         },
         capabilities: {
           maxFileSize: '10MB',
@@ -308,7 +348,13 @@ export async function createApp(): Promise<Application> {
           refundProcessing: true,
           promoCodeSupport: true,
           receiptGeneration: true,
-          creditAnalytics: true
+          creditAnalytics: true,
+          leadsMarketplace: true,
+          jobApplications: true,
+          marketplaceSearch: true,
+          applicationTracking: true,
+          creditBasedApplications: true,
+          realTimeNotifications: true
         }
       });
     });
@@ -340,9 +386,15 @@ export async function createApp(): Promise<Application> {
         'credit-transactions',
         'auto-topup',
         'trial-credits',
-        'credit-notifications'
+        'credit-notifications',
+        'leads-marketplace',
+        'job-applications',
+        'marketplace-search',
+        'application-tracking',
+        'credit-based-applications',
+        'real-time-notifications'
       ],
-      totalEndpoints: 133,
+      totalEndpoints: 159,
       version: '1.0.0',
       documentation: '/api-docs'
     });
