@@ -792,3 +792,297 @@ export const logCreditError = (
     timestamp: new Date().toISOString()
   });
 };
+
+
+export const logMarketplaceJobCreation = (
+  clientId: number,
+  marketplaceJobId: number,
+  jobTitle: string,
+  jobType: string,
+  location: string,
+  estimatedBudget: number | null,
+  urgencyLevel: string,
+  success: boolean,
+  requestId: string
+): void => {
+  logger.info('Marketplace job creation attempt', {
+    clientId,
+    marketplaceJobId,
+    jobTitle,
+    jobType,
+    location,
+    estimatedBudget,
+    urgencyLevel,
+    success,
+    requestId,
+    timestamp: new Date().toISOString()
+  });
+};
+
+export const logMarketplaceJobViewed = (
+  marketplaceJobId: number,
+  viewerId: number,
+  viewerRole: string,
+  requestId: string
+): void => {
+  logger.info('Marketplace job viewed', {
+    marketplaceJobId,
+    viewerId,
+    viewerRole,
+    requestId,
+    timestamp: new Date().toISOString()
+  });
+};
+
+export const logMarketplaceJobExpired = (
+  marketplaceJobId: number,
+  jobTitle: string,
+  applicationCount: number,
+  requestId: string
+): void => {
+  logger.info('Marketplace job expired', {
+    marketplaceJobId,
+    jobTitle,
+    applicationCount,
+    requestId,
+    timestamp: new Date().toISOString()
+  });
+};
+
+export const logMarketplaceJobStatusChange = (
+  clientId: number,
+  marketplaceJobId: number,
+  fromStatus: string,
+  toStatus: string,
+  requestId: string
+): void => {
+  logger.info('Marketplace job status change', {
+    clientId,
+    marketplaceJobId,
+    fromStatus,
+    toStatus,
+    requestId,
+    timestamp: new Date().toISOString()
+  });
+};
+
+export const logJobApplicationSubmission = (
+  tradieId: number,
+  marketplaceJobId: number,
+  applicationId: number,
+  customQuote: number,
+  creditsUsed: number,
+  success: boolean,
+  requestId: string
+): void => {
+  logger.info('Job application submission attempt', {
+    tradieId,
+    marketplaceJobId,
+    applicationId,
+    customQuote,
+    creditsUsed,
+    success,
+    requestId,
+    timestamp: new Date().toISOString()
+  });
+};
+
+export const logJobApplicationStatusChange = (
+  applicationId: number,
+  tradieId: number,
+  marketplaceJobId: number,
+  fromStatus: string,
+  toStatus: string,
+  requestId: string
+): void => {
+  logger.info('Job application status change', {
+    applicationId,
+    tradieId,
+    marketplaceJobId,
+    fromStatus,
+    toStatus,
+    requestId,
+    timestamp: new Date().toISOString()
+  });
+};
+
+export const logJobApplicationReview = (
+  clientId: number,
+  marketplaceJobId: number,
+  applicationId: number,
+  tradieId: number,
+  reviewAction: string,
+  requestId: string
+): void => {
+  logger.info('Job application review', {
+    clientId,
+    marketplaceJobId,
+    applicationId,
+    tradieId,
+    reviewAction,
+    requestId,
+    timestamp: new Date().toISOString()
+  });
+};
+
+export const logTradieSelection = (
+  clientId: number,
+  marketplaceJobId: number,
+  selectedTradieId: number,
+  selectedApplicationId: number,
+  selectionReason: string | null,
+  negotiatedQuote: number | null,
+  success: boolean,
+  requestId: string
+): void => {
+  logger.info('Tradie selection attempt', {
+    clientId,
+    marketplaceJobId,
+    selectedTradieId,
+    selectedApplicationId,
+    selectionReason,
+    negotiatedQuote,
+    success,
+    requestId,
+    timestamp: new Date().toISOString()
+  });
+};
+
+export const logJobAssignment = (
+  assignmentId: number,
+  marketplaceJobId: number,
+  selectedTradieId: number,
+  existingJobId: number,
+  success: boolean,
+  requestId: string
+): void => {
+  logger.info('Job assignment attempt', {
+    assignmentId,
+    marketplaceJobId,
+    selectedTradieId,
+    existingJobId,
+    success,
+    requestId,
+    timestamp: new Date().toISOString()
+  });
+};
+
+export const logMarketplaceSearch = (
+  userId: number | null,
+  searchQuery: string | null,
+  filters: Record<string, any>,
+  resultsCount: number,
+  requestId: string
+): void => {
+  logger.info('Marketplace search performed', {
+    userId,
+    searchQuery,
+    filters,
+    resultsCount,
+    requestId,
+    timestamp: new Date().toISOString()
+  });
+};
+
+export const logMarketplaceAnalytics = (
+  userId: number,
+  analyticsType: string,
+  dateRange: string,
+  dataPoints: Record<string, any>,
+  requestId: string
+): void => {
+  logger.info('Marketplace analytics accessed', {
+    userId,
+    analyticsType,
+    dateRange,
+    dataPoints,
+    requestId,
+    timestamp: new Date().toISOString()
+  });
+};
+
+export const logMarketplaceNotification = (
+  userId: number,
+  notificationId: number,
+  notificationType: string,
+  marketplaceJobId: number | null,
+  applicationId: number | null,
+  sent: boolean,
+  requestId: string
+): void => {
+  logger.info('Marketplace notification', {
+    userId,
+    notificationId,
+    notificationType,
+    marketplaceJobId,
+    applicationId,
+    sent,
+    requestId,
+    timestamp: new Date().toISOString()
+  });
+};
+
+export const logMarketplaceApplicationCredit = (
+  userId: number,
+  marketplaceJobId: number,
+  applicationId: number,
+  creditsUsed: number,
+  urgencyMultiplier: number,
+  jobTypeMultiplier: number,
+  finalCost: number,
+  success: boolean,
+  requestId: string
+): void => {
+  logger.info('Marketplace application credit usage', {
+    userId,
+    marketplaceJobId,
+    applicationId,
+    creditsUsed,
+    urgencyMultiplier,
+    jobTypeMultiplier,
+    finalCost,
+    success,
+    requestId,
+    timestamp: new Date().toISOString()
+  });
+};
+
+export const logCreditCostCalculation = (
+  marketplaceJobId: number,
+  jobType: string,
+  urgencyLevel: string,
+  baseCost: number,
+  urgencyMultiplier: number,
+  jobTypeMultiplier: number,
+  finalCost: number,
+  requestId: string
+): void => {
+  logger.info('Credit cost calculation', {
+    marketplaceJobId,
+    jobType,
+    urgencyLevel,
+    baseCost,
+    urgencyMultiplier,
+    jobTypeMultiplier,
+    finalCost,
+    requestId,
+    timestamp: new Date().toISOString()
+  });
+};
+
+export const logMarketplaceError = (
+  userId: number | null,
+  operation: string,
+  error: string,
+  metadata: Record<string, any>,
+  requestId: string
+): void => {
+  logger.error('Marketplace operation failed', {
+    userId,
+    operation,
+    error,
+    metadata,
+    requestId,
+    timestamp: new Date().toISOString()
+  });
+};

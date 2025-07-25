@@ -851,3 +851,525 @@ export const creditErrorHandler = (
 
   return errorHandler(error, req, res, next);
 };
+
+export const marketplaceJobErrorHandler = (
+  error: Error,
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Response | void => {
+  const requestId = res.locals.requestId || 'unknown';
+  const userId = req.user?.id;
+
+  if (error.message.includes('Marketplace job not found')) {
+    logger.warn('Marketplace job not found error', {
+      requestId,
+      userId,
+      path: req.path,
+      method: req.method,
+      marketplaceJobId: req.params.marketplaceJobId
+    });
+
+    const marketplaceJobError = new AppError(
+      'Marketplace job not found',
+      HTTP_STATUS_CODES.NOT_FOUND,
+      'MARKETPLACE_JOB_NOT_FOUND',
+      true,
+      requestId
+    );
+
+    const errorResponse = createErrorResponse(marketplaceJobError, requestId);
+    return res.status(HTTP_STATUS_CODES.NOT_FOUND).json(errorResponse);
+  }
+
+  if (error.message.includes('Marketplace job has expired')) {
+    logger.warn('Marketplace job expired error', {
+      requestId,
+      userId,
+      path: req.path,
+      method: req.method,
+      marketplaceJobId: req.params.marketplaceJobId
+    });
+
+    const expiredError = new AppError(
+      'Marketplace job has expired',
+      HTTP_STATUS_CODES.BAD_REQUEST,
+      'MARKETPLACE_JOB_EXPIRED',
+      true,
+      requestId
+    );
+
+    const errorResponse = createErrorResponse(expiredError, requestId);
+    return res.status(HTTP_STATUS_CODES.BAD_REQUEST).json(errorResponse);
+  }
+
+  if (error.message.includes('Unauthorized access to marketplace job')) {
+    logger.warn('Unauthorized marketplace job access attempt', {
+      requestId,
+      userId,
+      path: req.path,
+      method: req.method,
+      marketplaceJobId: req.params.marketplaceJobId
+    });
+
+    const authError = new AppError(
+      'Unauthorized access to marketplace job',
+      HTTP_STATUS_CODES.FORBIDDEN,
+      'UNAUTHORIZED_MARKETPLACE_JOB_ACCESS',
+      true,
+      requestId
+    );
+
+    const errorResponse = createErrorResponse(authError, requestId);
+    return res.status(HTTP_STATUS_CODES.FORBIDDEN).json(errorResponse);
+  }
+
+  if (error.message.includes('Invalid marketplace job status')) {
+    logger.warn('Invalid marketplace job status transition', {
+      requestId,
+      userId,
+      path: req.path,
+      method: req.method,
+      marketplaceJobId: req.params.marketplaceJobId
+    });
+
+    const statusError = new AppError(
+      'Invalid marketplace job status transition',
+      HTTP_STATUS_CODES.BAD_REQUEST,
+      'INVALID_MARKETPLACE_JOB_STATUS',
+      true,
+      requestId
+    );
+
+    const errorResponse = createErrorResponse(statusError, requestId);
+    return res.status(HTTP_STATUS_CODES.BAD_REQUEST).json(errorResponse);
+  }
+
+  return errorHandler(error, req, res, next);
+};
+
+export const jobApplicationErrorHandler = (
+  error: Error,
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Response | void => {
+  const requestId = res.locals.requestId || 'unknown';
+  const userId = req.user?.id;
+
+  if (error.message.includes('Job application not found')) {
+    logger.warn('Job application not found error', {
+      requestId,
+      userId,
+      path: req.path,
+      method: req.method,
+      applicationId: req.params.applicationId
+    });
+
+    const applicationError = new AppError(
+      'Job application not found',
+      HTTP_STATUS_CODES.NOT_FOUND,
+      'JOB_APPLICATION_NOT_FOUND',
+      true,
+      requestId
+    );
+
+    const errorResponse = createErrorResponse(applicationError, requestId);
+    return res.status(HTTP_STATUS_CODES.NOT_FOUND).json(errorResponse);
+  }
+
+  if (error.message.includes('You have already applied to this job')) {
+    logger.warn('Duplicate application attempt', {
+      requestId,
+      userId,
+      path: req.path,
+      method: req.method,
+      marketplaceJobId: req.body?.marketplaceJobId
+    });
+
+    const duplicateError = new AppError(
+      'You have already applied to this job',
+      HTTP_STATUS_CODES.CONFLICT,
+      'DUPLICATE_APPLICATION',
+      true,
+      requestId
+    );
+
+    const errorResponse = createErrorResponse(duplicateError, requestId);
+    return res.status(HTTP_STATUS_CODES.CONFLICT).json(errorResponse);
+  }
+
+  if (error.message.includes('Application status update failed')) {
+    logger.warn('Application status update error', {
+      requestId,
+      userId,
+      path: req.path,
+      method: req.method,
+      applicationId: req.params.applicationId
+    });
+
+    const statusError = new AppError(
+      'Application status update failed',
+      HTTP_STATUS_CODES.BAD_REQUEST,
+      'APPLICATION_STATUS_UPDATE_ERROR',
+      true,
+      requestId
+    );
+
+    const errorResponse = createErrorResponse(statusError, requestId);
+    return res.status(HTTP_STATUS_CODES.BAD_REQUEST).json(errorResponse);
+  }
+
+  if (error.message.includes('Unauthorized access to job application')) {
+    logger.warn('Unauthorized application access attempt', {
+      requestId,
+      userId,
+      path: req.path,
+      method: req.method,
+      applicationId: req.params.applicationId
+    });
+
+    const authError = new AppError(
+      'Unauthorized access to job application',
+      HTTP_STATUS_CODES.FORBIDDEN,
+      'UNAUTHORIZED_APPLICATION_ACCESS',
+      true,
+      requestId
+    );
+
+    const errorResponse = createErrorResponse(authError, requestId);
+    return res.status(HTTP_STATUS_CODES.FORBIDDEN).json(errorResponse);
+  }
+
+  if (error.message.includes('Insufficient credits for job application')) {
+    logger.warn('Insufficient credits for application error', {
+      requestId,
+      userId,
+      path: req.path,
+      method: req.method,
+      marketplaceJobId: req.body?.marketplaceJobId
+    });
+
+    const creditsError = new AppError(
+      'Insufficient credits for job application',
+      HTTP_STATUS_CODES.BAD_REQUEST,
+      'INSUFFICIENT_CREDITS_FOR_APPLICATION',
+      true,
+      requestId
+    );
+
+    const errorResponse = createErrorResponse(creditsError, requestId);
+    return res.status(HTTP_STATUS_CODES.BAD_REQUEST).json(errorResponse);
+  }
+
+  return errorHandler(error, req, res, next);
+};
+
+export const tradieSelectionErrorHandler = (
+  error: Error,
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Response | void => {
+  const requestId = res.locals.requestId || 'unknown';
+  const userId = req.user?.id;
+
+  if (error.message.includes('Tradie selection failed')) {
+    logger.warn('Tradie selection error', {
+      requestId,
+      userId,
+      path: req.path,
+      method: req.method,
+      marketplaceJobId: req.body?.marketplaceJobId,
+      selectedTradieId: req.body?.selectedTradieId
+    });
+
+    const selectionError = new AppError(
+      'Tradie selection failed',
+      HTTP_STATUS_CODES.BAD_REQUEST,
+      'TRADIE_SELECTION_ERROR',
+      true,
+      requestId
+    );
+
+    const errorResponse = createErrorResponse(selectionError, requestId);
+    return res.status(HTTP_STATUS_CODES.BAD_REQUEST).json(errorResponse);
+  }
+
+  if (error.message.includes('Unauthorized to select tradie for this job')) {
+    logger.warn('Unauthorized selection attempt', {
+      requestId,
+      userId,
+      path: req.path,
+      method: req.method,
+      marketplaceJobId: req.body?.marketplaceJobId
+    });
+
+    const authError = new AppError(
+      'Unauthorized to select tradie for this job',
+      HTTP_STATUS_CODES.FORBIDDEN,
+      'UNAUTHORIZED_SELECTION',
+      true,
+      requestId
+    );
+
+    const errorResponse = createErrorResponse(authError, requestId);
+    return res.status(HTTP_STATUS_CODES.FORBIDDEN).json(errorResponse);
+  }
+
+  if (error.message.includes('Invalid tradie selection')) {
+    logger.warn('Invalid selection error', {
+      requestId,
+      userId,
+      path: req.path,
+      method: req.method,
+      selectedApplicationId: req.body?.selectedApplicationId
+    });
+
+    const invalidError = new AppError(
+      'Invalid tradie selection',
+      HTTP_STATUS_CODES.BAD_REQUEST,
+      'INVALID_SELECTION',
+      true,
+      requestId
+    );
+
+    const errorResponse = createErrorResponse(invalidError, requestId);
+    return res.status(HTTP_STATUS_CODES.BAD_REQUEST).json(errorResponse);
+  }
+
+  if (error.message.includes('Job assignment failed')) {
+    logger.warn('Job assignment error', {
+      requestId,
+      userId,
+      path: req.path,
+      method: req.method,
+      marketplaceJobId: req.body?.marketplaceJobId
+    });
+
+    const assignmentError = new AppError(
+      'Job assignment failed',
+      HTTP_STATUS_CODES.BAD_REQUEST,
+      'JOB_ASSIGNMENT_ERROR',
+      true,
+      requestId
+    );
+
+    const errorResponse = createErrorResponse(assignmentError, requestId);
+    return res.status(HTTP_STATUS_CODES.BAD_REQUEST).json(errorResponse);
+  }
+
+  return errorHandler(error, req, res, next);
+};
+
+export const marketplaceAnalyticsErrorHandler = (
+  error: Error,
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Response | void => {
+  const requestId = res.locals.requestId || 'unknown';
+  const userId = req.user?.id;
+
+  if (error.message.includes('Analytics operation failed')) {
+    logger.warn('Analytics operation error', {
+      requestId,
+      userId,
+      path: req.path,
+      method: req.method
+    });
+
+    const analyticsError = new AppError(
+      'Analytics operation failed',
+      HTTP_STATUS_CODES.BAD_REQUEST,
+      'MARKETPLACE_ANALYTICS_ERROR',
+      true,
+      requestId
+    );
+
+    const errorResponse = createErrorResponse(analyticsError, requestId);
+    return res.status(HTTP_STATUS_CODES.BAD_REQUEST).json(errorResponse);
+  }
+
+  if (error.message.includes('Dashboard operation failed')) {
+    logger.warn('Dashboard operation error', {
+      requestId,
+      userId,
+      path: req.path,
+      method: req.method
+    });
+
+    const dashboardError = new AppError(
+      'Dashboard operation failed',
+      HTTP_STATUS_CODES.BAD_REQUEST,
+      'MARKETPLACE_DASHBOARD_ERROR',
+      true,
+      requestId
+    );
+
+    const errorResponse = createErrorResponse(dashboardError, requestId);
+    return res.status(HTTP_STATUS_CODES.BAD_REQUEST).json(errorResponse);
+  }
+
+  return errorHandler(error, req, res, next);
+};
+
+export const marketplaceSearchErrorHandler = (
+  error: Error,
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Response | void => {
+  const requestId = res.locals.requestId || 'unknown';
+  const userId = req.user?.id;
+
+  if (error.message.includes('Search operation failed')) {
+    logger.warn('Search operation error', {
+      requestId,
+      userId,
+      path: req.path,
+      method: req.method,
+      searchQuery: req.query?.query
+    });
+
+    const searchError = new AppError(
+      'Search operation failed',
+      HTTP_STATUS_CODES.BAD_REQUEST,
+      'MARKETPLACE_SEARCH_ERROR',
+      true,
+      requestId
+    );
+
+    const errorResponse = createErrorResponse(searchError, requestId);
+    return res.status(HTTP_STATUS_CODES.BAD_REQUEST).json(errorResponse);
+  }
+
+  return errorHandler(error, req, res, next);
+};
+
+export const marketplaceNotificationErrorHandler = (
+  error: Error,
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Response | void => {
+  const requestId = res.locals.requestId || 'unknown';
+  const userId = req.user?.id;
+
+  if (error.message.includes('Notification operation failed')) {
+    logger.warn('Notification operation error', {
+      requestId,
+      userId,
+      path: req.path,
+      method: req.method
+    });
+
+    const notificationError = new AppError(
+      'Notification operation failed',
+      HTTP_STATUS_CODES.BAD_REQUEST,
+      'MARKETPLACE_NOTIFICATION_ERROR',
+      true,
+      requestId
+    );
+
+    const errorResponse = createErrorResponse(notificationError, requestId);
+    return res.status(HTTP_STATUS_CODES.BAD_REQUEST).json(errorResponse);
+  }
+
+  if (error.message.includes('Notification not found')) {
+    logger.warn('Notification not found error', {
+      requestId,
+      userId,
+      path: req.path,
+      method: req.method,
+      notificationId: req.params.notificationId
+    });
+
+    const notFoundError = new AppError(
+      'Notification not found',
+      HTTP_STATUS_CODES.NOT_FOUND,
+      'MARKETPLACE_NOTIFICATION_NOT_FOUND',
+      true,
+      requestId
+    );
+
+    const errorResponse = createErrorResponse(notFoundError, requestId);
+    return res.status(HTTP_STATUS_CODES.NOT_FOUND).json(errorResponse);
+  }
+
+  return errorHandler(error, req, res, next);
+};
+
+export const marketplaceCreditErrorHandler = (
+  error: Error,
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Response | void => {
+  const requestId = res.locals.requestId || 'unknown';
+  const userId = req.user?.id;
+
+  if (error.message.includes('Marketplace credit operation failed')) {
+    logger.warn('Marketplace credit operation error', {
+      requestId,
+      userId,
+      path: req.path,
+      method: req.method
+    });
+
+    const creditError = new AppError(
+      'Marketplace credit operation failed',
+      HTTP_STATUS_CODES.BAD_REQUEST,
+      'MARKETPLACE_CREDIT_ERROR',
+      true,
+      requestId
+    );
+
+    const errorResponse = createErrorResponse(creditError, requestId);
+    return res.status(HTTP_STATUS_CODES.BAD_REQUEST).json(errorResponse);
+  }
+
+  if (error.message.includes('Credit cost calculation failed')) {
+    logger.warn('Credit cost calculation error', {
+      requestId,
+      userId,
+      path: req.path,
+      method: req.method,
+      marketplaceJobId: req.body?.marketplaceJobId
+    });
+
+    const calculationError = new AppError(
+      'Credit cost calculation failed',
+      HTTP_STATUS_CODES.BAD_REQUEST,
+      'CREDIT_COST_CALCULATION_ERROR',
+      true,
+      requestId
+    );
+
+    const errorResponse = createErrorResponse(calculationError, requestId);
+    return res.status(HTTP_STATUS_CODES.BAD_REQUEST).json(errorResponse);
+  }
+
+  if (error.message.includes('Application credit transaction failed')) {
+    logger.warn('Application credit transaction error', {
+      requestId,
+      userId,
+      path: req.path,
+      method: req.method,
+      applicationId: req.body?.applicationId
+    });
+
+    const transactionError = new AppError(
+      'Application credit transaction failed',
+      HTTP_STATUS_CODES.BAD_REQUEST,
+      'APPLICATION_CREDIT_TRANSACTION_ERROR',
+      true,
+      requestId
+    );
+
+    const errorResponse = createErrorResponse(transactionError, requestId);
+    return res.status(HTTP_STATUS_CODES.BAD_REQUEST).json(errorResponse);
+  }
+
+  return errorHandler(error, req, res, next);
+};

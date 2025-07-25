@@ -156,6 +156,12 @@ export class DatabaseConnection implements DatabaseClient {
         `ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMP;`,
         `ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_customer_id VARCHAR(255);`,
         `ALTER TABLE users ADD COLUMN IF NOT EXISTS credit_balance INTEGER DEFAULT 0;`,
+        `ALTER TABLE users ADD COLUMN IF NOT EXISTS daily_usage INTEGER DEFAULT 0;`,
+        `ALTER TABLE users ADD COLUMN IF NOT EXISTS monthly_usage INTEGER DEFAULT 0;`,
+        `ALTER TABLE users ADD COLUMN IF NOT EXISTS daily_spent DECIMAL(10,2) DEFAULT 0.00;`,
+        `ALTER TABLE users ADD COLUMN IF NOT EXISTS monthly_spent DECIMAL(10,2) DEFAULT 0.00;`,
+        `ALTER TABLE users ADD COLUMN IF NOT EXISTS daily_transactions INTEGER DEFAULT 0;`,
+        `ALTER TABLE users ADD COLUMN IF NOT EXISTS monthly_transactions INTEGER DEFAULT 0;`,
         `ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_id INTEGER;`,
         `ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_status VARCHAR(20);`
       ];
@@ -172,6 +178,35 @@ export class DatabaseConnection implements DatabaseClient {
       logger.info('Missing columns check completed');
     } catch (error) {
       logger.error('Failed to add missing columns:', error);
+      throw error;
+    }
+  }
+
+  async addMarketplaceColumns(): Promise<void> {
+    try {
+      logger.info('Adding marketplace-specific columns...');
+
+      const marketplaceAlterQueries = [
+        `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS marketplace_job_id INTEGER;`,
+        `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS source_type VARCHAR(20) DEFAULT 'direct';`,
+        `ALTER TABLE credit_transactions ADD COLUMN IF NOT EXISTS marketplace_job_id INTEGER;`,
+        `ALTER TABLE credit_transactions ADD COLUMN IF NOT EXISTS application_id INTEGER;`,
+        `ALTER TABLE credit_transactions ADD COLUMN IF NOT EXISTS urgency_multiplier DECIMAL(3,2) DEFAULT 1.00;`,
+        `ALTER TABLE credit_transactions ADD COLUMN IF NOT EXISTS job_type_multiplier DECIMAL(3,2) DEFAULT 1.00;`
+      ];
+
+      for (const query of marketplaceAlterQueries) {
+        try {
+          await this.query(query);
+          logger.info(`Executed: ${query}`);
+        } catch (error: any) {
+          logger.warn(`Column might already exist: ${error.message}`);
+        }
+      }
+
+      logger.info('Marketplace columns added successfully');
+    } catch (error) {
+      logger.error('Failed to add marketplace columns:', error);
       throw error;
     }
   }
@@ -200,6 +235,12 @@ export class DatabaseConnection implements DatabaseClient {
           last_login_at TIMESTAMP,
           stripe_customer_id VARCHAR(255),
           credit_balance INTEGER DEFAULT 0,
+          daily_usage INTEGER DEFAULT 0,
+          monthly_usage INTEGER DEFAULT 0,
+          daily_spent DECIMAL(10,2) DEFAULT 0.00,
+          monthly_spent DECIMAL(10,2) DEFAULT 0.00,
+          daily_transactions INTEGER DEFAULT 0,
+          monthly_transactions INTEGER DEFAULT 0,
           subscription_id INTEGER,
           subscription_status VARCHAR(20),
           created_at TIMESTAMP DEFAULT NOW(),
@@ -211,6 +252,7 @@ export class DatabaseConnection implements DatabaseClient {
       logger.info('Users table created/verified');
 
       await this.addMissingColumns();
+      await this.addMarketplaceColumns();
       
       await this.query('DROP TABLE IF EXISTS profiles CASCADE');
       await this.query('DROP TABLE IF EXISTS sessions CASCADE');
@@ -253,10 +295,237 @@ export class DatabaseConnection implements DatabaseClient {
 
       await this.createJobTables();
       await this.createPaymentTables();
+      await this.createMarketplaceTables();
       
       logger.info('Database tables created successfully');
     } catch (error) {
       logger.error('Failed to create database tables:', error);
+      throw error;
+    }
+  }
+
+  async createMarketplaceTables(): Promise<void> {
+    try {
+      logger.info('Creating marketplace tables...');
+
+      const createMarketplaceJobsTable = `
+        CREATE TABLE IF NOT EXISTS marketplace_jobs (
+          id SERIAL PRIMARY KEY,
+          client_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+          title VARCHAR(200) NOT NULL,
+          description TEXT NOT NULL,
+          job_type VARCHAR(50) NOT NULL,
+          location VARCHAR(100) NOT NULL,
+          estimated_budget DECIMAL(12,2),
+          date_required TIMESTAMP NOT NULL,
+          urgency_level VARCHAR(20) NOT NULL DEFAULT 'medium',
+          photos TEXT[] DEFAULT '{}',
+          status VARCHAR(20) NOT NULL DEFAULT 'available',
+          application_count INTEGER DEFAULT 0,
+          view_count INTEGER DEFAULT 0,
+          client_name VARCHAR(100) NOT NULL,
+          client_email VARCHAR(255) NOT NULL,
+          client_phone VARCHAR(20) NOT NULL,
+          client_company VARCHAR(100),
+          expires_at TIMESTAMP,
+          source_type VARCHAR(20) DEFAULT 'marketplace',
+          metadata JSONB DEFAULT '{}',
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW()
+        );
+      `;
+
+      const createJobApplicationsTable = `
+        CREATE TABLE IF NOT EXISTS job_applications (
+          id SERIAL PRIMARY KEY,
+          marketplace_job_id INTEGER REFERENCES marketplace_jobs(id) ON DELETE CASCADE,
+          tradie_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+          custom_quote DECIMAL(12,2) NOT NULL,
+          proposed_timeline TEXT NOT NULL,
+          approach_description TEXT NOT NULL,
+          materials_list TEXT,
+          availability_dates TEXT[] NOT NULL,
+          cover_message TEXT,
+          relevant_experience TEXT,
+          additional_photos TEXT[] DEFAULT '{}',
+          questions_for_client TEXT,
+          special_offers TEXT,
+          credits_used INTEGER NOT NULL,
+          status VARCHAR(20) NOT NULL DEFAULT 'submitted',
+          application_timestamp TIMESTAMP DEFAULT NOW(),
+          metadata JSONB DEFAULT '{}',
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW(),
+          UNIQUE(marketplace_job_id, tradie_id)
+        );
+      `;
+
+      const createMarketplaceJobAssignmentsTable = `
+        CREATE TABLE IF NOT EXISTS marketplace_job_assignments (
+          id SERIAL PRIMARY KEY,
+          marketplace_job_id INTEGER REFERENCES marketplace_jobs(id) ON DELETE CASCADE,
+          selected_tradie_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+          selected_application_id INTEGER REFERENCES job_applications(id) ON DELETE CASCADE,
+          existing_job_id INTEGER REFERENCES jobs(id) ON DELETE CASCADE,
+          selection_reason TEXT,
+          negotiated_quote DECIMAL(12,2),
+          project_start_date TIMESTAMP,
+          assignment_timestamp TIMESTAMP DEFAULT NOW(),
+          metadata JSONB DEFAULT '{}',
+          created_at TIMESTAMP DEFAULT NOW(),
+          UNIQUE(marketplace_job_id)
+        );
+      `;
+
+      const createMarketplaceNotificationsTable = `
+        CREATE TABLE IF NOT EXISTS marketplace_notifications (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+          notification_type VARCHAR(50) NOT NULL,
+          title VARCHAR(200) NOT NULL,
+          message TEXT NOT NULL,
+          read BOOLEAN DEFAULT FALSE,
+          marketplace_job_id INTEGER REFERENCES marketplace_jobs(id) ON DELETE SET NULL,
+          application_id INTEGER REFERENCES job_applications(id) ON DELETE SET NULL,
+          assignment_id INTEGER REFERENCES marketplace_job_assignments(id) ON DELETE SET NULL,
+          metadata JSONB DEFAULT '{}',
+          expires_at TIMESTAMP,
+          created_at TIMESTAMP DEFAULT NOW(),
+          read_at TIMESTAMP
+        );
+      `;
+
+      const createMarketplaceAnalyticsTable = `
+        CREATE TABLE IF NOT EXISTS marketplace_analytics (
+          id SERIAL PRIMARY KEY,
+          date DATE NOT NULL,
+          total_jobs_posted INTEGER DEFAULT 0,
+          total_applications INTEGER DEFAULT 0,
+          total_credits_spent INTEGER DEFAULT 0,
+          total_assignments INTEGER DEFAULT 0,
+          average_applications_per_job DECIMAL(5,2) DEFAULT 0.00,
+          conversion_rate DECIMAL(5,4) DEFAULT 0.0000,
+          top_job_types JSONB DEFAULT '{}',
+          top_locations JSONB DEFAULT '{}',
+          created_at TIMESTAMP DEFAULT NOW(),
+          UNIQUE(date)
+        );
+      `;
+
+      const createTradieMarketplaceStatsTable = `
+        CREATE TABLE IF NOT EXISTS tradie_marketplace_stats (
+          id SERIAL PRIMARY KEY,
+          tradie_id INTEGER REFERENCES users(id) ON DELETE CASCADE UNIQUE,
+          total_applications INTEGER DEFAULT 0,
+          successful_applications INTEGER DEFAULT 0,
+          total_credits_spent INTEGER DEFAULT 0,
+          conversion_rate DECIMAL(5,4) DEFAULT 0.0000,
+          average_quote DECIMAL(12,2) DEFAULT 0.00,
+          last_application_at TIMESTAMP,
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW()
+        );
+      `;
+
+      const createClientMarketplaceStatsTable = `
+        CREATE TABLE IF NOT EXISTS client_marketplace_stats (
+          id SERIAL PRIMARY KEY,
+          client_id INTEGER REFERENCES users(id) ON DELETE CASCADE UNIQUE,
+          total_jobs_posted INTEGER DEFAULT 0,
+          total_applications_received INTEGER DEFAULT 0,
+          total_hires_made INTEGER DEFAULT 0,
+          average_applications_per_job DECIMAL(5,2) DEFAULT 0.00,
+          average_hire_time_hours DECIMAL(8,2) DEFAULT 0.00,
+          last_job_posted_at TIMESTAMP,
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW()
+        );
+      `;
+
+      await this.query(createMarketplaceJobsTable);
+      logger.info('Marketplace jobs table created/verified');
+
+      await this.query(createJobApplicationsTable);
+      logger.info('Job applications table created/verified');
+
+      await this.query(createMarketplaceJobAssignmentsTable);
+      logger.info('Marketplace job assignments table created/verified');
+
+      await this.query(createMarketplaceNotificationsTable);
+      logger.info('Marketplace notifications table created/verified');
+
+      await this.query(createMarketplaceAnalyticsTable);
+      logger.info('Marketplace analytics table created/verified');
+
+      await this.query(createTradieMarketplaceStatsTable);
+      logger.info('Tradie marketplace stats table created/verified');
+
+      await this.query(createClientMarketplaceStatsTable);
+      logger.info('Client marketplace stats table created/verified');
+
+      await this.createMarketplaceIndexes();
+
+      logger.info('Marketplace tables created successfully');
+    } catch (error) {
+      logger.error('Failed to create marketplace tables:', error);
+      throw error;
+    }
+  }
+
+  async createMarketplaceIndexes(): Promise<void> {
+    try {
+      logger.info('Creating marketplace indexes...');
+
+      const marketplaceIndexes = [
+        'CREATE INDEX IF NOT EXISTS idx_marketplace_jobs_client_id ON marketplace_jobs(client_id);',
+        'CREATE INDEX IF NOT EXISTS idx_marketplace_jobs_job_type ON marketplace_jobs(job_type);',
+        'CREATE INDEX IF NOT EXISTS idx_marketplace_jobs_location ON marketplace_jobs(location);',
+        'CREATE INDEX IF NOT EXISTS idx_marketplace_jobs_status ON marketplace_jobs(status);',
+        'CREATE INDEX IF NOT EXISTS idx_marketplace_jobs_urgency_level ON marketplace_jobs(urgency_level);',
+        'CREATE INDEX IF NOT EXISTS idx_marketplace_jobs_date_required ON marketplace_jobs(date_required);',
+        'CREATE INDEX IF NOT EXISTS idx_marketplace_jobs_estimated_budget ON marketplace_jobs(estimated_budget);',
+        'CREATE INDEX IF NOT EXISTS idx_marketplace_jobs_created_at ON marketplace_jobs(created_at);',
+        'CREATE INDEX IF NOT EXISTS idx_marketplace_jobs_expires_at ON marketplace_jobs(expires_at);',
+        'CREATE INDEX IF NOT EXISTS idx_job_applications_marketplace_job_id ON job_applications(marketplace_job_id);',
+        'CREATE INDEX IF NOT EXISTS idx_job_applications_tradie_id ON job_applications(tradie_id);',
+        'CREATE INDEX IF NOT EXISTS idx_job_applications_status ON job_applications(status);',
+        'CREATE INDEX IF NOT EXISTS idx_job_applications_custom_quote ON job_applications(custom_quote);',
+        'CREATE INDEX IF NOT EXISTS idx_job_applications_created_at ON job_applications(created_at);',
+        'CREATE INDEX IF NOT EXISTS idx_job_applications_credits_used ON job_applications(credits_used);',
+        'CREATE INDEX IF NOT EXISTS idx_marketplace_job_assignments_marketplace_job_id ON marketplace_job_assignments(marketplace_job_id);',
+        'CREATE INDEX IF NOT EXISTS idx_marketplace_job_assignments_selected_tradie_id ON marketplace_job_assignments(selected_tradie_id);',
+        'CREATE INDEX IF NOT EXISTS idx_marketplace_job_assignments_selected_application_id ON marketplace_job_assignments(selected_application_id);',
+        'CREATE INDEX IF NOT EXISTS idx_marketplace_job_assignments_existing_job_id ON marketplace_job_assignments(existing_job_id);',
+        'CREATE INDEX IF NOT EXISTS idx_marketplace_job_assignments_created_at ON marketplace_job_assignments(created_at);',
+        'CREATE INDEX IF NOT EXISTS idx_marketplace_notifications_user_id ON marketplace_notifications(user_id);',
+        'CREATE INDEX IF NOT EXISTS idx_marketplace_notifications_notification_type ON marketplace_notifications(notification_type);',
+        'CREATE INDEX IF NOT EXISTS idx_marketplace_notifications_read ON marketplace_notifications(read);',
+        'CREATE INDEX IF NOT EXISTS idx_marketplace_notifications_marketplace_job_id ON marketplace_notifications(marketplace_job_id);',
+        'CREATE INDEX IF NOT EXISTS idx_marketplace_notifications_application_id ON marketplace_notifications(application_id);',
+        'CREATE INDEX IF NOT EXISTS idx_marketplace_notifications_created_at ON marketplace_notifications(created_at);',
+        'CREATE INDEX IF NOT EXISTS idx_marketplace_analytics_date ON marketplace_analytics(date);',
+        'CREATE INDEX IF NOT EXISTS idx_tradie_marketplace_stats_tradie_id ON tradie_marketplace_stats(tradie_id);',
+        'CREATE INDEX IF NOT EXISTS idx_tradie_marketplace_stats_conversion_rate ON tradie_marketplace_stats(conversion_rate);',
+        'CREATE INDEX IF NOT EXISTS idx_tradie_marketplace_stats_last_application_at ON tradie_marketplace_stats(last_application_at);',
+        'CREATE INDEX IF NOT EXISTS idx_client_marketplace_stats_client_id ON client_marketplace_stats(client_id);',
+        'CREATE INDEX IF NOT EXISTS idx_client_marketplace_stats_last_job_posted_at ON client_marketplace_stats(last_job_posted_at);',
+        'CREATE INDEX IF NOT EXISTS idx_jobs_marketplace_job_id ON jobs(marketplace_job_id);',
+        'CREATE INDEX IF NOT EXISTS idx_jobs_source_type ON jobs(source_type);',
+        'CREATE INDEX IF NOT EXISTS idx_credit_transactions_marketplace_job_id ON credit_transactions(marketplace_job_id);',
+        'CREATE INDEX IF NOT EXISTS idx_credit_transactions_application_id ON credit_transactions(application_id);'
+      ];
+
+      for (const indexQuery of marketplaceIndexes) {
+        try {
+          await this.query(indexQuery);
+        } catch (error: any) {
+          logger.warn(`Index might already exist: ${error.message}`);
+        }
+      }
+
+      logger.info('Marketplace indexes created successfully');
+    } catch (error) {
+      logger.error('Failed to create marketplace indexes:', error);
       throw error;
     }
   }
@@ -375,6 +644,10 @@ export class DatabaseConnection implements DatabaseClient {
           description TEXT NOT NULL,
           reference_id INTEGER,
           reference_type VARCHAR(50),
+          marketplace_job_id INTEGER,
+          application_id INTEGER,
+          urgency_multiplier DECIMAL(3,2) DEFAULT 1.00,
+          job_type_multiplier DECIMAL(3,2) DEFAULT 1.00,
           expires_at TIMESTAMP,
           metadata JSONB DEFAULT '{}',
           created_at TIMESTAMP DEFAULT NOW(),
@@ -472,7 +745,7 @@ export class DatabaseConnection implements DatabaseClient {
           created_at TIMESTAMP DEFAULT NOW()
         );
       `;
-      
+
       await this.query(createPaymentsTable);
       logger.info('Payments table created/verified');
 
@@ -517,8 +790,8 @@ export class DatabaseConnection implements DatabaseClient {
       throw error;
     }
   }
-  
-    async createPaymentIndexes(): Promise<void> {
+
+  async createPaymentIndexes(): Promise<void> {
     try {
       logger.info('Creating payment indexes...');
 
@@ -636,6 +909,8 @@ export class DatabaseConnection implements DatabaseClient {
           hours_worked DECIMAL(5,2) DEFAULT 0.00,
           notes TEXT[] DEFAULT '{}',
           tags TEXT[] DEFAULT '{}',
+          marketplace_job_id INTEGER,
+          source_type VARCHAR(20) DEFAULT 'direct',
           created_at TIMESTAMP DEFAULT NOW(),
           updated_at TIMESTAMP DEFAULT NOW()
         );
@@ -785,7 +1060,19 @@ export class DatabaseConnection implements DatabaseClient {
     try {
       logger.info('Recreating database tables...');
 
+      await this.query('DROP TABLE IF EXISTS client_marketplace_stats CASCADE');
+      await this.query('DROP TABLE IF EXISTS tradie_marketplace_stats CASCADE');
+      await this.query('DROP TABLE IF EXISTS marketplace_analytics CASCADE');
+      await this.query('DROP TABLE IF EXISTS marketplace_notifications CASCADE');
+      await this.query('DROP TABLE IF EXISTS marketplace_job_assignments CASCADE');
+      await this.query('DROP TABLE IF EXISTS job_applications CASCADE');
+      await this.query('DROP TABLE IF EXISTS marketplace_jobs CASCADE');
       await this.query('DROP TABLE IF EXISTS webhook_events CASCADE');
+      await this.query('DROP TABLE IF EXISTS credit_notifications CASCADE');
+      await this.query('DROP TABLE IF EXISTS auto_topups CASCADE');
+      await this.query('DROP TABLE IF EXISTS credit_usages CASCADE');
+      await this.query('DROP TABLE IF EXISTS credit_purchases CASCADE');
+      await this.query('DROP TABLE IF EXISTS credit_balances CASCADE');
       await this.query('DROP TABLE IF EXISTS credit_transactions CASCADE');
       await this.query('DROP TABLE IF EXISTS subscriptions CASCADE');
       await this.query('DROP TABLE IF EXISTS refunds CASCADE');
@@ -801,11 +1088,6 @@ export class DatabaseConnection implements DatabaseClient {
       await this.query('DROP TABLE IF EXISTS sessions CASCADE');
       await this.query('DROP TABLE IF EXISTS profiles CASCADE');
       await this.query('DROP TABLE IF EXISTS users CASCADE');
-      await this.query('DROP TABLE IF EXISTS credit_notifications CASCADE');
-      await this.query('DROP TABLE IF EXISTS auto_topups CASCADE');
-      await this.query('DROP TABLE IF EXISTS credit_usages CASCADE');
-      await this.query('DROP TABLE IF EXISTS credit_purchases CASCADE');
-      await this.query('DROP TABLE IF EXISTS credit_balances CASCADE');
 
       await this.createTables();
       
@@ -944,7 +1226,6 @@ export const recreateDatabase = async (): Promise<void> => {
     }
     
     await database.recreateTables();
-    
     logger.info('Database recreated successfully');
   } catch (error) {
     logger.error('Failed to recreate database:', error);
@@ -952,17 +1233,5 @@ export const recreateDatabase = async (): Promise<void> => {
   }
 };
 
-export const closeDatabase = async (): Promise<void> => {
-  try {
-    await database.end();
-    logger.info('Database connections closed successfully');
-  } catch (error) {
-    logger.error('Error closing database connections:', error);
-    throw error;
-  }
-};
 
-export const connection = database;
-
-export const db = database.getFirestoreClient();
 

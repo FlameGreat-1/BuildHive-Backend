@@ -1253,3 +1253,615 @@ export const sanitizeCreditInput = (
 
   next();
 };
+
+export const validateMarketplaceJobAccess = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const userId = req.user?.id;
+  const userRole = req.user?.role;
+
+  if (!userId) {
+    res.status(401).json({
+      success: false,
+      message: 'Authentication required',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  if (userRole !== 'client' && userRole !== 'tradie' && userRole !== 'enterprise') {
+    res.status(403).json({
+      success: false,
+      message: 'Insufficient permissions for marketplace operations',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  next();
+};
+
+export const validateMarketplaceJobData = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const { title, description, location, estimatedBudget, dateRequired, urgencyLevel } = req.body;
+
+  if (!title || typeof title !== 'string' || title.trim().length < 5) {
+    res.status(400).json({
+      success: false,
+      message: 'Job title must be at least 5 characters long',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  if (title.length > 200) {
+    res.status(400).json({
+      success: false,
+      message: 'Job title cannot exceed 200 characters',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  if (!description || typeof description !== 'string' || description.trim().length < 20) {
+    res.status(400).json({
+      success: false,
+      message: 'Job description must be at least 20 characters long',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  if (description.length > 2000) {
+    res.status(400).json({
+      success: false,
+      message: 'Job description cannot exceed 2000 characters',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  if (!location || typeof location !== 'string' || location.trim().length < 3) {
+    res.status(400).json({
+      success: false,
+      message: 'Valid location is required',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  if (estimatedBudget && (typeof estimatedBudget !== 'number' || estimatedBudget <= 0)) {
+    res.status(400).json({
+      success: false,
+      message: 'Estimated budget must be a positive number',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  if (estimatedBudget && estimatedBudget > 1000000) {
+    res.status(400).json({
+      success: false,
+      message: 'Estimated budget exceeds maximum limit',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  if (!dateRequired || typeof dateRequired !== 'string') {
+    res.status(400).json({
+      success: false,
+      message: 'Date required is mandatory',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  const dateRequiredObj = new Date(dateRequired);
+  const now = new Date();
+  if (isNaN(dateRequiredObj.getTime()) || dateRequiredObj <= now) {
+    res.status(400).json({
+      success: false,
+      message: 'Date required must be a future date',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  const validUrgencyLevels = ['low', 'medium', 'high', 'urgent'];
+  if (urgencyLevel && !validUrgencyLevels.includes(urgencyLevel)) {
+    res.status(400).json({
+      success: false,
+      message: 'Invalid urgency level',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  next();
+};
+
+export const sanitizeMarketplaceJobInput = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  if (req.body) {
+    const sanitizeString = (str: string): string => {
+      return str.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+                .replace(/javascript:/gi, '')
+                .replace(/on\w+\s*=/gi, '');
+    };
+
+    if (req.body.title && typeof req.body.title === 'string') {
+      req.body.title = sanitizeString(req.body.title.trim());
+    }
+
+    if (req.body.description && typeof req.body.description === 'string') {
+      req.body.description = sanitizeString(req.body.description.trim());
+    }
+
+    if (req.body.location && typeof req.body.location === 'string') {
+      req.body.location = sanitizeString(req.body.location.trim());
+    }
+
+    if (req.body.clientName && typeof req.body.clientName === 'string') {
+      req.body.clientName = sanitizeString(req.body.clientName.trim());
+    }
+
+    if (req.body.clientCompany && typeof req.body.clientCompany === 'string') {
+      req.body.clientCompany = sanitizeString(req.body.clientCompany.trim());
+    }
+  }
+
+  next();
+};
+
+export const validateJobApplicationData = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const { marketplaceJobId, customQuote, proposedTimeline, approachDescription, availabilityDates } = req.body;
+
+  if (!marketplaceJobId || typeof marketplaceJobId !== 'number') {
+    res.status(400).json({
+      success: false,
+      message: 'Valid marketplace job ID is required',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  if (!customQuote || typeof customQuote !== 'number' || customQuote <= 0) {
+    res.status(400).json({
+      success: false,
+      message: 'Valid custom quote is required',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  if (customQuote > 1000000) {
+    res.status(400).json({
+      success: false,
+      message: 'Custom quote exceeds maximum limit',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  if (!proposedTimeline || typeof proposedTimeline !== 'string' || proposedTimeline.trim().length < 10) {
+    res.status(400).json({
+      success: false,
+      message: 'Proposed timeline must be at least 10 characters long',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  if (!approachDescription || typeof approachDescription !== 'string' || approachDescription.trim().length < 20) {
+    res.status(400).json({
+      success: false,
+      message: 'Approach description must be at least 20 characters long',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  if (approachDescription.length > 1000) {
+    res.status(400).json({
+      success: false,
+      message: 'Approach description cannot exceed 1000 characters',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  if (!availabilityDates || !Array.isArray(availabilityDates) || availabilityDates.length === 0) {
+    res.status(400).json({
+      success: false,
+      message: 'At least one availability date is required',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  for (const date of availabilityDates) {
+    const dateObj = new Date(date);
+    if (isNaN(dateObj.getTime())) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid availability date format',
+        timestamp: new Date().toISOString(),
+        requestId: res.locals.requestId || 'unknown'
+      });
+      return;
+    }
+  }
+
+  next();
+};
+
+export const sanitizeJobApplicationInput = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  if (req.body) {
+    const sanitizeString = (str: string): string => {
+      return str.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+                .replace(/javascript:/gi, '')
+                .replace(/on\w+\s*=/gi, '');
+    };
+
+    if (req.body.proposedTimeline && typeof req.body.proposedTimeline === 'string') {
+      req.body.proposedTimeline = sanitizeString(req.body.proposedTimeline.trim());
+    }
+
+    if (req.body.approachDescription && typeof req.body.approachDescription === 'string') {
+      req.body.approachDescription = sanitizeString(req.body.approachDescription.trim());
+    }
+
+    if (req.body.materialsList && typeof req.body.materialsList === 'string') {
+      req.body.materialsList = sanitizeString(req.body.materialsList.trim());
+    }
+
+    if (req.body.coverMessage && typeof req.body.coverMessage === 'string') {
+      req.body.coverMessage = sanitizeString(req.body.coverMessage.trim());
+    }
+
+    if (req.body.relevantExperience && typeof req.body.relevantExperience === 'string') {
+      req.body.relevantExperience = sanitizeString(req.body.relevantExperience.trim());
+    }
+
+    if (req.body.questionsForClient && typeof req.body.questionsForClient === 'string') {
+      req.body.questionsForClient = sanitizeString(req.body.questionsForClient.trim());
+    }
+
+    if (req.body.specialOffers && typeof req.body.specialOffers === 'string') {
+      req.body.specialOffers = sanitizeString(req.body.specialOffers.trim());
+    }
+  }
+
+  next();
+};
+
+export const validateTradieAccess = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const userRole = req.user?.role;
+
+  if (userRole !== 'tradie' && userRole !== 'enterprise') {
+    res.status(403).json({
+      success: false,
+      message: 'Tradie access required',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  next();
+};
+
+export const validateClientAccess = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const userRole = req.user?.role;
+
+  if (userRole !== 'client' && userRole !== 'enterprise') {
+    res.status(403).json({
+      success: false,
+      message: 'Client access required',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  next();
+};
+
+export const validateTradieSelectionData = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const { marketplaceJobId, selectedApplicationId, selectionReason, negotiatedQuote } = req.body;
+
+  if (!marketplaceJobId || typeof marketplaceJobId !== 'number') {
+    res.status(400).json({
+      success: false,
+      message: 'Valid marketplace job ID is required',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  if (!selectedApplicationId || typeof selectedApplicationId !== 'number') {
+    res.status(400).json({
+      success: false,
+      message: 'Valid application ID is required',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  if (selectionReason && typeof selectionReason === 'string' && selectionReason.length > 500) {
+    res.status(400).json({
+      success: false,
+      message: 'Selection reason cannot exceed 500 characters',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  if (negotiatedQuote && (typeof negotiatedQuote !== 'number' || negotiatedQuote <= 0)) {
+    res.status(400).json({
+      success: false,
+      message: 'Negotiated quote must be a positive number',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  if (negotiatedQuote && negotiatedQuote > 1000000) {
+    res.status(400).json({
+      success: false,
+      message: 'Negotiated quote exceeds maximum limit',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  next();
+};
+
+export const validateApplicationStatusData = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const { status, reason, feedback } = req.body;
+  const validStatuses = ['submitted', 'under_review', 'selected', 'rejected', 'withdrawn'];
+
+  if (!status || !validStatuses.includes(status)) {
+    res.status(400).json({
+      success: false,
+      message: 'Valid application status is required',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  if (reason && typeof reason === 'string' && reason.length > 500) {
+    res.status(400).json({
+      success: false,
+      message: 'Status reason cannot exceed 500 characters',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  if (feedback && typeof feedback === 'string' && feedback.length > 1000) {
+    res.status(400).json({
+      success: false,
+      message: 'Feedback cannot exceed 1000 characters',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  next();
+};
+
+export const validateMarketplaceSearchData = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const { query, minBudget, maxBudget, dateRange } = req.query;
+
+  if (query && typeof query === 'string' && query.length > 100) {
+    res.status(400).json({
+      success: false,
+      message: 'Search query cannot exceed 100 characters',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  if (minBudget && (isNaN(Number(minBudget)) || Number(minBudget) < 0)) {
+    res.status(400).json({
+      success: false,
+      message: 'Minimum budget must be a non-negative number',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  if (maxBudget && (isNaN(Number(maxBudget)) || Number(maxBudget) < 0)) {
+    res.status(400).json({
+      success: false,
+      message: 'Maximum budget must be a non-negative number',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  if (minBudget && maxBudget && Number(minBudget) > Number(maxBudget)) {
+    res.status(400).json({
+      success: false,
+      message: 'Minimum budget cannot be greater than maximum budget',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  next();
+};
+
+export const validateMarketplaceApplicationCreditData = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const { marketplaceJobId, applicationData } = req.body;
+
+  if (!marketplaceJobId || typeof marketplaceJobId !== 'number') {
+    res.status(400).json({
+      success: false,
+      message: 'Valid marketplace job ID is required',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  if (!applicationData || typeof applicationData !== 'object') {
+    res.status(400).json({
+      success: false,
+      message: 'Valid application data is required',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  next();
+};
+
+export const validateCreditCostCalculationData = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const { marketplaceJobId, jobType, urgencyLevel } = req.body;
+
+  if (!marketplaceJobId || typeof marketplaceJobId !== 'number') {
+    res.status(400).json({
+      success: false,
+      message: 'Valid marketplace job ID is required',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  const validJobTypes = ['electrical', 'plumbing', 'carpentry', 'painting', 'roofing', 'hvac', 'landscaping', 'cleaning', 'handyman', 'general'];
+  if (jobType && !validJobTypes.includes(jobType)) {
+    res.status(400).json({
+      success: false,
+      message: 'Invalid job type',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  const validUrgencyLevels = ['low', 'medium', 'high', 'urgent'];
+  if (urgencyLevel && !validUrgencyLevels.includes(urgencyLevel)) {
+    res.status(400).json({
+      success: false,
+      message: 'Invalid urgency level',
+      timestamp: new Date().toISOString(),
+      requestId: res.locals.requestId || 'unknown'
+    });
+    return;
+  }
+
+  next();
+};
+
+export const sanitizeMarketplaceInput = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  if (req.body) {
+    const sanitizeString = (str: string): string => {
+      return str.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+                .replace(/javascript:/gi, '')
+                .replace(/on\w+\s*=/gi, '');
+    };
+
+    if (req.body.selectionReason && typeof req.body.selectionReason === 'string') {
+      req.body.selectionReason = sanitizeString(req.body.selectionReason.trim());
+    }
+
+    if (req.body.reason && typeof req.body.reason === 'string') {
+      req.body.reason = sanitizeString(req.body.reason.trim());
+    }
+
+    if (req.body.feedback && typeof req.body.feedback === 'string') {
+      req.body.feedback = sanitizeString(req.body.feedback.trim());
+    }
+
+    if (req.body.message && typeof req.body.message === 'string') {
+      req.body.message = sanitizeString(req.body.message.trim());
+    }
+  }
+
+  next();
+};

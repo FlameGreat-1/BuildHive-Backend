@@ -1,4 +1,5 @@
 import { PaymentStatus, PaymentMethod, PaymentType, RefundStatus, QuoteStatus, QuoteItemType, DeliveryMethod, CreditTransactionType, CreditTransactionStatus, CreditUsageType, CreditPackageType, AutoTopupStatus } from './database.types';
+
 import { CreditTransactionResponse } from '../../credits/types';
 
 export interface ApiResponse<T = any> {
@@ -1178,4 +1179,392 @@ export interface CreditAnalyticsResponse {
     purchases: number;
     revenue: number;
   }[];
+}
+
+// ==================== MARKETPLACE JOB TYPES ====================
+
+export interface CreateMarketplaceJobRequest {
+  title: string;
+  description: string;
+  jobType: string;
+  location: string;
+  estimatedBudget?: number;
+  dateRequired: string;
+  urgencyLevel?: 'low' | 'medium' | 'high' | 'urgent';
+  photos?: string[];
+  clientName: string;
+  clientEmail: string;
+  clientPhone: string;
+  clientCompany?: string;
+  requiresVerification?: boolean;
+}
+
+export interface MarketplaceJobResponse {
+  id: number;
+  clientId: number;
+  title: string;
+  description: string;
+  jobType: string;
+  location: string;
+  estimatedBudget?: number;
+  dateRequired: string;
+  urgencyLevel: string;
+  photos: string[];
+  status: MarketplaceJobStatus;
+  applicationCount: number;
+  viewCount: number;
+  clientName: string;
+  clientEmail: string;
+  clientPhone: string;
+  clientCompany?: string;
+  expiresAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MarketplaceJobPreviewResponse {
+  id: number;
+  title: string;
+  jobType: string;
+  location: string;
+  estimatedBudget?: number;
+  dateRequired: string;
+  urgencyLevel: string;
+  applicationCount: number;
+  creditsRequired: number;
+  createdAt: string;
+  hasApplied?: boolean;
+}
+
+export interface MarketplaceJobListResponse {
+  jobs: MarketplaceJobPreviewResponse[];
+  summary: {
+    total: number;
+    available: number;
+    inReview: number;
+    assigned: number;
+    completed: number;
+    expired: number;
+  };
+}
+
+export interface MarketplaceJobFilterRequest {
+  jobType?: string;
+  location?: string;
+  urgencyLevel?: string;
+  minBudget?: number;
+  maxBudget?: number;
+  dateFrom?: string;
+  dateTo?: string;
+  status?: MarketplaceJobStatus;
+  excludeApplied?: boolean;
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+}
+
+export interface UpdateMarketplaceJobRequest {
+  title?: string;
+  description?: string;
+  estimatedBudget?: number;
+  dateRequired?: string;
+  urgencyLevel?: string;
+  status?: MarketplaceJobStatus;
+}
+
+// ==================== JOB APPLICATION TYPES ====================
+
+export interface CreateJobApplicationRequest {
+  marketplaceJobId: number;
+  customQuote: number;
+  proposedTimeline: string;
+  approachDescription: string;
+  materialsList?: string;
+  availabilityDates: string[];
+  coverMessage?: string;
+  relevantExperience?: string;
+  additionalPhotos?: string[];
+  questionsForClient?: string;
+  specialOffers?: string;
+}
+
+export interface JobApplicationResponse {
+  id: number;
+  marketplaceJobId: number;
+  tradieId: number;
+  customQuote: number;
+  proposedTimeline: string;
+  approachDescription: string;
+  materialsList?: string;
+  availabilityDates: string[];
+  coverMessage?: string;
+  relevantExperience?: string;
+  additionalPhotos: string[];
+  questionsForClient?: string;
+  specialOffers?: string;
+  creditsUsed: number;
+  status: ApplicationStatus;
+  applicationTimestamp: string;
+  createdAt: string;
+  updatedAt: string;
+  tradie?: {
+    id: number;
+    name: string;
+    email: string;
+    phone: string;
+    hourlyRate: number;
+    rating: number;
+    completedJobs: number;
+    profilePhoto?: string;
+    abn?: string;
+    qualifications: string[];
+    serviceTypes: string[];
+  };
+}
+
+export interface JobApplicationListResponse {
+  applications: JobApplicationResponse[];
+  summary: {
+    total: number;
+    submitted: number;
+    underReview: number;
+    selected: number;
+    rejected: number;
+  };
+}
+
+export interface JobApplicationFilterRequest {
+  marketplaceJobId?: number;
+  tradieId?: number;
+  status?: ApplicationStatus;
+  minQuote?: number;
+  maxQuote?: number;
+  startDate?: string;
+  endDate?: string;
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+}
+
+export interface UpdateApplicationStatusRequest {
+  applicationId: number;
+  status: ApplicationStatus;
+  reason?: string;
+  feedback?: string;
+}
+
+export interface UpdateApplicationStatusResponse {
+  applicationId: number;
+  status: ApplicationStatus;
+  updatedAt: string;
+  success: boolean;
+  jobAssigned?: boolean;
+  newJobId?: number;
+}
+
+// ==================== CLIENT REVIEW & SELECTION TYPES ====================
+
+export interface ClientApplicationReviewRequest {
+  marketplaceJobId: number;
+  page?: number;
+  limit?: number;
+  sortBy?: 'quote' | 'rating' | 'experience' | 'timeline';
+  sortOrder?: 'asc' | 'desc';
+}
+
+export interface ClientApplicationReviewResponse {
+  marketplaceJob: MarketplaceJobResponse;
+  applications: JobApplicationResponse[];
+  totalApplications: number;
+  averageQuote: number;
+  quoteRange: {
+    min: number;
+    max: number;
+  };
+}
+
+export interface SelectTradieRequest {
+  marketplaceJobId: number;
+  selectedApplicationId: number;
+  selectionReason?: string;
+  negotiatedQuote?: number;
+  projectStartDate?: string;
+}
+
+export interface SelectTradieResponse {
+  success: boolean;
+  marketplaceJobId: number;
+  selectedApplicationId: number;
+  selectedTradieId: number;
+  newJobId: number;
+  jobCreated: boolean;
+  notificationsSent: boolean;
+  assignmentTimestamp: string;
+}
+
+// ==================== MARKETPLACE ANALYTICS TYPES ====================
+
+export interface MarketplaceAnalyticsResponse {
+  totalJobs: number;
+  totalApplications: number;
+  averageApplicationsPerJob: number;
+  totalCreditsSpent: number;
+  conversionRate: number;
+  topJobTypes: {
+    jobType: string;
+    count: number;
+    percentage: number;
+  }[];
+  locationStats: {
+    location: string;
+    jobCount: number;
+    applicationCount: number;
+  }[];
+  monthlyTrends: {
+    month: string;
+    jobsPosted: number;
+    applicationsSubmitted: number;
+    creditsSpent: number;
+    conversions: number;
+  }[];
+}
+
+export interface TradieMarketplaceStatsResponse {
+  totalApplications: number;
+  successfulApplications: number;
+  totalCreditsSpent: number;
+  averageCreditsPerApplication: number;
+  conversionRate: number;
+  applicationHistory: {
+    date: string;
+    applicationsCount: number;
+    creditsSpent: number;
+    successRate: number;
+  }[];
+  topJobTypes: {
+    jobType: string;
+    applications: number;
+    successRate: number;
+  }[];
+}
+
+// ==================== MARKETPLACE CREDIT INTEGRATION TYPES ====================
+
+export interface MarketplaceJobApplicationCreditRequest {
+  marketplaceJobId: number;
+  applicationData: CreateJobApplicationRequest;
+}
+
+export interface MarketplaceJobApplicationCreditResponse {
+  success: boolean;
+  applicationId: number;
+  creditsUsed: number;
+  remainingBalance: number;
+  transactionId: number;
+  applicationSubmitted: boolean;
+}
+
+export interface MarketplaceCreditCostRequest {
+  marketplaceJobId: number;
+  jobType?: string;
+  urgencyLevel?: string;
+}
+
+export interface MarketplaceCreditCostResponse {
+  marketplaceJobId: number;
+  creditsRequired: number;
+  baseCost: number;
+  urgencyMultiplier: number;
+  jobTypeMultiplier: number;
+  finalCost: number;
+}
+
+// ==================== MARKETPLACE NOTIFICATION TYPES ====================
+
+export interface MarketplaceNotificationRequest {
+  userId: number;
+  notificationType: 'new_job' | 'application_status' | 'job_assigned' | 'application_received';
+  marketplaceJobId?: number;
+  applicationId?: number;
+  message: string;
+  metadata?: Record<string, any>;
+}
+
+export interface MarketplaceNotificationResponse {
+  id: number;
+  userId: number;
+  notificationType: string;
+  message: string;
+  read: boolean;
+  marketplaceJobId?: number;
+  applicationId?: number;
+  metadata?: Record<string, any>;
+  createdAt: string;
+}
+
+// ==================== MARKETPLACE SEARCH TYPES ====================
+
+export interface MarketplaceSearchRequest {
+  query?: string;
+  jobType?: string;
+  location?: string;
+  minBudget?: number;
+  maxBudget?: number;
+  urgencyLevel?: string;
+  dateRange?: {
+    from: string;
+    to: string;
+  };
+  excludeApplied?: boolean;
+  page?: number;
+  limit?: number;
+}
+
+export interface MarketplaceSearchResponse {
+  jobs: MarketplaceJobPreviewResponse[];
+  totalResults: number;
+  searchQuery: string;
+  filters: {
+    jobTypes: string[];
+    locations: string[];
+    budgetRanges: {
+      min: number;
+      max: number;
+      count: number;
+    }[];
+  };
+  suggestions: string[];
+}
+
+// ==================== MARKETPLACE DASHBOARD TYPES ====================
+
+export interface ClientMarketplaceDashboardResponse {
+  activeJobs: number;
+  totalApplicationsReceived: number;
+  averageApplicationsPerJob: number;
+  recentJobs: MarketplaceJobResponse[];
+  pendingReviews: {
+    jobId: number;
+    title: string;
+    applicationCount: number;
+    postedAt: string;
+  }[];
+  completedHires: number;
+}
+
+export interface TradieMarketplaceDashboardResponse {
+  availableJobs: number;
+  appliedJobs: number;
+  successfulApplications: number;
+  creditsRemaining: number;
+  recentApplications: {
+    jobId: number;
+    jobTitle: string;
+    status: ApplicationStatus;
+    appliedAt: string;
+    creditsUsed: number;
+  }[];
+  recommendedJobs: MarketplaceJobPreviewResponse[];
 }

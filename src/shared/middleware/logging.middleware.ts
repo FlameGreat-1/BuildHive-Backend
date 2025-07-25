@@ -905,8 +905,431 @@ export const creditSensitiveDataFilter = (
   next();
 };
 
+export const marketplaceJobOperationLogger = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const requestId = res.locals.requestId || 'unknown';
+  const userId = req.user?.id;
+  const marketplaceJobId = req.params.marketplaceJobId;
 
+  if (req.path.includes('/marketplace/jobs')) {
+    const operation = req.method === 'POST' ? 'create' : 
+                     req.method === 'PUT' ? 'update' : 
+                     req.method === 'DELETE' ? 'delete' : 'read';
 
+    logger.info('Marketplace job operation initiated', {
+      requestId,
+      userId,
+      marketplaceJobId,
+      operation,
+      method: req.method,
+      path: req.path,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  next();
+};
+
+export const marketplaceJobStatusChangeLogger = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const requestId = res.locals.requestId || 'unknown';
+  const userId = req.user?.id;
+  const marketplaceJobId = req.params.marketplaceJobId;
+
+  if (req.body.status && req.method === 'PUT' && req.path.includes('/marketplace/jobs')) {
+    logger.info('Marketplace job status change initiated', {
+      requestId,
+      userId,
+      marketplaceJobId,
+      newStatus: req.body.status,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  next();
+};
+
+export const marketplaceJobViewLogger = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const requestId = res.locals.requestId || 'unknown';
+  const userId = req.user?.id;
+  const marketplaceJobId = req.params.marketplaceJobId;
+
+  if (req.path.includes('/marketplace/jobs') && req.method === 'GET' && marketplaceJobId) {
+    logger.info('Marketplace job view initiated', {
+      requestId,
+      userId,
+      marketplaceJobId,
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  next();
+};
+
+export const jobApplicationOperationLogger = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const requestId = res.locals.requestId || 'unknown';
+  const userId = req.user?.id;
+  const applicationId = req.params.applicationId;
+
+  if (req.path.includes('/marketplace/applications')) {
+    const operation = req.method === 'POST' ? 'submit' : 
+                     req.method === 'PUT' ? 'update' : 
+                     req.method === 'DELETE' ? 'withdraw' : 'read';
+
+    logger.info('Job application operation initiated', {
+      requestId,
+      userId,
+      applicationId,
+      operation,
+      marketplaceJobId: req.body.marketplaceJobId,
+      method: req.method,
+      path: req.path,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  next();
+};
+
+export const jobApplicationStatusChangeLogger = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const requestId = res.locals.requestId || 'unknown';
+  const userId = req.user?.id;
+  const applicationId = req.params.applicationId;
+
+  if (req.body.status && req.method === 'PUT' && req.path.includes('/marketplace/applications')) {
+    logger.info('Job application status change initiated', {
+      requestId,
+      userId,
+      applicationId,
+      newStatus: req.body.status,
+      reason: req.body.reason,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  next();
+};
+
+export const clientApplicationReviewLogger = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const requestId = res.locals.requestId || 'unknown';
+  const userId = req.user?.id;
+  const marketplaceJobId = req.params.marketplaceJobId;
+
+  if (req.path.includes('/marketplace/jobs') && req.path.includes('/applications') && req.method === 'GET') {
+    logger.info('Client application review initiated', {
+      requestId,
+      userId,
+      marketplaceJobId,
+      sortBy: req.query.sortBy,
+      sortOrder: req.query.sortOrder,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  next();
+};
+
+export const tradieSelectionLogger = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const requestId = res.locals.requestId || 'unknown';
+  const userId = req.user?.id;
+
+  if (req.path.includes('/marketplace/select-tradie')) {
+    logger.info('Tradie selection initiated', {
+      requestId,
+      userId,
+      marketplaceJobId: req.body.marketplaceJobId,
+      selectedApplicationId: req.body.selectedApplicationId,
+      selectionReason: req.body.selectionReason ? '[FILTERED]' : undefined,
+      negotiatedQuote: req.body.negotiatedQuote ? '[FILTERED]' : undefined,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  next();
+};
+
+export const marketplaceSearchLogger = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const requestId = res.locals.requestId || 'unknown';
+  const userId = req.user?.id;
+
+  if (req.path.includes('/marketplace/search')) {
+    logger.info('Marketplace search initiated', {
+      requestId,
+      userId,
+      query: req.query.query,
+      jobType: req.query.jobType,
+      location: req.query.location,
+      urgencyLevel: req.query.urgencyLevel,
+      minBudget: req.query.minBudget,
+      maxBudget: req.query.maxBudget,
+      excludeApplied: req.query.excludeApplied,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  next();
+};
+
+export const marketplaceAnalyticsLogger = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const requestId = res.locals.requestId || 'unknown';
+  const userId = req.user?.id;
+
+  if (req.path.includes('/marketplace/analytics')) {
+    logger.info('Marketplace analytics access initiated', {
+      requestId,
+      userId,
+      analyticsType: req.path.includes('/tradie') ? 'tradie' : 
+                    req.path.includes('/client') ? 'client' : 'general',
+      method: req.method,
+      path: req.path,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  next();
+};
+
+export const marketplaceDashboardLogger = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const requestId = res.locals.requestId || 'unknown';
+  const userId = req.user?.id;
+
+  if (req.path.includes('/marketplace/dashboard')) {
+    logger.info('Marketplace dashboard access initiated', {
+      requestId,
+      userId,
+      dashboardType: req.path.includes('/tradie') ? 'tradie' : 'client',
+      method: req.method,
+      path: req.path,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  next();
+};
+
+export const marketplaceNotificationLogger = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const requestId = res.locals.requestId || 'unknown';
+  const userId = req.user?.id;
+  const notificationId = req.params.notificationId;
+
+  if (req.path.includes('/marketplace/notifications')) {
+    const operation = req.method === 'POST' ? 'create' : 
+                     req.method === 'PUT' ? 'update' : 
+                     req.method === 'DELETE' ? 'delete' : 'read';
+
+    logger.info('Marketplace notification operation initiated', {
+      requestId,
+      userId,
+      notificationId,
+      operation,
+      notificationType: req.body.notificationType,
+      method: req.method,
+      path: req.path,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  next();
+};
+
+export const marketplaceApplicationCreditLogger = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const requestId = res.locals.requestId || 'unknown';
+  const userId = req.user?.id;
+
+  if (req.path.includes('/marketplace/credits/application')) {
+    logger.info('Marketplace application credit usage initiated', {
+      requestId,
+      userId,
+      marketplaceJobId: req.body.marketplaceJobId,
+      creditsUsed: req.body.creditsUsed ? '[FILTERED]' : undefined,
+      urgencyMultiplier: req.body.urgencyMultiplier,
+      jobTypeMultiplier: req.body.jobTypeMultiplier,
+      method: req.method,
+      path: req.path,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  next();
+};
+
+export const creditCostCalculationLogger = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const requestId = res.locals.requestId || 'unknown';
+  const userId = req.user?.id;
+
+  if (req.path.includes('/marketplace/credits/cost')) {
+    logger.info('Credit cost calculation initiated', {
+      requestId,
+      userId,
+      marketplaceJobId: req.body.marketplaceJobId,
+      jobType: req.body.jobType,
+      urgencyLevel: req.body.urgencyLevel,
+      method: req.method,
+      path: req.path,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  next();
+};
+
+export const marketplaceSensitiveDataFilter = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const originalBody = req.body;
+  
+  if (originalBody && req.path.includes('/marketplace')) {
+    const filteredBody = { ...originalBody };
+    
+    if (filteredBody.estimatedBudget) {
+      filteredBody.estimatedBudget = '[FILTERED]';
+    }
+    
+    if (filteredBody.customQuote) {
+      filteredBody.customQuote = '[FILTERED]';
+    }
+    
+    if (filteredBody.negotiatedQuote) {
+      filteredBody.negotiatedQuote = '[FILTERED]';
+    }
+
+    if (filteredBody.clientPhone) {
+      filteredBody.clientPhone = filteredBody.clientPhone.replace(/(\d{3})\d{4}(\d{3})/, '$1****$2');
+    }
+
+    if (filteredBody.creditsUsed) {
+      filteredBody.creditsUsed = '[FILTERED]';
+    }
+
+    if (filteredBody.creditsRequired) {
+      filteredBody.creditsRequired = '[FILTERED]';
+    }
+
+    if (filteredBody.finalCost) {
+      filteredBody.finalCost = '[FILTERED]';
+    }
+
+    if (filteredBody.baseCost) {
+      filteredBody.baseCost = '[FILTERED]';
+    }
+
+    req.body = filteredBody;
+  }
+
+  next();
+};
+
+export const marketplaceJobListLogger = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const requestId = res.locals.requestId || 'unknown';
+  const userId = req.user?.id;
+
+  if (req.path.includes('/marketplace/jobs') && req.method === 'GET' && !req.params.marketplaceJobId) {
+    logger.info('Marketplace job list access initiated', {
+      requestId,
+      userId,
+      filters: {
+        jobType: req.query.jobType,
+        location: req.query.location,
+        urgencyLevel: req.query.urgencyLevel,
+        status: req.query.status,
+        excludeApplied: req.query.excludeApplied
+      },
+      pagination: {
+        page: req.query.page,
+        limit: req.query.limit
+      },
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  next();
+};
+
+export const jobAssignmentLogger = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const requestId = res.locals.requestId || 'unknown';
+  const userId = req.user?.id;
+
+  if (req.path.includes('/marketplace/assignments')) {
+    const operation = req.method === 'POST' ? 'create' : 
+                     req.method === 'PUT' ? 'update' : 'read';
+
+    logger.info('Job assignment operation initiated', {
+      requestId,
+      userId,
+      operation,
+      marketplaceJobId: req.body.marketplaceJobId,
+      selectedTradieId: req.body.selectedTradieId,
+      existingJobId: req.body.existingJobId,
+      method: req.method,
+      path: req.path,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  next();
+};
 
 
 

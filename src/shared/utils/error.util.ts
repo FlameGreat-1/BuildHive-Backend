@@ -142,39 +142,6 @@ export class QuoteDeliveryError extends AppError {
   }
 }
 
-export const createErrorResponse = (
-  error: AppError,
-  requestId: string
-): ErrorResponse => {
-  return {
-    success: false,
-    message: error.message,
-    errors: error instanceof ValidationAppError ? error.errors : undefined,
-    timestamp: error.timestamp,
-    requestId: error.requestId || requestId,
-    statusCode: error.statusCode
-  };
-};
-
-export const isOperationalError = (error: Error): boolean => {
-  if (error instanceof AppError) {
-    return error.isOperational;
-  }
-  return false;
-};
-
-export const handleAsyncError = (fn: Function) => {
-  return (req: any, res: any, next: any) => {
-    Promise.resolve(fn(req, res, next)).catch(next);
-  };
-};
-
-export const asyncErrorHandler = (fn: Function) => {
-  return (req: Request, res: Response, next: NextFunction) => {
-    Promise.resolve(fn(req, res, next)).catch(next);
-  };
-};
-
 export class PaymentNotFoundError extends AppError {
   constructor(message: string = 'Payment not found', requestId?: string) {
     super(message, HTTP_STATUS_CODES.NOT_FOUND, 'PAYMENT_NOT_FOUND', true, requestId);
@@ -306,3 +273,182 @@ export class CreditBalanceError extends AppError {
     super(message, HTTP_STATUS_CODES.BAD_REQUEST, 'CREDIT_BALANCE_ERROR', true, requestId);
   }
 }
+
+// ==================== MARKETPLACE ERROR CLASSES ====================
+
+export class MarketplaceJobNotFoundError extends AppError {
+  constructor(message: string = 'Marketplace job not found', requestId?: string) {
+    super(message, HTTP_STATUS_CODES.NOT_FOUND, 'MARKETPLACE_JOB_NOT_FOUND', true, requestId);
+  }
+}
+
+export class MarketplaceJobValidationError extends ValidationAppError {
+  constructor(message: string, errors: ValidationError[], requestId?: string) {
+    super(message, errors, requestId);
+  }
+}
+
+export class MarketplaceJobExpiredError extends AppError {
+  constructor(message: string = 'Marketplace job has expired', requestId?: string) {
+    super(message, HTTP_STATUS_CODES.BAD_REQUEST, 'MARKETPLACE_JOB_EXPIRED', true, requestId);
+  }
+}
+
+export class UnauthorizedMarketplaceJobAccessError extends AppError {
+  constructor(message: string = 'Unauthorized access to marketplace job', requestId?: string) {
+    super(message, HTTP_STATUS_CODES.FORBIDDEN, 'UNAUTHORIZED_MARKETPLACE_JOB_ACCESS', true, requestId);
+  }
+}
+
+export class JobApplicationNotFoundError extends AppError {
+  constructor(message: string = 'Job application not found', requestId?: string) {
+    super(message, HTTP_STATUS_CODES.NOT_FOUND, 'JOB_APPLICATION_NOT_FOUND', true, requestId);
+  }
+}
+
+export class JobApplicationValidationError extends ValidationAppError {
+  constructor(message: string, errors: ValidationError[], requestId?: string) {
+    super(message, errors, requestId);
+  }
+}
+
+export class DuplicateApplicationError extends AppError {
+  constructor(message: string = 'You have already applied to this job', requestId?: string) {
+    super(message, HTTP_STATUS_CODES.CONFLICT, 'DUPLICATE_APPLICATION', true, requestId);
+  }
+}
+
+export class ApplicationStatusUpdateError extends AppError {
+  constructor(message: string = 'Application status update failed', requestId?: string) {
+    super(message, HTTP_STATUS_CODES.BAD_REQUEST, 'APPLICATION_STATUS_UPDATE_ERROR', true, requestId);
+  }
+}
+
+export class UnauthorizedApplicationAccessError extends AppError {
+  constructor(message: string = 'Unauthorized access to job application', requestId?: string) {
+    super(message, HTTP_STATUS_CODES.FORBIDDEN, 'UNAUTHORIZED_APPLICATION_ACCESS', true, requestId);
+  }
+}
+
+export class TradieSelectionError extends AppError {
+  constructor(message: string = 'Tradie selection failed', requestId?: string) {
+    super(message, HTTP_STATUS_CODES.BAD_REQUEST, 'TRADIE_SELECTION_ERROR', true, requestId);
+  }
+}
+
+export class UnauthorizedSelectionError extends AppError {
+  constructor(message: string = 'Unauthorized to select tradie for this job', requestId?: string) {
+    super(message, HTTP_STATUS_CODES.FORBIDDEN, 'UNAUTHORIZED_SELECTION', true, requestId);
+  }
+}
+
+export class InvalidSelectionError extends AppError {
+  constructor(message: string = 'Invalid tradie selection', requestId?: string) {
+    super(message, HTTP_STATUS_CODES.BAD_REQUEST, 'INVALID_SELECTION', true, requestId);
+  }
+}
+
+export class MarketplaceCreditError extends AppError {
+  constructor(message: string = 'Marketplace credit operation failed', requestId?: string) {
+    super(message, HTTP_STATUS_CODES.BAD_REQUEST, 'MARKETPLACE_CREDIT_ERROR', true, requestId);
+  }
+}
+
+export class InsufficientCreditsForApplicationError extends AppError {
+  constructor(message: string = 'Insufficient credits for job application', requestId?: string) {
+    super(message, HTTP_STATUS_CODES.BAD_REQUEST, 'INSUFFICIENT_CREDITS_FOR_APPLICATION', true, requestId);
+  }
+}
+
+export class MarketplaceSearchError extends AppError {
+  constructor(message: string = 'Search operation failed', requestId?: string) {
+    super(message, HTTP_STATUS_CODES.BAD_REQUEST, 'MARKETPLACE_SEARCH_ERROR', true, requestId);
+  }
+}
+
+export class MarketplaceAnalyticsError extends AppError {
+  constructor(message: string = 'Analytics operation failed', requestId?: string) {
+    super(message, HTTP_STATUS_CODES.BAD_REQUEST, 'MARKETPLACE_ANALYTICS_ERROR', true, requestId);
+  }
+}
+
+export class MarketplaceNotificationError extends AppError {
+  constructor(message: string = 'Notification operation failed', requestId?: string) {
+    super(message, HTTP_STATUS_CODES.BAD_REQUEST, 'MARKETPLACE_NOTIFICATION_ERROR', true, requestId);
+  }
+}
+
+export class MarketplaceNotificationNotFoundError extends AppError {
+  constructor(message: string = 'Notification not found', requestId?: string) {
+    super(message, HTTP_STATUS_CODES.NOT_FOUND, 'MARKETPLACE_NOTIFICATION_NOT_FOUND', true, requestId);
+  }
+}
+
+export class JobAssignmentError extends AppError {
+  constructor(message: string = 'Job assignment failed', requestId?: string) {
+    super(message, HTTP_STATUS_CODES.BAD_REQUEST, 'JOB_ASSIGNMENT_ERROR', true, requestId);
+  }
+}
+
+export class JobAssignmentNotFoundError extends AppError {
+  constructor(message: string = 'Job assignment not found', requestId?: string) {
+    super(message, HTTP_STATUS_CODES.NOT_FOUND, 'JOB_ASSIGNMENT_NOT_FOUND', true, requestId);
+  }
+}
+
+export class MarketplaceJobStatusError extends AppError {
+  constructor(message: string = 'Invalid marketplace job status transition', requestId?: string) {
+    super(message, HTTP_STATUS_CODES.BAD_REQUEST, 'INVALID_MARKETPLACE_JOB_STATUS', true, requestId);
+  }
+}
+
+export class ApplicationCreditTransactionError extends AppError {
+  constructor(message: string = 'Application credit transaction failed', requestId?: string) {
+    super(message, HTTP_STATUS_CODES.BAD_REQUEST, 'APPLICATION_CREDIT_TRANSACTION_ERROR', true, requestId);
+  }
+}
+
+export class MarketplaceDashboardError extends AppError {
+  constructor(message: string = 'Dashboard operation failed', requestId?: string) {
+    super(message, HTTP_STATUS_CODES.BAD_REQUEST, 'MARKETPLACE_DASHBOARD_ERROR', true, requestId);
+  }
+}
+
+export class CreditCostCalculationError extends AppError {
+  constructor(message: string = 'Credit cost calculation failed', requestId?: string) {
+    super(message, HTTP_STATUS_CODES.BAD_REQUEST, 'CREDIT_COST_CALCULATION_ERROR', true, requestId);
+  }
+}
+
+export const createErrorResponse = (
+  error: AppError,
+  requestId: string
+): ErrorResponse => {
+  return {
+    success: false,
+    message: error.message,
+    errors: error instanceof ValidationAppError ? error.errors : undefined,
+    timestamp: error.timestamp,
+    requestId: error.requestId || requestId,
+    statusCode: error.statusCode
+  };
+};
+
+export const isOperationalError = (error: Error): boolean => {
+  if (error instanceof AppError) {
+    return error.isOperational;
+  }
+  return false;
+};
+
+export const handleAsyncError = (fn: Function) => {
+  return (req: any, res: any, next: any) => {
+    Promise.resolve(fn(req, res, next)).catch(next);
+  };
+};
+
+export const asyncErrorHandler = (fn: Function) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    Promise.resolve(fn(req, res, next)).catch(next);
+  };
+};

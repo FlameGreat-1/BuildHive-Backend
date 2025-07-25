@@ -591,3 +591,255 @@ export const sendInternalServerError = (
 ): Response => {
   return sendError(res, message, HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR);
 };
+
+
+// ==================== MARKETPLACE JOB RESPONSES ====================
+
+export const sendMarketplaceJobSuccess = <T = any>(
+  res: Response,
+  message: string,
+  data?: T,
+  statusCode: number = HTTP_STATUS_CODES.OK
+): Response => {
+  return sendSuccess(res, message, data, statusCode);
+};
+
+export const sendMarketplaceJobCreated = <T = any>(
+  res: Response,
+  message: string,
+  data?: T
+): Response => {
+  return sendCreated(res, message, data);
+};
+
+export const sendMarketplaceJobNotFound = (
+  res: Response,
+  message: string = 'Marketplace job not found'
+): Response => {
+  return sendError(res, message, HTTP_STATUS_CODES.NOT_FOUND);
+};
+
+export const sendMarketplaceJobListResponse = <T = any>(
+  res: Response,
+  message: string,
+  jobs: T[],
+  summary: any
+): Response => {
+  return sendSuccess(res, message, { jobs, summary });
+};
+
+export const sendMarketplaceJobValidationError = (
+  res: Response,
+  message: string,
+  errors: ValidationError[]
+): Response => {
+  return sendValidationError(res, message, errors);
+};
+
+export const sendMarketplaceJobExpiredError = (
+  res: Response,
+  message: string = 'Marketplace job has expired'
+): Response => {
+  return sendError(res, message, HTTP_STATUS_CODES.BAD_REQUEST);
+};
+
+// ==================== JOB APPLICATION RESPONSES ====================
+
+export const sendJobApplicationSuccess = <T = any>(
+  res: Response,
+  message: string,
+  data?: T,
+  statusCode: number = HTTP_STATUS_CODES.OK
+): Response => {
+  return sendSuccess(res, message, data, statusCode);
+};
+
+export const sendJobApplicationCreated = <T = any>(
+  res: Response,
+  message: string,
+  data?: T
+): Response => {
+  return sendCreated(res, message, data);
+};
+
+export const sendJobApplicationNotFound = (
+  res: Response,
+  message: string = 'Job application not found'
+): Response => {
+  return sendError(res, message, HTTP_STATUS_CODES.NOT_FOUND);
+};
+
+export const sendJobApplicationValidationError = (
+  res: Response,
+  message: string,
+  errors: ValidationError[]
+): Response => {
+  return sendValidationError(res, message, errors);
+};
+
+export const sendJobApplicationListResponse = <T = any>(
+  res: Response,
+  message: string,
+  applications: T[],
+  summary: any
+): Response => {
+  return sendSuccess(res, message, { applications, summary });
+};
+
+export const sendDuplicateApplicationError = (
+  res: Response,
+  message: string = 'You have already applied to this job'
+): Response => {
+  return sendError(res, message, HTTP_STATUS_CODES.CONFLICT);
+};
+
+export const sendApplicationStatusUpdateError = (
+  res: Response,
+  message: string = 'Application status update failed'
+): Response => {
+  return sendError(res, message, HTTP_STATUS_CODES.BAD_REQUEST);
+};
+
+// ==================== CLIENT REVIEW & SELECTION RESPONSES ====================
+
+export const sendClientReviewResponse = <T = any>(
+  res: Response,
+  message: string,
+  data?: T
+): Response => {
+  return sendSuccess(res, message, data);
+};
+
+export const sendTradieSelectionSuccess = <T = any>(
+  res: Response,
+  message: string,
+  data?: T
+): Response => {
+  return sendSuccess(res, message, data);
+};
+
+export const sendTradieSelectionError = (
+  res: Response,
+  message: string = 'Tradie selection failed'
+): Response => {
+  return sendError(res, message, HTTP_STATUS_CODES.BAD_REQUEST);
+};
+
+export const sendUnauthorizedSelectionError = (
+  res: Response,
+  message: string = 'Unauthorized to select tradie for this job'
+): Response => {
+  return sendError(res, message, HTTP_STATUS_CODES.FORBIDDEN);
+};
+
+// ==================== MARKETPLACE ANALYTICS RESPONSES ====================
+
+export const sendMarketplaceAnalyticsResponse = <T = any>(
+  res: Response,
+  message: string,
+  data?: T
+): Response => {
+  return sendSuccess(res, message, data);
+};
+
+export const sendTradieStatsResponse = <T = any>(
+  res: Response,
+  message: string,
+  data?: T
+): Response => {
+  return sendSuccess(res, message, data);
+};
+
+export const sendClientStatsResponse = <T = any>(
+  res: Response,
+  message: string,
+  data?: T
+): Response => {
+  return sendSuccess(res, message, data);
+};
+
+// ==================== MARKETPLACE SEARCH RESPONSES ====================
+
+export const sendMarketplaceSearchResponse = <T = any>(
+  res: Response,
+  message: string,
+  data?: T
+): Response => {
+  return sendSuccess(res, message, data);
+};
+
+export const sendMarketplaceSearchError = (
+  res: Response,
+  message: string = 'Search operation failed'
+): Response => {
+  return sendError(res, message, HTTP_STATUS_CODES.BAD_REQUEST);
+};
+
+// ==================== MARKETPLACE DASHBOARD RESPONSES ====================
+
+export const sendClientDashboardResponse = <T = any>(
+  res: Response,
+  message: string,
+  data?: T
+): Response => {
+  return sendSuccess(res, message, data);
+};
+
+export const sendTradieDashboardResponse = <T = any>(
+  res: Response,
+  message: string,
+  data?: T
+): Response => {
+  return sendSuccess(res, message, data);
+};
+
+// ==================== MARKETPLACE CREDIT RESPONSES ====================
+
+export const sendMarketplaceCreditCostResponse = <T = any>(
+  res: Response,
+  message: string,
+  data?: T
+): Response => {
+  return sendSuccess(res, message, data);
+};
+
+export const sendMarketplaceApplicationCreditResponse = <T = any>(
+  res: Response,
+  message: string,
+  data?: T
+): Response => {
+  return sendSuccess(res, message, data);
+};
+
+export const sendMarketplaceCreditError = (
+  res: Response,
+  message: string = 'Marketplace credit operation failed'
+): Response => {
+  return sendError(res, message, HTTP_STATUS_CODES.BAD_REQUEST);
+};
+
+// ==================== MARKETPLACE NOTIFICATION RESPONSES ====================
+
+export const sendMarketplaceNotificationResponse = <T = any>(
+  res: Response,
+  message: string,
+  data?: T
+): Response => {
+  return sendSuccess(res, message, data);
+};
+
+export const sendMarketplaceNotificationListResponse = <T = any>(
+  res: Response,
+  message: string,
+  notifications: T[],
+  meta?: any
+): Response => {
+  return sendSuccess(res, message, { notifications, meta });
+};
+
+export const sendMarketplaceNotificationError = (
+  res: Response,
+  message: string = 'Notification operation failed'
+): Response => {
+  return sendError(res, message, HTTP_STATUS_CODES.BAD_REQUEST);
+};

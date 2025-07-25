@@ -125,9 +125,16 @@ export enum PaymentType {
   SUBSCRIPTION = 'subscription',
   CREDIT_PURCHASE = 'credit_purchase',
   INVOICE_PAYMENT = 'invoice_payment',
-  JOB_APPLICATION = 'job_application'
+  JOB_APPLICATION = 'job_application',
+  MARKETPLACE_APPLICATION = 'marketplace_application'
 }
 
+export interface MarketplaceCreditTransactionDatabaseRecord extends CreditTransactionDatabaseRecord {
+  marketplace_job_id?: number;
+  application_id?: number;
+  urgency_multiplier?: number;
+  job_type_multiplier?: number;
+}
 export interface JobDatabaseRecord {
   id: number;
   tradie_id: number;
@@ -495,6 +502,7 @@ export enum CreditTransactionStatus {
 
 export enum CreditUsageType {
   JOB_APPLICATION = 'job_application',
+  MARKETPLACE_APPLICATION = 'marketplace_application',
   PROFILE_BOOST = 'profile_boost',
   PREMIUM_JOB_UNLOCK = 'premium_job_unlock',
   DIRECT_MESSAGE = 'direct_message',
@@ -513,6 +521,46 @@ export enum AutoTopupStatus {
   DISABLED = 'disabled',
   SUSPENDED = 'suspended',
   PROCESSING = 'processing'
+}
+
+export enum MarketplaceJobStatus {
+  AVAILABLE = 'available',
+  IN_REVIEW = 'in_review',
+  ASSIGNED = 'assigned',
+  COMPLETED = 'completed',
+  EXPIRED = 'expired',
+  CANCELLED = 'cancelled'
+}
+
+export enum ApplicationStatus {
+  SUBMITTED = 'submitted',
+  UNDER_REVIEW = 'under_review',
+  SELECTED = 'selected',
+  REJECTED = 'rejected',
+  WITHDRAWN = 'withdrawn'
+}
+
+export enum UrgencyLevel {
+  LOW = 'low',
+  MEDIUM = 'medium',
+  HIGH = 'high',
+  URGENT = 'urgent'
+}
+
+export enum JobApplicationCreditCost {
+  STANDARD = 3,
+  URGENT = 5,
+  PREMIUM = 7,
+  ENTERPRISE = 10
+}
+
+export enum MarketplaceNotificationType {
+  NEW_JOB_POSTED = 'new_job_posted',
+  APPLICATION_RECEIVED = 'application_received',
+  APPLICATION_STATUS_CHANGED = 'application_status_changed',
+  JOB_ASSIGNED = 'job_assigned',
+  JOB_EXPIRED = 'job_expired',
+  CREDIT_LOW_BALANCE = 'credit_low_balance'
 }
 
 export interface CreditBalanceDatabaseRecord {
@@ -602,4 +650,163 @@ export interface AutoTopupSettings {
   topupAmount: number;
   packageType: CreditPackageType;
   paymentMethodId: number;
+}
+
+export interface MarketplaceJobDatabaseRecord {
+  id: number;
+  client_id: number;
+  title: string;
+  description: string;
+  job_type: JobType;
+  location: string;
+  estimated_budget?: number;
+  date_required: Date;
+  urgency_level: UrgencyLevel;
+  photos: string[];
+  status: MarketplaceJobStatus;
+  application_count: number;
+  view_count: number;
+  client_name: string;
+  client_email: string;
+  client_phone: string;
+  client_company?: string;
+  expires_at?: Date;
+  source_type: 'marketplace';
+  metadata?: Record<string, any>;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface JobApplicationDatabaseRecord {
+  id: number;
+  marketplace_job_id: number;
+  tradie_id: number;
+  custom_quote: number;
+  proposed_timeline: string;
+  approach_description: string;
+  materials_list?: string;
+  availability_dates: string[];
+  cover_message?: string;
+  relevant_experience?: string;
+  additional_photos: string[];
+  questions_for_client?: string;
+  special_offers?: string;
+  credits_used: number;
+  status: ApplicationStatus;
+  application_timestamp: Date;
+  metadata?: Record<string, any>;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface MarketplaceJobAssignmentDatabaseRecord {
+  id: number;
+  marketplace_job_id: number;
+  selected_tradie_id: number;
+  selected_application_id: number;
+  existing_job_id: number;
+  selection_reason?: string;
+  negotiated_quote?: number;
+  project_start_date?: Date;
+  assignment_timestamp: Date;
+  metadata?: Record<string, any>;
+  created_at: Date;
+}
+
+export interface MarketplaceNotificationDatabaseRecord {
+  id: number;
+  user_id: number;
+  notification_type: MarketplaceNotificationType;
+  title: string;
+  message: string;
+  read: boolean;
+  marketplace_job_id?: number;
+  application_id?: number;
+  assignment_id?: number;
+  metadata?: Record<string, any>;
+  expires_at?: Date;
+  created_at: Date;
+  read_at?: Date;
+}
+
+export interface MarketplaceAnalyticsDatabaseRecord {
+  id: number;
+  date: Date;
+  total_jobs_posted: number;
+  total_applications: number;
+  total_credits_spent: number;
+  total_assignments: number;
+  average_applications_per_job: number;
+  conversion_rate: number;
+  top_job_types: Record<string, number>;
+  top_locations: Record<string, number>;
+  created_at: Date;
+}
+
+export interface TradieMarketplaceStatsDatabaseRecord {
+  id: number;
+  tradie_id: number;
+  total_applications: number;
+  successful_applications: number;
+  total_credits_spent: number;
+  conversion_rate: number;
+  average_quote: number;
+  last_application_at?: Date;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface ClientMarketplaceStatsDatabaseRecord {
+  id: number;
+  client_id: number;
+  total_jobs_posted: number;
+  total_applications_received: number;
+  total_hires_made: number;
+  average_applications_per_job: number;
+  average_hire_time_hours: number;
+  last_job_posted_at?: Date;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface MarketplaceJobFilter {
+  clientId?: number;
+  jobType?: JobType;
+  location?: string;
+  status?: MarketplaceJobStatus;
+  urgencyLevel?: UrgencyLevel;
+  minBudget?: number;
+  maxBudget?: number;
+  dateFrom?: Date;
+  dateTo?: Date;
+  page: number;
+  limit: number;
+  sortBy?: string;
+  sortOrder: 'asc' | 'desc';
+}
+
+export interface JobApplicationFilter {
+  tradieId?: number;
+  marketplaceJobId?: number;
+  status?: ApplicationStatus;
+  minQuote?: number;
+  maxQuote?: number;
+  dateFrom?: Date;
+  dateTo?: Date;
+  page: number;
+  limit: number;
+  sortBy?: string;
+  sortOrder: 'asc' | 'desc';
+}
+
+export interface MarketplaceNotificationFilter {
+  userId: number;
+  notificationType?: MarketplaceNotificationType;
+  read?: boolean;
+  dateFrom?: Date;
+  dateTo?: Date;
+  page: number;
+  limit: number;
+  sortBy?: string;
+  sortOrder: 'asc' | 'desc';
 }

@@ -652,4 +652,199 @@ export const creditNotificationRateLimit = rateLimit({
   }
 });
 
+export const marketplaceJobCreationRateLimit = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 20,
+  message: 'Too many marketplace job creation attempts, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: createRateLimitHandler('Too many marketplace job creation attempts, please try again after 10 minutes'),
+  keyGenerator: (req: Request): string => {
+    const userId = req.user?.id;
+    return userId ? `marketplace-job-create-${userId}` : req.ip || 'unknown';
+  }
+});
+
+export const marketplaceJobViewRateLimit = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 100,
+  message: 'Too many marketplace job view requests, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: createRateLimitHandler('Too many marketplace job view requests, please try again after 1 minute'),
+  keyGenerator: (req: Request): string => {
+    const userId = req.user?.id;
+    return userId ? `marketplace-job-view-${userId}` : req.ip || 'unknown';
+  }
+});
+
+export const marketplaceJobUpdateRateLimit = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  max: 30,
+  message: 'Too many marketplace job update attempts, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: createRateLimitHandler('Too many marketplace job update attempts, please try again after 5 minutes'),
+  keyGenerator: (req: Request): string => {
+    const userId = req.user?.id;
+    return userId ? `marketplace-job-update-${userId}` : req.ip || 'unknown';
+  }
+});
+
+export const jobApplicationSubmissionRateLimit = rateLimit({
+  windowMs: 2 * 60 * 1000,
+  max: 10,
+  message: 'Too many job application submissions, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: createRateLimitHandler('Too many job application submissions, please try again after 2 minutes'),
+  keyGenerator: (req: Request): string => {
+    const userId = req.user?.id;
+    return userId ? `job-application-submit-${userId}` : req.ip || 'unknown';
+  }
+});
+
+export const jobApplicationViewRateLimit = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 50,
+  message: 'Too many job application view requests, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: createRateLimitHandler('Too many job application view requests, please try again after 1 minute'),
+  keyGenerator: (req: Request): string => {
+    const userId = req.user?.id;
+    return userId ? `job-application-view-${userId}` : req.ip || 'unknown';
+  }
+});
+
+export const jobApplicationStatusUpdateRateLimit = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  max: 25,
+  message: 'Too many application status updates, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: createRateLimitHandler('Too many application status updates, please try again after 5 minutes'),
+  keyGenerator: (req: Request): string => {
+    const userId = req.user?.id;
+    return userId ? `application-status-update-${userId}` : req.ip || 'unknown';
+  }
+});
+
+export const clientApplicationReviewRateLimit = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 40,
+  message: 'Too many application review requests, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: createRateLimitHandler('Too many application review requests, please try again after 1 minute'),
+  keyGenerator: (req: Request): string => {
+    const userId = req.user?.id;
+    return userId ? `client-review-${userId}` : req.ip || 'unknown';
+  }
+});
+
+export const tradieSelectionRateLimit = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 15,
+  message: 'Too many tradie selection attempts, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: createRateLimitHandler('Too many tradie selection attempts, please try again after 10 minutes'),
+  keyGenerator: (req: Request): string => {
+    const userId = req.user?.id;
+    return userId ? `tradie-selection-${userId}` : req.ip || 'unknown';
+  }
+});
+
+export const marketplaceSearchRateLimit = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 60,
+  message: 'Too many marketplace search requests, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: createRateLimitHandler('Too many marketplace search requests, please try again after 1 minute'),
+  keyGenerator: (req: Request): string => {
+    const userId = req.user?.id;
+    return userId ? `marketplace-search-${userId}` : req.ip || 'unknown';
+  }
+});
+
+export const marketplaceAnalyticsRateLimit = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  max: 20,
+  message: 'Too many analytics requests, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: createRateLimitHandler('Too many analytics requests, please try again after 5 minutes'),
+  keyGenerator: (req: Request): string => {
+    const userId = req.user?.id;
+    return userId ? `marketplace-analytics-${userId}` : req.ip || 'unknown';
+  }
+});
+
+export const marketplaceDashboardRateLimit = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 30,
+  message: 'Too many dashboard requests, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: createRateLimitHandler('Too many dashboard requests, please try again after 1 minute'),
+  keyGenerator: (req: Request): string => {
+    const userId = req.user?.id;
+    return userId ? `marketplace-dashboard-${userId}` : req.ip || 'unknown';
+  }
+});
+
+export const marketplaceNotificationRateLimit = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 40,
+  message: 'Too many notification requests, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: createRateLimitHandler('Too many notification requests, please try again after 1 minute'),
+  keyGenerator: (req: Request): string => {
+    const userId = req.user?.id;
+    return userId ? `marketplace-notification-${userId}` : req.ip || 'unknown';
+  }
+});
+
+export const marketplaceApplicationCreditRateLimit = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 15,
+  message: 'Too many marketplace application credit requests, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: createRateLimitHandler('Too many marketplace application credit requests, please try again after 1 minute'),
+  keyGenerator: (req: Request): string => {
+    const userId = req.user?.id;
+    return userId ? `marketplace-app-credit-${userId}` : req.ip || 'unknown';
+  }
+});
+
+export const creditCostCalculationRateLimit = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 50,
+  message: 'Too many credit cost calculation requests, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: createRateLimitHandler('Too many credit cost calculation requests, please try again after 1 minute'),
+  keyGenerator: (req: Request): string => {
+    const userId = req.user?.id;
+    return userId ? `credit-cost-calc-${userId}` : req.ip || 'unknown';
+  }
+});
+
+export const marketplaceJobListRateLimit = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 80,
+  message: 'Too many marketplace job list requests, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: createRateLimitHandler('Too many marketplace job list requests, please try again after 1 minute'),
+  keyGenerator: (req: Request): string => {
+    const userId = req.user?.id;
+    return userId ? `marketplace-job-list-${userId}` : req.ip || 'unknown';
+  }
+});
+
 export { default as rateLimit } from 'express-rate-limit';
