@@ -38,7 +38,7 @@ export class MarketplaceRepository {
     this.marketplaceJobModel = new MarketplaceJobModel();
   }
 
-  async createJob(jobData: MarketplaceJobCreateData, clientId?: number): Promise<MarketplaceJobEntity> {
+  async createJob(jobData: MarketplaceJobCreateData, clientId: number): Promise<MarketplaceJobEntity> {
     const client = await this.db.connect();
     
     try {
@@ -150,7 +150,7 @@ export class MarketplaceRepository {
     }
   }
 
-  async updateJob(id: number, updateData: MarketplaceJobUpdateData, clientId?: number): Promise<MarketplaceJobEntity | null> {
+  async updateJob(id: number, updateData: MarketplaceJobUpdateData, clientId: number): Promise<MarketplaceJobEntity | null> {
     const client = await this.db.connect();
     
     try {
@@ -162,7 +162,7 @@ export class MarketplaceRepository {
         return null;
       }
 
-      if (clientId && existingJob.clientId !== clientId) {
+      if (existingJob.clientId !== clientId) {
         await client.query('ROLLBACK');
         throw new DatabaseError('Unauthorized job update attempt');
       }
@@ -621,7 +621,7 @@ export class MarketplaceRepository {
       );
 
       const activities = result.rows.map(row => ({
-        id: row.id,
+        id: parseInt(row.id),
         activityType: row.activity_type,
         metadata: JSON.parse(row.metadata || '{}'),
         createdAt: new Date(row.created_at)
@@ -665,6 +665,92 @@ export class MarketplaceRepository {
     }
   }
 
+  async getJobApplications(jobId: number): Promise<any[]> {
+    try {
+      const result = await this.db.query(
+        `SELECT ja.*, p.first_name, p.last_name, p.phone, p.email
+         FROM job_applications ja
+         JOIN profiles p ON ja.tradie_id = p.user_id
+         WHERE ja.marketplace_job_id = $1
+         ORDER BY ja.created_at DESC`,
+        [jobId]
+      );
+
+      logger.debug('Job applications retrieved', {
+        jobId,
+        applicationCount: result.rows.length
+      });
+
+      return result.rows.map(row => ({
+        id: parseInt(row.id),
+        tradieId: parseInt(row.tradie_id),
+        marketplaceJobId: parseInt(row.marketplace_job_id),
+        customQuote: parseFloat(row.custom_quote) || 0,
+        proposedTimeline: row.proposed_timeline,
+        coverLetter: row.cover_letter,
+        status: row.status,
+        creditsUsed: parseInt(row.credits_used) || 0,
+        applicationTimestamp: new Date(row.application_timestamp),
+        tradie: {
+          firstName: row.first_name,
+          lastName: row.last_name,
+          phone: row.phone,
+          email: row.email
+        }
+      }));
+    } catch (error) {
+      logger.error('Error getting job applications', { error, jobId });
+      throw new DatabaseError('Failed to get job applications', error);
+    }
+  }
+
+  async createOrUpdateClientProfile(jobData: MarketplaceJobCreateData): Promise<number> {
+    const client = await this.db.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      let userId: number;
+      const userResult = await client.query(
+        'SELECT id FROM users WHERE email = $1',
+        [jobData.clientEmail]
+      );
+
+      if (userResult.rows.length > 0) {
+        userId = parseInt(userResult.rows[0].id);
+      } else {
+        const newUserResult = await client.query(
+          `INSERT INTO users (email, username, role, created_at) 
+           VALUES ($1, $2, 'client', NOW()) RETURNING id`,
+          [jobData.clientEmail, jobData.clientEmail.split('@')[0]]
+        );
+        userId = parseInt(newUserResult.rows[0].id);
+      }
+
+      await client.query(
+        `INSERT INTO profiles (user_id, first_name, phone, company, created_at) 
+         VALUES ($1, $2, $3, $4, NOW()) 
+         ON CONFLICT (user_id) DO UPDATE SET 
+         phone = EXCLUDED.phone, 
+         company = EXCLUDED.company, 
+         updated_at = NOW()`,
+        [userId, jobData.clientName, jobData.clientPhone, jobData.clientCompany]
+      );
+
+      await client.query('COMMIT');
+
+      logger.debug('Client profile created/updated', { userId, email: jobData.clientEmail });
+
+      return userId;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      logger.error('Error creating/updating client profile', { error, jobData });
+      throw new DatabaseError('Failed to create/update client profile');
+    } finally {
+      client.release();
+    }
+  }
+
   private async checkTradieApplication(jobId: number, tradieId: number): Promise<boolean> {
     try {
       const result = await this.db.query(
@@ -679,72 +765,6 @@ export class MarketplaceRepository {
     }
   }
 
-  private async validateClientProfile(clientId: number): Promise<void> {
-    try {
-      const db = database.getPool();
-      const result = await db.query('SELECT id FROM profiles WHERE user_id = $1', [clientId]);
-      
-      if (result.rows.length === 0) {
-        throw new DatabaseError('Client profile not found');
-      }
-    } catch (error) {
-      logger.error('Error validating client profile', { error, clientId });
-      throw error;
-    }
-  }
-
-  private async createOrUpdateClientProfile(jobData: MarketplaceJobCreateData): Promise<number> {
-    try {
-      const db = database.getPool();
-      const client = await db.connect();
-
-      try {
-        await client.query('BEGIN');
-
-        let userId: number;
-        const userResult = await client.query(
-          'SELECT id FROM users WHERE email = $1',
-          [jobData.clientEmail]
-        );
-
-        if (userResult.rows.length > 0) {
-          userId = userResult.rows[0].id;
-        } else {
-          const newUserResult = await client.query(
-            `INSERT INTO users (email, username, role, created_at) 
-             VALUES ($1, $2, 'client', NOW()) RETURNING id`,
-            [jobData.clientEmail, jobData.clientEmail.split('@')[0]]
-          );
-          userId = newUserResult.rows[0].id;
-        }
-
-        await client.query(
-          `INSERT INTO profiles (user_id, first_name, phone, company, created_at) 
-           VALUES ($1, $2, $3, $4, NOW()) 
-           ON CONFLICT (user_id) DO UPDATE SET 
-           phone = EXCLUDED.phone, 
-           company = EXCLUDED.company, 
-           updated_at = NOW()`,
-          [userId, jobData.clientName, jobData.clientPhone, jobData.clientCompany]
-        );
-
-        await client.query('COMMIT');
-
-        logger.debug('Client profile created/updated', { userId, email: jobData.clientEmail });
-
-        return userId;
-      } catch (error) {
-        await client.query('ROLLBACK');
-        throw error;
-      } finally {
-        client.release();
-      }
-    } catch (error) {
-      logger.error('Error creating/updating client profile', { error, jobData });
-      throw new DatabaseError('Failed to create/update client profile');
-    }
-  }
-
   private async getTradieApplicationId(jobId: number, tradieId: number): Promise<number | undefined> {
     try {
       const result = await this.db.query(
@@ -752,7 +772,7 @@ export class MarketplaceRepository {
         [jobId, tradieId]
       );
       
-      return result.rows.length > 0 ? result.rows[0].id : undefined;
+      return result.rows.length > 0 ? parseInt(result.rows[0].id) : undefined;
     } catch (error) {
       logger.error('Error getting tradie application ID', { error, jobId, tradieId });
       return undefined;
@@ -801,13 +821,13 @@ export class MarketplaceRepository {
 
   private transformRowToEntity(row: any): MarketplaceJobEntity {
     return {
-      id: row.id,
-      clientId: row.client_id,
+      id: parseInt(row.id),
+      clientId: parseInt(row.client_id),
       title: row.title,
       description: row.description,
       jobType: row.job_type,
       location: row.location,
-      estimatedBudget: row.estimated_budget,
+      estimatedBudget: parseFloat(row.estimated_budget) || 0,
       dateRequired: new Date(row.date_required),
       urgencyLevel: row.urgency_level,
       photos: row.photos ? JSON.parse(row.photos) : [],
@@ -827,5 +847,3 @@ export class MarketplaceRepository {
   }
 }
 
-
-  

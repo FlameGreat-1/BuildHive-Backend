@@ -1,35 +1,11 @@
 import { Request, Response } from 'express';
 import { MarketplaceService } from '../services';
 import { 
-  validateJobCreation,
-  validateJobUpdate,
-  validateJobSearch,
-  validateJobStatusUpdate,
-  checkJobOwnership,
-  checkJobAvailability,
-  rateLimitJobCreation,
-  rateLimitJobSearch,
-  logJobActivity,
-  validateClientRole,
-  validateTradieRole,
-  sanitizeJobData,
-  validatePagination,
-  checkJobDeletion,
-  validateJobFilters,
-  cacheJobData,
-  trackJobViews,
-  validateJobExpiry,
-  requireJobAccess,
-  validateBulkOperations
-} from '../middleware';
-import { 
   MarketplaceJobCreateData,
   MarketplaceJobUpdateData,
   MarketplaceJobSearchParams
 } from '../types';
-import { authenticate, authorize } from '../../shared/middleware';
 import { logger, createApiResponse } from '../../shared/utils';
-import { ApiResponse } from '../../shared/types';
 
 interface AuthenticatedRequest extends Request {
   user?: {
@@ -56,13 +32,7 @@ export class MarketplaceController {
       const jobData: MarketplaceJobCreateData = req.body;
       const clientId = this.convertUserIdToNumber(req.user?.id);
 
-      if (!clientId) {
-        const response = createApiResponse(false, 'Authentication required', null);
-        res.status(401).json(response);
-        return;
-      }
-
-      const result = await this.marketplaceService.createMarketplaceJob(jobData, clientId);
+      const result = await this.marketplaceService.createMarketplaceJob(jobData, clientId!);
 
       if (result.success) {
         logger.info('Marketplace job created successfully', {
@@ -85,12 +55,6 @@ export class MarketplaceController {
     try {
       const { jobId } = req.params;
       const tradieId = this.convertUserIdToNumber(req.user?.id);
-
-      if (!jobId || isNaN(parseInt(jobId))) {
-        const response = createApiResponse(false, 'Valid job ID is required', null);
-        res.status(400).json(response);
-        return;
-      }
 
       const result = await this.marketplaceService.getMarketplaceJob(parseInt(jobId), tradieId);
 
@@ -138,22 +102,10 @@ export class MarketplaceController {
       const updateData: MarketplaceJobUpdateData = req.body;
       const clientId = this.convertUserIdToNumber(req.user?.id);
 
-      if (!jobId || isNaN(parseInt(jobId))) {
-        const response = createApiResponse(false, 'Valid job ID is required', null);
-        res.status(400).json(response);
-        return;
-      }
-
-      if (!clientId) {
-        const response = createApiResponse(false, 'Authentication required', null);
-        res.status(401).json(response);
-        return;
-      }
-
       const result = await this.marketplaceService.updateMarketplaceJob(
         parseInt(jobId),
         updateData,
-        clientId
+        clientId!
       );
 
       res.status(result.success ? 200 : 400).json(result);
@@ -174,23 +126,11 @@ export class MarketplaceController {
       const { status, reason } = req.body;
       const clientId = this.convertUserIdToNumber(req.user?.id);
 
-      if (!jobId || isNaN(parseInt(jobId))) {
-        const response = createApiResponse(false, 'Valid job ID is required', null);
-        res.status(400).json(response);
-        return;
-      }
-
-      if (!clientId) {
-        const response = createApiResponse(false, 'Authentication required', null);
-        res.status(401).json(response);
-        return;
-      }
-
       const result = await this.marketplaceService.updateJobStatus(
         parseInt(jobId),
         status,
         reason,
-        clientId
+        clientId!
       );
 
       res.status(result.success ? 200 : 400).json(result);
@@ -210,19 +150,7 @@ export class MarketplaceController {
       const { jobId } = req.params;
       const clientId = this.convertUserIdToNumber(req.user?.id);
 
-      if (!jobId || isNaN(parseInt(jobId))) {
-        const response = createApiResponse(false, 'Valid job ID is required', null);
-        res.status(400).json(response);
-        return;
-      }
-
-      if (!clientId) {
-        const response = createApiResponse(false, 'Authentication required', null);
-        res.status(401).json(response);
-        return;
-      }
-
-      const result = await this.marketplaceService.deleteMarketplaceJob(parseInt(jobId), clientId);
+      const result = await this.marketplaceService.deleteMarketplaceJob(parseInt(jobId), clientId!);
 
       res.status(result.success ? 200 : 400).json(result);
     } catch (error) {
@@ -243,13 +171,7 @@ export class MarketplaceController {
       const limit = parseInt(req.query.limit as string) || 20;
       const status = req.query.status as string;
 
-      if (!clientId) {
-        const response = createApiResponse(false, 'Authentication required', null);
-        res.status(401).json(response);
-        return;
-      }
-
-      const result = await this.marketplaceService.getClientJobs(clientId, {
+      const result = await this.marketplaceService.getClientJobs(clientId!, {
         page,
         limit,
         status
@@ -279,12 +201,6 @@ export class MarketplaceController {
     try {
       const { jobId } = req.params;
 
-      if (!jobId || isNaN(parseInt(jobId))) {
-        const response = createApiResponse(false, 'Valid job ID is required', null);
-        res.status(400).json(response);
-        return;
-      }
-
       const result = await this.marketplaceService.getJobCreditCost(parseInt(jobId));
 
       res.status(result.success ? 200 : 404).json(result);
@@ -300,13 +216,7 @@ export class MarketplaceController {
       const tradieId = this.convertUserIdToNumber(req.user?.id);
       const limit = parseInt(req.query.limit as string) || 10;
 
-      if (!tradieId) {
-        const response = createApiResponse(false, 'Authentication required', null);
-        res.status(401).json(response);
-        return;
-      }
-
-      const result = await this.marketplaceService.getRecommendedJobs(tradieId, limit);
+      const result = await this.marketplaceService.getRecommendedJobs(tradieId!, limit);
 
       res.status(result.success ? 200 : 400).json(result);
     } catch (error) {
@@ -333,18 +243,6 @@ export class MarketplaceController {
       const { jobIds, status, reason } = req.body;
       const clientId = this.convertUserIdToNumber(req.user?.id);
 
-      if (!clientId) {
-        const response = createApiResponse(false, 'Authentication required', null);
-        res.status(401).json(response);
-        return;
-      }
-
-      if (!Array.isArray(jobIds) || jobIds.length === 0) {
-        const response = createApiResponse(false, 'Job IDs array is required', null);
-        res.status(400).json(response);
-        return;
-      }
-
       const results = [];
       for (const jobId of jobIds) {
         try {
@@ -352,7 +250,7 @@ export class MarketplaceController {
             parseInt(jobId),
             status,
             reason,
-            clientId
+            clientId!
           );
           results.push({ jobId, success: result.success, message: result.message });
         } catch (error) {

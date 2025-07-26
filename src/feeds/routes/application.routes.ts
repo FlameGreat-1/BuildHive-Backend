@@ -125,6 +125,16 @@ router.get(
 );
 
 router.get(
+  '/job/:jobId/analytics',
+  authenticate,
+  validateClientRole,
+  validateJobApplicationAccess,
+  cacheApplicationData(300),
+  logApplicationActivity('job_application_analytics'),
+  getApplicationAnalytics
+);
+
+router.get(
   '/:applicationId',
   authenticate,
   requireApplicationAccess('read'),
@@ -178,4 +188,3 @@ router.get(
 router.use(handleApplicationErrors);
 
 export default router;
-  

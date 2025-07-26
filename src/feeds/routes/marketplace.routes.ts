@@ -13,8 +13,7 @@ import {
   getRecommendedJobs,
   processExpiredJobs,
   bulkUpdateJobStatus,
-  getJobApplications,
-  getJobAnalytics
+  getMarketplaceAnalytics
 } from '../controllers';
 import {
   validateJobCreation,
@@ -171,23 +170,12 @@ router.get(
 );
 
 router.get(
-  '/:jobId/applications',
+  '/analytics',
   authenticate,
-  validateClientRole,
-  requireJobAccess('read'),
-  validatePagination,
-  logJobActivity('job_applications_view'),
-  getJobApplications
-);
-
-router.get(
-  '/:jobId/analytics',
-  authenticate,
-  validateClientRole,
-  requireJobAccess('read'),
-  cacheJobData(300),
-  logJobActivity('job_analytics'),
-  getJobAnalytics
+  authorize(['admin']),
+  cacheJobData(600),
+  logJobActivity('marketplace_analytics'),
+  getMarketplaceAnalytics
 );
 
 router.use(handleJobErrors);

@@ -3,7 +3,6 @@ import { database } from '../../shared/database/connection';
 import { logger } from '../../shared/utils';
 import { DatabaseError } from '../../shared/types';
 import { ApplicationModel } from '../models';
-import { MarketplaceRepository } from './marketplace.repository';
 import { 
   JobApplicationEntity,
   JobApplicationCreateData,
@@ -35,12 +34,10 @@ import {
 export class ApplicationRepository {
   private db: Pool;
   private applicationModel: ApplicationModel;
-  private marketplaceRepository: MarketplaceRepository;
 
   constructor() {
     this.db = database.getPool();
     this.applicationModel = new ApplicationModel();
-    this.marketplaceRepository = new MarketplaceRepository();
   }
 
   async createApplication(
@@ -62,20 +59,27 @@ export class ApplicationRepository {
         throw new DatabaseError('Application already exists for this job');
       }
 
-      const marketplaceJob = await this.marketplaceRepository.findJobById(applicationData.marketplaceJobId);
-      if (!marketplaceJob) {
+      const marketplaceJobQuery = `
+        SELECT id, status, job_type, urgency_level 
+        FROM marketplace_jobs 
+        WHERE id = $1
+      `;
+      const jobResult = await client.query(marketplaceJobQuery, [applicationData.marketplaceJobId]);
+      
+      if (jobResult.rows.length === 0) {
         await client.query('ROLLBACK');
         throw new DatabaseError('Marketplace job not found');
       }
 
+      const marketplaceJob = jobResult.rows[0];
       if (marketplaceJob.status !== 'available') {
         await client.query('ROLLBACK');
         throw new DatabaseError('Job is no longer available for applications');
       }
 
       const creditCost = await this.calculateApplicationCreditCost(
-        marketplaceJob.jobType, 
-        marketplaceJob.urgencyLevel
+        marketplaceJob.job_type, 
+        marketplaceJob.urgency_level
       );
 
       await this.validateTradieCredits(client, tradieId, creditCost);
@@ -84,7 +88,10 @@ export class ApplicationRepository {
 
       await this.deductApplicationCredits(client, tradieId, application.id, creditCost);
       
-      await this.marketplaceRepository.incrementApplicationCount(applicationData.marketplaceJobId);
+      await client.query(
+        'UPDATE marketplace_jobs SET application_count = application_count + 1 WHERE id = $1',
+        [applicationData.marketplaceJobId]
+      );
 
       await this.logApplicationActivity(client, application.id, 'APPLICATION_CREATED', {
         tradieId,
@@ -132,8 +139,16 @@ export class ApplicationRepository {
       const application = await this.findApplicationById(id);
       if (!application) return null;
 
-      const marketplaceJob = await this.marketplaceRepository.findJobById(application.marketplaceJobId);
-      if (!marketplaceJob) return null;
+      const jobQuery = `
+        SELECT id, title, job_type, location, estimated_budget, urgency_level, date_required
+        FROM marketplace_jobs 
+        WHERE id = $1
+      `;
+      const jobResult = await this.db.query(jobQuery, [application.marketplaceJobId]);
+      
+      if (jobResult.rows.length === 0) return null;
+
+      const marketplaceJob = jobResult.rows[0];
 
       const tradieProfileQuery = `
         SELECT u.username, p.first_name, p.last_name, p.avatar, p.rating,
@@ -157,13 +172,13 @@ export class ApplicationRepository {
       const applicationDetails: JobApplicationDetails = {
         ...application,
         job: {
-          id: marketplaceJob.id,
+          id: parseInt(marketplaceJob.id),
           title: marketplaceJob.title,
-          jobType: marketplaceJob.jobType,
+          jobType: marketplaceJob.job_type,
           location: marketplaceJob.location,
-          estimatedBudget: marketplaceJob.estimatedBudget,
-          urgencyLevel: marketplaceJob.urgencyLevel,
-          dateRequired: marketplaceJob.dateRequired
+          estimatedBudget: parseFloat(marketplaceJob.estimated_budget) || 0,
+          urgencyLevel: marketplaceJob.urgency_level,
+          dateRequired: new Date(marketplaceJob.date_required)
         },
         tradie: {
           id: application.tradieId,
@@ -701,7 +716,7 @@ export class ApplicationRepository {
       [tradieId]
     );
 
-    if (creditResult.rows.length === 0 || creditResult.rows[0].balance < requiredCredits) {
+    if (creditResult.rows.length === 0 || parseInt(creditResult.rows[0].balance) < requiredCredits) {
       throw new DatabaseError('Insufficient credits for application');
     }
   }
@@ -754,10 +769,11 @@ export class ApplicationRepository {
       [application.marketplaceJobId, application.id]
     );
 
-    await this.marketplaceRepository.updateJobStatus(
-      application.marketplaceJobId, 
-      'assigned', 
-      'Tradie selected from applications'
+    await client.query(
+      `UPDATE marketplace_jobs 
+       SET status = 'assigned' 
+       WHERE id = $1`,
+      [application.marketplaceJobId]
     );
   }
 

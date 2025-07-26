@@ -1,39 +1,13 @@
 import { Request, Response } from 'express';
 import { ApplicationService, MarketplaceService } from '../services';
 import { 
-  validateApplicationCreation,
-  validateApplicationUpdate,
-  validateApplicationSearch,
-  validateApplicationStatusUpdate,
-  checkApplicationOwnership,
-  checkApplicationWithdrawal,
-  rateLimitApplicationCreation,
-  rateLimitApplicationSearch,
-  logApplicationActivity,
-  validateTradieRole,
-  validateClientRole,
-  sanitizeApplicationData,
-  validatePagination,
-  validateApplicationFilters,
-  checkDuplicateApplication,
-  validateJobApplicationAccess,
-  cacheApplicationData,
-  trackApplicationViews,
-  requireApplicationAccess,
-  validateBulkApplicationOperations,
-  validateWithdrawalData,
-  checkApplicationLimit
-} from '../middleware';
-import { 
   JobApplicationCreateData,
   JobApplicationUpdateData,
   JobApplicationSearchParams,
   ApplicationStatusUpdate,
   ApplicationWithdrawal
 } from '../types';
-import { authenticate, authorize } from '../../shared/middleware';
 import { logger, createApiResponse } from '../../shared/utils';
-import { ApiResponse } from '../../shared/types';
 
 interface AuthenticatedRequest extends Request {
   user?: {
@@ -62,13 +36,7 @@ export class ApplicationController {
       const applicationData: JobApplicationCreateData = req.body;
       const tradieId = this.convertUserIdToNumber(req.user?.id);
 
-      if (!tradieId) {
-        const response = createApiResponse(false, 'Authentication required', null);
-        res.status(401).json(response);
-        return;
-      }
-
-      const result = await this.applicationService.createApplication(applicationData, tradieId);
+      const result = await this.applicationService.createApplication(applicationData, tradieId!);
 
       if (result.success) {
         logger.info('Job application created successfully', {
@@ -92,12 +60,6 @@ export class ApplicationController {
       const { applicationId } = req.params;
       const userId = this.convertUserIdToNumber(req.user?.id);
 
-      if (!applicationId || isNaN(parseInt(applicationId))) {
-        const response = createApiResponse(false, 'Valid application ID is required', null);
-        res.status(400).json(response);
-        return;
-      }
-
       const result = await this.applicationService.getApplication(parseInt(applicationId), userId);
 
       res.status(result.success ? 200 : 404).json(result);
@@ -115,12 +77,6 @@ export class ApplicationController {
     try {
       const { jobId } = req.params;
       const clientId = this.convertUserIdToNumber(req.user?.id);
-
-      if (!jobId || isNaN(parseInt(jobId))) {
-        const response = createApiResponse(false, 'Valid job ID is required', null);
-        res.status(400).json(response);
-        return;
-      }
 
       const result = await this.applicationService.getApplicationsByJob(parseInt(jobId), clientId);
 
@@ -143,13 +99,7 @@ export class ApplicationController {
       const limit = parseInt(req.query.limit as string) || 20;
       const status = req.query.status as string;
 
-      if (!tradieId) {
-        const response = createApiResponse(false, 'Authentication required', null);
-        res.status(401).json(response);
-        return;
-      }
-
-      const result = await this.applicationService.getTradieApplications(tradieId, {
+      const result = await this.applicationService.getTradieApplications(tradieId!, {
         page,
         limit,
         status
@@ -200,22 +150,10 @@ export class ApplicationController {
       const updateData: JobApplicationUpdateData = req.body;
       const tradieId = this.convertUserIdToNumber(req.user?.id);
 
-      if (!applicationId || isNaN(parseInt(applicationId))) {
-        const response = createApiResponse(false, 'Valid application ID is required', null);
-        res.status(400).json(response);
-        return;
-      }
-
-      if (!tradieId) {
-        const response = createApiResponse(false, 'Authentication required', null);
-        res.status(401).json(response);
-        return;
-      }
-
       const result = await this.applicationService.updateApplication(
         parseInt(applicationId),
         updateData,
-        tradieId
+        tradieId!
       );
 
       res.status(result.success ? 200 : 400).json(result);
@@ -235,12 +173,6 @@ export class ApplicationController {
       const { applicationId } = req.params;
       const statusUpdate: ApplicationStatusUpdate = req.body;
       const clientId = this.convertUserIdToNumber(req.user?.id);
-
-      if (!applicationId || isNaN(parseInt(applicationId))) {
-        const response = createApiResponse(false, 'Valid application ID is required', null);
-        res.status(400).json(response);
-        return;
-      }
 
       const result = await this.applicationService.updateApplicationStatus(
         parseInt(applicationId),
@@ -266,21 +198,9 @@ export class ApplicationController {
       const withdrawalData: ApplicationWithdrawal = req.body;
       const tradieId = this.convertUserIdToNumber(req.user?.id);
 
-      if (!applicationId || isNaN(parseInt(applicationId))) {
-        const response = createApiResponse(false, 'Valid application ID is required', null);
-        res.status(400).json(response);
-        return;
-      }
-
-      if (!tradieId) {
-        const response = createApiResponse(false, 'Authentication required', null);
-        res.status(401).json(response);
-        return;
-      }
-
       const result = await this.applicationService.withdrawApplication(
         parseInt(applicationId),
-        tradieId,
+        tradieId!,
         withdrawalData
       );
 
@@ -300,13 +220,7 @@ export class ApplicationController {
     try {
       const tradieId = this.convertUserIdToNumber(req.user?.id);
 
-      if (!tradieId) {
-        const response = createApiResponse(false, 'Authentication required', null);
-        res.status(401).json(response);
-        return;
-      }
-
-      const result = await this.applicationService.getTradieApplicationHistory(tradieId);
+      const result = await this.applicationService.getTradieApplicationHistory(tradieId!);
 
       res.status(result.success ? 200 : 400).json(result);
     } catch (error) {
@@ -346,18 +260,6 @@ export class ApplicationController {
     try {
       const { applicationIds, status, reason, feedback } = req.body;
       const clientId = this.convertUserIdToNumber(req.user?.id);
-
-      if (!clientId) {
-        const response = createApiResponse(false, 'Authentication required', null);
-        res.status(401).json(response);
-        return;
-      }
-
-      if (!Array.isArray(applicationIds) || applicationIds.length === 0) {
-        const response = createApiResponse(false, 'Application IDs array is required', null);
-        res.status(400).json(response);
-        return;
-      }
 
       const results = [];
       for (const applicationId of applicationIds) {
@@ -404,12 +306,6 @@ export class ApplicationController {
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 20;
 
-      if (!userId) {
-        const response = createApiResponse(false, 'Authentication required', null);
-        res.status(401).json(response);
-        return;
-      }
-
       const searchParams: JobApplicationSearchParams = {
         page,
         limit,
@@ -435,12 +331,6 @@ export class ApplicationController {
     try {
       const { applicationId } = req.params;
       const userId = this.convertUserIdToNumber(req.user?.id);
-
-      if (!applicationId || isNaN(parseInt(applicationId))) {
-        const response = createApiResponse(false, 'Valid application ID is required', null);
-        res.status(400).json(response);
-        return;
-      }
 
       const applicationResult = await this.applicationService.getApplication(parseInt(applicationId), userId);
       if (!applicationResult.success || !applicationResult.data) {
@@ -530,4 +420,3 @@ export const {
   getApplicationsByStatus,
   getApplicationMetrics
 } = applicationController;
-
