@@ -1,7 +1,6 @@
 import { Request, Response } from 'express';
 import { ApplicationService, MarketplaceService } from '../services';
 import { 
-  applicationMiddleware,
   validateApplicationCreation,
   validateApplicationUpdate,
   validateApplicationSearch,
@@ -33,8 +32,17 @@ import {
   ApplicationWithdrawal
 } from '../types';
 import { authenticate, authorize } from '../../shared/middleware';
-import { logger, createApiResponse, validateRequest } from '../../shared/utils';
+import { logger, createApiResponse } from '../../shared/utils';
 import { ApiResponse } from '../../shared/types';
+
+interface AuthenticatedRequest extends Request {
+  user?: {
+    id: string;
+    email: string;
+    role: string;
+    emailVerified: boolean;
+  };
+}
 
 export class ApplicationController {
   private applicationService: ApplicationService;
@@ -45,10 +53,14 @@ export class ApplicationController {
     this.marketplaceService = new MarketplaceService();
   }
 
-  createApplication = async (req: Request, res: Response): Promise<void> => {
+  private convertUserIdToNumber(userId: string | undefined): number | undefined {
+    return userId ? parseInt(userId, 10) : undefined;
+  }
+
+  createApplication = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const applicationData: JobApplicationCreateData = req.body;
-      const tradieId = req.user?.id;
+      const tradieId = this.convertUserIdToNumber(req.user?.id);
 
       if (!tradieId) {
         const response = createApiResponse(false, 'Authentication required', null);
@@ -75,10 +87,10 @@ export class ApplicationController {
     }
   };
 
-  getApplication = async (req: Request, res: Response): Promise<void> => {
+  getApplication = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const { applicationId } = req.params;
-      const userId = req.user?.id;
+      const userId = this.convertUserIdToNumber(req.user?.id);
 
       if (!applicationId || isNaN(parseInt(applicationId))) {
         const response = createApiResponse(false, 'Valid application ID is required', null);
@@ -99,10 +111,10 @@ export class ApplicationController {
     }
   };
 
-  getApplicationsByJob = async (req: Request, res: Response): Promise<void> => {
+  getApplicationsByJob = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const { jobId } = req.params;
-      const clientId = req.user?.id;
+      const clientId = this.convertUserIdToNumber(req.user?.id);
 
       if (!jobId || isNaN(parseInt(jobId))) {
         const response = createApiResponse(false, 'Valid job ID is required', null);
@@ -124,9 +136,9 @@ export class ApplicationController {
     }
   };
 
-  getTradieApplications = async (req: Request, res: Response): Promise<void> => {
+  getTradieApplications = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
-      const tradieId = req.user?.id;
+      const tradieId = this.convertUserIdToNumber(req.user?.id);
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 20;
       const status = req.query.status as string;
@@ -151,7 +163,7 @@ export class ApplicationController {
     }
   };
 
-  searchApplications = async (req: Request, res: Response): Promise<void> => {
+  searchApplications = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const searchParams: JobApplicationSearchParams = {
         page: parseInt(req.query.page as string) || 1,
@@ -159,9 +171,17 @@ export class ApplicationController {
         status: req.query.status as string,
         tradieId: req.query.tradieId ? parseInt(req.query.tradieId as string) : undefined,
         marketplaceJobId: req.query.marketplaceJobId ? parseInt(req.query.marketplaceJobId as string) : undefined,
-        dateRange: req.query.dateRange as string,
+        jobType: req.query.jobType as string,
+        location: req.query.location as string,
         minQuote: req.query.minQuote ? parseFloat(req.query.minQuote as string) : undefined,
-        maxQuote: req.query.maxQuote ? parseFloat(req.query.maxQuote as string) : undefined
+        maxQuote: req.query.maxQuote ? parseFloat(req.query.maxQuote as string) : undefined,
+        dateRange: req.query.startDate && req.query.endDate ? {
+          startDate: new Date(req.query.startDate as string),
+          endDate: new Date(req.query.endDate as string)
+        } : undefined,
+        query: req.query.query as string,
+        sortBy: req.query.sortBy as string,
+        sortOrder: req.query.sortOrder as 'asc' | 'desc'
       };
 
       const result = await this.applicationService.searchApplications(searchParams);
@@ -174,11 +194,11 @@ export class ApplicationController {
     }
   };
 
-  updateApplication = async (req: Request, res: Response): Promise<void> => {
+  updateApplication = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const { applicationId } = req.params;
       const updateData: JobApplicationUpdateData = req.body;
-      const tradieId = req.user?.id;
+      const tradieId = this.convertUserIdToNumber(req.user?.id);
 
       if (!applicationId || isNaN(parseInt(applicationId))) {
         const response = createApiResponse(false, 'Valid application ID is required', null);
@@ -210,11 +230,11 @@ export class ApplicationController {
     }
   };
 
-  updateApplicationStatus = async (req: Request, res: Response): Promise<void> => {
+  updateApplicationStatus = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const { applicationId } = req.params;
       const statusUpdate: ApplicationStatusUpdate = req.body;
-      const clientId = req.user?.id;
+      const clientId = this.convertUserIdToNumber(req.user?.id);
 
       if (!applicationId || isNaN(parseInt(applicationId))) {
         const response = createApiResponse(false, 'Valid application ID is required', null);
@@ -240,11 +260,11 @@ export class ApplicationController {
     }
   };
 
-  withdrawApplication = async (req: Request, res: Response): Promise<void> => {
+  withdrawApplication = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const { applicationId } = req.params;
       const withdrawalData: ApplicationWithdrawal = req.body;
-      const tradieId = req.user?.id;
+      const tradieId = this.convertUserIdToNumber(req.user?.id);
 
       if (!applicationId || isNaN(parseInt(applicationId))) {
         const response = createApiResponse(false, 'Valid application ID is required', null);
@@ -276,9 +296,9 @@ export class ApplicationController {
     }
   };
 
-  getTradieApplicationHistory = async (req: Request, res: Response): Promise<void> => {
+  getTradieApplicationHistory = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
-      const tradieId = req.user?.id;
+      const tradieId = this.convertUserIdToNumber(req.user?.id);
 
       if (!tradieId) {
         const response = createApiResponse(false, 'Authentication required', null);
@@ -296,9 +316,11 @@ export class ApplicationController {
     }
   };
 
-  getApplicationAnalytics = async (req: Request, res: Response): Promise<void> => {
+  getApplicationAnalytics = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
-      const tradieId = req.query.tradieId ? parseInt(req.query.tradieId as string) : req.user?.id;
+      const tradieId = req.query.tradieId ? 
+        parseInt(req.query.tradieId as string) : 
+        this.convertUserIdToNumber(req.user?.id);
       const startDate = req.query.startDate ? new Date(req.query.startDate as string) : undefined;
       const endDate = req.query.endDate ? new Date(req.query.endDate as string) : undefined;
       const groupBy = req.query.groupBy as 'day' | 'week' | 'month' | 'status';
@@ -320,14 +342,20 @@ export class ApplicationController {
     }
   };
 
-  bulkUpdateApplicationStatus = async (req: Request, res: Response): Promise<void> => {
+  bulkUpdateApplicationStatus = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const { applicationIds, status, reason, feedback } = req.body;
-      const clientId = req.user?.id;
+      const clientId = this.convertUserIdToNumber(req.user?.id);
 
       if (!clientId) {
         const response = createApiResponse(false, 'Authentication required', null);
         res.status(401).json(response);
+        return;
+      }
+
+      if (!Array.isArray(applicationIds) || applicationIds.length === 0) {
+        const response = createApiResponse(false, 'Application IDs array is required', null);
+        res.status(400).json(response);
         return;
       }
 
@@ -368,10 +396,10 @@ export class ApplicationController {
     }
   };
 
-  getApplicationsByStatus = async (req: Request, res: Response): Promise<void> => {
+  getApplicationsByStatus = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const { status } = req.params;
-      const userId = req.user?.id;
+      const userId = this.convertUserIdToNumber(req.user?.id);
       const userRole = req.user?.role;
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 20;
@@ -403,10 +431,10 @@ export class ApplicationController {
     }
   };
 
-  getApplicationMetrics = async (req: Request, res: Response): Promise<void> => {
+  getApplicationMetrics = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const { applicationId } = req.params;
-      const userId = req.user?.id;
+      const userId = this.convertUserIdToNumber(req.user?.id);
 
       if (!applicationId || isNaN(parseInt(applicationId))) {
         const response = createApiResponse(false, 'Valid application ID is required', null);
@@ -429,23 +457,32 @@ export class ApplicationController {
         creditsUsed: application.creditsUsed,
         customQuote: application.customQuote,
         proposedTimeline: application.proposedTimeline,
-        competitorCount: application.job.applicationCount || 0,
+        competitorCount: 0,
         averageQuote: 0,
         rankPosition: 0,
-        responseTime: application.job.applications ? 
-          Math.min(...application.job.applications.map(app => 
-            new Date(app.applicationTimestamp).getTime() - new Date(application.job.createdAt).getTime()
-          )) : 0
+        responseTime: 0,
+        canWithdraw: application.canWithdraw,
+        canModify: application.canModify
       };
 
-      if (application.job.applications && application.job.applications.length > 0) {
-        const quotes = application.job.applications
+      const jobApplicationsResult = await this.applicationService.getApplicationsByJob(
+        application.marketplaceJobId, 
+        userId
+      );
+
+      if (jobApplicationsResult.success && jobApplicationsResult.data) {
+        const allApplications = jobApplicationsResult.data;
+        metrics.competitorCount = allApplications.length;
+
+        const quotes = allApplications
           .map(app => app.customQuote || 0)
           .filter(quote => quote > 0);
         
-        metrics.averageQuote = quotes.reduce((sum, quote) => sum + quote, 0) / quotes.length;
+        if (quotes.length > 0) {
+          metrics.averageQuote = quotes.reduce((sum, quote) => sum + quote, 0) / quotes.length;
+        }
         
-        const sortedByQuote = application.job.applications
+        const sortedByQuote = allApplications
           .filter(app => app.customQuote && app.customQuote > 0)
           .sort((a, b) => (a.customQuote || 0) - (b.customQuote || 0));
         
@@ -493,3 +530,4 @@ export const {
   getApplicationsByStatus,
   getApplicationMetrics
 } = applicationController;
+

@@ -1,7 +1,6 @@
 import { Request, Response } from 'express';
 import { MarketplaceService } from '../services';
 import { 
-  marketplaceMiddleware,
   validateJobCreation,
   validateJobUpdate,
   validateJobSearch,
@@ -29,8 +28,17 @@ import {
   MarketplaceJobSearchParams
 } from '../types';
 import { authenticate, authorize } from '../../shared/middleware';
-import { logger, createApiResponse, validateRequest } from '../../shared/utils';
+import { logger, createApiResponse } from '../../shared/utils';
 import { ApiResponse } from '../../shared/types';
+
+interface AuthenticatedRequest extends Request {
+  user?: {
+    id: string;
+    email: string;
+    role: string;
+    emailVerified: boolean;
+  };
+}
 
 export class MarketplaceController {
   private marketplaceService: MarketplaceService;
@@ -39,10 +47,20 @@ export class MarketplaceController {
     this.marketplaceService = new MarketplaceService();
   }
 
-  createMarketplaceJob = async (req: Request, res: Response): Promise<void> => {
+  private convertUserIdToNumber(userId: string | undefined): number | undefined {
+    return userId ? parseInt(userId, 10) : undefined;
+  }
+
+  createMarketplaceJob = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const jobData: MarketplaceJobCreateData = req.body;
-      const clientId = req.user?.id;
+      const clientId = this.convertUserIdToNumber(req.user?.id);
+
+      if (!clientId) {
+        const response = createApiResponse(false, 'Authentication required', null);
+        res.status(401).json(response);
+        return;
+      }
 
       const result = await this.marketplaceService.createMarketplaceJob(jobData, clientId);
 
@@ -63,10 +81,10 @@ export class MarketplaceController {
     }
   };
 
-  getMarketplaceJob = async (req: Request, res: Response): Promise<void> => {
+  getMarketplaceJob = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const { jobId } = req.params;
-      const tradieId = req.user?.id;
+      const tradieId = this.convertUserIdToNumber(req.user?.id);
 
       if (!jobId || isNaN(parseInt(jobId))) {
         const response = createApiResponse(false, 'Valid job ID is required', null);
@@ -84,8 +102,10 @@ export class MarketplaceController {
     }
   };
 
-  searchMarketplaceJobs = async (req: Request, res: Response): Promise<void> => {
+  searchMarketplaceJobs = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
+      const tradieId = this.convertUserIdToNumber(req.user?.id);
+      
       const searchParams: MarketplaceJobSearchParams = {
         page: parseInt(req.query.page as string) || 1,
         limit: parseInt(req.query.limit as string) || 20,
@@ -96,8 +116,10 @@ export class MarketplaceController {
         maxBudget: req.query.maxBudget ? parseFloat(req.query.maxBudget as string) : undefined,
         dateRange: req.query.dateRange as string,
         excludeApplied: req.query.excludeApplied === 'true',
-        tradieId: req.user?.id,
-        searchTerm: req.query.searchTerm as string
+        tradieId: tradieId,
+        searchTerm: req.query.searchTerm as string,
+        sortBy: req.query.sortBy as string,
+        sortOrder: req.query.sortOrder as 'asc' | 'desc'
       };
 
       const result = await this.marketplaceService.searchMarketplaceJobs(searchParams);
@@ -110,11 +132,11 @@ export class MarketplaceController {
     }
   };
 
-  updateMarketplaceJob = async (req: Request, res: Response): Promise<void> => {
+  updateMarketplaceJob = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const { jobId } = req.params;
       const updateData: MarketplaceJobUpdateData = req.body;
-      const clientId = req.user?.id;
+      const clientId = this.convertUserIdToNumber(req.user?.id);
 
       if (!jobId || isNaN(parseInt(jobId))) {
         const response = createApiResponse(false, 'Valid job ID is required', null);
@@ -146,15 +168,21 @@ export class MarketplaceController {
     }
   };
 
-  updateJobStatus = async (req: Request, res: Response): Promise<void> => {
+  updateJobStatus = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const { jobId } = req.params;
       const { status, reason } = req.body;
-      const clientId = req.user?.id;
+      const clientId = this.convertUserIdToNumber(req.user?.id);
 
       if (!jobId || isNaN(parseInt(jobId))) {
         const response = createApiResponse(false, 'Valid job ID is required', null);
         res.status(400).json(response);
+        return;
+      }
+
+      if (!clientId) {
+        const response = createApiResponse(false, 'Authentication required', null);
+        res.status(401).json(response);
         return;
       }
 
@@ -177,10 +205,10 @@ export class MarketplaceController {
     }
   };
 
-  deleteMarketplaceJob = async (req: Request, res: Response): Promise<void> => {
+  deleteMarketplaceJob = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const { jobId } = req.params;
-      const clientId = req.user?.id;
+      const clientId = this.convertUserIdToNumber(req.user?.id);
 
       if (!jobId || isNaN(parseInt(jobId))) {
         const response = createApiResponse(false, 'Valid job ID is required', null);
@@ -208,9 +236,9 @@ export class MarketplaceController {
     }
   };
 
-  getClientJobs = async (req: Request, res: Response): Promise<void> => {
+  getClientJobs = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
-      const clientId = req.user?.id;
+      const clientId = this.convertUserIdToNumber(req.user?.id);
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 20;
       const status = req.query.status as string;
@@ -235,7 +263,7 @@ export class MarketplaceController {
     }
   };
 
-  getMarketplaceStats = async (req: Request, res: Response): Promise<void> => {
+  getMarketplaceStats = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const result = await this.marketplaceService.getMarketplaceStats();
 
@@ -247,7 +275,7 @@ export class MarketplaceController {
     }
   };
 
-  getJobCreditCost = async (req: Request, res: Response): Promise<void> => {
+  getJobCreditCost = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const { jobId } = req.params;
 
@@ -267,9 +295,9 @@ export class MarketplaceController {
     }
   };
 
-  getRecommendedJobs = async (req: Request, res: Response): Promise<void> => {
+  getRecommendedJobs = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
-      const tradieId = req.user?.id;
+      const tradieId = this.convertUserIdToNumber(req.user?.id);
       const limit = parseInt(req.query.limit as string) || 10;
 
       if (!tradieId) {
@@ -288,7 +316,7 @@ export class MarketplaceController {
     }
   };
 
-  processExpiredJobs = async (req: Request, res: Response): Promise<void> => {
+  processExpiredJobs = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const result = await this.marketplaceService.processExpiredJobs();
 
@@ -300,14 +328,20 @@ export class MarketplaceController {
     }
   };
 
-  bulkUpdateJobStatus = async (req: Request, res: Response): Promise<void> => {
+  bulkUpdateJobStatus = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const { jobIds, status, reason } = req.body;
-      const clientId = req.user?.id;
+      const clientId = this.convertUserIdToNumber(req.user?.id);
 
       if (!clientId) {
         const response = createApiResponse(false, 'Authentication required', null);
         res.status(401).json(response);
+        return;
+      }
+
+      if (!Array.isArray(jobIds) || jobIds.length === 0) {
+        const response = createApiResponse(false, 'Job IDs array is required', null);
+        res.status(400).json(response);
         return;
       }
 
@@ -341,94 +375,20 @@ export class MarketplaceController {
     }
   };
 
-  getJobApplications = async (req: Request, res: Response): Promise<void> => {
+  getMarketplaceAnalytics = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
-      const { jobId } = req.params;
-      const clientId = req.user?.id;
-
-      if (!jobId || isNaN(parseInt(jobId))) {
-        const response = createApiResponse(false, 'Valid job ID is required', null);
-        res.status(400).json(response);
-        return;
-      }
-
-      const jobResult = await this.marketplaceService.getMarketplaceJob(parseInt(jobId));
-      if (!jobResult.success || !jobResult.data) {
-        const response = createApiResponse(false, 'Job not found', null);
-        res.status(404).json(response);
-        return;
-      }
-
-      if (clientId && jobResult.data.job.clientId !== clientId) {
-        const response = createApiResponse(false, 'Unauthorized access', null);
-        res.status(403).json(response);
-        return;
-      }
-
-      const response = createApiResponse(
-        true,
-        'Job applications retrieved successfully',
-        jobResult.data.applications || []
-      );
-
-      res.status(200).json(response);
-    } catch (error) {
-      logger.error('Error in getJobApplications controller', { 
-        error, 
-        jobId: req.params.jobId,
-        userId: req.user?.id 
-      });
-      const response = createApiResponse(false, 'Failed to retrieve job applications', null, [error]);
-      res.status(500).json(response);
-    }
-  };
-
-  getJobAnalytics = async (req: Request, res: Response): Promise<void> => {
-    try {
-      const { jobId } = req.params;
-      const clientId = req.user?.id;
-
-      if (!jobId || isNaN(parseInt(jobId))) {
-        const response = createApiResponse(false, 'Valid job ID is required', null);
-        res.status(400).json(response);
-        return;
-      }
-
-      const jobResult = await this.marketplaceService.getMarketplaceJob(parseInt(jobId));
-      if (!jobResult.success || !jobResult.data) {
-        const response = createApiResponse(false, 'Job not found', null);
-        res.status(404).json(response);
-        return;
-      }
-
-      if (clientId && jobResult.data.job.clientId !== clientId) {
-        const response = createApiResponse(false, 'Unauthorized access', null);
-        res.status(403).json(response);
-        return;
-      }
-
-      const analytics = {
-        jobId: parseInt(jobId),
-        totalApplications: jobResult.data.applicationCount || 0,
-        viewCount: jobResult.data.job.viewCount || 0,
-        averageQuote: jobResult.data.applications?.reduce((sum, app) => sum + (app.customQuote || 0), 0) / (jobResult.data.applications?.length || 1) || 0,
-        applicationsByStatus: jobResult.data.applications?.reduce((acc, app) => {
-          acc[app.status] = (acc[app.status] || 0) + 1;
-          return acc;
-        }, {} as Record<string, number>) || {},
-        createdAt: jobResult.data.job.createdAt,
-        lastApplicationAt: jobResult.data.applications?.[0]?.applicationTimestamp
+      const params = {
+        startDate: req.query.startDate ? new Date(req.query.startDate as string) : undefined,
+        endDate: req.query.endDate ? new Date(req.query.endDate as string) : undefined,
+        groupBy: req.query.groupBy as 'day' | 'week' | 'month' | 'jobType' | 'location' | undefined
       };
 
-      const response = createApiResponse(true, 'Job analytics retrieved successfully', analytics);
-      res.status(200).json(response);
+      const result = await this.marketplaceService.getMarketplaceAnalytics(params);
+
+      res.status(result.success ? 200 : 500).json(result);
     } catch (error) {
-      logger.error('Error in getJobAnalytics controller', { 
-        error, 
-        jobId: req.params.jobId,
-        userId: req.user?.id 
-      });
-      const response = createApiResponse(false, 'Failed to retrieve job analytics', null, [error]);
+      logger.error('Error in getMarketplaceAnalytics controller', { error });
+      const response = createApiResponse(false, 'Failed to retrieve marketplace analytics', null, [error]);
       res.status(500).json(response);
     }
   };
@@ -458,6 +418,5 @@ export const {
   getRecommendedJobs,
   processExpiredJobs,
   bulkUpdateJobStatus,
-  getJobApplications,
-  getJobAnalytics
+  getMarketplaceAnalytics
 } = marketplaceController;

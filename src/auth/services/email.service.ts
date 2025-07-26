@@ -260,6 +260,70 @@ export class EmailService {
     }
   }
 
+  async sendJobNotificationEmail(email: string, subject: string, message: string): Promise<void> {
+    const mailOptions = {
+      from: environment.EMAIL_FROM,
+      to: email,
+      subject: subject,
+      html: this.getJobNotificationTemplate(subject, message)
+    };
+  
+    try {
+      await this.transporter.sendMail(mailOptions);
+      logger.info('Job notification email sent successfully', { email });
+    } catch (error: any) {
+      logger.error('Failed to send job notification email', { email, error: error.message });
+    }
+  }
+  
+  async sendApplicationNotificationEmail(email: string, applicationData: any): Promise<void> {
+    const mailOptions = {
+      from: environment.EMAIL_FROM,
+      to: email,
+      subject: `New Application for "${applicationData.jobTitle}"`,
+      html: this.getApplicationNotificationTemplate(applicationData)
+    };
+  
+    try {
+      await this.transporter.sendMail(mailOptions);
+      logger.info('Application notification email sent successfully', { email });
+    } catch (error: any) {
+      logger.error('Failed to send application notification email', { email, error: error.message });
+    }
+  }
+  
+  async sendApplicationStatusEmail(email: string, username: string, jobTitle: string, status: string): Promise<void> {
+    const mailOptions = {
+      from: environment.EMAIL_FROM,
+      to: email,
+      subject: `Application ${status} - ${jobTitle}`,
+      html: this.getApplicationStatusTemplate(username, jobTitle, status)
+    };
+  
+    try {
+      await this.transporter.sendMail(mailOptions);
+      logger.info('Application status email sent successfully', { email });
+    } catch (error: any) {
+      logger.error('Failed to send application status email', { email, error: error.message });
+    }
+  }
+  
+  async sendJobAssignmentEmail(email: string, username: string, jobTitle: string): Promise<void> {
+    const mailOptions = {
+      from: environment.EMAIL_FROM,
+      to: email,
+      subject: `Job Assignment Confirmed - ${jobTitle}`,
+      html: this.getJobAssignmentTemplate(username, jobTitle)
+    };
+  
+    try {
+      await this.transporter.sendMail(mailOptions);
+      logger.info('Job assignment email sent successfully', { email });
+    } catch (error: any) {
+      logger.error('Failed to send job assignment email', { email, error: error.message });
+    }
+  }  
+
   private getVerificationEmailTemplate(username: string, verificationUrl: string): string {
     return `
       <!DOCTYPE html>
@@ -726,5 +790,142 @@ export class EmailService {
       </html>
     `;
   }
+
+  private getJobNotificationTemplate(subject: string, message: string): string {
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>${subject}</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h1 style="color: #2c5aa0;">${subject}</h1>
+          <p>${message}</p>
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${environment.CORS_ORIGIN}/dashboard" style="background-color: #2c5aa0; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">View Dashboard</a>
+          </div>
+          <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+          <p style="font-size: 12px; color: #666;">
+            This is an automated notification from BuildHive.
+          </p>
+        </div>
+      </body>
+      </html>
+    `;
+  }
+  
+  private getApplicationNotificationTemplate(applicationData: any): string {
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>New Application Received</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h1 style="color: #2c5aa0;">New Application Received!</h1>
+          <p>You have received a new application for your job posting.</p>
+          <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0;">
+            <p><strong>Job Title:</strong> ${applicationData.jobTitle}</p>
+            <p><strong>Quoted Price:</strong> $${applicationData.customQuote}</p>
+            <p><strong>Proposed Timeline:</strong> ${applicationData.proposedTimeline}</p>
+            <p><strong>Application Time:</strong> ${new Date().toLocaleString()}</p>
+          </div>
+          <p>Review the application details and tradie profile to make your decision.</p>
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${environment.CORS_ORIGIN}/jobs/${applicationData.jobId}/applications" style="background-color: #2c5aa0; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">Review Application</a>
+          </div>
+          <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+          <p style="font-size: 12px; color: #666;">
+            This is an automated notification from BuildHive.
+          </p>
+        </div>
+      </body>
+      </html>
+    `;
+  }
+  
+  private getApplicationStatusTemplate(username: string, jobTitle: string, status: string): string {
+    const statusColor = status === 'selected' ? '#28a745' : status === 'rejected' ? '#dc3545' : '#ffc107';
+    const statusMessage = status === 'selected' ? 'Congratulations! Application Selected' : 
+                         status === 'rejected' ? 'Application Status Update' : 
+                         'Application Under Review';
+    
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Application ${status.charAt(0).toUpperCase() + status.slice(1)}</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h1 style="color: ${statusColor};">${statusMessage}</h1>
+          <p>Hi ${username},</p>
+          <p>We have an update regarding your application for the job: "<strong>${jobTitle}</strong>"</p>
+          <div style="background-color: ${status === 'selected' ? '#d4edda' : status === 'rejected' ? '#f8d7da' : '#fff3cd'}; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid ${statusColor};">
+            <p><strong>Status:</strong> ${status.charAt(0).toUpperCase() + status.slice(1)}</p>
+            <p><strong>Updated:</strong> ${new Date().toLocaleString()}</p>
+          </div>
+          ${status === 'selected' ? 
+            '<p>The client has selected your application! They will contact you soon with further details about the job.</p>' :
+            status === 'rejected' ? 
+            '<p>While your application was not selected this time, we encourage you to keep applying for other opportunities on BuildHive.</p>' :
+            '<p>Your application is currently being reviewed by the client. We will notify you once a decision has been made.</p>'
+          }
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${environment.CORS_ORIGIN}/applications" style="background-color: #2c5aa0; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">View My Applications</a>
+          </div>
+          <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+          <p style="font-size: 12px; color: #666;">
+            This is an automated notification from BuildHive.
+          </p>
+        </div>
+      </body>
+      </html>
+    `;
+  }
+  
+  private getJobAssignmentTemplate(username: string, jobTitle: string): string {
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Job Assignment Confirmed</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h1 style="color: #28a745;">Job Assignment Confirmed!</h1>
+          <p>Hi ${username},</p>
+          <p>Congratulations! You have been officially assigned to a job through BuildHive.</p>
+          <div style="background-color: #d4edda; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #28a745;">
+            <p><strong>Job Title:</strong> ${jobTitle}</p>
+            <p><strong>Assignment Date:</strong> ${new Date().toLocaleString()}</p>
+            <p><strong>Status:</strong> Assigned</p>
+          </div>
+          <p>The client will contact you directly with additional details, timeline, and any specific requirements for the job.</p>
+          <p><strong>Next Steps:</strong></p>
+          <ul>
+            <li>Wait for the client to contact you with job details</li>
+            <li>Prepare any necessary tools and materials</li>
+            <li>Review the job requirements carefully</li>
+            <li>Contact support if you have any questions</li>
+          </ul>
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${environment.CORS_ORIGIN}/jobs/assigned" style="background-color: #28a745; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">View Assigned Jobs</a>
+          </div>
+          <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+          <p style="font-size: 12px; color: #666;">
+            This is an automated notification from BuildHive.
+          </p>
+        </div>
+      </body>
+      </html>
+    `;
+  }  
 
 }
