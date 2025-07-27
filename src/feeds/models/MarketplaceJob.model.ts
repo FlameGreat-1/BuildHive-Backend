@@ -372,4 +372,4 @@ export class MarketplaceJobModel {
       hasApplied: false
     };
   }
-  
+}
