@@ -32,9 +32,9 @@ export interface JobApplicationCreateData {
   approachDescription: string;
   materialsList?: string;
   availabilityDates: Date[];
-  coverMessage?: string;
-  relevantExperience?: string;
-  additionalPhotos?: string[];
+  cover_message?: string;
+  relevant_experience?: string;
+  additional_photos?: string[];
   questionsForClient?: string;
   specialOffers?: string;
 }
@@ -45,9 +45,9 @@ export interface JobApplicationUpdateData {
   approachDescription?: string;
   materialsList?: string;
   availabilityDates?: Date[];
-  coverMessage?: string;
-  relevantExperience?: string;
-  additionalPhotos?: string[];
+  cover_message?: string;
+  relevant_experience?: string;
+  additional_photos?: string[];
   questionsForClient?: string;
   specialOffers?: string;
   status?: ApplicationStatus;
@@ -64,7 +64,7 @@ export interface JobApplicationDetails extends JobApplicationEntity {
     urgency_level: urgency_level;
     date_required: Date;
     client_name: string;
-    clientCompany?: string;
+    client_company?: string;
   };
   tradie: {
     id: number;
@@ -204,8 +204,8 @@ export interface ClientApplicationReview {
       custom_quote: number;
       proposed_timeline: string;
       approachDescription: string;
-      coverMessage?: string;
-      relevantExperience?: string;
+      cover_message?: string;
+      relevant_experience?: string;
       applicationTimestamp: Date;
       status: ApplicationStatus;
     };

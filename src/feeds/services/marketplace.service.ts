@@ -512,7 +512,7 @@ export class MarketplaceService extends EventEmitter {
         client_name: marketplaceJob.client_name,
         client_email : marketplaceJob.client_email ,
         client_phone: marketplaceJob.client_phone,
-        clientCompany: marketplaceJob.clientCompany,
+        client_company: marketplaceJob.client_company,
         siteAddress: marketplaceJob.location,
         siteCity: marketplaceJob.location,
         siteState: '',

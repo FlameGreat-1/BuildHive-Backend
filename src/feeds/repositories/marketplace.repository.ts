@@ -734,7 +734,7 @@ export class MarketplaceRepository {
          phone = EXCLUDED.phone, 
          company = EXCLUDED.company, 
          updated_at = NOW()`,
-        [userId, jobData.client_name, jobData.client_phone, jobData.clientCompany]
+        [userId, jobData.client_name, jobData.client_phone, jobData.client_company]
       );
 
       await client.query('COMMIT');
@@ -834,10 +834,10 @@ export class MarketplaceRepository {
       client_name: row.client_name,
       client_email : row.client_email,
       client_phone: row.client_phone,
-      clientCompany: row.client_company,
+      client_company: row.client_company,
       status: row.status,
       applicationCount: parseInt(row.application_count) || 0,
-      expiresAt: new Date(row.expires_at),
+      expires_at: new Date(row.expires_at),
       createdAt: new Date(row.created_at),
       updatedAt: new Date(row.updated_at),
       isExpired: new Date(row.expires_at) <= new Date(),

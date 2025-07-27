@@ -44,7 +44,7 @@ import {
     client_name: string;
     client_email : string;
     client_phone?: string;
-    clientCompany?: string;
+    client_company?: string;
   }
   
   export interface MarketplaceJobUpdateData {
@@ -253,7 +253,7 @@ import {
   export interface MarketplaceJobExpiry {
     jobId: number;
     title: string;
-    expiresAt: Date;
+    expires_at: Date;
     applicationCount: number;
     notificationSent: boolean;
   }
@@ -282,7 +282,7 @@ import {
     applicationId?: number;
     assignmentId?: number;
     data?: Record<string, any>;
-    expiresAt?: Date;
+    expires_at?: Date;
   }
   
   export interface MarketplaceSearchResult {
@@ -345,7 +345,7 @@ import {
   export interface MarketplaceJobCache {
     key: string;
     data: any;
-    expiresAt: Date;
+    expires_at: Date;
     tags: string[];
   }
   

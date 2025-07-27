@@ -37,9 +37,9 @@ export class ApplicationModel {
         applicationData.approachDescription,
         applicationData.materialsList || null,
         JSON.stringify(applicationData.availabilityDates),
-        applicationData.coverMessage || null,
-        applicationData.relevantExperience || null,
-        JSON.stringify(applicationData.additionalPhotos || []),
+        applicationData.cover_message || null,
+        applicationData.relevant_experience || null,
+        JSON.stringify(applicationData.additional_photos || []),
         applicationData.questionsForClient || null,
         applicationData.specialOffers || null,
         0
@@ -129,21 +129,21 @@ export class ApplicationModel {
       paramIndex++;
     }
 
-    if (updateData.coverMessage !== undefined) {
+    if (updateData.cover_message !== undefined) {
       updateFields.push(`cover_message = $${paramIndex}`);
-      updateValues.push(updateData.coverMessage);
+      updateValues.push(updateData.cover_message);
       paramIndex++;
     }
 
-    if (updateData.relevantExperience !== undefined) {
+    if (updateData.relevant_experience !== undefined) {
       updateFields.push(`relevant_experience = $${paramIndex}`);
-      updateValues.push(updateData.relevantExperience);
+      updateValues.push(updateData.relevant_experience);
       paramIndex++;
     }
 
-    if (updateData.additionalPhotos !== undefined) {
+    if (updateData.additional_photos !== undefined) {
       updateFields.push(`additional_photos = $${paramIndex}`);
-      updateValues.push(JSON.stringify(updateData.additionalPhotos));
+      updateValues.push(JSON.stringify(updateData.additional_photos));
       paramIndex++;
     }
 

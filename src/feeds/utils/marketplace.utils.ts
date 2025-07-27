@@ -163,7 +163,7 @@ import {
       client_name: sanitizeString(jobData.client_name.trim()),
       client_email : jobData.client_email .trim().toLowerCase(),
       client_phone: jobData.client_phone?.trim(),
-      clientCompany: jobData.clientCompany ? sanitizeString(jobData.clientCompany.trim()) : undefined
+      client_company: jobData.client_company ? sanitizeString(jobData.client_company.trim()) : undefined
     };
   };
   
@@ -311,7 +311,7 @@ import {
         name: job.client_name,
         email: job.client_email ,
         phone: job.client_phone,
-        company: job.clientCompany,
+        company: job.client_company,
         isVerified: false
       },
       applications: {
@@ -330,7 +330,7 @@ import {
   };
   
   export const isJobExpired = (job: MarketplaceJobEntity): boolean => {
-    return new Date(job.expiresAt) <= new Date();
+    return new Date(job.expires_at) <= new Date();
   };
   
   export const canJobBeModified = (job: MarketplaceJobEntity): boolean => {

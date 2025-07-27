@@ -111,7 +111,7 @@ export const validateCreateMarketplaceJob = [
     .matches(MARKETPLACE_VALIDATION_RULES.PHONE_REGEX)
     .withMessage('Invalid phone number format'),
 
-  body('clientCompany')
+  body('client_company')
     .optional()
     .trim()
     .isLength({ max: 100 })
@@ -498,8 +498,8 @@ export const validateMarketplaceJobFilters = [
         req.body.client_phone = req.body.client_phone.trim();
       }
   
-      if (req.body.clientCompany) {
-        req.body.clientCompany = sanitizeString(req.body.clientCompany.trim());
+      if (req.body.client_company) {
+        req.body.client_company = sanitizeString(req.body.client_company.trim());
       }
   
       if (req.body.selectionReason) {

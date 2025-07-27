@@ -101,17 +101,17 @@ import {
       }
     }
   
-    if (applicationData.coverMessage && applicationData.coverMessage.length > MARKETPLACE_LIMITS.APPLICATION_COVER_MESSAGE_MAX_LENGTH) {
+    if (applicationData.cover_message && applicationData.cover_message.length > MARKETPLACE_LIMITS.APPLICATION_COVER_MESSAGE_MAX_LENGTH) {
       errors.push({
-        field: 'coverMessage',
+        field: 'cover_message',
         message: `Cover message cannot exceed ${MARKETPLACE_LIMITS.APPLICATION_COVER_MESSAGE_MAX_LENGTH} characters`,
         code: 'COVER_MESSAGE_TOO_LONG'
       });
     }
   
-    if (applicationData.relevantExperience && applicationData.relevantExperience.length > MARKETPLACE_LIMITS.APPLICATION_EXPERIENCE_MAX_LENGTH) {
+    if (applicationData.relevant_experience && applicationData.relevant_experience.length > MARKETPLACE_LIMITS.APPLICATION_EXPERIENCE_MAX_LENGTH) {
       errors.push({
-        field: 'relevantExperience',
+        field: 'relevant_experience',
         message: `Relevant experience cannot exceed ${MARKETPLACE_LIMITS.APPLICATION_EXPERIENCE_MAX_LENGTH} characters`,
         code: 'EXPERIENCE_TOO_LONG'
       });
@@ -141,9 +141,9 @@ import {
       });
     }
   
-    if (applicationData.additionalPhotos && applicationData.additionalPhotos.length > MARKETPLACE_LIMITS.MAX_ADDITIONAL_PHOTOS) {
+    if (applicationData.additional_photos && applicationData.additional_photos.length > MARKETPLACE_LIMITS.MAX_ADDITIONAL_PHOTOS) {
       errors.push({
-        field: 'additionalPhotos',
+        field: 'additional_photos',
         message: `Maximum ${MARKETPLACE_LIMITS.MAX_ADDITIONAL_PHOTOS} additional photos allowed`,
         code: 'TOO_MANY_ADDITIONAL_PHOTOS'
       });
@@ -173,8 +173,8 @@ import {
       proposed_timeline: sanitizeString(applicationData.proposed_timeline.trim()),
       approachDescription: sanitizeString(applicationData.approachDescription.trim()),
       materialsList: applicationData.materialsList ? sanitizeString(applicationData.materialsList.trim()) : undefined,
-      coverMessage: applicationData.coverMessage ? sanitizeString(applicationData.coverMessage.trim()) : undefined,
-      relevantExperience: applicationData.relevantExperience ? sanitizeString(applicationData.relevantExperience.trim()) : undefined,
+      cover_message: applicationData.cover_message ? sanitizeString(applicationData.cover_message.trim()) : undefined,
+      relevant_experience: applicationData.relevant_experience ? sanitizeString(applicationData.relevant_experience.trim()) : undefined,
       questionsForClient: applicationData.questionsForClient ? sanitizeString(applicationData.questionsForClient.trim()) : undefined,
       specialOffers: applicationData.specialOffers ? sanitizeString(applicationData.specialOffers.trim()) : undefined
     };
@@ -276,9 +276,9 @@ import {
     else if (application.tradie.marketplaceStats.conversionRate >= 60) score += 7;
     else if (application.tradie.marketplaceStats.conversionRate >= 40) score += 5;
   
-    if (application.relevantExperience && application.relevantExperience.length > 100) score += 5;
-    if (application.coverMessage && application.coverMessage.length > 50) score += 3;
-    if (application.additionalPhotos && application.additionalPhotos.length > 0) score += 5;
+    if (application.relevant_experience && application.relevant_experience.length > 100) score += 5;
+    if (application.cover_message && application.cover_message.length > 50) score += 3;
+    if (application.additional_photos && application.additional_photos.length > 0) score += 5;
   
     return Math.min(score, 100);
   };
@@ -484,15 +484,15 @@ import {
       recommendations.push('Consider adjusting your quote to be more competitive');
     }
     
-    if (!application.coverMessage || application.coverMessage.length < 50) {
+    if (!application.cover_message || application.cover_message.length < 50) {
       recommendations.push('Add a personalized cover message to stand out');
     }
     
-    if (!application.additionalPhotos || application.additionalPhotos.length === 0) {
+    if (!application.additional_photos || application.additional_photos.length === 0) {
       recommendations.push('Include photos of similar work to showcase your skills');
     }
     
-    if (!application.relevantExperience || application.relevantExperience.length < 100) {
+    if (!application.relevant_experience || application.relevant_experience.length < 100) {
       recommendations.push('Provide more details about your relevant experience');
     }
     

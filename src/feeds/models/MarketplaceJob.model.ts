@@ -27,8 +27,8 @@ export class MarketplaceJobModel {
   }
 
   async create(jobData: MarketplaceJobCreateData, client_id?: number): Promise<MarketplaceJobEntity> {
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + MARKETPLACE_LIMITS.JOB_EXPIRY_DAYS);
+    const expires_at = new Date();
+    expires_at.setDate(expires_at.getDate() + MARKETPLACE_LIMITS.JOB_EXPIRY_DAYS);
 
     const result = await this.db.query(
       MARKETPLACE_QUERIES.CREATE_MARKETPLACE_JOB,
@@ -45,8 +45,8 @@ export class MarketplaceJobModel {
         jobData.client_name,
         jobData.client_email ,
         jobData.client_phone || null,
-        jobData.clientCompany || null,
-        expiresAt
+        jobData.client_company || null,
+        expires_at
       ]
     );
 
@@ -245,7 +245,7 @@ export class MarketplaceJobModel {
     return result.rows.map(row => ({
       jobId: row.id,
       title: row.title,
-      expiresAt: new Date(row.expires_at),
+      expires_at: new Date(row.expires_at),
       applicationCount: row.application_count || 0,
       notificationSent: false
     }));

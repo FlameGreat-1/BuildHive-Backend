@@ -66,19 +66,19 @@ export const validateCreateJobApplication = [
       return true;
     }),
 
-  body('coverMessage')
+  body('cover_message')
     .optional()
     .trim()
     .isLength({ max: MARKETPLACE_LIMITS.APPLICATION_COVER_MESSAGE_MAX_LENGTH })
     .withMessage(`Cover message must be less than ${MARKETPLACE_LIMITS.APPLICATION_COVER_MESSAGE_MAX_LENGTH} characters`),
 
-  body('relevantExperience')
+  body('relevant_experience')
     .optional()
     .trim()
     .isLength({ max: MARKETPLACE_LIMITS.APPLICATION_EXPERIENCE_MAX_LENGTH })
     .withMessage(`Relevant experience must be less than ${MARKETPLACE_LIMITS.APPLICATION_EXPERIENCE_MAX_LENGTH} characters`),
 
-  body('additionalPhotos')
+  body('additional_photos')
     .optional()
     .isArray({ max: MARKETPLACE_LIMITS.MAX_ADDITIONAL_PHOTOS })
     .withMessage(`Maximum ${MARKETPLACE_LIMITS.MAX_ADDITIONAL_PHOTOS} additional photos allowed`)
@@ -155,19 +155,19 @@ export const validateUpdateJobApplication = [
       return true;
     }),
 
-  body('coverMessage')
+  body('cover_message')
     .optional()
     .trim()
     .isLength({ max: MARKETPLACE_LIMITS.APPLICATION_COVER_MESSAGE_MAX_LENGTH })
     .withMessage(`Cover message must be less than ${MARKETPLACE_LIMITS.APPLICATION_COVER_MESSAGE_MAX_LENGTH} characters`),
 
-  body('relevantExperience')
+  body('relevant_experience')
     .optional()
     .trim()
     .isLength({ max: MARKETPLACE_LIMITS.APPLICATION_EXPERIENCE_MAX_LENGTH })
     .withMessage(`Relevant experience must be less than ${MARKETPLACE_LIMITS.APPLICATION_EXPERIENCE_MAX_LENGTH} characters`),
 
-  body('additionalPhotos')
+  body('additional_photos')
     .optional()
     .isArray({ max: MARKETPLACE_LIMITS.MAX_ADDITIONAL_PHOTOS })
     .withMessage(`Maximum ${MARKETPLACE_LIMITS.MAX_ADDITIONAL_PHOTOS} additional photos allowed`),
@@ -486,12 +486,12 @@ export const validateBulkApplicationOperation = [
         req.body.materialsList = sanitizeString(req.body.materialsList.trim());
       }
   
-      if (req.body.coverMessage) {
-        req.body.coverMessage = sanitizeString(req.body.coverMessage.trim());
+      if (req.body.cover_message) {
+        req.body.cover_message = sanitizeString(req.body.cover_message.trim());
       }
   
-      if (req.body.relevantExperience) {
-        req.body.relevantExperience = sanitizeString(req.body.relevantExperience.trim());
+      if (req.body.relevant_experience) {
+        req.body.relevant_experience = sanitizeString(req.body.relevant_experience.trim());
       }
   
       if (req.body.questionsForClient) {
