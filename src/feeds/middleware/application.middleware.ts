@@ -1,4 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
+import rateLimit from 'express-rate-limit';
+import { authenticate, AuthenticatedRequest } from '../../auth/middleware';
 import { ApplicationService, MarketplaceService } from '../services';
 import { 
   validateApplicationData,
@@ -7,24 +9,18 @@ import {
   canModifyApplication,
   validateApplicationStatusTransition
 } from '../utils';
-import {
-  APPLICATION_STATUS,
-  MARKETPLACE_LIMITS,
-  MARKETPLACE_CREDIT_COSTS
-} from '../../config/feeds';
-import { rateLimit } from '../../shared/middleware';
-import { logger, createResponse, AppError } from '../../shared/utils';
+import { APPLICATION_STATUS } from '../../config/feeds';
 import { ValidationError } from '../../shared/types';
+import { createErrorResponse, logger, AppError } from '../../shared/utils';
+import { HTTP_STATUS_CODES } from '../../config/auth/constants';
 import { MARKETPLACE_CONFIG } from '../../config/feeds/marketplace.config';
 
-interface AuthenticatedRequest extends Request {
-  user?: {
-    id: string;
-    email: string;
-    role: string;
-    emailVerified: boolean;
-  };
-}
+const sendValidationError = (res: Response, message: string, errors: ValidationError[]): void => {
+  const error = new AppError(message, HTTP_STATUS_CODES.BAD_REQUEST, 'VALIDATION_ERROR');
+  res.status(HTTP_STATUS_CODES.BAD_REQUEST).json(
+    createErrorResponse(error, res.locals.requestId || 'unknown')
+  );
+};
 
 export class ApplicationMiddleware {
   private applicationService: ApplicationService;
@@ -35,50 +31,80 @@ export class ApplicationMiddleware {
     this.marketplaceService = new MarketplaceService();
   }
 
+  private sanitizeData = (data: any): any => {
+    if (typeof data === 'string') {
+      return data.trim().replace(/[<>'"&]/g, '');
+    }
+    if (typeof data === 'object' && data !== null) {
+      const sanitized: any = {};
+      for (const [key, value] of Object.entries(data)) {
+        sanitized[key] = this.sanitizeData(value);
+      }
+      return sanitized;
+    }
+    return data;
+  };
+
+  authenticateApplicationUser = async (
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
+    try {
+      await authenticate(req, res, next);
+    } catch (error) {
+      logger.error('Application authentication error', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        requestId: req.requestId,
+        ip: req.ip
+      });
+
+      next(new AppError(
+        'Authentication service unavailable',
+        HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR
+      ));
+    }
+  };
+
   validateApplicationCreation = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { body } = req;
       const userId = req.user?.id;
+      const errors: ValidationError[] = [];
 
       if (!body || Object.keys(body).length === 0) {
-        const response = createResponse(false, 'Request body is required', null);
-        res.status(400).json(response);
-        return;
+        errors.push({
+          field: 'body',
+          message: 'Request body is required',
+          code: 'REQUIRED_FIELD'
+        });
+        return sendValidationError(res, 'Request body is required', errors);
       }
 
       if (!userId) {
-        const response = createResponse(false, 'Authentication required', null);
-        res.status(401).json(response);
-        return;
+        return next(new AppError('Authentication required', HTTP_STATUS_CODES.UNAUTHORIZED));
       }
 
       const validationResult = validateApplicationData(body);
       if (!validationResult.isValid) {
-        const response = createResponse(false, 'Validation failed', null, validationResult.errors);
-        res.status(400).json(response);
-        return;
+        return sendValidationError(res, 'Validation failed', validationResult.errors);
       }
 
-      const jobResult = await this.marketplaceService.getMarketplaceJob(body.marketplace_job_id );
+      const jobResult = await this.marketplaceService.getMarketplaceJob(body.marketplace_job_id);
       if (!jobResult.success || !jobResult.data) {
-        const response = createResponse(false, 'Job not found', null);
-        res.status(404).json(response);
-        return;
+        return next(new AppError('Job not found', HTTP_STATUS_CODES.NOT_FOUND));
       }
 
       const job = jobResult.data;
       if (job.client_id === userId) {
-        const response = createResponse(false, 'Cannot apply to your own job', null);
-        res.status(400).json(response);
-        return;
+        return next(new AppError('Cannot apply to your own job', HTTP_STATUS_CODES.BAD_REQUEST));
       }
 
       req.body = sanitizeAppData(body);
       next();
     } catch (error) {
       logger.error('Error in application creation validation middleware', { error, body: req.body });
-      const response = createResponse(false, 'Validation error', null, [error]);
-      res.status(500).json(response);
+      next(new AppError('Validation error', HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR));
     }
   };
 
@@ -87,45 +113,45 @@ export class ApplicationMiddleware {
       const { applicationId } = req.params;
       const { body } = req;
       const userId = req.user?.id;
+      const errors: ValidationError[] = [];
 
       if (!applicationId || isNaN(parseInt(applicationId))) {
-        const response = createResponse(false, 'Valid application ID is required', null);
-        res.status(400).json(response);
-        return;
+        errors.push({
+          field: 'applicationId',
+          message: 'Valid application ID is required',
+          code: 'INVALID_VALUE'
+        });
+        return sendValidationError(res, 'Valid application ID is required', errors);
       }
 
       if (!body || Object.keys(body).length === 0) {
-        const response = createResponse(false, 'Update data is required', null);
-        res.status(400).json(response);
-        return;
+        errors.push({
+          field: 'body',
+          message: 'Update data is required',
+          code: 'REQUIRED_FIELD'
+        });
+        return sendValidationError(res, 'Update data is required', errors);
       }
 
       const applicationResult = await this.applicationService.getApplication(parseInt(applicationId), userId);
       if (!applicationResult.success || !applicationResult.data) {
-        const response = createResponse(false, 'Application not found', null);
-        res.status(404).json(response);
-        return;
+        return next(new AppError('Application not found', HTTP_STATUS_CODES.NOT_FOUND));
       }
 
       const application = applicationResult.data;
       if (application.tradie_id !== userId) {
-        const response = createResponse(false, 'Unauthorized access', null);
-        res.status(403).json(response);
-        return;
+        return next(new AppError('Unauthorized access', HTTP_STATUS_CODES.FORBIDDEN));
       }
 
       if (!canModifyApplication(application as any)) {
-        const response = createResponse(false, 'Application cannot be modified in current status', null);
-        res.status(400).json(response);
-        return;
+        return next(new AppError('Application cannot be modified in current status', HTTP_STATUS_CODES.BAD_REQUEST));
       }
 
       req.body = sanitizeAppData(body);
       next();
     } catch (error) {
       logger.error('Error in application update validation middleware', { error, applicationId: req.params.applicationId });
-      const response = createResponse(false, 'Validation error', null, [error]);
-      res.status(500).json(response);
+      next(new AppError('Validation error', HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR));
     }
   };
 
@@ -136,75 +162,83 @@ export class ApplicationMiddleware {
         page: parseInt(req.query.page as string) || 1,
         limit: Math.min(parseInt(req.query.limit as string) || 20, MARKETPLACE_CONFIG.SEARCH_AND_FILTERING.MAX_SEARCH_RESULTS)
       };
-  
+      const errors: ValidationError[] = [];
+
       if (searchParams.page < 1) {
-        const response = createResponse(false, 'Page must be greater than 0', null);
-        res.status(400).json(response);
-        return;
+        errors.push({
+          field: 'page',
+          message: 'Page must be greater than 0',
+          code: 'INVALID_VALUE'
+        });
       }
-  
+
       if (searchParams.limit < 1 || searchParams.limit > MARKETPLACE_CONFIG.SEARCH_AND_FILTERING.MAX_SEARCH_RESULTS) {
-        const response = createResponse(false, `Limit must be between 1 and ${MARKETPLACE_CONFIG.SEARCH_AND_FILTERING.MAX_SEARCH_RESULTS}`, null);
-        res.status(400).json(response);
-        return;
+        errors.push({
+          field: 'limit',
+          message: `Limit must be between 1 and ${MARKETPLACE_CONFIG.SEARCH_AND_FILTERING.MAX_SEARCH_RESULTS}`,
+          code: 'INVALID_VALUE'
+        });
       }
-  
+
+      if (errors.length > 0) {
+        return sendValidationError(res, 'Search validation failed', errors);
+      }
+
       req.query = searchParams as any;
       next();
     } catch (error) {
       logger.error('Error in application search validation middleware', { error, query: req.query });
-      const response = createResponse(false, 'Search validation error', null, [error]);
-      res.status(500).json(response);
+      next(new AppError('Search validation error', HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR));
     }
   };
-  
+
   validateApplicationStatusUpdate = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { applicationId } = req.params;
       const { status, reason, feedback } = req.body;
       const userId = req.user?.id;
+      const errors: ValidationError[] = [];
 
       if (!applicationId || isNaN(parseInt(applicationId))) {
-        const response = createResponse(false, 'Valid application ID is required', null);
-        res.status(400).json(response);
-        return;
+        errors.push({
+          field: 'applicationId',
+          message: 'Valid application ID is required',
+          code: 'INVALID_VALUE'
+        });
+        return sendValidationError(res, 'Valid application ID is required', errors);
       }
 
       if (!status || !Object.values(APPLICATION_STATUS).includes(status)) {
-        const response = createResponse(false, 'Valid status is required', null);
-        res.status(400).json(response);
-        return;
+        errors.push({
+          field: 'status',
+          message: 'Valid status is required',
+          code: 'INVALID_VALUE'
+        });
+        return sendValidationError(res, 'Valid status is required', errors);
       }
 
       const applicationResult = await this.applicationService.getApplication(parseInt(applicationId), userId);
       if (!applicationResult.success || !applicationResult.data) {
-        const response = createResponse(false, 'Application not found', null);
-        res.status(404).json(response);
-        return;
+        return next(new AppError('Application not found', HTTP_STATUS_CODES.NOT_FOUND));
       }
 
       const application = applicationResult.data;
       const jobOwnership = await this.marketplaceService.getMarketplaceJob(application.marketplace_job_id, userId);
       
       if (!jobOwnership.success || !jobOwnership.data) {
-        const response = createResponse(false, 'Unauthorized access', null);
-        res.status(403).json(response);
-        return;
+        return next(new AppError('Unauthorized access', HTTP_STATUS_CODES.FORBIDDEN));
       }
 
       const transitionValidation = validateApplicationStatusTransition(application.status, status);
       if (!transitionValidation.isValid) {
-        const response = createResponse(false, transitionValidation.error || 'Invalid status transition', null);
-        res.status(400).json(response);
-        return;
+        return next(new AppError(transitionValidation.error || 'Invalid status transition', HTTP_STATUS_CODES.BAD_REQUEST));
       }
 
-      req.body = sanitizeAppData({ status, reason, feedback });
+      req.body = this.sanitizeData({ status, reason, feedback });
       next();
     } catch (error) {
       logger.error('Error in application status update validation middleware', { error, applicationId: req.params.applicationId });
-      const response = createResponse(false, 'Status update validation error', null, [error]);
-      res.status(500).json(response);
+      next(new AppError('Status update validation error', HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR));
     }
   };
 
@@ -214,36 +248,27 @@ export class ApplicationMiddleware {
       const userId = req.user?.id;
 
       if (!userId) {
-        const response = createResponse(false, 'Authentication required', null);
-        res.status(401).json(response);
-        return;
+        return next(new AppError('Authentication required', HTTP_STATUS_CODES.UNAUTHORIZED));
       }
 
       if (!applicationId || isNaN(parseInt(applicationId))) {
-        const response = createResponse(false, 'Valid application ID is required', null);
-        res.status(400).json(response);
-        return;
+        return next(new AppError('Valid application ID is required', HTTP_STATUS_CODES.BAD_REQUEST));
       }
 
       const applicationResult = await this.applicationService.getApplication(parseInt(applicationId), userId);
       if (!applicationResult.success || !applicationResult.data) {
-        const response = createResponse(false, 'Application not found', null);
-        res.status(404).json(response);
-        return;
+        return next(new AppError('Application not found', HTTP_STATUS_CODES.NOT_FOUND));
       }
 
       const application = applicationResult.data;
       if (application.tradie_id !== userId) {
-        const response = createResponse(false, 'Unauthorized access', null);
-        res.status(403).json(response);
-        return;
+        return next(new AppError('Unauthorized access', HTTP_STATUS_CODES.FORBIDDEN));
       }
 
       next();
     } catch (error) {
       logger.error('Error in application ownership check middleware', { error, applicationId: req.params.applicationId });
-      const response = createResponse(false, 'Ownership check error', null, [error]);
-      res.status(500).json(response);
+      next(new AppError('Ownership check error', HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR));
     }
   };
 
@@ -253,56 +278,55 @@ export class ApplicationMiddleware {
       const userId = req.user?.id;
 
       if (!applicationId || isNaN(parseInt(applicationId))) {
-        const response = createResponse(false, 'Valid application ID is required', null);
-        res.status(400).json(response);
-        return;
+        return next(new AppError('Valid application ID is required', HTTP_STATUS_CODES.BAD_REQUEST));
       }
 
       const applicationResult = await this.applicationService.getApplication(parseInt(applicationId), userId);
       if (!applicationResult.success || !applicationResult.data) {
-        const response = createResponse(false, 'Application not found', null);
-        res.status(404).json(response);
-        return;
+        return next(new AppError('Application not found', HTTP_STATUS_CODES.NOT_FOUND));
       }
 
       const application = applicationResult.data;
       if (application.tradie_id !== userId) {
-        const response = createResponse(false, 'Unauthorized access', null);
-        res.status(403).json(response);
-        return;
+        return next(new AppError('Unauthorized access', HTTP_STATUS_CODES.FORBIDDEN));
       }
 
       if (!canWithdrawApplication(application as any)) {
-        const response = createResponse(false, 'Application cannot be withdrawn at this time', null);
-        res.status(400).json(response);
-        return;
+        return next(new AppError('Application cannot be withdrawn at this time', HTTP_STATUS_CODES.BAD_REQUEST));
       }
 
       next();
     } catch (error) {
       logger.error('Error in application withdrawal check middleware', { error, applicationId: req.params.applicationId });
-      const response = createResponse(false, 'Withdrawal check error', null, [error]);
-      res.status(500).json(response);
+      next(new AppError('Withdrawal check error', HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR));
     }
   };
 
   rateLimitApplicationCreation = rateLimit({
     windowMs: 60 * 60 * 1000,
     max: MARKETPLACE_CONFIG.APPLICATION_SETTINGS.MAX_APPLICATIONS_PER_HOUR,
-    message: createResponse(false, 'Too many applications. Please try again later.', null),
+    message: {
+      success: false,
+      message: 'Too many applications. Please try again later.',
+      data: null
+    },
     standardHeaders: true,
     legacyHeaders: false,
-    keyGenerator: (req: AuthenticatedRequest) => `application_creation_${req.user?.id || req.ip}`,
-    skip: (req: AuthenticatedRequest) => req.user?.role === 'admin'
+    keyGenerator: (req: Request) => `application_creation_${(req as any).user?.id || req.ip}`,
+    skip: (req: Request) => (req as any).user?.role === 'admin'
   });
 
   rateLimitApplicationSearch = rateLimit({
     windowMs: 60 * 1000,
     max: MARKETPLACE_CONFIG.SEARCH_AND_FILTERING.MAX_SEARCHES_PER_MINUTE,
-    message: createResponse(false, 'Too many search requests. Please try again later.', null),
+    message: {
+      success: false,
+      message: 'Too many search requests. Please try again later.',
+      data: null
+    },
     standardHeaders: true,
     legacyHeaders: false,
-    keyGenerator: (req: AuthenticatedRequest) => `application_search_${req.user?.id || req.ip}`
+    keyGenerator: (req: Request) => `application_search_${(req as any).user?.id || req.ip}`
   });
 
   logApplicationActivity = (action: string) => {
@@ -337,16 +361,13 @@ export class ApplicationMiddleware {
       const userRole = req.user?.role;
       
       if (!userRole || !['tradie', 'admin'].includes(userRole)) {
-        const response = createResponse(false, 'Tradie role required', null);
-        res.status(403).json(response);
-        return;
+        return next(new AppError('Tradie role required', HTTP_STATUS_CODES.FORBIDDEN));
       }
 
       next();
     } catch (error) {
       logger.error('Error in tradie role validation middleware', { error, userId: req.user?.id });
-      const response = createResponse(false, 'Role validation error', null, [error]);
-      res.status(500).json(response);
+      next(new AppError('Role validation error', HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR));
     }
   };
 
@@ -355,16 +376,13 @@ export class ApplicationMiddleware {
       const userRole = req.user?.role;
       
       if (!userRole || !['client', 'admin'].includes(userRole)) {
-        const response = createResponse(false, 'Client role required', null);
-        res.status(403).json(response);
-        return;
+        return next(new AppError('Client role required', HTTP_STATUS_CODES.FORBIDDEN));
       }
 
       next();
     } catch (error) {
       logger.error('Error in client role validation middleware', { error, userId: req.user?.id });
-      const response = createResponse(false, 'Role validation error', null, [error]);
-      res.status(500).json(response);
+      next(new AppError('Role validation error', HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR));
     }
   };
 
@@ -377,56 +395,60 @@ export class ApplicationMiddleware {
       userId: req.user?.id,
       applicationId: req.params.applicationId
     });
-  
-    if (error && typeof error === 'object' && 'details' in error) {
-      const response = createResponse(false, error.message, null, error.details);
-      res.status(400).json(response);
-      return;
-    }
-  
+
     if (error instanceof AppError) {
-      const response = createResponse(false, error.message, null);
+      const response = createErrorResponse(error, res.locals.requestId || 'unknown');
       res.status(error.statusCode).json(response);
       return;
     }
-  
-    const response = createResponse(false, 'Internal server error', null);
-    res.status(500).json(response);
+
+    const appError = new AppError('Internal server error', HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR);
+    res.status(HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR).json(
+      createErrorResponse(appError, res.locals.requestId || 'unknown')
+    );
   };
-  
+
   sanitizeApplicationData = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
     try {
       if (req.body) {
-        req.body = sanitizeAppData(req.body);
+        req.body = this.sanitizeData(req.body);
       }
       
       if (req.query) {
-        req.query = sanitizeAppData(req.query as any) as any;  
+        req.query = this.sanitizeData(req.query);
       }
 
       next();
     } catch (error) {
       logger.error('Error in application data sanitization middleware', { error });
-      const response = createResponse(false, 'Data sanitization error', null, [error]);
-      res.status(500).json(response);
+      next(new AppError('Data sanitization error', HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR));
     }
   };
 
-  validatePagination = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
+  validatePagination = (req: Request, res: Response, next: NextFunction): void => {
     try {
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 20;
+      const errors: ValidationError[] = [];
 
       if (page < 1) {
-        const response = createResponse(false, 'Page must be greater than 0', null);
-        res.status(400).json(response);
-        return;
+        errors.push({
+          field: 'page',
+          message: 'Page must be greater than 0',
+          code: 'INVALID_VALUE'
+        });
       }
 
       if (limit < 1 || limit > MARKETPLACE_CONFIG.SEARCH_AND_FILTERING.MAX_SEARCH_RESULTS) {
-        const response = createResponse(false, `Limit must be between 1 and ${MARKETPLACE_CONFIG.SEARCH_AND_FILTERING.MAX_SEARCH_RESULTS}`, null);
-        res.status(400).json(response);
-        return;
+        errors.push({
+          field: 'limit',
+          message: `Limit must be between 1 and ${MARKETPLACE_CONFIG.SEARCH_AND_FILTERING.MAX_SEARCH_RESULTS}`,
+          code: 'INVALID_VALUE'
+        });
+      }
+
+      if (errors.length > 0) {
+        return sendValidationError(res, 'Pagination validation failed', errors);
       }
 
       req.query.page = page.toString();
@@ -435,144 +457,176 @@ export class ApplicationMiddleware {
       next();
     } catch (error) {
       logger.error('Error in pagination validation middleware', { error, query: req.query });
-      const response = createResponse(false, 'Pagination validation error', null, [error]);
-      res.status(500).json(response);
+      next(new AppError('Pagination validation error', HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR));
     }
   };
 
-  validateApplicationFilters = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
+  validateApplicationFilters = (req: Request, res: Response, next: NextFunction): void => {
     try {
-      const { status, minQuote, maxQuote, dateRange } = req.query;
+      const { status, job_type, date_from, date_to } = req.query;
+      const errors: ValidationError[] = [];
 
       if (status && typeof status === 'string') {
         const validStatuses = Object.values(APPLICATION_STATUS);
         if (!validStatuses.includes(status as any)) {
-          const response = createResponse(false, 'Invalid status filter', null);
-          res.status(400).json(response);
-          return;
+          errors.push({
+            field: 'status',
+            message: 'Invalid status filter',
+            code: 'INVALID_VALUE'
+          });
         }
       }
 
-      if (minQuote && isNaN(parseFloat(minQuote as string))) {
-        const response = createResponse(false, 'Invalid minimum quote filter', null);
-        res.status(400).json(response);
-        return;
+      if (date_from && typeof date_from === 'string') {
+        const fromDate = new Date(date_from);
+        if (isNaN(fromDate.getTime())) {
+          errors.push({
+            field: 'date_from',
+            message: 'Invalid date_from format',
+            code: 'INVALID_FORMAT'
+          });
+        }
       }
 
-      if (maxQuote && isNaN(parseFloat(maxQuote as string))) {
-        const response = createResponse(false, 'Invalid maximum quote filter', null);
-        res.status(400).json(response);
-        return;
+      if (date_to && typeof date_to === 'string') {
+        const toDate = new Date(date_to);
+        if (isNaN(toDate.getTime())) {
+          errors.push({
+            field: 'date_to',
+            message: 'Invalid date_to format',
+            code: 'INVALID_FORMAT'
+          });
+        }
       }
 
-      if (minQuote && maxQuote && parseFloat(minQuote as string) > parseFloat(maxQuote as string)) {
-        const response = createResponse(false, 'Minimum quote cannot be greater than maximum quote', null);
-        res.status(400).json(response);
-        return;
+      if (date_from && date_to && typeof date_from === 'string' && typeof date_to === 'string') {
+        const fromDate = new Date(date_from);
+        const toDate = new Date(date_to);
+        if (!isNaN(fromDate.getTime()) && !isNaN(toDate.getTime()) && fromDate > toDate) {
+          errors.push({
+            field: 'date_range',
+            message: 'date_from cannot be after date_to',
+            code: 'INVALID_VALUE'
+          });
+        }
+      }
+
+      if (errors.length > 0) {
+        return sendValidationError(res, 'Filter validation failed', errors);
       }
 
       next();
     } catch (error) {
       logger.error('Error in application filters validation middleware', { error, query: req.query });
-      const response = createResponse(false, 'Filter validation error', null, [error]);
-      res.status(500).json(response);
+      next(new AppError('Filter validation error', HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR));
     }
   };
 
-  checkDuplicateApplication = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
-    try {
-      const { marketplace_job_id  } = req.body;
-      const userId = req.user?.id;
+  requireApplicationAccess = (accessType: 'read' | 'write' | 'delete') => {
+    return async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+      try {
+        const { applicationId } = req.params;
+        const userId = req.user?.id;
+        const userRole = req.user?.role;
 
-      if (!marketplace_job_id  || !userId) {
-        next();
-        return;
-      }
+        if (!userId) {
+          return next(new AppError('Authentication required', HTTP_STATUS_CODES.UNAUTHORIZED));
+        }
 
-      const existingApplications = await this.applicationService.getTradieApplications(userId, {
-        page: 1,
-        limit: 1000
-      });
-
-      if (existingApplications.success && existingApplications.data) {
-        const duplicateApplication = existingApplications.data.applications.find(
-          app => app.marketplace_job_id  === marketplace_job_id  && 
-                 app.status !== APPLICATION_STATUS.WITHDRAWN
-        );
-
-        if (duplicateApplication) {
-          const response = createResponse(false, 'You have already applied to this job', null);
-          res.status(400).json(response);
+        if (userRole === 'admin') {
+          next();
           return;
         }
-      }
 
-      next();
-    } catch (error) {
-      logger.error('Error in duplicate application check middleware', { error, userId: req.user?.id });
-      next();
-    }
-  };
+        if (!applicationId || isNaN(parseInt(applicationId))) {
+          return next(new AppError('Valid application ID is required', HTTP_STATUS_CODES.BAD_REQUEST));
+        }
 
-  validateJobApplicationAccess = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
-    try {
-      const { jobId } = req.params;
-      const userId = req.user?.id;
-      const userRole = req.user?.role;
+        const applicationResult = await this.applicationService.getApplication(parseInt(applicationId), userId);
+        if (!applicationResult.success || !applicationResult.data) {
+          return next(new AppError('Application not found', HTTP_STATUS_CODES.NOT_FOUND));
+        }
 
-      if (!jobId || isNaN(parseInt(jobId))) {
-        const response = createResponse(false, 'Valid job ID is required', null);
-        res.status(400).json(response);
-        return;
-      }
+        const application = applicationResult.data;
+        const isOwner = application.tradie_id === userId;
+        const jobResult = await this.marketplaceService.getMarketplaceJob(application.marketplace_job_id);
+        const isJobOwner = jobResult.success && jobResult.data && jobResult.data.client_id === userId;
 
-      if (userRole === 'admin') {
+        switch (accessType) {
+          case 'read':
+            if (!isOwner && !isJobOwner) {
+              return next(new AppError('Unauthorized access', HTTP_STATUS_CODES.FORBIDDEN));
+            }
+            break;
+          case 'write':
+          case 'delete':
+            if (!isOwner) {
+              return next(new AppError('Unauthorized access', HTTP_STATUS_CODES.FORBIDDEN));
+            }
+            break;
+        }
+
         next();
-        return;
+      } catch (error) {
+        logger.error('Error in application access middleware', { error, applicationId: req.params.applicationId, accessType });
+        next(new AppError('Access check error', HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR));
       }
-
-      const jobResult = await this.marketplaceService.getMarketplaceJob(parseInt(jobId));
-      if (!jobResult.success || !jobResult.data) {
-        const response = createResponse(false, 'Job not found', null);
-        res.status(404).json(response);
-        return;
-      }
-
-      const job = jobResult.data;
-      if (job.client_id !== userId) {
-        const response = createResponse(false, 'Unauthorized access', null);
-        res.status(403).json(response);
-        return;
-      }
-
-      next();
-    } catch (error) {
-      logger.error('Error in job application access validation middleware', { error, jobId: req.params.jobId });
-      const response = createResponse(false, 'Access validation error', null, [error]);
-      res.status(500).json(response);
-    }
-  };
-
-  cacheApplicationData = (cacheDuration: number = 300) => {
-    return (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
-      const cacheKey = `application_${req.params.applicationId || 'search'}_${JSON.stringify(req.query)}`;
-      
-      res.set('Cache-Control', `public, max-age=${cacheDuration}`);
-      res.set('ETag', `"${Buffer.from(cacheKey).toString('base64')}"`);
-
-      if (req.headers['if-none-match'] === res.get('ETag')) {
-        res.status(304).end();
-        return;
-      }
-
-      next();
     };
   };
 
-  trackApplicationViews = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+  validateBulkOperations = (req: Request, res: Response, next: NextFunction): void => {
+    try {
+      const { applicationIds } = req.body;
+      const errors: ValidationError[] = [];
+
+      if (!Array.isArray(applicationIds)) {
+        errors.push({
+          field: 'applicationIds',
+          message: 'Application IDs must be an array',
+          code: 'INVALID_TYPE'
+        });
+      } else {
+        if (applicationIds.length === 0) {
+          errors.push({
+            field: 'applicationIds',
+            message: 'At least one application ID is required',
+            code: 'REQUIRED_FIELD'
+          });
+        }
+
+        if (applicationIds.length > MARKETPLACE_CONFIG.APPLICATION_SETTINGS.MAX_BULK_OPERATIONS) {
+          errors.push({
+            field: 'applicationIds',
+            message: `Maximum ${MARKETPLACE_CONFIG.APPLICATION_SETTINGS.MAX_BULK_OPERATIONS} applications allowed per bulk operation`,
+            code: 'FIELD_TOO_LARGE'
+          });
+        }
+
+        const invalidIds = applicationIds.filter(id => isNaN(parseInt(id)));
+        if (invalidIds.length > 0) {
+          errors.push({
+            field: 'applicationIds',
+            message: 'All application IDs must be valid numbers',
+            code: 'INVALID_VALUE'
+          });
+        }
+      }
+
+      if (errors.length > 0) {
+        return sendValidationError(res, 'Bulk operations validation failed', errors);
+      }
+
+      next();
+    } catch (error) {
+      logger.error('Error in bulk operations validation middleware', { error, body: req.body });
+      next(new AppError('Bulk operations validation error', HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR));
+    }
+  };
+
+  trackApplicationViews = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { applicationId } = req.params;
-      const userId = req.user?.id;
+      const userId = (req as any).user?.id;
 
       if (applicationId && !isNaN(parseInt(applicationId))) {
         const viewData = {
@@ -593,174 +647,6 @@ export class ApplicationMiddleware {
     }
   };
 
-  requireApplicationAccess = (accessType: 'read' | 'write' | 'delete') => {
-    return async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
-      try {
-        const { applicationId } = req.params;
-        const userId = req.user?.id;
-        const userRole = req.user?.role;
-
-        if (!userId) {
-          const response = createResponse(false, 'Authentication required', null);
-          res.status(401).json(response);
-          return;
-        }
-
-        if (userRole === 'admin') {
-          next();
-          return;
-        }
-
-        if (!applicationId || isNaN(parseInt(applicationId))) {
-          const response = createResponse(false, 'Valid application ID is required', null);
-          res.status(400).json(response);
-          return;
-        }
-
-        const applicationResult = await this.applicationService.getApplication(parseInt(applicationId), userId);
-        if (!applicationResult.success || !applicationResult.data) {
-          const response = createResponse(false, 'Application not found', null);
-          res.status(404).json(response);
-          return;
-        }
-
-        const application = applicationResult.data;
-        const isOwner = application.tradie_id === userId;
-
-        const jobResult = await this.marketplaceService.getMarketplaceJob(application.marketplace_job_id);
-        const isJobOwner = jobResult.success && jobResult.data && jobResult.data.client_id === userId;
-
-        switch (accessType) {
-          case 'read':
-            if (!isOwner && !isJobOwner) {
-              const response = createResponse(false, 'Unauthorized access', null);
-              res.status(403).json(response);
-              return;
-            }
-            break;
-          case 'write':
-          case 'delete':
-            if (!isOwner) {
-              const response = createResponse(false, 'Unauthorized access', null);
-              res.status(403).json(response);
-              return;
-            }
-            break;
-        }
-
-        next();
-      } catch (error) {
-        logger.error('Error in application access middleware', { error, applicationId: req.params.applicationId, accessType });
-        const response = createResponse(false, 'Access check error', null, [error]);
-        res.status(500).json(response);
-      }
-    };
-  };
-
-  validateBulkApplicationOperations = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
-    try {
-      const { applicationIds } = req.body;
-
-      if (!Array.isArray(applicationIds)) {
-        const response = createResponse(false, 'Application IDs must be an array', null);
-        res.status(400).json(response);
-        return;
-      }
-
-      if (applicationIds.length === 0) {
-        const response = createResponse(false, 'At least one application ID is required', null);
-        res.status(400).json(response);
-        return;
-      }
-
-      if (applicationIds.length > MARKETPLACE_CONFIG.MARKETPLACE_FEATURES.MAX_BULK_OPERATIONS) {
-        const response = createResponse(false, `Maximum ${MARKETPLACE_CONFIG.MARKETPLACE_FEATURES.MAX_BULK_OPERATIONS} applications allowed per bulk operation`, null);
-        res.status(400).json(response);
-        return;
-      }
-
-      const invalidIds = applicationIds.filter(id => isNaN(parseInt(id)));
-      if (invalidIds.length > 0) {
-        const response = createResponse(false, 'All application IDs must be valid numbers', null);
-        res.status(400).json(response);
-        return;
-      }
-
-      next();
-    } catch (error) {
-      logger.error('Error in bulk application operations validation middleware', { error, body: req.body });
-      const response = createResponse(false, 'Bulk operations validation error', null, [error]);
-      res.status(500).json(response);
-    }
-  };
-
-  validateWithdrawalData = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
-    try {
-      const { reason, refundCredits } = req.body;
-
-      if (!reason || typeof reason !== 'string' || reason.trim().length === 0) {
-        const response = createResponse(false, 'Withdrawal reason is required', null);
-        res.status(400).json(response);
-        return;
-      }
-
-      if (reason.length > 500) {
-        const response = createResponse(false, 'Withdrawal reason cannot exceed 500 characters', null);
-        res.status(400).json(response);
-        return;
-      }
-
-      if (refundCredits !== undefined && typeof refundCredits !== 'boolean') {
-        const response = createResponse(false, 'Refund credits must be a boolean value', null);
-        res.status(400).json(response);
-        return;
-      }
-
-      req.body = sanitizeAppData({ reason, refundCredits: refundCredits || false });
-      next();
-    } catch (error) {
-      logger.error('Error in withdrawal data validation middleware', { error, body: req.body });
-      const response = createResponse(false, 'Withdrawal validation error', null, [error]);
-      res.status(500).json(response);
-    }
-  };
-
-  checkApplicationLimit = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
-    try {
-      const userId = req.user?.id;
-
-      if (!userId) {
-        next();
-        return;
-      }
-
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      const todayApplications = await this.applicationService.getTradieApplications(userId, {
-        page: 1,
-        limit: 1000
-      });
-
-      if (todayApplications.success && todayApplications.data) {
-        const todayCount = todayApplications.data.applications.filter(
-          app => new Date(app.applicationTimestamp) >= today
-        ).length;
-
-        if (todayCount >= MARKETPLACE_CONFIG.APPLICATION_SETTINGS.MAX_APPLICATIONS_PER_TRADIE_PER_DAY) {
-          const response = createResponse(false, 'Daily application limit reached', null);
-          res.status(429).json(response);
-          return;
-        }
-      }
-
-      next();
-    } catch (error) {
-      logger.error('Error in application limit check middleware', { error, userId: req.user?.id });
-      next();
-    }
-  };
-
   async destroy(): Promise<void> {
     try {
       await this.applicationService.destroy();
@@ -775,6 +661,7 @@ export class ApplicationMiddleware {
 export const applicationMiddleware = new ApplicationMiddleware();
 
 export const {
+  authenticateApplicationUser,
   validateApplicationCreation,
   validateApplicationUpdate,
   validateApplicationSearch,
@@ -790,13 +677,8 @@ export const {
   sanitizeApplicationData,
   validatePagination,
   validateApplicationFilters,
-  checkDuplicateApplication,
-  validateJobApplicationAccess,
-  cacheApplicationData,
-  trackApplicationViews,
   requireApplicationAccess,
-  validateBulkApplicationOperations,
-  validateWithdrawalData,
-  checkApplicationLimit
+  validateBulkOperations,
+  trackApplicationViews
 } = applicationMiddleware;
 
