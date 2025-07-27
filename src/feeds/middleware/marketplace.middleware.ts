@@ -14,7 +14,6 @@ import {
 } from '../../config/feeds';
 import { authenticate } from '../../auth/middleware/auth.middleware';
 import { 
-  validateMarketplaceJobData,
   sanitizeMarketplaceJobInput,
   requestLogger,
   marketplaceJobErrorHandler

@@ -18,7 +18,6 @@ import {
     MARKETPLACE_FILTER_OPTIONS,
     MARKETPLACE_SORT_OPTIONS
   } from '../../config/feeds';
-  import { validateEmail, validatePhone, sanitizeString } from '../../shared/utils';
   
   export const validateMarketplaceJobData = (jobData: MarketplaceJobCreateData): MarketplaceJobValidationResult => {
     const errors: Array<{ field: string; message: string; code: string }> = [];
@@ -157,15 +156,15 @@ import {
   export const sanitizeMarketplaceJobData = (jobData: MarketplaceJobCreateData): MarketplaceJobCreateData => {
     return {
       ...jobData,
-      title: sanitizeString(jobData.title.trim()),
-      description: sanitizeString(jobData.description.trim()),
-      location: sanitizeString(jobData.location.trim()),
-      client_name: sanitizeString(jobData.client_name.trim()),
-      client_email : jobData.client_email .trim().toLowerCase(),
+      title: jobData.title.trim().replace(/[<>'"&]/g, ''),
+      description: jobData.description.trim().replace(/[<>'"&]/g, ''),
+      location: jobData.location.trim().replace(/[<>'"&]/g, ''),
+      client_name: jobData.client_name.trim().replace(/[<>'"&]/g, ''),
+      client_email: jobData.client_email.trim().toLowerCase(),
       client_phone: jobData.client_phone?.trim(),
-      client_company: jobData.client_company ? sanitizeString(jobData.client_company.trim()) : undefined
+      client_company: jobData.client_company ? jobData.client_company.trim().replace(/[<>'"&]/g, '') : undefined
     };
-  };
+  };  
   
   export const calculateCreditCost = (job_type: string, urgency_level: string): MarketplaceCreditCost => {
     const baseCost = MARKETPLACE_CREDIT_COSTS.BASE_APPLICATION_COST;
@@ -622,6 +621,23 @@ import {
   
   export const isValidJobStatus = (status: string): boolean => {
     return Object.values(MARKETPLACE_JOB_STATUS).includes(status as any);
+  };
+  
+  export const validateJobSearchParams = (params: any): boolean => {
+    if (!params) return false;
+    
+  
+    if (params.page && (params.page < 1 || !Number.isInteger(Number(params.page)))) return false;
+    if (params.limit && (params.limit < 1 || params.limit > 100)) return false;
+    
+    if (params.minBudget && params.minBudget < 0) return false;
+    if (params.maxBudget && params.maxBudget < 0) return false;
+    if (params.minBudget && params.maxBudget && params.minBudget > params.maxBudget) return false;
+
+    const validSortOptions = ['date_posted', 'budget_desc', 'budget_asc', 'urgency', 'location'];
+    if (params.sortBy && !validSortOptions.includes(params.sortBy)) return false;
+    
+    return true;
   };
   
   export const getNextValidStatuses = (currentStatus: string): string[] => {

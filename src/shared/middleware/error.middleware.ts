@@ -1374,3 +1374,13 @@ export const marketplaceCreditErrorHandler = (
   return errorHandler(error, req, res, next);
 };
 
+export const marketplaceJobErrorHandler = (error: any, req: Request, res: Response, next: NextFunction) => {
+  if (error.name === 'MarketplaceJobError') {
+    return res.status(400).json({
+      success: false,
+      message: error.message,
+      code: 'MARKETPLACE_JOB_ERROR'
+    });
+  }
+  next(error);
+};

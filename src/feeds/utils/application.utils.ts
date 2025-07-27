@@ -18,8 +18,6 @@ import {
     URGENCY_LEVEL,
     MARKETPLACE_JOB_TYPES
   } from '../../config/feeds';
-  import { sanitizeString, validateCurrency } from '../../shared/utils';
-  import { calculateCreditCost } from './marketplace.utils';
   
   export const validateApplicationData = (applicationData: JobApplicationCreateData): ApplicationValidationResult => {
     const errors: Array<{ field: string; message: string; code: string }> = [];
@@ -166,17 +164,17 @@ import {
       }
     };
   };
-  
+
   export const sanitizeApplicationData = (applicationData: JobApplicationCreateData): JobApplicationCreateData => {
     return {
       ...applicationData,
-      proposed_timeline: sanitizeString(applicationData.proposed_timeline.trim()),
-      approachDescription: sanitizeString(applicationData.approachDescription.trim()),
-      materialsList: applicationData.materialsList ? sanitizeString(applicationData.materialsList.trim()) : undefined,
-      cover_message: applicationData.cover_message ? sanitizeString(applicationData.cover_message.trim()) : undefined,
-      relevant_experience: applicationData.relevant_experience ? sanitizeString(applicationData.relevant_experience.trim()) : undefined,
-      questionsForClient: applicationData.questionsForClient ? sanitizeString(applicationData.questionsForClient.trim()) : undefined,
-      specialOffers: applicationData.specialOffers ? sanitizeString(applicationData.specialOffers.trim()) : undefined
+      proposed_timeline: applicationData.proposed_timeline.trim().replace(/[<>'"&]/g, ''),
+      approachDescription: applicationData.approachDescription.trim().replace(/[<>'"&]/g, ''),
+      materialsList: applicationData.materialsList ? applicationData.materialsList.trim().replace(/[<>'"&]/g, '') : undefined,
+      cover_message: applicationData.cover_message ? applicationData.cover_message.trim().replace(/[<>'"&]/g, '') : undefined,
+      relevant_experience: applicationData.relevant_experience ? applicationData.relevant_experience.trim().replace(/[<>'"&]/g, '') : undefined,
+      questionsForClient: applicationData.questionsForClient ? applicationData.questionsForClient.trim().replace(/[<>'"&]/g, '') : undefined,
+      specialOffers: applicationData.specialOffers ? applicationData.specialOffers.trim().replace(/[<>'"&]/g, '') : undefined
     };
   };
   
