@@ -7,7 +7,7 @@ import {
   ApplicationStatusUpdate,
   ApplicationWithdrawal
 } from '../types';
-import { logger, createApiResponse } from '../../shared/utils';
+import { logger, createResponse } from '../../shared/utils';
 
 interface AuthenticatedRequest extends Request {
   user?: {
@@ -50,7 +50,7 @@ export class ApplicationController {
       res.status(result.success ? 201 : 400).json(result);
     } catch (error) {
       logger.error('Error in createApplication controller', { error, userId: req.user?.id });
-      const response = createApiResponse(false, 'Failed to create application', null, [error]);
+      const response = createResponse(false, 'Failed to create application', null, [error]);
       res.status(500).json(response);
     }
   };
@@ -68,7 +68,7 @@ export class ApplicationController {
         error, 
         applicationId: req.params.applicationId 
       });
-      const response = createApiResponse(false, 'Failed to retrieve application', null, [error]);
+      const response = createResponse(false, 'Failed to retrieve application', null, [error]);
       res.status(500).json(response);
     }
   };
@@ -87,7 +87,7 @@ export class ApplicationController {
         jobId: req.params.jobId,
         userId: req.user?.id 
       });
-      const response = createApiResponse(false, 'Failed to retrieve applications', null, [error]);
+      const response = createResponse(false, 'Failed to retrieve applications', null, [error]);
       res.status(500).json(response);
     }
   };
@@ -108,7 +108,7 @@ export class ApplicationController {
       res.status(result.success ? 200 : 400).json(result);
     } catch (error) {
       logger.error('Error in getTradieApplications controller', { error, userId: req.user?.id });
-      const response = createApiResponse(false, 'Failed to retrieve tradie applications', null, [error]);
+      const response = createResponse(false, 'Failed to retrieve tradie applications', null, [error]);
       res.status(500).json(response);
     }
   };
@@ -139,7 +139,7 @@ export class ApplicationController {
       res.status(result.success ? 200 : 400).json(result);
     } catch (error) {
       logger.error('Error in searchApplications controller', { error, query: req.query });
-      const response = createApiResponse(false, 'Failed to search applications', null, [error]);
+      const response = createResponse(false, 'Failed to search applications', null, [error]);
       res.status(500).json(response);
     }
   };
@@ -163,7 +163,7 @@ export class ApplicationController {
         applicationId: req.params.applicationId,
         userId: req.user?.id 
       });
-      const response = createApiResponse(false, 'Failed to update application', null, [error]);
+      const response = createResponse(false, 'Failed to update application', null, [error]);
       res.status(500).json(response);
     }
   };
@@ -187,7 +187,7 @@ export class ApplicationController {
         applicationId: req.params.applicationId,
         userId: req.user?.id 
       });
-      const response = createApiResponse(false, 'Failed to update application status', null, [error]);
+      const response = createResponse(false, 'Failed to update application status', null, [error]);
       res.status(500).json(response);
     }
   };
@@ -211,7 +211,7 @@ export class ApplicationController {
         applicationId: req.params.applicationId,
         userId: req.user?.id 
       });
-      const response = createApiResponse(false, 'Failed to withdraw application', null, [error]);
+      const response = createResponse(false, 'Failed to withdraw application', null, [error]);
       res.status(500).json(response);
     }
   };
@@ -225,7 +225,7 @@ export class ApplicationController {
       res.status(result.success ? 200 : 400).json(result);
     } catch (error) {
       logger.error('Error in getTradieApplicationHistory controller', { error, userId: req.user?.id });
-      const response = createApiResponse(false, 'Failed to retrieve application history', null, [error]);
+      const response = createResponse(false, 'Failed to retrieve application history', null, [error]);
       res.status(500).json(response);
     }
   };
@@ -251,7 +251,7 @@ export class ApplicationController {
       res.status(result.success ? 200 : 400).json(result);
     } catch (error) {
       logger.error('Error in getApplicationAnalytics controller', { error, query: req.query });
-      const response = createApiResponse(false, 'Failed to retrieve analytics', null, [error]);
+      const response = createResponse(false, 'Failed to retrieve analytics', null, [error]);
       res.status(500).json(response);
     }
   };
@@ -284,7 +284,7 @@ export class ApplicationController {
       }
 
       const successCount = results.filter(r => r.success).length;
-      const response = createApiResponse(
+      const response = createResponse(
         true,
         `Updated ${successCount} of ${applicationIds.length} applications`,
         { results, successCount, totalCount: applicationIds.length }
@@ -293,7 +293,7 @@ export class ApplicationController {
       res.status(200).json(response);
     } catch (error) {
       logger.error('Error in bulkUpdateApplicationStatus controller', { error, userId: req.user?.id });
-      const response = createApiResponse(false, 'Failed to bulk update application status', null, [error]);
+      const response = createResponse(false, 'Failed to bulk update application status', null, [error]);
       res.status(500).json(response);
     }
   };
@@ -322,7 +322,7 @@ export class ApplicationController {
         status: req.params.status,
         userId: req.user?.id 
       });
-      const response = createApiResponse(false, 'Failed to retrieve applications by status', null, [error]);
+      const response = createResponse(false, 'Failed to retrieve applications by status', null, [error]);
       res.status(500).json(response);
     }
   };
@@ -334,7 +334,7 @@ export class ApplicationController {
 
       const applicationResult = await this.applicationService.getApplication(parseInt(applicationId), userId);
       if (!applicationResult.success || !applicationResult.data) {
-        const response = createApiResponse(false, 'Application not found', null);
+        const response = createResponse(false, 'Application not found', null);
         res.status(404).json(response);
         return;
       }
@@ -379,7 +379,7 @@ export class ApplicationController {
         metrics.rankPosition = sortedByQuote.findIndex(app => app.id === application.id) + 1;
       }
 
-      const response = createApiResponse(true, 'Application metrics retrieved successfully', metrics);
+      const response = createResponse(true, 'Application metrics retrieved successfully', metrics);
       res.status(200).json(response);
     } catch (error) {
       logger.error('Error in getApplicationMetrics controller', { 
@@ -387,7 +387,7 @@ export class ApplicationController {
         applicationId: req.params.applicationId,
         userId: req.user?.id 
       });
-      const response = createApiResponse(false, 'Failed to retrieve application metrics', null, [error]);
+      const response = createResponse(false, 'Failed to retrieve application metrics', null, [error]);
       res.status(500).json(response);
     }
   };

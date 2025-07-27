@@ -5,7 +5,7 @@ import {
   MarketplaceJobUpdateData,
   MarketplaceJobSearchParams
 } from '../types';
-import { logger, createApiResponse } from '../../shared/utils';
+import { logger, createResponse } from '../../shared/utils';
 
 interface AuthenticatedRequest extends Request {
   user?: {
@@ -46,7 +46,7 @@ export class MarketplaceController {
       res.status(result.success ? 201 : 400).json(result);
     } catch (error) {
       logger.error('Error in createMarketplaceJob controller', { error, userId: req.user?.id });
-      const response = createApiResponse(false, 'Failed to create marketplace job', null, [error]);
+      const response = createResponse(false, 'Failed to create marketplace job', null, [error]);
       res.status(500).json(response);
     }
   };
@@ -61,7 +61,7 @@ export class MarketplaceController {
       res.status(result.success ? 200 : 404).json(result);
     } catch (error) {
       logger.error('Error in getMarketplaceJob controller', { error, jobId: req.params.jobId });
-      const response = createApiResponse(false, 'Failed to retrieve marketplace job', null, [error]);
+      const response = createResponse(false, 'Failed to retrieve marketplace job', null, [error]);
       res.status(500).json(response);
     }
   };
@@ -91,7 +91,7 @@ export class MarketplaceController {
       res.status(result.success ? 200 : 400).json(result);
     } catch (error) {
       logger.error('Error in searchMarketplaceJobs controller', { error, query: req.query });
-      const response = createApiResponse(false, 'Failed to search marketplace jobs', null, [error]);
+      const response = createResponse(false, 'Failed to search marketplace jobs', null, [error]);
       res.status(500).json(response);
     }
   };
@@ -115,7 +115,7 @@ export class MarketplaceController {
         jobId: req.params.jobId,
         userId: req.user?.id 
       });
-      const response = createApiResponse(false, 'Failed to update marketplace job', null, [error]);
+      const response = createResponse(false, 'Failed to update marketplace job', null, [error]);
       res.status(500).json(response);
     }
   };
@@ -140,7 +140,7 @@ export class MarketplaceController {
         jobId: req.params.jobId,
         userId: req.user?.id 
       });
-      const response = createApiResponse(false, 'Failed to update job status', null, [error]);
+      const response = createResponse(false, 'Failed to update job status', null, [error]);
       res.status(500).json(response);
     }
   };
@@ -159,7 +159,7 @@ export class MarketplaceController {
         jobId: req.params.jobId,
         userId: req.user?.id 
       });
-      const response = createApiResponse(false, 'Failed to delete marketplace job', null, [error]);
+      const response = createResponse(false, 'Failed to delete marketplace job', null, [error]);
       res.status(500).json(response);
     }
   };
@@ -180,7 +180,7 @@ export class MarketplaceController {
       res.status(result.success ? 200 : 400).json(result);
     } catch (error) {
       logger.error('Error in getClientJobs controller', { error, userId: req.user?.id });
-      const response = createApiResponse(false, 'Failed to retrieve client jobs', null, [error]);
+      const response = createResponse(false, 'Failed to retrieve client jobs', null, [error]);
       res.status(500).json(response);
     }
   };
@@ -192,7 +192,7 @@ export class MarketplaceController {
       res.status(result.success ? 200 : 500).json(result);
     } catch (error) {
       logger.error('Error in getMarketplaceStats controller', { error });
-      const response = createApiResponse(false, 'Failed to retrieve marketplace stats', null, [error]);
+      const response = createResponse(false, 'Failed to retrieve marketplace stats', null, [error]);
       res.status(500).json(response);
     }
   };
@@ -206,7 +206,7 @@ export class MarketplaceController {
       res.status(result.success ? 200 : 404).json(result);
     } catch (error) {
       logger.error('Error in getJobCreditCost controller', { error, jobId: req.params.jobId });
-      const response = createApiResponse(false, 'Failed to calculate credit cost', null, [error]);
+      const response = createResponse(false, 'Failed to calculate credit cost', null, [error]);
       res.status(500).json(response);
     }
   };
@@ -221,7 +221,7 @@ export class MarketplaceController {
       res.status(result.success ? 200 : 400).json(result);
     } catch (error) {
       logger.error('Error in getRecommendedJobs controller', { error, userId: req.user?.id });
-      const response = createApiResponse(false, 'Failed to retrieve recommended jobs', null, [error]);
+      const response = createResponse(false, 'Failed to retrieve recommended jobs', null, [error]);
       res.status(500).json(response);
     }
   };
@@ -233,7 +233,7 @@ export class MarketplaceController {
       res.status(result.success ? 200 : 500).json(result);
     } catch (error) {
       logger.error('Error in processExpiredJobs controller', { error });
-      const response = createApiResponse(false, 'Failed to process expired jobs', null, [error]);
+      const response = createResponse(false, 'Failed to process expired jobs', null, [error]);
       res.status(500).json(response);
     }
   };
@@ -259,7 +259,7 @@ export class MarketplaceController {
       }
 
       const successCount = results.filter(r => r.success).length;
-      const response = createApiResponse(
+      const response = createResponse(
         true,
         `Updated ${successCount} of ${jobIds.length} jobs`,
         { results, successCount, totalCount: jobIds.length }
@@ -268,7 +268,7 @@ export class MarketplaceController {
       res.status(200).json(response);
     } catch (error) {
       logger.error('Error in bulkUpdateJobStatus controller', { error, userId: req.user?.id });
-      const response = createApiResponse(false, 'Failed to bulk update job status', null, [error]);
+      const response = createResponse(false, 'Failed to bulk update job status', null, [error]);
       res.status(500).json(response);
     }
   };
@@ -286,7 +286,7 @@ export class MarketplaceController {
       res.status(result.success ? 200 : 500).json(result);
     } catch (error) {
       logger.error('Error in getMarketplaceAnalytics controller', { error });
-      const response = createApiResponse(false, 'Failed to retrieve marketplace analytics', null, [error]);
+      const response = createResponse(false, 'Failed to retrieve marketplace analytics', null, [error]);
       res.status(500).json(response);
     }
   };

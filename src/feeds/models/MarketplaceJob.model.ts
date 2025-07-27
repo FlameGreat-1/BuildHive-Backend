@@ -23,7 +23,7 @@ export class MarketplaceJobModel {
   private db: Pool;
 
   constructor() {
-    this.db = database.getPool();
+    this.db = database; 
   }
 
   async create(jobData: MarketplaceJobCreateData, clientId?: number): Promise<MarketplaceJobEntity> {

@@ -23,7 +23,7 @@ export class ApplicationModel {
   private db: Pool;
 
   constructor() {
-    this.db = database.getPool();
+    this.db = database;
   }
 
   async create(applicationData: JobApplicationCreateData, tradieId: number): Promise<JobApplicationEntity> {

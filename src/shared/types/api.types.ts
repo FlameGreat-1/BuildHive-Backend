@@ -1098,6 +1098,27 @@ export interface CreditRefundResponse {
   createdAt: string;
 }
 
+export enum MarketplaceJobStatus {
+  DRAFT = 'draft',
+  POSTED = 'posted',
+  ACTIVE = 'active', 
+  IN_PROGRESS = 'in_progress',
+  COMPLETED = 'completed',
+  CANCELLED = 'cancelled',
+  EXPIRED = 'expired'
+}
+
+export enum ApplicationStatus {
+  APPLIED = 'applied',
+  UNDER_REVIEW = 'under_review',
+  SELECTED = 'selected',
+  REJECTED = 'rejected',
+  ASSIGNED = 'assigned',
+  ACCEPTED = 'accepted',
+  COMPLETED = 'completed',
+  WITHDRAWN = 'withdrawn'
+}
+
 export interface JobApplicationCreditRequest {
   jobId: number;
   creditsRequired: number;

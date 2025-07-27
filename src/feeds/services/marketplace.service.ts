@@ -29,7 +29,7 @@ import {
   getNextValidStatuses,
   canTransitionToStatus
 } from '../utils';
-import { logger, createApiResponse } from '../../shared/utils';
+import { logger, createResponse } from '../../shared/utils';
 import { DatabaseError, ApiResponse } from '../../shared/types';
 
 import { CreditService } from '../../credits/services/credit.service';
@@ -103,7 +103,7 @@ export class MarketplaceService extends EventEmitter {
     try {
       const validationResult = validateMarketplaceJobData(jobData);
       if (!validationResult.isValid) {
-        return createApiResponse(false, 'Validation failed', null, validationResult.errors);
+        return createResponse(false, 'Validation failed', null, validationResult.errors);
       }
 
       const sanitizedData = sanitizeMarketplaceJobData(jobData);
@@ -111,12 +111,12 @@ export class MarketplaceService extends EventEmitter {
       if (clientId) {
         const clientUser = await this.userService.getUserById(this.convertUserIdToString(clientId));
         if (!clientUser) {
-          return createApiResponse(false, 'Client not found', null);
+          return createResponse(false, 'Client not found', null);
         }
         
         const clientProfile = await this.profileService.getProfileByUserId(this.convertUserIdToString(clientId));
         if (!clientProfile) {
-          return createApiResponse(false, 'Client profile not found', null);
+          return createResponse(false, 'Client profile not found', null);
         }
       } else {
 
@@ -136,10 +136,10 @@ export class MarketplaceService extends EventEmitter {
         location: job.location
       });
 
-      return createApiResponse(true, 'Job created successfully', job);
+      return createResponse(true, 'Job created successfully', job);
     } catch (error) {
       logger.error('Error creating marketplace job', { error, jobData });
-      return createApiResponse(false, 'Failed to create job', null, [error]);
+      return createResponse(false, 'Failed to create job', null, [error]);
     }
   }
 
@@ -148,12 +148,12 @@ export class MarketplaceService extends EventEmitter {
       const jobDetails = await this.marketplaceRepository.findJobDetails(id, tradieId);
       
       if (!jobDetails) {
-        return createApiResponse(false, 'Job not found', null);
+        return createResponse(false, 'Job not found', null);
       }
 
       if (isJobExpired(jobDetails as MarketplaceJobEntity)) {
         await this.handleJobExpiry(id);
-        return createApiResponse(false, 'Job has expired', null);
+        return createResponse(false, 'Job has expired', null);
       }
 
       if (tradieId) {
@@ -166,10 +166,10 @@ export class MarketplaceService extends EventEmitter {
 
       logger.debug('Marketplace job retrieved', { jobId: id, tradieId });
 
-      return createApiResponse(true, 'Job retrieved successfully', jobDetails);
+      return createResponse(true, 'Job retrieved successfully', jobDetails);
     } catch (error) {
       logger.error('Error getting marketplace job', { error, jobId: id });
-      return createApiResponse(false, 'Failed to retrieve job', null, [error]);
+      return createResponse(false, 'Failed to retrieve job', null, [error]);
     }
   }
 
@@ -208,10 +208,10 @@ export class MarketplaceService extends EventEmitter {
         searchParams
       });
 
-      return createApiResponse(true, 'Jobs retrieved successfully', response);
+      return createResponse(true, 'Jobs retrieved successfully', response);
     } catch (error) {
       logger.error('Error searching marketplace jobs', { error, searchParams });
-      return createApiResponse(false, 'Failed to search jobs', null, [error]);
+      return createResponse(false, 'Failed to search jobs', null, [error]);
     }
   }
 
@@ -223,21 +223,21 @@ export class MarketplaceService extends EventEmitter {
     try {
       const existingJob = await this.marketplaceRepository.findJobById(id);
       if (!existingJob) {
-        return createApiResponse(false, 'Job not found', null);
+        return createResponse(false, 'Job not found', null);
       }
 
       const clientUser = await this.userService.getUserById(this.convertUserIdToString(clientId));
       if (!clientUser) {
-        return createApiResponse(false, 'Client not found', null);
+        return createResponse(false, 'Client not found', null);
       }
 
       if (!canJobBeModified(existingJob)) {
-        return createApiResponse(false, 'Job cannot be modified in current status', null);
+        return createResponse(false, 'Job cannot be modified in current status', null);
       }
 
       const updatedJob = await this.marketplaceRepository.updateJob(id, updateData, clientId);
       if (!updatedJob) {
-        return createApiResponse(false, 'Failed to update job', null);
+        return createResponse(false, 'Failed to update job', null);
       }
 
       await this.publishJobUpdatedEvent(existingJob, updatedJob);
@@ -249,10 +249,10 @@ export class MarketplaceService extends EventEmitter {
         changes: Object.keys(updateData)
       });
 
-      return createApiResponse(true, 'Job updated successfully', updatedJob);
+      return createResponse(true, 'Job updated successfully', updatedJob);
     } catch (error) {
       logger.error('Error updating marketplace job', { error, jobId: id, updateData });
-      return createApiResponse(false, 'Failed to update job', null, [error]);
+      return createResponse(false, 'Failed to update job', null, [error]);
     }
   }
 
@@ -265,20 +265,20 @@ export class MarketplaceService extends EventEmitter {
     try {
       const existingJob = await this.marketplaceRepository.findJobById(id);
       if (!existingJob) {
-        return createApiResponse(false, 'Job not found', null);
+        return createResponse(false, 'Job not found', null);
       }
 
       if (clientId && existingJob.clientId !== clientId) {
-        return createApiResponse(false, 'Unauthorized access', null);
+        return createResponse(false, 'Unauthorized access', null);
       }
 
       if (!canTransitionToStatus(existingJob.status, status)) {
-        return createApiResponse(false, `Cannot transition from ${existingJob.status} to ${status}`, null);
+        return createResponse(false, `Cannot transition from ${existingJob.status} to ${status}`, null);
       }
 
       const updatedJob = await this.marketplaceRepository.updateJobStatus(id, status, reason);
       if (!updatedJob) {
-        return createApiResponse(false, 'Failed to update job status', null);
+        return createResponse(false, 'Failed to update job status', null);
       }
 
       await this.publishJobStatusChangedEvent(existingJob, updatedJob, reason);
@@ -291,10 +291,10 @@ export class MarketplaceService extends EventEmitter {
         reason
       });
 
-      return createApiResponse(true, 'Job status updated successfully', updatedJob);
+      return createResponse(true, 'Job status updated successfully', updatedJob);
     } catch (error) {
       logger.error('Error updating job status', { error, jobId: id, status });
-      return createApiResponse(false, 'Failed to update job status', null, [error]);
+      return createResponse(false, 'Failed to update job status', null, [error]);
     }
   }
 
@@ -302,12 +302,12 @@ export class MarketplaceService extends EventEmitter {
     try {
       const existingJob = await this.marketplaceRepository.findJobById(id);
       if (!existingJob) {
-        return createApiResponse(false, 'Job not found', null);
+        return createResponse(false, 'Job not found', null);
       }
 
       const clientUser = await this.userService.getUserById(this.convertUserIdToString(clientId));
       if (!clientUser) {
-        return createApiResponse(false, 'Client not found', null);
+        return createResponse(false, 'Client not found', null);
       }
 
       if (existingJob.applicationCount > 0) {
@@ -316,7 +316,7 @@ export class MarketplaceService extends EventEmitter {
 
       const deletedJob = await this.marketplaceRepository.deleteJob(id, clientId);
       if (!deletedJob) {
-        return createApiResponse(false, 'Failed to delete job', null);
+        return createResponse(false, 'Failed to delete job', null);
       }
 
       await this.publishJobDeletedEvent(deletedJob);
@@ -324,10 +324,10 @@ export class MarketplaceService extends EventEmitter {
 
       logger.info('Marketplace job deleted successfully', { jobId: id, clientId });
 
-      return createApiResponse(true, 'Job deleted successfully', true);
+      return createResponse(true, 'Job deleted successfully', true);
     } catch (error) {
       logger.error('Error deleting marketplace job', { error, jobId: id, clientId });
-      return createApiResponse(false, 'Failed to delete job', null, [error]);
+      return createResponse(false, 'Failed to delete job', null, [error]);
     }
   }
 
@@ -342,7 +342,7 @@ export class MarketplaceService extends EventEmitter {
     try {
       const clientUser = await this.userService.getUserById(this.convertUserIdToString(clientId));
       if (!clientUser) {
-        return createApiResponse(false, 'Client not found', null);
+        return createResponse(false, 'Client not found', null);
       }
 
       const result = await this.marketplaceRepository.findJobsByClient(clientId, params);
@@ -353,10 +353,10 @@ export class MarketplaceService extends EventEmitter {
         returnedCount: result.jobs.length
       });
 
-      return createApiResponse(true, 'Client jobs retrieved successfully', result);
+      return createResponse(true, 'Client jobs retrieved successfully', result);
     } catch (error) {
       logger.error('Error getting client jobs', { error, clientId, params });
-      return createApiResponse(false, 'Failed to retrieve client jobs', null, [error]);
+      return createResponse(false, 'Failed to retrieve client jobs', null, [error]);
     }
   }
 
@@ -369,10 +369,10 @@ export class MarketplaceService extends EventEmitter {
         activeJobs: stats.activeJobs
       });
 
-      return createApiResponse(true, 'Marketplace stats retrieved successfully', stats);
+      return createResponse(true, 'Marketplace stats retrieved successfully', stats);
     } catch (error) {
       logger.error('Error getting marketplace stats', { error });
-      return createApiResponse(false, 'Failed to retrieve marketplace stats', null, [error]);
+      return createResponse(false, 'Failed to retrieve marketplace stats', null, [error]);
     }
   }
 
@@ -381,13 +381,13 @@ export class MarketplaceService extends EventEmitter {
       const creditCost = await this.marketplaceRepository.getJobCreditCost(jobId);
       
       if (!creditCost) {
-        return createApiResponse(false, 'Job not found', null);
+        return createResponse(false, 'Job not found', null);
       }
 
-      return createApiResponse(true, 'Credit cost calculated successfully', creditCost);
+      return createResponse(true, 'Credit cost calculated successfully', creditCost);
     } catch (error) {
       logger.error('Error getting job credit cost', { error, jobId });
-      return createApiResponse(false, 'Failed to calculate credit cost', null, [error]);
+      return createResponse(false, 'Failed to calculate credit cost', null, [error]);
     }
   }
 
@@ -395,7 +395,7 @@ export class MarketplaceService extends EventEmitter {
     try {
       const tradieUser = await this.userService.getUserById(this.convertUserIdToString(tradieId));
       if (!tradieUser) {
-        return createApiResponse(false, 'Tradie not found', null);
+        return createResponse(false, 'Tradie not found', null);
       }
 
       const tradieProfile = await this.profileService.getProfileByUserId(this.convertUserIdToString(tradieId));
@@ -413,10 +413,10 @@ export class MarketplaceService extends EventEmitter {
         count: recommendedJobs.length
       });
 
-      return createApiResponse(true, 'Recommended jobs retrieved successfully', recommendedJobs);
+      return createResponse(true, 'Recommended jobs retrieved successfully', recommendedJobs);
     } catch (error) {
       logger.error('Error getting recommended jobs', { error, tradieId });
-      return createApiResponse(false, 'Failed to retrieve recommended jobs', null, [error]);
+      return createResponse(false, 'Failed to retrieve recommended jobs', null, [error]);
     }
   }
 
@@ -439,10 +439,10 @@ export class MarketplaceService extends EventEmitter {
 
       logger.info('Expired jobs processing completed', { processed, failed });
 
-      return createApiResponse(true, 'Expired jobs processed successfully', { processed, failed });
+      return createResponse(true, 'Expired jobs processed successfully', { processed, failed });
     } catch (error) {
       logger.error('Error processing expired jobs', { error });
-      return createApiResponse(false, 'Failed to process expired jobs', null, [error]);
+      return createResponse(false, 'Failed to process expired jobs', null, [error]);
     }
   }
 

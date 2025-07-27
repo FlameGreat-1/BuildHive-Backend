@@ -12,16 +12,14 @@ import {
   MARKETPLACE_LIMITS,
   MARKETPLACE_CREDIT_COSTS
 } from '../../config/feeds';
+import { authenticate } from '../../auth/middleware/auth.middleware';
 import { 
-  authenticate, 
-  authorize, 
-  rateLimit, 
-  validateRequest,
-  sanitizeInput,
-  logRequest,
-  handleError
+  validateMarketplaceJobData,
+  sanitizeMarketplaceJobInput,
+  requestLogger,
+  marketplaceJobErrorHandler
 } from '../../shared/middleware';
-import { logger, createApiResponse } from '../../shared/utils';
+import { logger, createResponse } from '../../shared/utils';
 import { ApiError, ValidationError } from '../../shared/types';
 
 export class MarketplaceMiddleware {
@@ -36,14 +34,14 @@ export class MarketplaceMiddleware {
       const { body } = req;
       
       if (!body || Object.keys(body).length === 0) {
-        const response = createApiResponse(false, 'Request body is required', null);
+        const response = createResponse(false, 'Request body is required', null);
         res.status(400).json(response);
         return;
       }
 
       const validationResult = validateMarketplaceJobData(body);
       if (!validationResult.isValid) {
-        const response = createApiResponse(false, 'Validation failed', null, validationResult.errors);
+        const response = createResponse(false, 'Validation failed', null, validationResult.errors);
         res.status(400).json(response);
         return;
       }
@@ -52,7 +50,7 @@ export class MarketplaceMiddleware {
       next();
     } catch (error) {
       logger.error('Error in job creation validation middleware', { error, body: req.body });
-      const response = createApiResponse(false, 'Validation error', null, [error]);
+      const response = createResponse(false, 'Validation error', null, [error]);
       res.status(500).json(response);
     }
   };
@@ -64,33 +62,33 @@ export class MarketplaceMiddleware {
       const userId = req.user?.id;
 
       if (!jobId || isNaN(parseInt(jobId))) {
-        const response = createApiResponse(false, 'Valid job ID is required', null);
+        const response = createResponse(false, 'Valid job ID is required', null);
         res.status(400).json(response);
         return;
       }
 
       if (!body || Object.keys(body).length === 0) {
-        const response = createApiResponse(false, 'Update data is required', null);
+        const response = createResponse(false, 'Update data is required', null);
         res.status(400).json(response);
         return;
       }
 
       const jobResult = await this.marketplaceService.getMarketplaceJob(parseInt(jobId));
       if (!jobResult.success || !jobResult.data) {
-        const response = createApiResponse(false, 'Job not found', null);
+        const response = createResponse(false, 'Job not found', null);
         res.status(404).json(response);
         return;
       }
 
       const job = jobResult.data;
       if (job.job.clientId !== userId) {
-        const response = createApiResponse(false, 'Unauthorized access', null);
+        const response = createResponse(false, 'Unauthorized access', null);
         res.status(403).json(response);
         return;
       }
 
       if (!canJobBeModified(job as any)) {
-        const response = createApiResponse(false, 'Job cannot be modified in current status', null);
+        const response = createResponse(false, 'Job cannot be modified in current status', null);
         res.status(400).json(response);
         return;
       }
@@ -99,7 +97,7 @@ export class MarketplaceMiddleware {
       next();
     } catch (error) {
       logger.error('Error in job update validation middleware', { error, jobId: req.params.jobId });
-      const response = createApiResponse(false, 'Validation error', null, [error]);
+      const response = createResponse(false, 'Validation error', null, [error]);
       res.status(500).json(response);
     }
   };
@@ -114,7 +112,7 @@ export class MarketplaceMiddleware {
 
       const validationResult = validateJobSearchParams(searchParams);
       if (!validationResult.isValid) {
-        const response = createApiResponse(false, 'Invalid search parameters', null, validationResult.errors);
+        const response = createResponse(false, 'Invalid search parameters', null, validationResult.errors);
         res.status(400).json(response);
         return;
       }
@@ -123,7 +121,7 @@ export class MarketplaceMiddleware {
       next();
     } catch (error) {
       logger.error('Error in job search validation middleware', { error, query: req.query });
-      const response = createApiResponse(false, 'Search validation error', null, [error]);
+      const response = createResponse(false, 'Search validation error', null, [error]);
       res.status(500).json(response);
     }
   };
@@ -135,27 +133,27 @@ export class MarketplaceMiddleware {
       const userId = req.user?.id;
 
       if (!jobId || isNaN(parseInt(jobId))) {
-        const response = createApiResponse(false, 'Valid job ID is required', null);
+        const response = createResponse(false, 'Valid job ID is required', null);
         res.status(400).json(response);
         return;
       }
 
       if (!status || !Object.values(MARKETPLACE_JOB_STATUS).includes(status)) {
-        const response = createApiResponse(false, 'Valid status is required', null);
+        const response = createResponse(false, 'Valid status is required', null);
         res.status(400).json(response);
         return;
       }
 
       const jobResult = await this.marketplaceService.getMarketplaceJob(parseInt(jobId));
       if (!jobResult.success || !jobResult.data) {
-        const response = createApiResponse(false, 'Job not found', null);
+        const response = createResponse(false, 'Job not found', null);
         res.status(404).json(response);
         return;
       }
 
       const job = jobResult.data;
       if (job.job.clientId !== userId) {
-        const response = createApiResponse(false, 'Unauthorized access', null);
+        const response = createResponse(false, 'Unauthorized access', null);
         res.status(403).json(response);
         return;
       }
@@ -164,7 +162,7 @@ export class MarketplaceMiddleware {
       next();
     } catch (error) {
       logger.error('Error in job status update validation middleware', { error, jobId: req.params.jobId });
-      const response = createApiResponse(false, 'Status update validation error', null, [error]);
+      const response = createResponse(false, 'Status update validation error', null, [error]);
       res.status(500).json(response);
     }
   };
@@ -175,27 +173,27 @@ export class MarketplaceMiddleware {
       const userId = req.user?.id;
 
       if (!userId) {
-        const response = createApiResponse(false, 'Authentication required', null);
+        const response = createResponse(false, 'Authentication required', null);
         res.status(401).json(response);
         return;
       }
 
       if (!jobId || isNaN(parseInt(jobId))) {
-        const response = createApiResponse(false, 'Valid job ID is required', null);
+        const response = createResponse(false, 'Valid job ID is required', null);
         res.status(400).json(response);
         return;
       }
 
       const jobResult = await this.marketplaceService.getMarketplaceJob(parseInt(jobId));
       if (!jobResult.success || !jobResult.data) {
-        const response = createApiResponse(false, 'Job not found', null);
+        const response = createResponse(false, 'Job not found', null);
         res.status(404).json(response);
         return;
       }
 
       const job = jobResult.data;
       if (job.job.clientId !== userId) {
-        const response = createApiResponse(false, 'Unauthorized access', null);
+        const response = createResponse(false, 'Unauthorized access', null);
         res.status(403).json(response);
         return;
       }
@@ -203,7 +201,7 @@ export class MarketplaceMiddleware {
       next();
     } catch (error) {
       logger.error('Error in job ownership check middleware', { error, jobId: req.params.jobId });
-      const response = createApiResponse(false, 'Ownership check error', null, [error]);
+      const response = createResponse(false, 'Ownership check error', null, [error]);
       res.status(500).json(response);
     }
   };
@@ -213,27 +211,27 @@ export class MarketplaceMiddleware {
       const { jobId } = req.params;
 
       if (!jobId || isNaN(parseInt(jobId))) {
-        const response = createApiResponse(false, 'Valid job ID is required', null);
+        const response = createResponse(false, 'Valid job ID is required', null);
         res.status(400).json(response);
         return;
       }
 
       const jobResult = await this.marketplaceService.getMarketplaceJob(parseInt(jobId));
       if (!jobResult.success || !jobResult.data) {
-        const response = createApiResponse(false, 'Job not found', null);
+        const response = createResponse(false, 'Job not found', null);
         res.status(404).json(response);
         return;
       }
 
       const job = jobResult.data;
       if (job.job.status !== MARKETPLACE_JOB_STATUS.AVAILABLE) {
-        const response = createApiResponse(false, 'Job is not available for applications', null);
+        const response = createResponse(false, 'Job is not available for applications', null);
         res.status(400).json(response);
         return;
       }
 
       if (isJobExpired(job as any)) {
-        const response = createApiResponse(false, 'Job has expired', null);
+        const response = createResponse(false, 'Job has expired', null);
         res.status(400).json(response);
         return;
       }
@@ -241,7 +239,7 @@ export class MarketplaceMiddleware {
       next();
     } catch (error) {
       logger.error('Error in job availability check middleware', { error, jobId: req.params.jobId });
-      const response = createApiResponse(false, 'Availability check error', null, [error]);
+      const response = createResponse(false, 'Availability check error', null, [error]);
       res.status(500).json(response);
     }
   };
@@ -249,7 +247,7 @@ export class MarketplaceMiddleware {
   rateLimitJobCreation = rateLimit({
     windowMs: 60 * 60 * 1000,
     max: MARKETPLACE_LIMITS.MAX_JOBS_PER_HOUR,
-    message: createApiResponse(false, 'Too many job postings. Please try again later.', null),
+    message: createResponse(false, 'Too many job postings. Please try again later.', null),
     standardHeaders: true,
     legacyHeaders: false,
     keyGenerator: (req: Request) => `job_creation_${req.user?.id || req.ip}`,
@@ -259,7 +257,7 @@ export class MarketplaceMiddleware {
   rateLimitJobSearch = rateLimit({
     windowMs: 60 * 1000,
     max: MARKETPLACE_LIMITS.MAX_SEARCHES_PER_MINUTE,
-    message: createApiResponse(false, 'Too many search requests. Please try again later.', null),
+    message: createResponse(false, 'Too many search requests. Please try again later.', null),
     standardHeaders: true,
     legacyHeaders: false,
     keyGenerator: (req: Request) => `job_search_${req.user?.id || req.ip}`
@@ -296,7 +294,7 @@ export class MarketplaceMiddleware {
       const userRole = req.user?.role;
       
       if (!userRole || !['client', 'admin'].includes(userRole)) {
-        const response = createApiResponse(false, 'Client role required', null);
+        const response = createResponse(false, 'Client role required', null);
         res.status(403).json(response);
         return;
       }
@@ -304,7 +302,7 @@ export class MarketplaceMiddleware {
       next();
     } catch (error) {
       logger.error('Error in client role validation middleware', { error, userId: req.user?.id });
-      const response = createApiResponse(false, 'Role validation error', null, [error]);
+      const response = createResponse(false, 'Role validation error', null, [error]);
       res.status(500).json(response);
     }
   };
@@ -314,7 +312,7 @@ export class MarketplaceMiddleware {
       const userRole = req.user?.role;
       
       if (!userRole || !['tradie', 'admin'].includes(userRole)) {
-        const response = createApiResponse(false, 'Tradie role required', null);
+        const response = createResponse(false, 'Tradie role required', null);
         res.status(403).json(response);
         return;
       }
@@ -322,7 +320,7 @@ export class MarketplaceMiddleware {
       next();
     } catch (error) {
       logger.error('Error in tradie role validation middleware', { error, userId: req.user?.id });
-      const response = createApiResponse(false, 'Role validation error', null, [error]);
+      const response = createResponse(false, 'Role validation error', null, [error]);
       res.status(500).json(response);
     }
   };
@@ -338,18 +336,18 @@ export class MarketplaceMiddleware {
     });
 
     if (error instanceof ValidationError) {
-      const response = createApiResponse(false, error.message, null, error.details);
+      const response = createResponse(false, error.message, null, error.details);
       res.status(400).json(response);
       return;
     }
 
     if (error instanceof ApiError) {
-      const response = createApiResponse(false, error.message, null);
+      const response = createResponse(false, error.message, null);
       res.status(error.statusCode).json(response);
       return;
     }
 
-    const response = createApiResponse(false, 'Internal server error', null);
+    const response = createResponse(false, 'Internal server error', null);
     res.status(500).json(response);
   };
 
@@ -366,7 +364,7 @@ export class MarketplaceMiddleware {
         next();
       } catch (error) {
         logger.error('Error in job data sanitization middleware', { error });
-        const response = createApiResponse(false, 'Data sanitization error', null, [error]);
+        const response = createResponse(false, 'Data sanitization error', null, [error]);
         res.status(500).json(response);
       }
     };
@@ -377,13 +375,13 @@ export class MarketplaceMiddleware {
         const limit = parseInt(req.query.limit as string) || 20;
   
         if (page < 1) {
-          const response = createApiResponse(false, 'Page must be greater than 0', null);
+          const response = createResponse(false, 'Page must be greater than 0', null);
           res.status(400).json(response);
           return;
         }
   
         if (limit < 1 || limit > MARKETPLACE_LIMITS.MAX_SEARCH_RESULTS) {
-          const response = createApiResponse(false, `Limit must be between 1 and ${MARKETPLACE_LIMITS.MAX_SEARCH_RESULTS}`, null);
+          const response = createResponse(false, `Limit must be between 1 and ${MARKETPLACE_LIMITS.MAX_SEARCH_RESULTS}`, null);
           res.status(400).json(response);
           return;
         }
@@ -394,7 +392,7 @@ export class MarketplaceMiddleware {
         next();
       } catch (error) {
         logger.error('Error in pagination validation middleware', { error, query: req.query });
-        const response = createApiResponse(false, 'Pagination validation error', null, [error]);
+        const response = createResponse(false, 'Pagination validation error', null, [error]);
         res.status(500).json(response);
       }
     };
@@ -405,27 +403,27 @@ export class MarketplaceMiddleware {
         const userId = req.user?.id;
   
         if (!jobId || isNaN(parseInt(jobId))) {
-          const response = createApiResponse(false, 'Valid job ID is required', null);
+          const response = createResponse(false, 'Valid job ID is required', null);
           res.status(400).json(response);
           return;
         }
   
         const jobResult = await this.marketplaceService.getMarketplaceJob(parseInt(jobId));
         if (!jobResult.success || !jobResult.data) {
-          const response = createApiResponse(false, 'Job not found', null);
+          const response = createResponse(false, 'Job not found', null);
           res.status(404).json(response);
           return;
         }
   
         const job = jobResult.data;
         if (job.job.clientId !== userId) {
-          const response = createApiResponse(false, 'Unauthorized access', null);
+          const response = createResponse(false, 'Unauthorized access', null);
           res.status(403).json(response);
           return;
         }
   
         if (job.applicationCount > 0) {
-          const response = createApiResponse(false, 'Cannot delete job with existing applications', null);
+          const response = createResponse(false, 'Cannot delete job with existing applications', null);
           res.status(400).json(response);
           return;
         }
@@ -433,7 +431,7 @@ export class MarketplaceMiddleware {
         next();
       } catch (error) {
         logger.error('Error in job deletion check middleware', { error, jobId: req.params.jobId });
-        const response = createApiResponse(false, 'Deletion check error', null, [error]);
+        const response = createResponse(false, 'Deletion check error', null, [error]);
         res.status(500).json(response);
       }
     };
@@ -445,26 +443,26 @@ export class MarketplaceMiddleware {
         if (jobType && typeof jobType === 'string') {
           const validJobTypes = Object.values(MARKETPLACE_JOB_STATUS);
           if (!validJobTypes.includes(jobType as any)) {
-            const response = createApiResponse(false, 'Invalid job type filter', null);
+            const response = createResponse(false, 'Invalid job type filter', null);
             res.status(400).json(response);
             return;
           }
         }
   
         if (minBudget && isNaN(parseFloat(minBudget as string))) {
-          const response = createApiResponse(false, 'Invalid minimum budget filter', null);
+          const response = createResponse(false, 'Invalid minimum budget filter', null);
           res.status(400).json(response);
           return;
         }
   
         if (maxBudget && isNaN(parseFloat(maxBudget as string))) {
-          const response = createApiResponse(false, 'Invalid maximum budget filter', null);
+          const response = createResponse(false, 'Invalid maximum budget filter', null);
           res.status(400).json(response);
           return;
         }
   
         if (minBudget && maxBudget && parseFloat(minBudget as string) > parseFloat(maxBudget as string)) {
-          const response = createApiResponse(false, 'Minimum budget cannot be greater than maximum budget', null);
+          const response = createResponse(false, 'Minimum budget cannot be greater than maximum budget', null);
           res.status(400).json(response);
           return;
         }
@@ -472,7 +470,7 @@ export class MarketplaceMiddleware {
         next();
       } catch (error) {
         logger.error('Error in job filters validation middleware', { error, query: req.query });
-        const response = createApiResponse(false, 'Filter validation error', null, [error]);
+        const response = createResponse(false, 'Filter validation error', null, [error]);
         res.status(500).json(response);
       }
     };
@@ -530,7 +528,7 @@ export class MarketplaceMiddleware {
         if (jobResult.success && jobResult.data) {
           const job = jobResult.data;
           if (isJobExpired(job as any)) {
-            const response = createApiResponse(false, 'Job has expired', null);
+            const response = createResponse(false, 'Job has expired', null);
             res.status(400).json(response);
             return;
           }
@@ -551,7 +549,7 @@ export class MarketplaceMiddleware {
           const userRole = req.user?.role;
   
           if (!userId) {
-            const response = createApiResponse(false, 'Authentication required', null);
+            const response = createResponse(false, 'Authentication required', null);
             res.status(401).json(response);
             return;
           }
@@ -562,14 +560,14 @@ export class MarketplaceMiddleware {
           }
   
           if (!jobId || isNaN(parseInt(jobId))) {
-            const response = createApiResponse(false, 'Valid job ID is required', null);
+            const response = createResponse(false, 'Valid job ID is required', null);
             res.status(400).json(response);
             return;
           }
   
           const jobResult = await this.marketplaceService.getMarketplaceJob(parseInt(jobId));
           if (!jobResult.success || !jobResult.data) {
-            const response = createApiResponse(false, 'Job not found', null);
+            const response = createResponse(false, 'Job not found', null);
             res.status(404).json(response);
             return;
           }
@@ -581,7 +579,7 @@ export class MarketplaceMiddleware {
           switch (accessType) {
             case 'read':
               if (!isOwner && !isTradie) {
-                const response = createApiResponse(false, 'Unauthorized access', null);
+                const response = createResponse(false, 'Unauthorized access', null);
                 res.status(403).json(response);
                 return;
               }
@@ -589,7 +587,7 @@ export class MarketplaceMiddleware {
             case 'write':
             case 'delete':
               if (!isOwner) {
-                const response = createApiResponse(false, 'Unauthorized access', null);
+                const response = createResponse(false, 'Unauthorized access', null);
                 res.status(403).json(response);
                 return;
               }
@@ -599,7 +597,7 @@ export class MarketplaceMiddleware {
           next();
         } catch (error) {
           logger.error('Error in job access middleware', { error, jobId: req.params.jobId, accessType });
-          const response = createApiResponse(false, 'Access check error', null, [error]);
+          const response = createResponse(false, 'Access check error', null, [error]);
           res.status(500).json(response);
         }
       };
@@ -610,26 +608,26 @@ export class MarketplaceMiddleware {
         const { jobIds } = req.body;
   
         if (!Array.isArray(jobIds)) {
-          const response = createApiResponse(false, 'Job IDs must be an array', null);
+          const response = createResponse(false, 'Job IDs must be an array', null);
           res.status(400).json(response);
           return;
         }
   
         if (jobIds.length === 0) {
-          const response = createApiResponse(false, 'At least one job ID is required', null);
+          const response = createResponse(false, 'At least one job ID is required', null);
           res.status(400).json(response);
           return;
         }
   
         if (jobIds.length > MARKETPLACE_LIMITS.MAX_BULK_OPERATIONS) {
-          const response = createApiResponse(false, `Maximum ${MARKETPLACE_LIMITS.MAX_BULK_OPERATIONS} jobs allowed per bulk operation`, null);
+          const response = createResponse(false, `Maximum ${MARKETPLACE_LIMITS.MAX_BULK_OPERATIONS} jobs allowed per bulk operation`, null);
           res.status(400).json(response);
           return;
         }
   
         const invalidIds = jobIds.filter(id => isNaN(parseInt(id)));
         if (invalidIds.length > 0) {
-          const response = createApiResponse(false, 'All job IDs must be valid numbers', null);
+          const response = createResponse(false, 'All job IDs must be valid numbers', null);
           res.status(400).json(response);
           return;
         }
@@ -637,7 +635,7 @@ export class MarketplaceMiddleware {
         next();
       } catch (error) {
         logger.error('Error in bulk operations validation middleware', { error, body: req.body });
-        const response = createApiResponse(false, 'Bulk operations validation error', null, [error]);
+        const response = createResponse(false, 'Bulk operations validation error', null, [error]);
         res.status(500).json(response);
       }
     };

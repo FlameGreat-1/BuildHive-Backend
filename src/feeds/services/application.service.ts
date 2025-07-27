@@ -29,7 +29,7 @@ import {
   rankApplications,
   validateApplicationStatusTransition
 } from '../utils';
-import { logger, createApiResponse } from '../../shared/utils';
+import { logger, createResponse } from '../../shared/utils';
 import { DatabaseError, ApiResponse } from '../../shared/types';
 
 import { UserService } from '../../auth/services/user.service';
@@ -92,32 +92,32 @@ export class ApplicationService extends EventEmitter {
     try {
       const validationResult = validateApplicationData(applicationData);
       if (!validationResult.isValid) {
-        return createApiResponse(false, 'Validation failed', null, validationResult.errors);
+        return createResponse(false, 'Validation failed', null, validationResult.errors);
       }
 
       const tradieUser = await this.userService.getUserById(this.convertUserIdToString(tradieId));
       if (!tradieUser) {
-        return createApiResponse(false, 'Tradie not found', null);
+        return createResponse(false, 'Tradie not found', null);
       }
 
       const tradieProfile = await this.profileService.getProfileByUserId(this.convertUserIdToString(tradieId));
       if (!tradieProfile) {
-        return createApiResponse(false, 'Tradie profile not found', null);
+        return createResponse(false, 'Tradie profile not found', null);
       }
 
       const sanitizedData = sanitizeApplicationData(applicationData);
 
       const marketplaceJob = await this.marketplaceRepository.findJobById(sanitizedData.marketplaceJobId);
       if (!marketplaceJob) {
-        return createApiResponse(false, 'Job not found', null);
+        return createResponse(false, 'Job not found', null);
       }
 
       if (marketplaceJob.status !== MARKETPLACE_JOB_STATUS.AVAILABLE) {
-        return createApiResponse(false, 'Job is no longer available for applications', null);
+        return createResponse(false, 'Job is no longer available for applications', null);
       }
 
       if (marketplaceJob.isExpired) {
-        return createApiResponse(false, 'Job has expired', null);
+        return createResponse(false, 'Job has expired', null);
       }
 
       const application = await this.applicationRepository.createApplication(sanitizedData, tradieId);
@@ -133,10 +133,10 @@ export class ApplicationService extends EventEmitter {
         creditsUsed: application.creditsUsed
       });
 
-      return createApiResponse(true, 'Application submitted successfully', application);
+      return createResponse(true, 'Application submitted successfully', application);
     } catch (error) {
       logger.error('Error creating job application', { error, applicationData, tradieId });
-      return createApiResponse(false, 'Failed to submit application', null, [error]);
+      return createResponse(false, 'Failed to submit application', null, [error]);
     }
   }
 
@@ -145,26 +145,26 @@ export class ApplicationService extends EventEmitter {
       const applicationDetails = await this.applicationRepository.findApplicationDetails(id);
       
       if (!applicationDetails) {
-        return createApiResponse(false, 'Application not found', null);
+        return createResponse(false, 'Application not found', null);
       }
 
       if (userId) {
         const user = await this.userService.getUserById(this.convertUserIdToString(userId));
         if (!user) {
-          return createApiResponse(false, 'User not found', null);
+          return createResponse(false, 'User not found', null);
         }
 
         if (!this.canUserAccessApplication(applicationDetails, userId)) {
-          return createApiResponse(false, 'Unauthorized access', null);
+          return createResponse(false, 'Unauthorized access', null);
         }
       }
 
       logger.debug('Application retrieved', { applicationId: id, userId });
 
-      return createApiResponse(true, 'Application retrieved successfully', applicationDetails);
+      return createResponse(true, 'Application retrieved successfully', applicationDetails);
     } catch (error) {
       logger.error('Error getting application', { error, applicationId: id });
-      return createApiResponse(false, 'Failed to retrieve application', null, [error]);
+      return createResponse(false, 'Failed to retrieve application', null, [error]);
     }
   }
 
@@ -176,12 +176,12 @@ export class ApplicationService extends EventEmitter {
       if (clientId) {
         const clientUser = await this.userService.getUserById(this.convertUserIdToString(clientId));
         if (!clientUser) {
-          return createApiResponse(false, 'Client not found', null);
+          return createResponse(false, 'Client not found', null);
         }
 
         const jobOwnership = await this.marketplaceRepository.validateJobOwnership(marketplaceJobId, clientId);
         if (!jobOwnership) {
-          return createApiResponse(false, 'Unauthorized access', null);
+          return createResponse(false, 'Unauthorized access', null);
         }
       }
 
@@ -193,10 +193,10 @@ export class ApplicationService extends EventEmitter {
         count: rankedApplications.length
       });
 
-      return createApiResponse(true, 'Applications retrieved successfully', rankedApplications);
+      return createResponse(true, 'Applications retrieved successfully', rankedApplications);
     } catch (error) {
       logger.error('Error getting applications by job', { error, marketplaceJobId });
-      return createApiResponse(false, 'Failed to retrieve applications', null, [error]);
+      return createResponse(false, 'Failed to retrieve applications', null, [error]);
     }
   }
 
@@ -211,7 +211,7 @@ export class ApplicationService extends EventEmitter {
     try {
       const tradieUser = await this.userService.getUserById(this.convertUserIdToString(tradieId));
       if (!tradieUser) {
-        return createApiResponse(false, 'Tradie not found', null);
+        return createResponse(false, 'Tradie not found', null);
       }
 
       const result = await this.applicationRepository.findApplicationsByTradie(tradieId, params);
@@ -222,10 +222,10 @@ export class ApplicationService extends EventEmitter {
         returnedCount: result.applications.length
       });
 
-      return createApiResponse(true, 'Applications retrieved successfully', result);
+      return createResponse(true, 'Applications retrieved successfully', result);
     } catch (error) {
       logger.error('Error getting tradie applications', { error, tradieId, params });
-      return createApiResponse(false, 'Failed to retrieve applications', null, [error]);
+      return createResponse(false, 'Failed to retrieve applications', null, [error]);
     }
   }
 
@@ -241,7 +241,7 @@ export class ApplicationService extends EventEmitter {
       if (searchParams.tradieId) {
         const tradieUser = await this.userService.getUserById(this.convertUserIdToString(searchParams.tradieId));
         if (!tradieUser) {
-          return createApiResponse(false, 'Tradie not found', null);
+          return createResponse(false, 'Tradie not found', null);
         }
       }
 
@@ -260,10 +260,10 @@ export class ApplicationService extends EventEmitter {
         searchParams
       });
 
-      return createApiResponse(true, 'Applications retrieved successfully', response);
+      return createResponse(true, 'Applications retrieved successfully', response);
     } catch (error) {
       logger.error('Error searching applications', { error, searchParams });
-      return createApiResponse(false, 'Failed to search applications', null, [error]);
+      return createResponse(false, 'Failed to search applications', null, [error]);
     }
   }
 
@@ -275,25 +275,25 @@ export class ApplicationService extends EventEmitter {
     try {
       const tradieUser = await this.userService.getUserById(this.convertUserIdToString(tradieId));
       if (!tradieUser) {
-        return createApiResponse(false, 'Tradie not found', null);
+        return createResponse(false, 'Tradie not found', null);
       }
 
       const existingApplication = await this.applicationRepository.findApplicationById(id);
       if (!existingApplication) {
-        return createApiResponse(false, 'Application not found', null);
+        return createResponse(false, 'Application not found', null);
       }
 
       if (existingApplication.tradieId !== tradieId) {
-        return createApiResponse(false, 'Unauthorized access', null);
+        return createResponse(false, 'Unauthorized access', null);
       }
 
       if (!canModifyApplication(existingApplication)) {
-        return createApiResponse(false, 'Application cannot be modified in current status', null);
+        return createResponse(false, 'Application cannot be modified in current status', null);
       }
 
       const updatedApplication = await this.applicationRepository.updateApplication(id, updateData, tradieId);
       if (!updatedApplication) {
-        return createApiResponse(false, 'Failed to update application', null);
+        return createResponse(false, 'Failed to update application', null);
       }
 
       await this.publishApplicationUpdatedEvent(existingApplication, updatedApplication);
@@ -305,10 +305,10 @@ export class ApplicationService extends EventEmitter {
         changes: Object.keys(updateData)
       });
 
-      return createApiResponse(true, 'Application updated successfully', updatedApplication);
+      return createResponse(true, 'Application updated successfully', updatedApplication);
     } catch (error) {
       logger.error('Error updating application', { error, applicationId: id, updateData });
-      return createApiResponse(false, 'Failed to update application', null, [error]);
+      return createResponse(false, 'Failed to update application', null, [error]);
     }
   }
 
@@ -320,13 +320,13 @@ export class ApplicationService extends EventEmitter {
     try {
       const existingApplication = await this.applicationRepository.findApplicationById(id);
       if (!existingApplication) {
-        return createApiResponse(false, 'Application not found', null);
+        return createResponse(false, 'Application not found', null);
       }
 
       if (clientId) {
         const clientUser = await this.userService.getUserById(this.convertUserIdToString(clientId));
         if (!clientUser) {
-          return createApiResponse(false, 'Client not found', null);
+          return createResponse(false, 'Client not found', null);
         }
 
         const jobOwnership = await this.marketplaceRepository.validateJobOwnership(
@@ -334,7 +334,7 @@ export class ApplicationService extends EventEmitter {
           clientId
         );
         if (!jobOwnership) {
-          return createApiResponse(false, 'Unauthorized access', null);
+          return createResponse(false, 'Unauthorized access', null);
         }
       }
 
@@ -343,7 +343,7 @@ export class ApplicationService extends EventEmitter {
         statusUpdate.status
       );
       if (!transitionValidation.isValid) {
-        return createApiResponse(false, transitionValidation.error || 'Invalid status transition', null);
+        return createResponse(false, transitionValidation.error || 'Invalid status transition', null);
       }
 
       const updatedApplication = await this.applicationRepository.updateApplicationStatus(
@@ -354,7 +354,7 @@ export class ApplicationService extends EventEmitter {
       );
 
       if (!updatedApplication) {
-        return createApiResponse(false, 'Failed to update application status', null);
+        return createResponse(false, 'Failed to update application status', null);
       }
 
       await this.publishApplicationStatusChangedEvent(existingApplication, updatedApplication, statusUpdate);
@@ -367,10 +367,10 @@ export class ApplicationService extends EventEmitter {
         reason: statusUpdate.reason
       });
 
-      return createApiResponse(true, 'Application status updated successfully', updatedApplication);
+      return createResponse(true, 'Application status updated successfully', updatedApplication);
     } catch (error) {
       logger.error('Error updating application status', { error, applicationId: id, statusUpdate });
-      return createApiResponse(false, 'Failed to update application status', null, [error]);
+      return createResponse(false, 'Failed to update application status', null, [error]);
     }
   }
 
@@ -382,20 +382,20 @@ export class ApplicationService extends EventEmitter {
     try {
       const tradieUser = await this.userService.getUserById(this.convertUserIdToString(tradieId));
       if (!tradieUser) {
-        return createApiResponse(false, 'Tradie not found', null);
+        return createResponse(false, 'Tradie not found', null);
       }
 
       const existingApplication = await this.applicationRepository.findApplicationById(id);
       if (!existingApplication) {
-        return createApiResponse(false, 'Application not found', null);
+        return createResponse(false, 'Application not found', null);
       }
 
       if (existingApplication.tradieId !== tradieId) {
-        return createApiResponse(false, 'Unauthorized access', null);
+        return createResponse(false, 'Unauthorized access', null);
       }
 
       if (!canWithdrawApplication(existingApplication)) {
-        return createApiResponse(false, 'Application cannot be withdrawn at this time', null);
+        return createResponse(false, 'Application cannot be withdrawn at this time', null);
       }
 
       const withdrawnApplication = await this.applicationRepository.withdrawApplication(
@@ -405,7 +405,7 @@ export class ApplicationService extends EventEmitter {
       );
 
       if (!withdrawnApplication) {
-        return createApiResponse(false, 'Failed to withdraw application', null);
+        return createResponse(false, 'Failed to withdraw application', null);
       }
 
       await this.publishApplicationWithdrawnEvent(withdrawnApplication, withdrawalData);
@@ -427,10 +427,10 @@ export class ApplicationService extends EventEmitter {
         refundCredits: withdrawalData.refundCredits
       });
 
-      return createApiResponse(true, 'Application withdrawn successfully', withdrawnApplication);
+      return createResponse(true, 'Application withdrawn successfully', withdrawnApplication);
     } catch (error) {
       logger.error('Error withdrawing application', { error, applicationId: id, tradieId });
-      return createApiResponse(false, 'Failed to withdraw application', null, [error]);
+      return createResponse(false, 'Failed to withdraw application', null, [error]);
     }
   }
 
@@ -438,7 +438,7 @@ export class ApplicationService extends EventEmitter {
     try {
       const tradieUser = await this.userService.getUserById(this.convertUserIdToString(tradieId));
       if (!tradieUser) {
-        return createApiResponse(false, 'Tradie not found', null);
+        return createResponse(false, 'Tradie not found', null);
       }
 
       const history = await this.applicationRepository.getTradieApplicationHistory(tradieId);
@@ -449,10 +449,10 @@ export class ApplicationService extends EventEmitter {
         conversionRate: history.conversionRate
       });
 
-      return createApiResponse(true, 'Application history retrieved successfully', history);
+      return createResponse(true, 'Application history retrieved successfully', history);
     } catch (error) {
       logger.error('Error getting tradie application history', { error, tradieId });
-      return createApiResponse(false, 'Failed to retrieve application history', null, [error]);
+      return createResponse(false, 'Failed to retrieve application history', null, [error]);
     }
   }
 
@@ -466,7 +466,7 @@ export class ApplicationService extends EventEmitter {
       if (params.tradieId) {
         const tradieUser = await this.userService.getUserById(this.convertUserIdToString(params.tradieId));
         if (!tradieUser) {
-          return createApiResponse(false, 'Tradie not found', null);
+          return createResponse(false, 'Tradie not found', null);
         }
       }
 
@@ -478,10 +478,10 @@ export class ApplicationService extends EventEmitter {
         params
       });
 
-      return createApiResponse(true, 'Analytics retrieved successfully', analytics);
+      return createResponse(true, 'Analytics retrieved successfully', analytics);
     } catch (error) {
       logger.error('Error getting application analytics', { error, params });
-      return createApiResponse(false, 'Failed to retrieve analytics', null, [error]);
+      return createResponse(false, 'Failed to retrieve analytics', null, [error]);
     }
   }
 

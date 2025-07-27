@@ -1233,5 +1233,7 @@ export const recreateDatabase = async (): Promise<void> => {
   }
 };
 
+export const connection = database;
 
+export const db = database.getFirestoreClient();
 
