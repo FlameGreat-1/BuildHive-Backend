@@ -329,40 +329,42 @@ export class MarketplaceJobModel {
   private transformToEntity(row: any): MarketplaceJobEntity {
     return {
       id: row.id,
-      clientId: row.client_id,
+      client_id: row.client_id,
       title: row.title,
       description: row.description,
-      jobType: row.job_type,
+      job_type: row.job_type,
       location: row.location,
-      estimatedBudget: row.estimated_budget,
-      dateRequired: new Date(row.date_required),
-      urgencyLevel: row.urgency_level,
+      estimated_budget: row.estimated_budget,
+      date_required: new Date(row.date_required),
+      urgency_level: row.urgency_level,
       photos: row.photos ? JSON.parse(row.photos) : [],
-      clientName: row.client_name,
-      clientEmail: row.client_email,
-      clientPhone: row.client_phone,
-      clientCompany: row.client_company,
       status: row.current_status || row.status,
-      applicationCount: parseInt(row.application_count) || 0,
-      expiresAt: new Date(row.expires_at),
+      view_count: row.view_count || 0,
+      client_name: row.client_name,
+      client_email: row.client_email,
+      client_phone: row.client_phone,
+      client_company: row.client_company,
+      expires_at: row.expires_at ? new Date(row.expires_at) : null,
+      metadata: row.metadata || {},
       createdAt: new Date(row.created_at),
       updatedAt: new Date(row.updated_at),
-      isExpired: new Date(row.expires_at) <= new Date(),
-      daysUntilExpiry: Math.ceil((new Date(row.expires_at).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)),
+      applicationCount: parseInt(row.application_count) || 0,
+      isExpired: row.expires_at ? new Date(row.expires_at) <= new Date() : false,
+      daysUntilExpiry: row.expires_at ? Math.ceil((new Date(row.expires_at).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : 0,
       creditCostForApplication: 0
     };
   }
-
+  
   private transformToSummary(row: any): MarketplaceJobSummary {
     const entity = this.transformToEntity(row);
     return {
       id: entity.id,
       title: entity.title,
-      jobType: entity.jobType,
+      jobType: entity.job_type,
       location: entity.location,
-      estimatedBudget: entity.estimatedBudget,
-      urgencyLevel: entity.urgencyLevel,
-      applicationCount: entity.applicationCount,
+      estimatedBudget: entity.estimated_budget,
+      urgencyLevel: entity.urgency_level,
+      applicationCount: entity.application_count,
       status: entity.status,
       createdAt: entity.createdAt,
       daysUntilExpiry: entity.daysUntilExpiry,
@@ -370,4 +372,4 @@ export class MarketplaceJobModel {
       hasApplied: false
     };
   }
-}
+  

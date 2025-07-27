@@ -418,22 +418,22 @@ export class ApplicationModel {
     const now = new Date();
     const applicationTime = new Date(row.application_timestamp);
     const withdrawalDeadline = new Date(applicationTime.getTime() + (24 * 60 * 60 * 1000));
-
+  
     return {
       id: row.id,
-      marketplaceJobId: row.marketplace_job_id,
-      tradieId: row.tradie_id,
-      customQuote: parseFloat(row.custom_quote),
-      proposedTimeline: row.proposed_timeline,
-      approachDescription: row.approach_description,
-      materialsList: row.materials_list,
-      availabilityDates: row.availability_dates ? JSON.parse(row.availability_dates) : [],
-      coverMessage: row.cover_message,
-      relevantExperience: row.relevant_experience,
-      additionalPhotos: row.additional_photos ? JSON.parse(row.additional_photos) : [],
-      questionsForClient: row.questions_for_client,
-      specialOffers: row.special_offers,
-      creditsUsed: parseInt(row.credits_used) || 0,
+      marketplace_job_id: row.marketplace_job_id,
+      tradie_id: row.tradie_id,
+      custom_quote: parseFloat(row.custom_quote),
+      proposed_timeline: row.proposed_timeline,
+      approach_description: row.approach_description,
+      materials_list: row.materials_list,
+      availability_dates: row.availability_dates ? JSON.parse(row.availability_dates) : [],
+      cover_message: row.cover_message,
+      relevant_experience: row.relevant_experience,
+      additional_photos: row.additional_photos ? JSON.parse(row.additional_photos) : [],
+      questions_for_client: row.questions_for_client,
+      special_offers: row.special_offers,
+      credits_used: parseInt(row.credits_used) || 0,
       status: row.status,
       applicationTimestamp: applicationTime,
       createdAt: new Date(row.created_at),
@@ -443,7 +443,7 @@ export class ApplicationModel {
       timeUntilWithdrawalDeadline: row.status === 'submitted' ? Math.max(0, withdrawalDeadline.getTime() - now.getTime()) : undefined
     };
   }
-
+  
   private transformToSummary(row: any): JobApplicationSummary {
     return {
       id: row.id,
