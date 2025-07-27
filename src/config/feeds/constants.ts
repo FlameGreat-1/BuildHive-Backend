@@ -83,8 +83,12 @@ export const MARKETPLACE_JOB_TYPES = {
     MAX_ADDITIONAL_PHOTOS: 5,
     SELECTION_REASON_MAX_LENGTH: 500,
     MAX_CUSTOM_QUOTE: 1000000,
-    MIN_CUSTOM_QUOTE: 10
-  } as const;
+    MIN_CUSTOM_QUOTE: 10,
+    MAX_SEARCH_RESULTS: 100,
+    MAX_JOBS_PER_HOUR: 10,
+    MAX_SEARCHES_PER_MINUTE: 30,
+    MAX_BULK_OPERATIONS: 50
+} as const;
   
   export const MARKETPLACE_SEARCH_LIMITS = {
     MAX_SEARCH_QUERY_LENGTH: 100,
@@ -235,6 +239,15 @@ export const MARKETPLACE_JOB_TYPES = {
     SEARCH_REQUESTS: { windowMs: 1 * 60 * 1000, max: 60 },
     ANALYTICS_REQUESTS: { windowMs: 5 * 60 * 1000, max: 20 },
     TRADIE_SELECTION: { windowMs: 10 * 60 * 1000, max: 15 }
+  } as const;
+  
+  
+  export const VALIDATION_PATTERNS = {
+    PHOTO_URL_REGEX: /^https?:\/\/.+\.(jpg|jpeg|png|gif|webp)$/i,
+    TITLE_REGEX: /^[a-zA-Z0-9\s\-\.,!?()]+$/,
+    LOCATION_REGEX: /^[a-zA-Z0-9\s\-\.,()]+$/,
+    NAME_REGEX: /^[a-zA-Z\s\-']+$/,
+    ABN_REGEX: /^\d{11}$/
   } as const;
   
   export type MarketplaceJobType = typeof MARKETPLACE_JOB_TYPES[keyof typeof MARKETPLACE_JOB_TYPES];

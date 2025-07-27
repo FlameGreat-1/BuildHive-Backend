@@ -1592,3 +1592,28 @@ export class DatabaseError extends Error {
     this.name = 'DatabaseError';
   }
 }
+
+export interface UpdateJobApplicationRequest {
+  status?: string;
+  reason?: string;
+  feedback?: string;
+}
+
+export interface MarketplaceJobSearchParams {
+  page?: number;
+  limit?: number;
+  job_type?: string;
+  location?: string;
+  urgency_level?: string;
+  minBudget?: number;
+  maxBudget?: number;
+  searchTerm?: string;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+  dateRange?: {
+    startDate: Date;
+    endDate: Date;
+  };
+  excludeApplied?: boolean;
+  tradie_id?: number;
+}
