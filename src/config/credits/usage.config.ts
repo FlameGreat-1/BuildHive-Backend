@@ -67,6 +67,17 @@ export const CREDIT_USAGE_CONFIGS: Record<CreditUsageType, CreditUsageConfig> = 
     enabled: true,
     category: 'premium',
     priority: 5
+  },
+  [CreditUsageType.MARKETPLACE_APPLICATION]: {
+    type: CreditUsageType.MARKETPLACE_APPLICATION,
+    name: 'Marketplace Application',
+    description: 'Apply to marketplace job postings',
+    creditsRequired: 2,
+    maxPerDay: 15,
+    maxPerMonth: 75,
+    enabled: true,
+    category: 'applications',
+    priority: 6
   }
 };
 

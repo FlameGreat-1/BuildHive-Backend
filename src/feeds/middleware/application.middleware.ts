@@ -3,7 +3,6 @@ import { ApplicationService, MarketplaceService } from '../services';
 import { 
   validateApplicationData,
   sanitizeApplicationData as sanitizeAppData,
-  validateApplicationSearchParams,
   canWithdrawApplication,
   canModifyApplication,
   validateApplicationStatusTransition
@@ -14,8 +13,9 @@ import {
   MARKETPLACE_CREDIT_COSTS
 } from '../../config/feeds';
 import { rateLimit } from '../../shared/middleware';
-import { logger, createResponse } from '../../shared/utils';
-import { ApiError, ValidationError } from '../../shared/types';
+import { logger, createResponse, AppError } from '../../shared/utils';
+import { ValidationError } from '../../shared/types';
+import { MARKETPLACE_CONFIG } from '../../config/feeds/marketplace.config';
 
 interface AuthenticatedRequest extends Request {
   user?: {
@@ -25,6 +25,7 @@ interface AuthenticatedRequest extends Request {
     emailVerified: boolean;
   };
 }
+
 export class ApplicationMiddleware {
   private applicationService: ApplicationService;
   private marketplaceService: MarketplaceService;
@@ -66,7 +67,7 @@ export class ApplicationMiddleware {
       }
 
       const job = jobResult.data;
-      if (job.job.clientId === userId) {
+      if (job.client_id === userId) {
         const response = createResponse(false, 'Cannot apply to your own job', null);
         res.status(400).json(response);
         return;
@@ -107,7 +108,7 @@ export class ApplicationMiddleware {
       }
 
       const application = applicationResult.data;
-      if (application.tradieId !== userId) {
+      if (application.tradie_id !== userId) {
         const response = createResponse(false, 'Unauthorized access', null);
         res.status(403).json(response);
         return;
@@ -118,7 +119,6 @@ export class ApplicationMiddleware {
         res.status(400).json(response);
         return;
       }
-
 
       req.body = sanitizeAppData(body);
       next();
@@ -134,16 +134,21 @@ export class ApplicationMiddleware {
       const searchParams = {
         ...req.query,
         page: parseInt(req.query.page as string) || 1,
-        limit: Math.min(parseInt(req.query.limit as string) || 20, MARKETPLACE_LIMITS.MAX_SEARCH_RESULTS)
+        limit: Math.min(parseInt(req.query.limit as string) || 20, MARKETPLACE_CONFIG.SEARCH_AND_FILTERING.MAX_SEARCH_RESULTS)
       };
-
-      const validationResult = validateApplicationSearchParams(searchParams);
-      if (!validationResult.isValid) {
-        const response = createResponse(false, 'Invalid search parameters', null, validationResult.errors);
+  
+      if (searchParams.page < 1) {
+        const response = createResponse(false, 'Page must be greater than 0', null);
         res.status(400).json(response);
         return;
       }
-
+  
+      if (searchParams.limit < 1 || searchParams.limit > MARKETPLACE_CONFIG.SEARCH_AND_FILTERING.MAX_SEARCH_RESULTS) {
+        const response = createResponse(false, `Limit must be between 1 and ${MARKETPLACE_CONFIG.SEARCH_AND_FILTERING.MAX_SEARCH_RESULTS}`, null);
+        res.status(400).json(response);
+        return;
+      }
+  
       req.query = searchParams as any;
       next();
     } catch (error) {
@@ -152,7 +157,7 @@ export class ApplicationMiddleware {
       res.status(500).json(response);
     }
   };
-
+  
   validateApplicationStatusUpdate = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { applicationId } = req.params;
@@ -179,7 +184,7 @@ export class ApplicationMiddleware {
       }
 
       const application = applicationResult.data;
-      const jobOwnership = await this.marketplaceService.getMarketplaceJob(application.job.id, userId);
+      const jobOwnership = await this.marketplaceService.getMarketplaceJob(application.marketplace_job_id, userId);
       
       if (!jobOwnership.success || !jobOwnership.data) {
         const response = createResponse(false, 'Unauthorized access', null);
@@ -228,7 +233,7 @@ export class ApplicationMiddleware {
       }
 
       const application = applicationResult.data;
-      if (application.tradieId !== userId) {
+      if (application.tradie_id !== userId) {
         const response = createResponse(false, 'Unauthorized access', null);
         res.status(403).json(response);
         return;
@@ -261,7 +266,7 @@ export class ApplicationMiddleware {
       }
 
       const application = applicationResult.data;
-      if (application.tradieId !== userId) {
+      if (application.tradie_id !== userId) {
         const response = createResponse(false, 'Unauthorized access', null);
         res.status(403).json(response);
         return;
@@ -283,7 +288,7 @@ export class ApplicationMiddleware {
 
   rateLimitApplicationCreation = rateLimit({
     windowMs: 60 * 60 * 1000,
-    max: MARKETPLACE_LIMITS.MAX_APPLICATIONS_PER_HOUR,
+    max: MARKETPLACE_CONFIG.APPLICATION_SETTINGS.MAX_APPLICATIONS_PER_HOUR,
     message: createResponse(false, 'Too many applications. Please try again later.', null),
     standardHeaders: true,
     legacyHeaders: false,
@@ -293,7 +298,7 @@ export class ApplicationMiddleware {
 
   rateLimitApplicationSearch = rateLimit({
     windowMs: 60 * 1000,
-    max: MARKETPLACE_LIMITS.MAX_SEARCHES_PER_MINUTE,
+    max: MARKETPLACE_CONFIG.SEARCH_AND_FILTERING.MAX_SEARCHES_PER_MINUTE,
     message: createResponse(false, 'Too many search requests. Please try again later.', null),
     standardHeaders: true,
     legacyHeaders: false,
@@ -372,424 +377,426 @@ export class ApplicationMiddleware {
       userId: req.user?.id,
       applicationId: req.params.applicationId
     });
-
-    if (error instanceof ValidationError) {
+  
+    if (error && typeof error === 'object' && 'details' in error) {
       const response = createResponse(false, error.message, null, error.details);
       res.status(400).json(response);
       return;
     }
-
-    if (error instanceof ApiError) {
+  
+    if (error instanceof AppError) {
       const response = createResponse(false, error.message, null);
       res.status(error.statusCode).json(response);
       return;
     }
-
+  
     const response = createResponse(false, 'Internal server error', null);
     res.status(500).json(response);
   };
+  
+  sanitizeApplicationData = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
+    try {
+      if (req.body) {
+        req.body = sanitizeAppData(req.body);
+      }
+      
+      if (req.query) {
+        req.query = sanitizeAppData(req.query as any) as any;  
+      }
 
-    sanitizeApplicationData = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
-      try {
-        if (req.body) {
-          req.body = sanitizeAppData(req.body);
-        }
-        
-        if (req.query) {
-          req.query = sanitizeAppData(req.query as any) as any;  
-        }
-  
-        next();
-      } catch (error) {
-        logger.error('Error in application data sanitization middleware', { error });
-        const response = createResponse(false, 'Data sanitization error', null, [error]);
-        res.status(500).json(response);
+      next();
+    } catch (error) {
+      logger.error('Error in application data sanitization middleware', { error });
+      const response = createResponse(false, 'Data sanitization error', null, [error]);
+      res.status(500).json(response);
+    }
+  };
+
+  validatePagination = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 20;
+
+      if (page < 1) {
+        const response = createResponse(false, 'Page must be greater than 0', null);
+        res.status(400).json(response);
+        return;
       }
-    };
-  
-    validatePagination = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
-      try {
-        const page = parseInt(req.query.page as string) || 1;
-        const limit = parseInt(req.query.limit as string) || 20;
-  
-        if (page < 1) {
-          const response = createResponse(false, 'Page must be greater than 0', null);
-          res.status(400).json(response);
-          return;
-        }
-  
-        if (limit < 1 || limit > MARKETPLACE_LIMITS.MAX_SEARCH_RESULTS) {
-          const response = createResponse(false, `Limit must be between 1 and ${MARKETPLACE_LIMITS.MAX_SEARCH_RESULTS}`, null);
-          res.status(400).json(response);
-          return;
-        }
-  
-        req.query.page = page.toString();
-        req.query.limit = limit.toString();
-  
-        next();
-      } catch (error) {
-        logger.error('Error in pagination validation middleware', { error, query: req.query });
-        const response = createResponse(false, 'Pagination validation error', null, [error]);
-        res.status(500).json(response);
+
+      if (limit < 1 || limit > MARKETPLACE_CONFIG.SEARCH_AND_FILTERING.MAX_SEARCH_RESULTS) {
+        const response = createResponse(false, `Limit must be between 1 and ${MARKETPLACE_CONFIG.SEARCH_AND_FILTERING.MAX_SEARCH_RESULTS}`, null);
+        res.status(400).json(response);
+        return;
       }
-    };
-  
-    validateApplicationFilters = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
-      try {
-        const { status, minQuote, maxQuote, dateRange } = req.query;
-  
-        if (status && typeof status === 'string') {
-          const validStatuses = Object.values(APPLICATION_STATUS);
-          if (!validStatuses.includes(status as any)) {
-            const response = createResponse(false, 'Invalid status filter', null);
-            res.status(400).json(response);
-            return;
-          }
-        }
-  
-        if (minQuote && isNaN(parseFloat(minQuote as string))) {
-          const response = createResponse(false, 'Invalid minimum quote filter', null);
+
+      req.query.page = page.toString();
+      req.query.limit = limit.toString();
+
+      next();
+    } catch (error) {
+      logger.error('Error in pagination validation middleware', { error, query: req.query });
+      const response = createResponse(false, 'Pagination validation error', null, [error]);
+      res.status(500).json(response);
+    }
+  };
+
+  validateApplicationFilters = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
+    try {
+      const { status, minQuote, maxQuote, dateRange } = req.query;
+
+      if (status && typeof status === 'string') {
+        const validStatuses = Object.values(APPLICATION_STATUS);
+        if (!validStatuses.includes(status as any)) {
+          const response = createResponse(false, 'Invalid status filter', null);
           res.status(400).json(response);
           return;
         }
-  
-        if (maxQuote && isNaN(parseFloat(maxQuote as string))) {
-          const response = createResponse(false, 'Invalid maximum quote filter', null);
-          res.status(400).json(response);
-          return;
-        }
-  
-        if (minQuote && maxQuote && parseFloat(minQuote as string) > parseFloat(maxQuote as string)) {
-          const response = createResponse(false, 'Minimum quote cannot be greater than maximum quote', null);
-          res.status(400).json(response);
-          return;
-        }
-  
-        next();
-      } catch (error) {
-        logger.error('Error in application filters validation middleware', { error, query: req.query });
-        const response = createResponse(false, 'Filter validation error', null, [error]);
-        res.status(500).json(response);
       }
-    };
-  
-    checkDuplicateApplication = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
-      try {
-        const { marketplaceJobId } = req.body;
-        const userId = req.user?.id;
-  
-        if (!marketplaceJobId || !userId) {
-          next();
+
+      if (minQuote && isNaN(parseFloat(minQuote as string))) {
+        const response = createResponse(false, 'Invalid minimum quote filter', null);
+        res.status(400).json(response);
+        return;
+      }
+
+      if (maxQuote && isNaN(parseFloat(maxQuote as string))) {
+        const response = createResponse(false, 'Invalid maximum quote filter', null);
+        res.status(400).json(response);
+        return;
+      }
+
+      if (minQuote && maxQuote && parseFloat(minQuote as string) > parseFloat(maxQuote as string)) {
+        const response = createResponse(false, 'Minimum quote cannot be greater than maximum quote', null);
+        res.status(400).json(response);
+        return;
+      }
+
+      next();
+    } catch (error) {
+      logger.error('Error in application filters validation middleware', { error, query: req.query });
+      const response = createResponse(false, 'Filter validation error', null, [error]);
+      res.status(500).json(response);
+    }
+  };
+
+  checkDuplicateApplication = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { marketplaceJobId } = req.body;
+      const userId = req.user?.id;
+
+      if (!marketplaceJobId || !userId) {
+        next();
+        return;
+      }
+
+      const existingApplications = await this.applicationService.getTradieApplications(userId, {
+        page: 1,
+        limit: 1000
+      });
+
+      if (existingApplications.success && existingApplications.data) {
+        const duplicateApplication = existingApplications.data.applications.find(
+          app => app.marketplaceJobId === marketplaceJobId && 
+                 app.status !== APPLICATION_STATUS.WITHDRAWN
+        );
+
+        if (duplicateApplication) {
+          const response = createResponse(false, 'You have already applied to this job', null);
+          res.status(400).json(response);
           return;
         }
-  
-        const existingApplications = await this.applicationService.getTradieApplications(userId, {
-          page: 1,
-          limit: 1000
-        });
-  
-        if (existingApplications.success && existingApplications.data) {
-          const duplicateApplication = existingApplications.data.applications.find(
-            app => app.marketplaceJobId === marketplaceJobId && 
-                   app.status !== APPLICATION_STATUS.WITHDRAWN
-          );
-  
-          if (duplicateApplication) {
-            const response = createResponse(false, 'You have already applied to this job', null);
-            res.status(400).json(response);
-            return;
-          }
-        }
-  
-        next();
-      } catch (error) {
-        logger.error('Error in duplicate application check middleware', { error, userId: req.user?.id });
-        next();
       }
+
+      next();
+    } catch (error) {
+      logger.error('Error in duplicate application check middleware', { error, userId: req.user?.id });
+      next();
+    }
+  };
+
+  validateJobApplicationAccess = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { jobId } = req.params;
+      const userId = req.user?.id;
+      const userRole = req.user?.role;
+
+      if (!jobId || isNaN(parseInt(jobId))) {
+        const response = createResponse(false, 'Valid job ID is required', null);
+        res.status(400).json(response);
+        return;
+      }
+
+      if (userRole === 'admin') {
+        next();
+        return;
+      }
+
+      const jobResult = await this.marketplaceService.getMarketplaceJob(parseInt(jobId));
+      if (!jobResult.success || !jobResult.data) {
+        const response = createResponse(false, 'Job not found', null);
+        res.status(404).json(response);
+        return;
+      }
+
+      const job = jobResult.data;
+      if (job.client_id !== userId) {
+        const response = createResponse(false, 'Unauthorized access', null);
+        res.status(403).json(response);
+        return;
+      }
+
+      next();
+    } catch (error) {
+      logger.error('Error in job application access validation middleware', { error, jobId: req.params.jobId });
+      const response = createResponse(false, 'Access validation error', null, [error]);
+      res.status(500).json(response);
+    }
+  };
+
+  cacheApplicationData = (cacheDuration: number = 300) => {
+    return (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
+      const cacheKey = `application_${req.params.applicationId || 'search'}_${JSON.stringify(req.query)}`;
+      
+      res.set('Cache-Control', `public, max-age=${cacheDuration}`);
+      res.set('ETag', `"${Buffer.from(cacheKey).toString('base64')}"`);
+
+      if (req.headers['if-none-match'] === res.get('ETag')) {
+        res.status(304).end();
+        return;
+      }
+
+      next();
     };
-  
-    validateJobApplicationAccess = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+  };
+
+  trackApplicationViews = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { applicationId } = req.params;
+      const userId = req.user?.id;
+
+      if (applicationId && !isNaN(parseInt(applicationId))) {
+        const viewData = {
+          applicationId: parseInt(applicationId),
+          userId: userId || null,
+          ip: req.ip,
+          userAgent: req.get('User-Agent'),
+          timestamp: new Date().toISOString()
+        };
+
+        logger.info('Application view tracked', viewData);
+      }
+
+      next();
+    } catch (error) {
+      logger.error('Error in application view tracking middleware', { error, applicationId: req.params.applicationId });
+      next();
+    }
+  };
+
+  requireApplicationAccess = (accessType: 'read' | 'write' | 'delete') => {
+    return async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
       try {
-        const { jobId } = req.params;
+        const { applicationId } = req.params;
         const userId = req.user?.id;
         const userRole = req.user?.role;
-  
-        if (!jobId || isNaN(parseInt(jobId))) {
-          const response = createResponse(false, 'Valid job ID is required', null);
-          res.status(400).json(response);
+
+        if (!userId) {
+          const response = createResponse(false, 'Authentication required', null);
+          res.status(401).json(response);
           return;
         }
-  
+
         if (userRole === 'admin') {
           next();
           return;
         }
-  
-        const jobResult = await this.marketplaceService.getMarketplaceJob(parseInt(jobId));
-        if (!jobResult.success || !jobResult.data) {
-          const response = createResponse(false, 'Job not found', null);
-          res.status(404).json(response);
-          return;
-        }
-  
-        const job = jobResult.data;
-        if (job.job.clientId !== userId) {
-          const response = createResponse(false, 'Unauthorized access', null);
-          res.status(403).json(response);
-          return;
-        }
-  
-        next();
-      } catch (error) {
-        logger.error('Error in job application access validation middleware', { error, jobId: req.params.jobId });
-        const response = createResponse(false, 'Access validation error', null, [error]);
-        res.status(500).json(response);
-      }
-    };
-  
-    cacheApplicationData = (cacheDuration: number = 300) => {
-      return (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
-        const cacheKey = `application_${req.params.applicationId || 'search'}_${JSON.stringify(req.query)}`;
-        
-        res.set('Cache-Control', `public, max-age=${cacheDuration}`);
-        res.set('ETag', `"${Buffer.from(cacheKey).toString('base64')}"`);
-  
-        if (req.headers['if-none-match'] === res.get('ETag')) {
-          res.status(304).end();
-          return;
-        }
-  
-        next();
-      };
-    };
-  
-    trackApplicationViews = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
-      try {
-        const { applicationId } = req.params;
-        const userId = req.user?.id;
-  
-        if (applicationId && !isNaN(parseInt(applicationId))) {
-          const viewData = {
-            applicationId: parseInt(applicationId),
-            userId: userId || null,
-            ip: req.ip,
-            userAgent: req.get('User-Agent'),
-            timestamp: new Date().toISOString()
-          };
-  
-          logger.info('Application view tracked', viewData);
-        }
-  
-        next();
-      } catch (error) {
-        logger.error('Error in application view tracking middleware', { error, applicationId: req.params.applicationId });
-        next();
-      }
-    };
-  
-    requireApplicationAccess = (accessType: 'read' | 'write' | 'delete') => {
-      return async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
-        try {
-          const { applicationId } = req.params;
-          const userId = req.user?.id;
-          const userRole = req.user?.role;
-  
-          if (!userId) {
-            const response = createResponse(false, 'Authentication required', null);
-            res.status(401).json(response);
-            return;
-          }
-  
-          if (userRole === 'admin') {
-            next();
-            return;
-          }
-  
-          if (!applicationId || isNaN(parseInt(applicationId))) {
-            const response = createResponse(false, 'Valid application ID is required', null);
-            res.status(400).json(response);
-            return;
-          }
-  
-          const applicationResult = await this.applicationService.getApplication(parseInt(applicationId), userId);
-          if (!applicationResult.success || !applicationResult.data) {
-            const response = createResponse(false, 'Application not found', null);
-            res.status(404).json(response);
-            return;
-          }
-  
-          const application = applicationResult.data;
-          const isOwner = application.tradieId === userId;
-          const isJobOwner = application.job.clientId === userId;
-  
-          switch (accessType) {
-            case 'read':
-              if (!isOwner && !isJobOwner) {
-                const response = createResponse(false, 'Unauthorized access', null);
-                res.status(403).json(response);
-                return;
-              }
-              break;
-            case 'write':
-            case 'delete':
-              if (!isOwner) {
-                const response = createResponse(false, 'Unauthorized access', null);
-                res.status(403).json(response);
-                return;
-              }
-              break;
-          }
-  
-          next();
-        } catch (error) {
-          logger.error('Error in application access middleware', { error, applicationId: req.params.applicationId, accessType });
-          const response = createResponse(false, 'Access check error', null, [error]);
-          res.status(500).json(response);
-        }
-      };
-    };
-  
-    validateBulkApplicationOperations = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
-      try {
-        const { applicationIds } = req.body;
-  
-        if (!Array.isArray(applicationIds)) {
-          const response = createResponse(false, 'Application IDs must be an array', null);
-          res.status(400).json(response);
-          return;
-        }
-  
-        if (applicationIds.length === 0) {
-          const response = createResponse(false, 'At least one application ID is required', null);
-          res.status(400).json(response);
-          return;
-        }
-  
-        if (applicationIds.length > MARKETPLACE_LIMITS.MAX_BULK_OPERATIONS) {
-          const response = createResponse(false, `Maximum ${MARKETPLACE_LIMITS.MAX_BULK_OPERATIONS} applications allowed per bulk operation`, null);
-          res.status(400).json(response);
-          return;
-        }
-  
-        const invalidIds = applicationIds.filter(id => isNaN(parseInt(id)));
-        if (invalidIds.length > 0) {
-          const response = createResponse(false, 'All application IDs must be valid numbers', null);
-          res.status(400).json(response);
-          return;
-        }
-  
-        next();
-      } catch (error) {
-        logger.error('Error in bulk application operations validation middleware', { error, body: req.body });
-        const response = createResponse(false, 'Bulk operations validation error', null, [error]);
-        res.status(500).json(response);
-      }
-    };
-  
-    validateWithdrawalData = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
-      try {
-        const { reason, refundCredits } = req.body;
-  
-        if (!reason || typeof reason !== 'string' || reason.trim().length === 0) {
-          const response = createResponse(false, 'Withdrawal reason is required', null);
-          res.status(400).json(response);
-          return;
-        }
-  
-        if (reason.length > 500) {
-          const response = createResponse(false, 'Withdrawal reason cannot exceed 500 characters', null);
-          res.status(400).json(response);
-          return;
-        }
-  
-        if (refundCredits !== undefined && typeof refundCredits !== 'boolean') {
-          const response = createResponse(false, 'Refund credits must be a boolean value', null);
+
+        if (!applicationId || isNaN(parseInt(applicationId))) {
+          const response = createResponse(false, 'Valid application ID is required', null);
           res.status(400).json(response);
           return;
         }
 
-        req.body = sanitizeAppData({ reason, refundCredits: refundCredits || false });
+        const applicationResult = await this.applicationService.getApplication(parseInt(applicationId), userId);
+        if (!applicationResult.success || !applicationResult.data) {
+          const response = createResponse(false, 'Application not found', null);
+          res.status(404).json(response);
+          return;
+        }
+
+        const application = applicationResult.data;
+        const isOwner = application.tradie_id === userId;
+
+        const jobResult = await this.marketplaceService.getMarketplaceJob(application.marketplace_job_id);
+        const isJobOwner = jobResult.success && jobResult.data && jobResult.data.client_id === userId;
+
+        switch (accessType) {
+          case 'read':
+            if (!isOwner && !isJobOwner) {
+              const response = createResponse(false, 'Unauthorized access', null);
+              res.status(403).json(response);
+              return;
+            }
+            break;
+          case 'write':
+          case 'delete':
+            if (!isOwner) {
+              const response = createResponse(false, 'Unauthorized access', null);
+              res.status(403).json(response);
+              return;
+            }
+            break;
+        }
+
         next();
       } catch (error) {
-        logger.error('Error in withdrawal data validation middleware', { error, body: req.body });
-        const response = createResponse(false, 'Withdrawal validation error', null, [error]);
+        logger.error('Error in application access middleware', { error, applicationId: req.params.applicationId, accessType });
+        const response = createResponse(false, 'Access check error', null, [error]);
         res.status(500).json(response);
       }
     };
-  
-    checkApplicationLimit = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
-      try {
-        const userId = req.user?.id;
-  
-        if (!userId) {
-          next();
+  };
+
+  validateBulkApplicationOperations = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
+    try {
+      const { applicationIds } = req.body;
+
+      if (!Array.isArray(applicationIds)) {
+        const response = createResponse(false, 'Application IDs must be an array', null);
+        res.status(400).json(response);
+        return;
+      }
+
+      if (applicationIds.length === 0) {
+        const response = createResponse(false, 'At least one application ID is required', null);
+        res.status(400).json(response);
+        return;
+      }
+
+      if (applicationIds.length > MARKETPLACE_CONFIG.MARKETPLACE_FEATURES.MAX_BULK_OPERATIONS) {
+        const response = createResponse(false, `Maximum ${MARKETPLACE_CONFIG.MARKETPLACE_FEATURES.MAX_BULK_OPERATIONS} applications allowed per bulk operation`, null);
+        res.status(400).json(response);
+        return;
+      }
+
+      const invalidIds = applicationIds.filter(id => isNaN(parseInt(id)));
+      if (invalidIds.length > 0) {
+        const response = createResponse(false, 'All application IDs must be valid numbers', null);
+        res.status(400).json(response);
+        return;
+      }
+
+      next();
+    } catch (error) {
+      logger.error('Error in bulk application operations validation middleware', { error, body: req.body });
+      const response = createResponse(false, 'Bulk operations validation error', null, [error]);
+      res.status(500).json(response);
+    }
+  };
+
+  validateWithdrawalData = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
+    try {
+      const { reason, refundCredits } = req.body;
+
+      if (!reason || typeof reason !== 'string' || reason.trim().length === 0) {
+        const response = createResponse(false, 'Withdrawal reason is required', null);
+        res.status(400).json(response);
+        return;
+      }
+
+      if (reason.length > 500) {
+        const response = createResponse(false, 'Withdrawal reason cannot exceed 500 characters', null);
+        res.status(400).json(response);
+        return;
+      }
+
+      if (refundCredits !== undefined && typeof refundCredits !== 'boolean') {
+        const response = createResponse(false, 'Refund credits must be a boolean value', null);
+        res.status(400).json(response);
+        return;
+      }
+
+      req.body = sanitizeAppData({ reason, refundCredits: refundCredits || false });
+      next();
+    } catch (error) {
+      logger.error('Error in withdrawal data validation middleware', { error, body: req.body });
+      const response = createResponse(false, 'Withdrawal validation error', null, [error]);
+      res.status(500).json(response);
+    }
+  };
+
+  checkApplicationLimit = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const userId = req.user?.id;
+
+      if (!userId) {
+        next();
+        return;
+      }
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const todayApplications = await this.applicationService.getTradieApplications(userId, {
+        page: 1,
+        limit: 1000
+      });
+
+      if (todayApplications.success && todayApplications.data) {
+        const todayCount = todayApplications.data.applications.filter(
+          app => new Date(app.applicationTimestamp) >= today
+        ).length;
+
+        if (todayCount >= MARKETPLACE_CONFIG.APPLICATION_SETTINGS.MAX_APPLICATIONS_PER_TRADIE_PER_DAY) {
+          const response = createResponse(false, 'Daily application limit reached', null);
+          res.status(429).json(response);
           return;
         }
-  
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-  
-        const todayApplications = await this.applicationService.getTradieApplications(userId, {
-          page: 1,
-          limit: 1000
-        });
-  
-        if (todayApplications.success && todayApplications.data) {
-          const todayCount = todayApplications.data.applications.filter(
-            app => new Date(app.applicationTimestamp) >= today
-          ).length;
-  
-          if (todayCount >= MARKETPLACE_LIMITS.MAX_APPLICATIONS_PER_DAY) {
-            const response = createResponse(false, 'Daily application limit reached', null);
-            res.status(429).json(response);
-            return;
-          }
-        }
-  
-        next();
-      } catch (error) {
-        logger.error('Error in application limit check middleware', { error, userId: req.user?.id });
-        next();
       }
-    };
-  
-    async destroy(): Promise<void> {
-      try {
-        await this.applicationService.destroy();
-        await this.marketplaceService.destroy();
-        logger.info('ApplicationMiddleware destroyed successfully');
-      } catch (error) {
-        logger.error('Error destroying ApplicationMiddleware', { error });
-      }
+
+      next();
+    } catch (error) {
+      logger.error('Error in application limit check middleware', { error, userId: req.user?.id });
+      next();
+    }
+  };
+
+  async destroy(): Promise<void> {
+    try {
+      await this.applicationService.destroy();
+      await this.marketplaceService.destroy();
+      logger.info('ApplicationMiddleware destroyed successfully');
+    } catch (error) {
+      logger.error('Error destroying ApplicationMiddleware', { error });
     }
   }
-  
-  export const applicationMiddleware = new ApplicationMiddleware();
-  
-  export const {
-    validateApplicationCreation,
-    validateApplicationUpdate,
-    validateApplicationSearch,
-    validateApplicationStatusUpdate,
-    checkApplicationOwnership,
-    checkApplicationWithdrawal,
-    rateLimitApplicationCreation,
-    rateLimitApplicationSearch,
-    logApplicationActivity,
-    validateTradieRole,
-    validateClientRole,
-    handleApplicationErrors,
-    sanitizeApplicationData,
-    validatePagination,
-    validateApplicationFilters,
-    checkDuplicateApplication,
-    validateJobApplicationAccess,
-    cacheApplicationData,
-    trackApplicationViews,
-    requireApplicationAccess,
-    validateBulkApplicationOperations,
-    validateWithdrawalData,
-    checkApplicationLimit
-  } = applicationMiddleware;
-  
+}
+
+export const applicationMiddleware = new ApplicationMiddleware();
+
+export const {
+  validateApplicationCreation,
+  validateApplicationUpdate,
+  validateApplicationSearch,
+  validateApplicationStatusUpdate,
+  checkApplicationOwnership,
+  checkApplicationWithdrawal,
+  rateLimitApplicationCreation,
+  rateLimitApplicationSearch,
+  logApplicationActivity,
+  validateTradieRole,
+  validateClientRole,
+  handleApplicationErrors,
+  sanitizeApplicationData,
+  validatePagination,
+  validateApplicationFilters,
+  checkDuplicateApplication,
+  validateJobApplicationAccess,
+  cacheApplicationData,
+  trackApplicationViews,
+  requireApplicationAccess,
+  validateBulkApplicationOperations,
+  validateWithdrawalData,
+  checkApplicationLimit
+} = applicationMiddleware;
+

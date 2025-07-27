@@ -200,7 +200,8 @@ export const USAGE_NOTIFICATION_THRESHOLDS: Record<CreditUsageType, number[]> = 
   [CreditUsageType.PROFILE_BOOST]: [2, 5, 8],
   [CreditUsageType.PREMIUM_JOB_UNLOCK]: [3, 7, 12],
   [CreditUsageType.DIRECT_MESSAGE]: [5, 10, 20],
-  [CreditUsageType.FEATURED_LISTING]: [1, 2, 3]
+  [CreditUsageType.FEATURED_LISTING]: [1, 2, 3],
+  [CreditUsageType.MARKETPLACE_APPLICATION]: [3, 8, 15]
 };
 
 export const getNotificationConfig = (type: NotificationType): NotificationConfig => {

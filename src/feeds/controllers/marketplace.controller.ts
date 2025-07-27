@@ -5,6 +5,8 @@ import {
   MarketplaceJobUpdateData,
   MarketplaceJobSearchParams
 } from '../types';
+import { MarketplaceJobType, UrgencyLevel } from '../../shared/types';
+import { MarketplaceSortOption } from '../../config/feeds/constants';
 import { logger, createResponse } from '../../shared/utils';
 
 interface AuthenticatedRequest extends Request {
@@ -38,7 +40,7 @@ export class MarketplaceController {
         logger.info('Marketplace job created successfully', {
           jobId: result.data?.id,
           clientId,
-          jobType: result.data?.jobType,
+          jobType: result.data?.job_type,
           location: result.data?.location
         });
       }
@@ -46,7 +48,7 @@ export class MarketplaceController {
       res.status(result.success ? 201 : 400).json(result);
     } catch (error) {
       logger.error('Error in createMarketplaceJob controller', { error, userId: req.user?.id });
-      const response = createResponse(false, 'Failed to create marketplace job', null, [error]);
+      const response = createResponse(false, 'Failed to create marketplace job', null, [error as any]);
       res.status(500).json(response);
     }
   };
@@ -61,7 +63,7 @@ export class MarketplaceController {
       res.status(result.success ? 200 : 404).json(result);
     } catch (error) {
       logger.error('Error in getMarketplaceJob controller', { error, jobId: req.params.jobId });
-      const response = createResponse(false, 'Failed to retrieve marketplace job', null, [error]);
+      const response = createResponse(false, 'Failed to retrieve marketplace job', null, [error as any]);
       res.status(500).json(response);
     }
   };
@@ -73,16 +75,19 @@ export class MarketplaceController {
       const searchParams: MarketplaceJobSearchParams = {
         page: parseInt(req.query.page as string) || 1,
         limit: parseInt(req.query.limit as string) || 20,
-        jobType: req.query.jobType as string,
+        jobType: req.query.jobType as MarketplaceJobType | undefined,
         location: req.query.location as string,
-        urgencyLevel: req.query.urgencyLevel as string,
+        urgencyLevel: req.query.urgencyLevel as UrgencyLevel | undefined,
         minBudget: req.query.minBudget ? parseFloat(req.query.minBudget as string) : undefined,
         maxBudget: req.query.maxBudget ? parseFloat(req.query.maxBudget as string) : undefined,
-        dateRange: req.query.dateRange as string,
+        dateRange: req.query.startDate && req.query.endDate ? {
+          startDate: new Date(req.query.startDate as string),
+          endDate: new Date(req.query.endDate as string)
+        } : undefined,
         excludeApplied: req.query.excludeApplied === 'true',
         tradieId: tradieId,
         searchTerm: req.query.searchTerm as string,
-        sortBy: req.query.sortBy as string,
+        sortBy: req.query.sortBy as MarketplaceSortOption | undefined,
         sortOrder: req.query.sortOrder as 'asc' | 'desc'
       };
 
@@ -91,7 +96,7 @@ export class MarketplaceController {
       res.status(result.success ? 200 : 400).json(result);
     } catch (error) {
       logger.error('Error in searchMarketplaceJobs controller', { error, query: req.query });
-      const response = createResponse(false, 'Failed to search marketplace jobs', null, [error]);
+      const response = createResponse(false, 'Failed to search marketplace jobs', null, [error as any]);
       res.status(500).json(response);
     }
   };
@@ -115,7 +120,7 @@ export class MarketplaceController {
         jobId: req.params.jobId,
         userId: req.user?.id 
       });
-      const response = createResponse(false, 'Failed to update marketplace job', null, [error]);
+      const response = createResponse(false, 'Failed to update marketplace job', null, [error as any]);
       res.status(500).json(response);
     }
   };
@@ -140,7 +145,7 @@ export class MarketplaceController {
         jobId: req.params.jobId,
         userId: req.user?.id 
       });
-      const response = createResponse(false, 'Failed to update job status', null, [error]);
+      const response = createResponse(false, 'Failed to update job status', null, [error as any]);
       res.status(500).json(response);
     }
   };
@@ -159,7 +164,7 @@ export class MarketplaceController {
         jobId: req.params.jobId,
         userId: req.user?.id 
       });
-      const response = createResponse(false, 'Failed to delete marketplace job', null, [error]);
+      const response = createResponse(false, 'Failed to delete marketplace job', null, [error as any]);
       res.status(500).json(response);
     }
   };
@@ -180,7 +185,7 @@ export class MarketplaceController {
       res.status(result.success ? 200 : 400).json(result);
     } catch (error) {
       logger.error('Error in getClientJobs controller', { error, userId: req.user?.id });
-      const response = createResponse(false, 'Failed to retrieve client jobs', null, [error]);
+      const response = createResponse(false, 'Failed to retrieve client jobs', null, [error as any]);
       res.status(500).json(response);
     }
   };
@@ -192,7 +197,7 @@ export class MarketplaceController {
       res.status(result.success ? 200 : 500).json(result);
     } catch (error) {
       logger.error('Error in getMarketplaceStats controller', { error });
-      const response = createResponse(false, 'Failed to retrieve marketplace stats', null, [error]);
+      const response = createResponse(false, 'Failed to retrieve marketplace stats', null, [error as any]);
       res.status(500).json(response);
     }
   };
@@ -206,7 +211,7 @@ export class MarketplaceController {
       res.status(result.success ? 200 : 404).json(result);
     } catch (error) {
       logger.error('Error in getJobCreditCost controller', { error, jobId: req.params.jobId });
-      const response = createResponse(false, 'Failed to calculate credit cost', null, [error]);
+      const response = createResponse(false, 'Failed to calculate credit cost', null, [error as any]);
       res.status(500).json(response);
     }
   };
@@ -221,7 +226,7 @@ export class MarketplaceController {
       res.status(result.success ? 200 : 400).json(result);
     } catch (error) {
       logger.error('Error in getRecommendedJobs controller', { error, userId: req.user?.id });
-      const response = createResponse(false, 'Failed to retrieve recommended jobs', null, [error]);
+      const response = createResponse(false, 'Failed to retrieve recommended jobs', null, [error as any]);
       res.status(500).json(response);
     }
   };
@@ -233,7 +238,7 @@ export class MarketplaceController {
       res.status(result.success ? 200 : 500).json(result);
     } catch (error) {
       logger.error('Error in processExpiredJobs controller', { error });
-      const response = createResponse(false, 'Failed to process expired jobs', null, [error]);
+      const response = createResponse(false, 'Failed to process expired jobs', null, [error as any]);
       res.status(500).json(response);
     }
   };
@@ -268,7 +273,7 @@ export class MarketplaceController {
       res.status(200).json(response);
     } catch (error) {
       logger.error('Error in bulkUpdateJobStatus controller', { error, userId: req.user?.id });
-      const response = createResponse(false, 'Failed to bulk update job status', null, [error]);
+      const response = createResponse(false, 'Failed to bulk update job status', null, [error as any]);
       res.status(500).json(response);
     }
   };
@@ -281,12 +286,12 @@ export class MarketplaceController {
         groupBy: req.query.groupBy as 'day' | 'week' | 'month' | 'jobType' | 'location' | undefined
       };
 
-      const result = await this.marketplaceService.getMarketplaceAnalytics(params);
+      const result = await this.marketplaceService.getMarketplaceStats();
 
       res.status(result.success ? 200 : 500).json(result);
     } catch (error) {
       logger.error('Error in getMarketplaceAnalytics controller', { error });
-      const response = createResponse(false, 'Failed to retrieve marketplace analytics', null, [error]);
+      const response = createResponse(false, 'Failed to retrieve marketplace analytics', null, [error as any]);
       res.status(500).json(response);
     }
   };

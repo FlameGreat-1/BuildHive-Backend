@@ -7,6 +7,7 @@ import {
   ApplicationStatusUpdate,
   ApplicationWithdrawal
 } from '../types';
+import { ApplicationStatus, MarketplaceJobType } from '../../shared/types';
 import { logger, createResponse } from '../../shared/utils';
 
 interface AuthenticatedRequest extends Request {
@@ -50,7 +51,7 @@ export class ApplicationController {
       res.status(result.success ? 201 : 400).json(result);
     } catch (error) {
       logger.error('Error in createApplication controller', { error, userId: req.user?.id });
-      const response = createResponse(false, 'Failed to create application', null, [error]);
+      const response = createResponse(false, 'Failed to create application', null, [error as any]);
       res.status(500).json(response);
     }
   };
@@ -68,7 +69,7 @@ export class ApplicationController {
         error, 
         applicationId: req.params.applicationId 
       });
-      const response = createResponse(false, 'Failed to retrieve application', null, [error]);
+      const response = createResponse(false, 'Failed to retrieve application', null, [error as any]);
       res.status(500).json(response);
     }
   };
@@ -87,7 +88,7 @@ export class ApplicationController {
         jobId: req.params.jobId,
         userId: req.user?.id 
       });
-      const response = createResponse(false, 'Failed to retrieve applications', null, [error]);
+      const response = createResponse(false, 'Failed to retrieve applications', null, [error as any]);
       res.status(500).json(response);
     }
   };
@@ -97,7 +98,7 @@ export class ApplicationController {
       const tradieId = this.convertUserIdToNumber(req.user?.id);
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 20;
-      const status = req.query.status as string;
+      const status = req.query.status as ApplicationStatus | undefined;
 
       const result = await this.applicationService.getTradieApplications(tradieId!, {
         page,
@@ -108,7 +109,7 @@ export class ApplicationController {
       res.status(result.success ? 200 : 400).json(result);
     } catch (error) {
       logger.error('Error in getTradieApplications controller', { error, userId: req.user?.id });
-      const response = createResponse(false, 'Failed to retrieve tradie applications', null, [error]);
+      const response = createResponse(false, 'Failed to retrieve tradie applications', null, [error as any]);
       res.status(500).json(response);
     }
   };
@@ -118,10 +119,10 @@ export class ApplicationController {
       const searchParams: JobApplicationSearchParams = {
         page: parseInt(req.query.page as string) || 1,
         limit: parseInt(req.query.limit as string) || 20,
-        status: req.query.status as string,
+        status: req.query.status as ApplicationStatus | undefined,
         tradieId: req.query.tradieId ? parseInt(req.query.tradieId as string) : undefined,
         marketplaceJobId: req.query.marketplaceJobId ? parseInt(req.query.marketplaceJobId as string) : undefined,
-        jobType: req.query.jobType as string,
+        jobType: req.query.jobType as MarketplaceJobType | undefined,
         location: req.query.location as string,
         minQuote: req.query.minQuote ? parseFloat(req.query.minQuote as string) : undefined,
         maxQuote: req.query.maxQuote ? parseFloat(req.query.maxQuote as string) : undefined,
@@ -130,7 +131,7 @@ export class ApplicationController {
           endDate: new Date(req.query.endDate as string)
         } : undefined,
         query: req.query.query as string,
-        sortBy: req.query.sortBy as string,
+        sortBy: req.query.sortBy as 'application_timestamp' | 'custom_quote' | 'tradie_rating' | undefined,
         sortOrder: req.query.sortOrder as 'asc' | 'desc'
       };
 
@@ -139,7 +140,7 @@ export class ApplicationController {
       res.status(result.success ? 200 : 400).json(result);
     } catch (error) {
       logger.error('Error in searchApplications controller', { error, query: req.query });
-      const response = createResponse(false, 'Failed to search applications', null, [error]);
+      const response = createResponse(false, 'Failed to search applications', null, [error as any]);
       res.status(500).json(response);
     }
   };
@@ -163,7 +164,7 @@ export class ApplicationController {
         applicationId: req.params.applicationId,
         userId: req.user?.id 
       });
-      const response = createResponse(false, 'Failed to update application', null, [error]);
+      const response = createResponse(false, 'Failed to update application', null, [error as any]);
       res.status(500).json(response);
     }
   };
@@ -187,7 +188,7 @@ export class ApplicationController {
         applicationId: req.params.applicationId,
         userId: req.user?.id 
       });
-      const response = createResponse(false, 'Failed to update application status', null, [error]);
+      const response = createResponse(false, 'Failed to update application status', null, [error as any]);
       res.status(500).json(response);
     }
   };
@@ -211,7 +212,7 @@ export class ApplicationController {
         applicationId: req.params.applicationId,
         userId: req.user?.id 
       });
-      const response = createResponse(false, 'Failed to withdraw application', null, [error]);
+      const response = createResponse(false, 'Failed to withdraw application', null, [error as any]);
       res.status(500).json(response);
     }
   };
@@ -225,7 +226,7 @@ export class ApplicationController {
       res.status(result.success ? 200 : 400).json(result);
     } catch (error) {
       logger.error('Error in getTradieApplicationHistory controller', { error, userId: req.user?.id });
-      const response = createResponse(false, 'Failed to retrieve application history', null, [error]);
+      const response = createResponse(false, 'Failed to retrieve application history', null, [error as any]);
       res.status(500).json(response);
     }
   };
@@ -251,7 +252,7 @@ export class ApplicationController {
       res.status(result.success ? 200 : 400).json(result);
     } catch (error) {
       logger.error('Error in getApplicationAnalytics controller', { error, query: req.query });
-      const response = createResponse(false, 'Failed to retrieve analytics', null, [error]);
+      const response = createResponse(false, 'Failed to retrieve analytics', null, [error as any]);
       res.status(500).json(response);
     }
   };
@@ -266,7 +267,7 @@ export class ApplicationController {
         try {
           const result = await this.applicationService.updateApplicationStatus(
             parseInt(applicationId),
-            { status, reason, feedback },
+            { newStatus: status, reason, feedback },
             clientId
           );
           results.push({ 
@@ -293,7 +294,7 @@ export class ApplicationController {
       res.status(200).json(response);
     } catch (error) {
       logger.error('Error in bulkUpdateApplicationStatus controller', { error, userId: req.user?.id });
-      const response = createResponse(false, 'Failed to bulk update application status', null, [error]);
+      const response = createResponse(false, 'Failed to bulk update application status', null, [error as any]);
       res.status(500).json(response);
     }
   };
@@ -309,7 +310,7 @@ export class ApplicationController {
       const searchParams: JobApplicationSearchParams = {
         page,
         limit,
-        status,
+        status: status as ApplicationStatus | undefined,
         tradieId: userRole === 'tradie' ? userId : undefined
       };
 
@@ -322,7 +323,7 @@ export class ApplicationController {
         status: req.params.status,
         userId: req.user?.id 
       });
-      const response = createResponse(false, 'Failed to retrieve applications by status', null, [error]);
+      const response = createResponse(false, 'Failed to retrieve applications by status', null, [error as any]);
       res.status(500).json(response);
     }
   };
@@ -344,19 +345,17 @@ export class ApplicationController {
         applicationId: parseInt(applicationId),
         submissionDate: application.applicationTimestamp,
         status: application.status,
-        creditsUsed: application.creditsUsed,
-        customQuote: application.customQuote,
-        proposedTimeline: application.proposedTimeline,
+        creditsUsed: application.credits_used,
+        customQuote: application.custom_quote,
+        proposedTimeline: application.proposed_timeline,
         competitorCount: 0,
         averageQuote: 0,
         rankPosition: 0,
-        responseTime: 0,
-        canWithdraw: application.canWithdraw,
-        canModify: application.canModify
+        responseTime: 0
       };
 
       const jobApplicationsResult = await this.applicationService.getApplicationsByJob(
-        application.marketplaceJobId, 
+        application.marketplace_job_id, 
         userId
       );
 
@@ -387,7 +386,7 @@ export class ApplicationController {
         applicationId: req.params.applicationId,
         userId: req.user?.id 
       });
-      const response = createResponse(false, 'Failed to retrieve application metrics', null, [error]);
+      const response = createResponse(false, 'Failed to retrieve application metrics', null, [error as any]);
       res.status(500).json(response);
     }
   };
