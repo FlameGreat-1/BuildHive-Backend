@@ -843,35 +843,3 @@ export const sendMarketplaceNotificationError = (
 ): Response => {
   return sendError(res, message, HTTP_STATUS_CODES.BAD_REQUEST);
 };
-
-export const sanitizeString = (input: string): string => {
-  return input.trim().replace(/[<>]/g, '');
-};
-
-export const sanitizeInput = (input: string): string => {
-  return input.trim().replace(/[<>'"&]/g, '');
-};
-
-export const validateEmail = (email: string): boolean => {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
-};
-
-export const validatePhone = (phone: string): boolean => {
-  const phoneRegex = /^[\+]?[1-9][\d]{0,15}$/;
-  return phoneRegex.test(phone.replace(/[\s\-\(\)]/g, ''));
-};
-
-export const validateCurrency = (amount: number): boolean => {
-  return amount >= 0 && Number.isFinite(amount);
-};
-
-export const validateJobSearchParams = (params: any): boolean => {
-
-  if (!params) return false;
-
-  if (params.page && (params.page < 1 || !Number.isInteger(params.page))) return false;
-  if (params.limit && (params.limit < 1 || params.limit > 100)) return false;
-  
-  return true;
-};

@@ -1374,26 +1374,3 @@ export const marketplaceCreditErrorHandler = (
   return errorHandler(error, req, res, next);
 };
 
-export class ValidationError extends Error {
-  constructor(message: string, public field?: string) {
-    super(message);
-    this.name = 'ValidationError';
-  }
-}
-
-export const createValidationError = (message: string, field?: string): ValidationError => {
-  return new ValidationError(message, field);
-};
-
-export const handleValidationErrors = (error: unknown): ValidationError => {
-  if (error instanceof ValidationError) {
-    return error;
-  }
-  return new ValidationError('Validation failed');
-};
-
-export const rateLimit = (options: { max: number; windowMs: number }) => {
-  return (req: Request, res: Response, next: NextFunction) => {
-    next();
-  };
-};
