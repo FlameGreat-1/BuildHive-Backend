@@ -25,17 +25,17 @@ import {
     const errors: Array<{ field: string; message: string; code: string }> = [];
     const warnings: Array<{ field: string; message: string }> = [];
   
-    if (!applicationData.customQuote || applicationData.customQuote < MARKETPLACE_LIMITS.MIN_CUSTOM_QUOTE) {
+    if (!applicationData.custom_quote || applicationData.custom_quote < MARKETPLACE_LIMITS.MIN_CUSTOM_QUOTE) {
       errors.push({
-        field: 'customQuote',
+        field: 'custom_quote',
         message: `Custom quote must be at least $${MARKETPLACE_LIMITS.MIN_CUSTOM_QUOTE}`,
         code: 'QUOTE_TOO_LOW'
       });
     }
   
-    if (applicationData.customQuote > MARKETPLACE_LIMITS.MAX_CUSTOM_QUOTE) {
+    if (applicationData.custom_quote > MARKETPLACE_LIMITS.MAX_CUSTOM_QUOTE) {
       errors.push({
-        field: 'customQuote',
+        field: 'custom_quote',
         message: `Custom quote cannot exceed $${MARKETPLACE_LIMITS.MAX_CUSTOM_QUOTE}`,
         code: 'QUOTE_TOO_HIGH'
       });
@@ -221,18 +221,18 @@ import {
   export const formatApplicationSummary = (application: JobApplicationEntity): JobApplicationSummary => {
     return {
       id: application.id,
-      marketplaceJobId: application.marketplaceJobId,
-      tradieId: application.tradieId,
-      customQuote: application.customQuote,
+      marketplace_job_id : application.marketplace_job_id ,
+      tradie_id: application.tradie_id,
+      custom_quote: application.custom_quote,
       proposedTimeline: application.proposedTimeline,
       status: application.status,
       applicationTimestamp: application.applicationTimestamp,
-      creditsUsed: application.creditsUsed,
+      credits_used: application.credits_used,
       tradieName: '',
       tradieRating: undefined,
       tradieCompletedJobs: 0,
       jobTitle: '',
-      jobType: MARKETPLACE_JOB_TYPES.GENERAL,
+      job_type: MARKETPLACE_JOB_TYPES.GENERAL,
       jobLocation: '',
       isSelected: application.status === APPLICATION_STATUS.SELECTED,
       canWithdraw: canWithdrawApplication(application)
@@ -242,20 +242,20 @@ import {
   export const calculateApplicationScore = (application: JobApplicationDetails, jobRequirements: {
     estimatedBudget?: number;
     urgencyLevel: string;
-    jobType: string;
+    job_type: string;
     location: string;
   }): number => {
     let score = 0;
   
-    if (jobRequirements.estimatedBudget && application.customQuote) {
-      const budgetDifference = Math.abs(application.customQuote - jobRequirements.estimatedBudget) / jobRequirements.estimatedBudget;
+    if (jobRequirements.estimatedBudget && application.custom_quote) {
+      const budgetDifference = Math.abs(application.custom_quote - jobRequirements.estimatedBudget) / jobRequirements.estimatedBudget;
       if (budgetDifference <= 0.1) score += 20;
       else if (budgetDifference <= 0.2) score += 15;
       else if (budgetDifference <= 0.3) score += 10;
       else if (budgetDifference <= 0.5) score += 5;
     }
   
-    if (application.tradie.profile.serviceTypes.includes(jobRequirements.jobType)) {
+    if (application.tradie.profile.serviceTypes.includes(jobRequirements.job_type)) {
       score += 25;
     }
   
@@ -286,7 +286,7 @@ import {
   export const rankApplications = (applications: JobApplicationDetails[], jobRequirements: {
     estimatedBudget?: number;
     urgencyLevel: string;
-    jobType: string;
+    job_type: string;
     location: string;
   }): JobApplicationDetails[] => {
     return applications
@@ -300,7 +300,7 @@ import {
   export const getRecommendedApplications = (applications: JobApplicationDetails[], jobRequirements: {
     estimatedBudget?: number;
     urgencyLevel: string;
-    jobType: string;
+    job_type: string;
     location: string;
   }, limit: number = 3): JobApplicationDetails[] => {
     const rankedApplications = rankApplications(applications, jobRequirements);
@@ -322,21 +322,21 @@ import {
       paramIndex++;
     }
   
-    if (searchParams.marketplaceJobId) {
+    if (searchParams.marketplace_job_id ) {
       conditions.push(`ja.marketplace_job_id = $${paramIndex}`);
-      parameters.push(searchParams.marketplaceJobId);
+      parameters.push(searchParams.marketplace_job_id );
       paramIndex++;
     }
   
-    if (searchParams.tradieId) {
+    if (searchParams.tradie_id) {
       conditions.push(`ja.tradie_id = $${paramIndex}`);
-      parameters.push(searchParams.tradieId);
+      parameters.push(searchParams.tradie_id);
       paramIndex++;
     }
   
-    if (searchParams.jobType) {
+    if (searchParams.job_type) {
       conditions.push(`mj.job_type = $${paramIndex}`);
-      parameters.push(searchParams.jobType);
+      parameters.push(searchParams.job_type);
       paramIndex++;
     }
   
@@ -475,8 +475,8 @@ import {
     profileStrength: string;
     recommendations: string[];
   } => {
-    const allQuotes = allApplications.map(app => app.customQuote);
-    const quoteAnalysis = calculateQuoteCompetitiveness(application.customQuote, allQuotes);
+    const allQuotes = allApplications.map(app => app.custom_quote);
+    const quoteAnalysis = calculateQuoteCompetitiveness(application.custom_quote, allQuotes);
     
     const recommendations: string[] = [];
     
@@ -539,7 +539,7 @@ import {
     averageResponseTime: number;
   } => {
     const totalApplications = applications.length;
-    const averageQuote = applications.reduce((sum, app) => sum + app.customQuote, 0) / totalApplications || 0;
+    const averageQuote = applications.reduce((sum, app) => sum + app.custom_quote, 0) / totalApplications || 0;
     
     const statusDistribution = applications.reduce((dist, app) => {
       dist[app.status] = (dist[app.status] || 0) + 1;

@@ -26,17 +26,17 @@ export class MarketplaceJobModel {
     this.db = database; 
   }
 
-  async create(jobData: MarketplaceJobCreateData, clientId?: number): Promise<MarketplaceJobEntity> {
+  async create(jobData: MarketplaceJobCreateData, client_id?: number): Promise<MarketplaceJobEntity> {
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + MARKETPLACE_LIMITS.JOB_EXPIRY_DAYS);
 
     const result = await this.db.query(
       MARKETPLACE_QUERIES.CREATE_MARKETPLACE_JOB,
       [
-        clientId || null,
+        client_id || null,
         jobData.title,
         jobData.description,
-        jobData.jobType,
+        jobData.job_type,
         jobData.location,
         jobData.estimatedBudget || null,
         jobData.dateRequired,
@@ -89,7 +89,7 @@ export class MarketplaceJobModel {
         limit,
         offset,
         searchParams.query || null,
-        searchParams.jobType || null,
+        searchParams.job_type || null,
         searchParams.location || null,
         searchParams.urgencyLevel || null,
         searchParams.minBudget || null,
@@ -111,7 +111,7 @@ export class MarketplaceJobModel {
       [
         null, null,
         searchParams.query || null,
-        searchParams.jobType || null,
+        searchParams.job_type || null,
         searchParams.location || null,
         searchParams.urgencyLevel || null,
         searchParams.minBudget || null,
@@ -214,19 +214,19 @@ export class MarketplaceJobModel {
     );
   }
 
-  async findByClient(clientId: number, params: { limit: number; offset: number }): Promise<MarketplaceJobSummary[]> {
+  async findByClient(client_id: number, params: { limit: number; offset: number }): Promise<MarketplaceJobSummary[]> {
     const result = await this.db.query(
       MARKETPLACE_QUERIES.GET_JOBS_BY_CLIENT,
-      [clientId, params.limit, params.offset]
+      [client_id, params.limit, params.offset]
     );
 
     return result.rows.map(row => this.transformToSummary(row));
   }
 
-  async delete(id: number, clientId: number): Promise<MarketplaceJobEntity | null> {
+  async delete(id: number, client_id: number): Promise<MarketplaceJobEntity | null> {
     const result = await this.db.query(
       MARKETPLACE_QUERIES.DELETE_MARKETPLACE_JOB,
-      [id, clientId]
+      [id, client_id]
     );
 
     if (result.rows.length === 0) {
@@ -263,7 +263,7 @@ export class MarketplaceJobModel {
       FROM marketplace_jobs
     `;
 
-    const jobTypesQuery = `
+    const job_typesQuery = `
       SELECT 
         job_type,
         COUNT(*) as count,
@@ -287,9 +287,9 @@ export class MarketplaceJobModel {
       LIMIT 5
     `;
 
-    const [statsResult, jobTypesResult, locationsResult] = await Promise.all([
+    const [statsResult, job_typesResult, locationsResult] = await Promise.all([
       this.db.query(statsQuery),
-      this.db.query(jobTypesQuery),
+      this.db.query(job_typesQuery),
       this.db.query(locationsQuery)
     ]);
 
@@ -305,8 +305,8 @@ export class MarketplaceJobModel {
       averageApplicationsPerJob: parseFloat(stats.avg_applications_per_job) || 0,
       totalApplications: totalApplications,
       conversionRate: totalApplications > 0 ? (assignedJobs / totalApplications) * 100 : 0,
-      topJobTypes: jobTypesResult.rows.map(row => ({
-        jobType: row.job_type,
+      topjob_types: job_typesResult.rows.map(row => ({
+        job_type: row.job_type,
         count: parseInt(row.count),
         percentage: parseFloat(row.percentage)
       })),
@@ -318,12 +318,12 @@ export class MarketplaceJobModel {
     };
   }
 
-  async calculateCreditCost(jobType: string, urgencyLevel: string): Promise<number> {
+  async calculateCreditCost(job_type: string, urgencyLevel: string): Promise<number> {
     const baseCost = MARKETPLACE_CREDIT_COSTS.BASE_APPLICATION_COST;
     const urgencyMultiplier = MARKETPLACE_CREDIT_COSTS.URGENCY_MULTIPLIERS[urgencyLevel as keyof typeof MARKETPLACE_CREDIT_COSTS.URGENCY_MULTIPLIERS] || 1.0;
-    const jobTypeMultiplier = MARKETPLACE_CREDIT_COSTS.JOB_TYPE_MULTIPLIERS[jobType as keyof typeof MARKETPLACE_CREDIT_COSTS.JOB_TYPE_MULTIPLIERS] || 1.0;
+    const job_typeMultiplier = MARKETPLACE_CREDIT_COSTS.JOB_TYPE_MULTIPLIERS[job_type as keyof typeof MARKETPLACE_CREDIT_COSTS.JOB_TYPE_MULTIPLIERS] || 1.0;
 
-    return Math.ceil(baseCost * urgencyMultiplier * jobTypeMultiplier);
+    return Math.ceil(baseCost * urgencyMultiplier * job_typeMultiplier);
   }
 
   private transformToEntity(row: any): MarketplaceJobEntity {
@@ -360,7 +360,7 @@ export class MarketplaceJobModel {
     return {
       id: entity.id,
       title: entity.title,
-      jobType: entity.job_type,
+      job_type: entity.job_type,
       location: entity.location,
       estimatedBudget: entity.estimated_budget,
       urgencyLevel: entity.urgency_level,

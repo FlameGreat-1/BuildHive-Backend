@@ -87,7 +87,7 @@ export class ApplicationService extends EventEmitter {
 
   async createApplication(
     applicationData: JobApplicationCreateData, 
-    tradieId: number
+    tradie_id: number
   ): Promise<ApiResponse<JobApplicationEntity>> {
     try {
       const validationResult = validateApplicationData(applicationData);
@@ -95,19 +95,19 @@ export class ApplicationService extends EventEmitter {
         return createResponse(false, 'Validation failed', null, validationResult.errors);
       }
 
-      const tradieUser = await this.userService.getUserById(this.convertUserIdToString(tradieId));
+      const tradieUser = await this.userService.getUserById(this.convertUserIdToString(tradie_id));
       if (!tradieUser) {
         return createResponse(false, 'Tradie not found', null);
       }
 
-      const tradieProfile = await this.profileService.getProfileByUserId(this.convertUserIdToString(tradieId));
+      const tradieProfile = await this.profileService.getProfileByUserId(this.convertUserIdToString(tradie_id));
       if (!tradieProfile) {
         return createResponse(false, 'Tradie profile not found', null);
       }
 
       const sanitizedData = sanitizeApplicationData(applicationData);
 
-      const marketplaceJob = await this.marketplaceRepository.findJobById(sanitizedData.marketplaceJobId);
+      const marketplaceJob = await this.marketplaceRepository.findJobById(sanitizedData.marketplace_job_id );
       if (!marketplaceJob) {
         return createResponse(false, 'Job not found', null);
       }
@@ -120,22 +120,22 @@ export class ApplicationService extends EventEmitter {
         return createResponse(false, 'Job has expired', null);
       }
 
-      const application = await this.applicationRepository.createApplication(sanitizedData, tradieId);
+      const application = await this.applicationRepository.createApplication(sanitizedData, tradie_id);
 
       await this.publishApplicationCreatedEvent(application, marketplaceJob);
       await this.notifyClientOfNewApplicationDirectly(application, marketplaceJob);
-      await this.updateTradieApplicationStatsDirectly(tradieId);
+      await this.updateTradieApplicationStatsDirectly(tradie_id);
 
       logger.info('Job application created successfully', {
         applicationId: application.id,
-        tradieId,
-        marketplaceJobId: sanitizedData.marketplaceJobId,
-        creditsUsed: application.creditsUsed
+        tradie_id,
+        marketplace_job_id : sanitizedData.marketplace_job_id ,
+        credits_used: application.credits_used
       });
 
       return createResponse(true, 'Application submitted successfully', application);
     } catch (error) {
-      logger.error('Error creating job application', { error, applicationData, tradieId });
+      logger.error('Error creating job application', { error, applicationData, tradie_id });
       return createResponse(false, 'Failed to submit application', null, [error]);
     }
   }
@@ -169,39 +169,39 @@ export class ApplicationService extends EventEmitter {
   }
 
   async getApplicationsByJob(
-    marketplaceJobId: number, 
-    clientId?: number
+    marketplace_job_id : number, 
+    client_id?: number
   ): Promise<ApiResponse<JobApplicationSummary[]>> {
     try {
-      if (clientId) {
-        const clientUser = await this.userService.getUserById(this.convertUserIdToString(clientId));
+      if (client_id) {
+        const clientUser = await this.userService.getUserById(this.convertUserIdToString(client_id));
         if (!clientUser) {
           return createResponse(false, 'Client not found', null);
         }
 
-        const jobOwnership = await this.marketplaceRepository.validateJobOwnership(marketplaceJobId, clientId);
+        const jobOwnership = await this.marketplaceRepository.validateJobOwnership(marketplace_job_id , client_id);
         if (!jobOwnership) {
           return createResponse(false, 'Unauthorized access', null);
         }
       }
 
-      const applications = await this.applicationRepository.findApplicationsByJob(marketplaceJobId);
+      const applications = await this.applicationRepository.findApplicationsByJob(marketplace_job_id );
       const rankedApplications = rankApplications(applications);
 
       logger.debug('Applications by job retrieved', {
-        marketplaceJobId,
+        marketplace_job_id ,
         count: rankedApplications.length
       });
 
       return createResponse(true, 'Applications retrieved successfully', rankedApplications);
     } catch (error) {
-      logger.error('Error getting applications by job', { error, marketplaceJobId });
+      logger.error('Error getting applications by job', { error, marketplace_job_id  });
       return createResponse(false, 'Failed to retrieve applications', null, [error]);
     }
   }
 
   async getTradieApplications(
-    tradieId: number, 
+    tradie_id: number, 
     params: { page: number; limit: number; status?: string }
   ): Promise<ApiResponse<{
     applications: JobApplicationSummary[];
@@ -209,22 +209,22 @@ export class ApplicationService extends EventEmitter {
     hasMore: boolean;
   }>> {
     try {
-      const tradieUser = await this.userService.getUserById(this.convertUserIdToString(tradieId));
+      const tradieUser = await this.userService.getUserById(this.convertUserIdToString(tradie_id));
       if (!tradieUser) {
         return createResponse(false, 'Tradie not found', null);
       }
 
-      const result = await this.applicationRepository.findApplicationsByTradie(tradieId, params);
+      const result = await this.applicationRepository.findApplicationsByTradie(tradie_id, params);
 
       logger.debug('Tradie applications retrieved', {
-        tradieId,
+        tradie_id,
         totalCount: result.totalCount,
         returnedCount: result.applications.length
       });
 
       return createResponse(true, 'Applications retrieved successfully', result);
     } catch (error) {
-      logger.error('Error getting tradie applications', { error, tradieId, params });
+      logger.error('Error getting tradie applications', { error, tradie_id, params });
       return createResponse(false, 'Failed to retrieve applications', null, [error]);
     }
   }
@@ -238,8 +238,8 @@ export class ApplicationService extends EventEmitter {
     filters: JobApplicationFilters;
   }>> {
     try {
-      if (searchParams.tradieId) {
-        const tradieUser = await this.userService.getUserById(this.convertUserIdToString(searchParams.tradieId));
+      if (searchParams.tradie_id) {
+        const tradieUser = await this.userService.getUserById(this.convertUserIdToString(searchParams.tradie_id));
         if (!tradieUser) {
           return createResponse(false, 'Tradie not found', null);
         }
@@ -270,10 +270,10 @@ export class ApplicationService extends EventEmitter {
   async updateApplication(
     id: number, 
     updateData: JobApplicationUpdateData, 
-    tradieId: number
+    tradie_id: number
   ): Promise<ApiResponse<JobApplicationEntity>> {
     try {
-      const tradieUser = await this.userService.getUserById(this.convertUserIdToString(tradieId));
+      const tradieUser = await this.userService.getUserById(this.convertUserIdToString(tradie_id));
       if (!tradieUser) {
         return createResponse(false, 'Tradie not found', null);
       }
@@ -283,7 +283,7 @@ export class ApplicationService extends EventEmitter {
         return createResponse(false, 'Application not found', null);
       }
 
-      if (existingApplication.tradieId !== tradieId) {
+      if (existingApplication.tradie_id !== tradie_id) {
         return createResponse(false, 'Unauthorized access', null);
       }
 
@@ -291,7 +291,7 @@ export class ApplicationService extends EventEmitter {
         return createResponse(false, 'Application cannot be modified in current status', null);
       }
 
-      const updatedApplication = await this.applicationRepository.updateApplication(id, updateData, tradieId);
+      const updatedApplication = await this.applicationRepository.updateApplication(id, updateData, tradie_id);
       if (!updatedApplication) {
         return createResponse(false, 'Failed to update application', null);
       }
@@ -301,7 +301,7 @@ export class ApplicationService extends EventEmitter {
 
       logger.info('Application updated successfully', {
         applicationId: id,
-        tradieId,
+        tradie_id,
         changes: Object.keys(updateData)
       });
 
@@ -315,7 +315,7 @@ export class ApplicationService extends EventEmitter {
   async updateApplicationStatus(
     id: number, 
     statusUpdate: ApplicationStatusUpdate,
-    clientId?: number
+    client_id?: number
   ): Promise<ApiResponse<JobApplicationEntity>> {
     try {
       const existingApplication = await this.applicationRepository.findApplicationById(id);
@@ -323,15 +323,15 @@ export class ApplicationService extends EventEmitter {
         return createResponse(false, 'Application not found', null);
       }
 
-      if (clientId) {
-        const clientUser = await this.userService.getUserById(this.convertUserIdToString(clientId));
+      if (client_id) {
+        const clientUser = await this.userService.getUserById(this.convertUserIdToString(client_id));
         if (!clientUser) {
           return createResponse(false, 'Client not found', null);
         }
 
         const jobOwnership = await this.marketplaceRepository.validateJobOwnership(
-          existingApplication.marketplaceJobId, 
-          clientId
+          existingApplication.marketplace_job_id , 
+          client_id
         );
         if (!jobOwnership) {
           return createResponse(false, 'Unauthorized access', null);
@@ -376,11 +376,11 @@ export class ApplicationService extends EventEmitter {
 
   async withdrawApplication(
     id: number, 
-    tradieId: number, 
+    tradie_id: number, 
     withdrawalData: ApplicationWithdrawal
   ): Promise<ApiResponse<JobApplicationEntity>> {
     try {
-      const tradieUser = await this.userService.getUserById(this.convertUserIdToString(tradieId));
+      const tradieUser = await this.userService.getUserById(this.convertUserIdToString(tradie_id));
       if (!tradieUser) {
         return createResponse(false, 'Tradie not found', null);
       }
@@ -390,7 +390,7 @@ export class ApplicationService extends EventEmitter {
         return createResponse(false, 'Application not found', null);
       }
 
-      if (existingApplication.tradieId !== tradieId) {
+      if (existingApplication.tradie_id !== tradie_id) {
         return createResponse(false, 'Unauthorized access', null);
       }
 
@@ -400,7 +400,7 @@ export class ApplicationService extends EventEmitter {
 
       const withdrawnApplication = await this.applicationRepository.withdrawApplication(
         id, 
-        tradieId, 
+        tradie_id, 
         withdrawalData
       );
 
@@ -415,56 +415,56 @@ export class ApplicationService extends EventEmitter {
         await this.emailService.sendCreditRefundNotification(
           tradieUser.email,
           tradieUser.username,
-          existingApplication.creditsUsed,
+          existingApplication.credits_used,
           'Application withdrawal'
         );
       }
 
       logger.info('Application withdrawn successfully', {
         applicationId: id,
-        tradieId,
+        tradie_id,
         reason: withdrawalData.reason,
         refundCredits: withdrawalData.refundCredits
       });
 
       return createResponse(true, 'Application withdrawn successfully', withdrawnApplication);
     } catch (error) {
-      logger.error('Error withdrawing application', { error, applicationId: id, tradieId });
+      logger.error('Error withdrawing application', { error, applicationId: id, tradie_id });
       return createResponse(false, 'Failed to withdraw application', null, [error]);
     }
   }
 
-  async getTradieApplicationHistory(tradieId: number): Promise<ApiResponse<TradieApplicationHistory>> {
+  async getTradieApplicationHistory(tradie_id: number): Promise<ApiResponse<TradieApplicationHistory>> {
     try {
-      const tradieUser = await this.userService.getUserById(this.convertUserIdToString(tradieId));
+      const tradieUser = await this.userService.getUserById(this.convertUserIdToString(tradie_id));
       if (!tradieUser) {
         return createResponse(false, 'Tradie not found', null);
       }
 
-      const history = await this.applicationRepository.getTradieApplicationHistory(tradieId);
+      const history = await this.applicationRepository.getTradieApplicationHistory(tradie_id);
 
       logger.debug('Tradie application history retrieved', {
-        tradieId,
+        tradie_id,
         totalApplications: history.totalApplications,
         conversionRate: history.conversionRate
       });
 
       return createResponse(true, 'Application history retrieved successfully', history);
     } catch (error) {
-      logger.error('Error getting tradie application history', { error, tradieId });
+      logger.error('Error getting tradie application history', { error, tradie_id });
       return createResponse(false, 'Failed to retrieve application history', null, [error]);
     }
   }
 
   async getApplicationAnalytics(params: {
-    tradieId?: number;
+    tradie_id?: number;
     startDate?: Date;
     endDate?: Date;
     groupBy?: 'day' | 'week' | 'month' | 'status';
   }): Promise<ApiResponse<ApplicationAnalytics>> {
     try {
-      if (params.tradieId) {
-        const tradieUser = await this.userService.getUserById(this.convertUserIdToString(params.tradieId));
+      if (params.tradie_id) {
+        const tradieUser = await this.userService.getUserById(this.convertUserIdToString(params.tradie_id));
         if (!tradieUser) {
           return createResponse(false, 'Tradie not found', null);
         }
@@ -512,14 +512,14 @@ export class ApplicationService extends EventEmitter {
   private async handleApplicationSelectionDirectly(application: JobApplicationEntity): Promise<void> {
     try {
       await this.notifyTradieOfSelectionDirectly(application);
-      await this.updateMarketplaceJobStatus(application.marketplaceJobId, MARKETPLACE_JOB_STATUS.ASSIGNED);
-      await this.rejectOtherApplicationsDirectly(application.marketplaceJobId, application.id);
-      await this.updateTradieSuccessStatsDirectly(application.tradieId);
+      await this.updateMarketplaceJobStatus(application.marketplace_job_id , MARKETPLACE_JOB_STATUS.ASSIGNED);
+      await this.rejectOtherApplicationsDirectly(application.marketplace_job_id , application.id);
+      await this.updateTradieSuccessStatsDirectly(application.tradie_id);
 
       const eventData = {
         applicationId: application.id,
-        tradieId: application.tradieId,
-        marketplaceJobId: application.marketplaceJobId,
+        tradie_id: application.tradie_id,
+        marketplace_job_id : application.marketplace_job_id ,
         timestamp: new Date().toISOString()
       };
 
@@ -538,12 +538,12 @@ export class ApplicationService extends EventEmitter {
   private async handleApplicationRejectionDirectly(application: JobApplicationEntity): Promise<void> {
     try {
       await this.notifyTradieOfRejectionDirectly(application);
-      await this.updateTradieRejectionStatsDirectly(application.tradieId);
+      await this.updateTradieRejectionStatsDirectly(application.tradie_id);
 
       const eventData = {
         applicationId: application.id,
-        tradieId: application.tradieId,
-        marketplaceJobId: application.marketplaceJobId,
+        tradie_id: application.tradie_id,
+        marketplace_job_id : application.marketplace_job_id ,
         timestamp: new Date().toISOString()
       };
 
@@ -577,7 +577,7 @@ export class ApplicationService extends EventEmitter {
     marketplaceJob: any
   ): Promise<void> {
     try {
-      const clientUser = await this.userService.getUserById(this.convertUserIdToString(marketplaceJob.clientId));
+      const clientUser = await this.userService.getUserById(this.convertUserIdToString(marketplaceJob.client_id));
       
       if (clientUser) {
         await this.emailService.sendWelcomeEmail(
@@ -586,9 +586,9 @@ export class ApplicationService extends EventEmitter {
           'client'
         );
 
-        const tradieUser = await this.userService.getUserById(this.convertUserIdToString(application.tradieId));
+        const tradieUser = await this.userService.getUserById(this.convertUserIdToString(application.tradie_id));
         if (tradieUser) {
-          const message = `New application received for "${marketplaceJob.title}" from ${tradieUser.username}. Quote: $${application.customQuote}`;
+          const message = `New application received for "${marketplaceJob.title}" from ${tradieUser.username}. Quote: $${application.custom_quote}`;
           await this.smsService.sendSMS(marketplaceJob.clientPhone || clientUser.username, message);
         }
       }
@@ -598,8 +598,8 @@ export class ApplicationService extends EventEmitter {
         applicationId: application.id,
         jobId: marketplaceJob.id,
         jobTitle: marketplaceJob.title,
-        tradieId: application.tradieId,
-        customQuote: application.customQuote,
+        tradie_id: application.tradie_id,
+        custom_quote: application.custom_quote,
         proposedTimeline: application.proposedTimeline,
         timestamp: new Date().toISOString()
       };
@@ -620,9 +620,9 @@ export class ApplicationService extends EventEmitter {
 
   private async notifyClientOfApplicationUpdateDirectly(application: JobApplicationEntity): Promise<void> {
     try {
-      const marketplaceJob = await this.marketplaceRepository.findJobById(application.marketplaceJobId);
+      const marketplaceJob = await this.marketplaceRepository.findJobById(application.marketplace_job_id );
       if (marketplaceJob) {
-        const clientUser = await this.userService.getUserById(this.convertUserIdToString(marketplaceJob.clientId));
+        const clientUser = await this.userService.getUserById(this.convertUserIdToString(marketplaceJob.client_id));
         
         if (clientUser) {
           await this.emailService.sendWelcomeEmail(
@@ -631,7 +631,7 @@ export class ApplicationService extends EventEmitter {
             'client'
           );
 
-          const message = `Application for "${marketplaceJob.title}" has been updated. New quote: $${application.customQuote}`;
+          const message = `Application for "${marketplaceJob.title}" has been updated. New quote: $${application.custom_quote}`;
           await this.smsService.sendSMS(marketplaceJob.clientPhone || clientUser.username, message);
         }
       }
@@ -639,8 +639,8 @@ export class ApplicationService extends EventEmitter {
       const notificationData = {
         type: 'application_updated',
         applicationId: application.id,
-        marketplaceJobId: application.marketplaceJobId,
-        tradieId: application.tradieId,
+        marketplace_job_id : application.marketplace_job_id ,
+        tradie_id: application.tradie_id,
         timestamp: new Date().toISOString()
       };
 
@@ -657,9 +657,9 @@ export class ApplicationService extends EventEmitter {
 
   private async notifyClientOfApplicationWithdrawalDirectly(application: JobApplicationEntity): Promise<void> {
     try {
-      const marketplaceJob = await this.marketplaceRepository.findJobById(application.marketplaceJobId);
+      const marketplaceJob = await this.marketplaceRepository.findJobById(application.marketplace_job_id );
       if (marketplaceJob) {
-        const clientUser = await this.userService.getUserById(this.convertUserIdToString(marketplaceJob.clientId));
+        const clientUser = await this.userService.getUserById(this.convertUserIdToString(marketplaceJob.client_id));
         
         if (clientUser) {
           await this.emailService.sendWelcomeEmail(
@@ -676,8 +676,8 @@ export class ApplicationService extends EventEmitter {
       const notificationData = {
         type: 'application_withdrawn',
         applicationId: application.id,
-        marketplaceJobId: application.marketplaceJobId,
-        tradieId: application.tradieId,
+        marketplace_job_id : application.marketplace_job_id ,
+        tradie_id: application.tradie_id,
         timestamp: new Date().toISOString()
       };
 
@@ -692,38 +692,38 @@ export class ApplicationService extends EventEmitter {
     }
   }
 
-  private async updateTradieApplicationStatsDirectly(tradieId: number): Promise<void> {
+  private async updateTradieApplicationStatsDirectly(tradie_id: number): Promise<void> {
     try {
-      const tradieUser = await this.userService.getUserById(this.convertUserIdToString(tradieId));
+      const tradieUser = await this.userService.getUserById(this.convertUserIdToString(tradie_id));
       
       if (tradieUser) {
-        const tradieProfile = await this.profileService.getProfileByUserId(this.convertUserIdToString(tradieId));
+        const tradieProfile = await this.profileService.getProfileByUserId(this.convertUserIdToString(tradie_id));
         
         if (tradieProfile) {
-          await this.profileService.updateProfile(this.convertUserIdToString(tradieId), {
+          await this.profileService.updateProfile(this.convertUserIdToString(tradie_id), {
             bio: tradieProfile.bio ? `${tradieProfile.bio} | Recent application submitted` : 'Recent application submitted'
           });
         }
       }
 
       const statsData = {
-        tradieId,
+        tradie_id,
         action: 'application_submitted',
         timestamp: new Date().toISOString()
       };
 
       await this.redis.publish('tradie_stats:application_submitted', JSON.stringify(statsData));
 
-      logger.debug('Tradie application stats updated', { tradieId });
+      logger.debug('Tradie application stats updated', { tradie_id });
     } catch (error) {
-      logger.error('Error updating tradie application stats', { error, tradieId });
+      logger.error('Error updating tradie application stats', { error, tradie_id });
     }
   }
 
   private async notifyTradieOfSelectionDirectly(application: JobApplicationEntity): Promise<void> {
     try {
-      const tradieUser = await this.userService.getUserById(this.convertUserIdToString(application.tradieId));
-      const marketplaceJob = await this.marketplaceRepository.findJobById(application.marketplaceJobId);
+      const tradieUser = await this.userService.getUserById(this.convertUserIdToString(application.tradie_id));
+      const marketplaceJob = await this.marketplaceRepository.findJobById(application.marketplace_job_id );
       
       if (tradieUser && marketplaceJob) {
         await this.emailService.sendWelcomeEmail(
@@ -739,8 +739,8 @@ export class ApplicationService extends EventEmitter {
       const notificationData = {
         type: 'application_selected',
         applicationId: application.id,
-        tradieId: application.tradieId,
-        marketplaceJobId: application.marketplaceJobId,
+        tradie_id: application.tradie_id,
+        marketplace_job_id : application.marketplace_job_id ,
         timestamp: new Date().toISOString()
       };
 
@@ -748,7 +748,7 @@ export class ApplicationService extends EventEmitter {
 
       logger.debug('Tradie notified of application selection', { 
         applicationId: application.id, 
-        tradieId: application.tradieId 
+        tradie_id: application.tradie_id 
       });
     } catch (error) {
       logger.error('Error notifying tradie of selection', { 
@@ -760,8 +760,8 @@ export class ApplicationService extends EventEmitter {
 
   private async notifyTradieOfRejectionDirectly(application: JobApplicationEntity): Promise<void> {
     try {
-      const tradieUser = await this.userService.getUserById(this.convertUserIdToString(application.tradieId));
-      const marketplaceJob = await this.marketplaceRepository.findJobById(application.marketplaceJobId);
+      const tradieUser = await this.userService.getUserById(this.convertUserIdToString(application.tradie_id));
+      const marketplaceJob = await this.marketplaceRepository.findJobById(application.marketplace_job_id );
       
       if (tradieUser && marketplaceJob) {
         await this.emailService.sendWelcomeEmail(
@@ -777,8 +777,8 @@ export class ApplicationService extends EventEmitter {
       const notificationData = {
         type: 'application_rejected',
         applicationId: application.id,
-        tradieId: application.tradieId,
-        marketplaceJobId: application.marketplaceJobId,
+        tradie_id: application.tradie_id,
+        marketplace_job_id : application.marketplace_job_id ,
         timestamp: new Date().toISOString()
       };
 
@@ -786,7 +786,7 @@ export class ApplicationService extends EventEmitter {
 
       logger.debug('Tradie notified of application rejection', { 
         applicationId: application.id, 
-        tradieId: application.tradieId 
+        tradie_id: application.tradie_id 
       });
     } catch (error) {
       logger.error('Error notifying tradie of rejection', { 
@@ -798,8 +798,8 @@ export class ApplicationService extends EventEmitter {
 
   private async notifyTradieOfReviewDirectly(application: JobApplicationEntity): Promise<void> {
     try {
-      const tradieUser = await this.userService.getUserById(this.convertUserIdToString(application.tradieId));
-      const marketplaceJob = await this.marketplaceRepository.findJobById(application.marketplaceJobId);
+      const tradieUser = await this.userService.getUserById(this.convertUserIdToString(application.tradie_id));
+      const marketplaceJob = await this.marketplaceRepository.findJobById(application.marketplace_job_id );
       
       if (tradieUser && marketplaceJob) {
         await this.emailService.sendWelcomeEmail(
@@ -815,8 +815,8 @@ export class ApplicationService extends EventEmitter {
       const notificationData = {
         type: 'application_under_review',
         applicationId: application.id,
-        tradieId: application.tradieId,
-        marketplaceJobId: application.marketplaceJobId,
+        tradie_id: application.tradie_id,
+        marketplace_job_id : application.marketplace_job_id ,
         timestamp: new Date().toISOString()
       };
 
@@ -824,7 +824,7 @@ export class ApplicationService extends EventEmitter {
 
       logger.debug('Tradie notified of application review', { 
         applicationId: application.id, 
-        tradieId: application.tradieId 
+        tradie_id: application.tradie_id 
       });
     } catch (error) {
       logger.error('Error notifying tradie of review', { 
@@ -844,9 +844,9 @@ export class ApplicationService extends EventEmitter {
     }
   }
 
-  private async rejectOtherApplicationsDirectly(marketplaceJobId: number, selectedApplicationId: number): Promise<void> {
+  private async rejectOtherApplicationsDirectly(marketplace_job_id : number, selectedApplicationId: number): Promise<void> {
     try {
-      const applications = await this.applicationRepository.findApplicationsByJob(marketplaceJobId);
+      const applications = await this.applicationRepository.findApplicationsByJob(marketplace_job_id );
       const otherApplicationIds = applications
         .filter(app => app.id !== selectedApplicationId && 
                       (app.status === APPLICATION_STATUS.SUBMITTED || 
@@ -869,67 +869,67 @@ export class ApplicationService extends EventEmitter {
       }
 
       logger.debug('Other applications rejected', { 
-        marketplaceJobId, 
+        marketplace_job_id , 
         rejectedCount: otherApplicationIds.length 
       });
     } catch (error) {
-      logger.error('Error rejecting other applications', { error, marketplaceJobId });
+      logger.error('Error rejecting other applications', { error, marketplace_job_id  });
     }
   }
 
-  private async updateTradieSuccessStatsDirectly(tradieId: number): Promise<void> {
+  private async updateTradieSuccessStatsDirectly(tradie_id: number): Promise<void> {
     try {
-      const tradieUser = await this.userService.getUserById(this.convertUserIdToString(tradieId));
+      const tradieUser = await this.userService.getUserById(this.convertUserIdToString(tradie_id));
       
       if (tradieUser) {
-        const tradieProfile = await this.profileService.getProfileByUserId(this.convertUserIdToString(tradieId));
+        const tradieProfile = await this.profileService.getProfileByUserId(this.convertUserIdToString(tradie_id));
         
         if (tradieProfile) {
-          await this.profileService.updateProfile(this.convertUserIdToString(tradieId), {
+          await this.profileService.updateProfile(this.convertUserIdToString(tradie_id), {
             bio: tradieProfile.bio ? `${tradieProfile.bio} | Successful application` : 'Successful application'
           });
         }
       }
 
       const statsData = {
-        tradieId,
+        tradie_id,
         action: 'application_successful',
         timestamp: new Date().toISOString()
       };
 
       await this.redis.publish('tradie_stats:application_successful', JSON.stringify(statsData));
 
-      logger.debug('Tradie success stats updated', { tradieId });
+      logger.debug('Tradie success stats updated', { tradie_id });
     } catch (error) {
-      logger.error('Error updating tradie success stats', { error, tradieId });
+      logger.error('Error updating tradie success stats', { error, tradie_id });
     }
   }
 
-  private async updateTradieRejectionStatsDirectly(tradieId: number): Promise<void> {
+  private async updateTradieRejectionStatsDirectly(tradie_id: number): Promise<void> {
     try {
-      const tradieUser = await this.userService.getUserById(this.convertUserIdToString(tradieId));
+      const tradieUser = await this.userService.getUserById(this.convertUserIdToString(tradie_id));
       
       if (tradieUser) {
-        const tradieProfile = await this.profileService.getProfileByUserId(this.convertUserIdToString(tradieId));
+        const tradieProfile = await this.profileService.getProfileByUserId(this.convertUserIdToString(tradie_id));
         
         if (tradieProfile) {
-          await this.profileService.updateProfile(this.convertUserIdToString(tradieId), {
+          await this.profileService.updateProfile(this.convertUserIdToString(tradie_id), {
             bio: tradieProfile.bio ? `${tradieProfile.bio} | Application experience` : 'Application experience'
           });
         }
       }
 
       const statsData = {
-        tradieId,
+        tradie_id,
         action: 'application_rejected',
         timestamp: new Date().toISOString()
       };
 
       await this.redis.publish('tradie_stats:application_rejected', JSON.stringify(statsData));
 
-      logger.debug('Tradie rejection stats updated', { tradieId });
+      logger.debug('Tradie rejection stats updated', { tradie_id });
     } catch (error) {
-      logger.error('Error updating tradie rejection stats', { error, tradieId });
+      logger.error('Error updating tradie rejection stats', { error, tradie_id });
     }
   }
 
@@ -940,11 +940,11 @@ export class ApplicationService extends EventEmitter {
     try {
       const eventData = {
         applicationId: application.id,
-        tradieId: application.tradieId,
-        marketplaceJobId: application.marketplaceJobId,
+        tradie_id: application.tradie_id,
+        marketplace_job_id : application.marketplace_job_id ,
         jobTitle: marketplaceJob.title,
-        customQuote: application.customQuote,
-        creditsUsed: application.creditsUsed,
+        custom_quote: application.custom_quote,
+        credits_used: application.credits_used,
         timestamp: new Date().toISOString()
       };
 
@@ -964,14 +964,14 @@ export class ApplicationService extends EventEmitter {
     try {
       const eventData = {
         applicationId: updatedApplication.id,
-        tradieId: updatedApplication.tradieId,
-        marketplaceJobId: updatedApplication.marketplaceJobId,
+        tradie_id: updatedApplication.tradie_id,
+        marketplace_job_id : updatedApplication.marketplace_job_id ,
         previousData: {
-          customQuote: previousApplication.customQuote,
+          custom_quote: previousApplication.custom_quote,
           proposedTimeline: previousApplication.proposedTimeline
         },
         updatedData: {
-          customQuote: updatedApplication.customQuote,
+          custom_quote: updatedApplication.custom_quote,
           proposedTimeline: updatedApplication.proposedTimeline
         },
         timestamp: new Date().toISOString()
@@ -994,8 +994,8 @@ export class ApplicationService extends EventEmitter {
     try {
       const eventData = {
         applicationId: updatedApplication.id,
-        tradieId: updatedApplication.tradieId,
-        marketplaceJobId: updatedApplication.marketplaceJobId,
+        tradie_id: updatedApplication.tradie_id,
+        marketplace_job_id : updatedApplication.marketplace_job_id ,
         previousStatus: previousApplication.status,
         newStatus: updatedApplication.status,
         reason: statusUpdate.reason,
@@ -1023,11 +1023,11 @@ export class ApplicationService extends EventEmitter {
     try {
       const eventData = {
         applicationId: application.id,
-        tradieId: application.tradieId,
-        marketplaceJobId: application.marketplaceJobId,
+        tradie_id: application.tradie_id,
+        marketplace_job_id : application.marketplace_job_id ,
         reason: withdrawalData.reason,
         refundCredits: withdrawalData.refundCredits,
-        creditsRefunded: withdrawalData.refundCredits ? application.creditsUsed : 0,
+        creditsRefunded: withdrawalData.refundCredits ? application.credits_used : 0,
         timestamp: new Date().toISOString()
       };
 
@@ -1041,14 +1041,14 @@ export class ApplicationService extends EventEmitter {
   }
 
   private canUserAccessApplication(application: JobApplicationDetails, userId: number): boolean {
-    return application.tradieId === userId || application.job.id === userId;
+    return application.tradie_id === userId || application.job.id === userId;
   }
 
   private extractFiltersFromSearch(searchParams: JobApplicationSearchParams): JobApplicationFilters {
     return {
       status: searchParams.status,
-      tradieId: searchParams.tradieId,
-      marketplaceJobId: searchParams.marketplaceJobId,
+      tradie_id: searchParams.tradie_id,
+      marketplace_job_id : searchParams.marketplace_job_id ,
       dateRange: searchParams.dateRange,
       minQuote: searchParams.minQuote,
       maxQuote: searchParams.maxQuote

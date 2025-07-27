@@ -40,7 +40,7 @@ import { PaymentService } from '../../payment/services/payment.service';
 import { EmailService } from '../../auth/services/email.service';
 import { SMSService } from '../../auth/services/sms.service';
 
-import { JobType, JobStatus, JobPriority, CreateJobData } from '../../jobs/types';
+import { job_type, JobStatus, JobPriority, CreateJobData } from '../../jobs/types';
 import { CreditUsageType } from '../../credits/types';
 
 export class MarketplaceService extends EventEmitter {
@@ -98,7 +98,7 @@ export class MarketplaceService extends EventEmitter {
 
   async createMarketplaceJob(
     jobData: MarketplaceJobCreateData, 
-    clientId?: number
+    client_id?: number
   ): Promise<ApiResponse<MarketplaceJobEntity>> {
     try {
       const validationResult = validateMarketplaceJobData(jobData);
@@ -108,31 +108,31 @@ export class MarketplaceService extends EventEmitter {
 
       const sanitizedData = sanitizeMarketplaceJobData(jobData);
       
-      if (clientId) {
-        const clientUser = await this.userService.getUserById(this.convertUserIdToString(clientId));
+      if (client_id) {
+        const clientUser = await this.userService.getUserById(this.convertUserIdToString(client_id));
         if (!clientUser) {
           return createResponse(false, 'Client not found', null);
         }
         
-        const clientProfile = await this.profileService.getProfileByUserId(this.convertUserIdToString(clientId));
+        const clientProfile = await this.profileService.getProfileByUserId(this.convertUserIdToString(client_id));
         if (!clientProfile) {
           return createResponse(false, 'Client profile not found', null);
         }
       } else {
 
-        clientId = await this.marketplaceRepository.createOrUpdateClientProfile(sanitizedData);
+        client_id = await this.marketplaceRepository.createOrUpdateClientProfile(sanitizedData);
       }
 
-      const job = await this.marketplaceRepository.createJob(sanitizedData, clientId);
+      const job = await this.marketplaceRepository.createJob(sanitizedData, client_id);
 
       await this.publishJobCreatedEvent(job);
       await this.notifyRelevantTradiesDirectly(job); 
-      await this.updateClientCRMDirectly(clientId, job);
+      await this.updateClientCRMDirectly(client_id, job);
 
       logger.info('Marketplace job created successfully', {
         jobId: job.id,
-        clientId,
-        jobType: job.jobType,
+        client_id,
+        job_type: job.job_type,
         location: job.location
       });
 
@@ -143,9 +143,9 @@ export class MarketplaceService extends EventEmitter {
     }
   }
 
-  async getMarketplaceJob(id: number, tradieId?: number): Promise<ApiResponse<MarketplaceJobDetails>> {
+  async getMarketplaceJob(id: number, tradie_id?: number): Promise<ApiResponse<MarketplaceJobDetails>> {
     try {
-      const jobDetails = await this.marketplaceRepository.findJobDetails(id, tradieId);
+      const jobDetails = await this.marketplaceRepository.findJobDetails(id, tradie_id);
       
       if (!jobDetails) {
         return createResponse(false, 'Job not found', null);
@@ -156,15 +156,15 @@ export class MarketplaceService extends EventEmitter {
         return createResponse(false, 'Job has expired', null);
       }
 
-      if (tradieId) {
-        const creditCost = calculateCreditCost(jobDetails.jobType, jobDetails.urgencyLevel).finalCost;
-        const creditCheck = await this.creditService.checkCreditSufficiency(tradieId, creditCost);
+      if (tradie_id) {
+        const creditCost = calculateCreditCost(jobDetails.job_type, jobDetails.urgencyLevel).finalCost;
+        const creditCheck = await this.creditService.checkCreditSufficiency(tradie_id, creditCost);
         
         (jobDetails as any).creditSufficient = creditCheck.sufficient;
         (jobDetails as any).creditShortfall = creditCheck.shortfall;
       }
 
-      logger.debug('Marketplace job retrieved', { jobId: id, tradieId });
+      logger.debug('Marketplace job retrieved', { jobId: id, tradie_id });
 
       return createResponse(true, 'Job retrieved successfully', jobDetails);
     } catch (error) {
@@ -183,9 +183,9 @@ export class MarketplaceService extends EventEmitter {
   }>> {
     try {
 
-      if (searchParams.tradieId) {
+      if (searchParams.tradie_id) {
         const tradieProfile = await this.profileService.getProfileByUserId(
-          this.convertUserIdToString(searchParams.tradieId)
+          this.convertUserIdToString(searchParams.tradie_id)
         );
         
         if (tradieProfile && tradieProfile.location && !searchParams.location) {
@@ -218,7 +218,7 @@ export class MarketplaceService extends EventEmitter {
   async updateMarketplaceJob(
     id: number, 
     updateData: MarketplaceJobUpdateData, 
-    clientId: number
+    client_id: number
   ): Promise<ApiResponse<MarketplaceJobEntity>> {
     try {
       const existingJob = await this.marketplaceRepository.findJobById(id);
@@ -226,7 +226,7 @@ export class MarketplaceService extends EventEmitter {
         return createResponse(false, 'Job not found', null);
       }
 
-      const clientUser = await this.userService.getUserById(this.convertUserIdToString(clientId));
+      const clientUser = await this.userService.getUserById(this.convertUserIdToString(client_id));
       if (!clientUser) {
         return createResponse(false, 'Client not found', null);
       }
@@ -235,7 +235,7 @@ export class MarketplaceService extends EventEmitter {
         return createResponse(false, 'Job cannot be modified in current status', null);
       }
 
-      const updatedJob = await this.marketplaceRepository.updateJob(id, updateData, clientId);
+      const updatedJob = await this.marketplaceRepository.updateJob(id, updateData, client_id);
       if (!updatedJob) {
         return createResponse(false, 'Failed to update job', null);
       }
@@ -245,7 +245,7 @@ export class MarketplaceService extends EventEmitter {
 
       logger.info('Marketplace job updated successfully', {
         jobId: id,
-        clientId,
+        client_id,
         changes: Object.keys(updateData)
       });
 
@@ -260,7 +260,7 @@ export class MarketplaceService extends EventEmitter {
     id: number, 
     status: string, 
     reason?: string,
-    clientId?: number
+    client_id?: number
   ): Promise<ApiResponse<MarketplaceJobEntity>> {
     try {
       const existingJob = await this.marketplaceRepository.findJobById(id);
@@ -268,7 +268,7 @@ export class MarketplaceService extends EventEmitter {
         return createResponse(false, 'Job not found', null);
       }
 
-      if (clientId && existingJob.clientId !== clientId) {
+      if (client_id && existingJob.client_id !== client_id) {
         return createResponse(false, 'Unauthorized access', null);
       }
 
@@ -298,14 +298,14 @@ export class MarketplaceService extends EventEmitter {
     }
   }
 
-  async deleteMarketplaceJob(id: number, clientId: number): Promise<ApiResponse<boolean>> {
+  async deleteMarketplaceJob(id: number, client_id: number): Promise<ApiResponse<boolean>> {
     try {
       const existingJob = await this.marketplaceRepository.findJobById(id);
       if (!existingJob) {
         return createResponse(false, 'Job not found', null);
       }
 
-      const clientUser = await this.userService.getUserById(this.convertUserIdToString(clientId));
+      const clientUser = await this.userService.getUserById(this.convertUserIdToString(client_id));
       if (!clientUser) {
         return createResponse(false, 'Client not found', null);
       }
@@ -314,7 +314,7 @@ export class MarketplaceService extends EventEmitter {
         await this.processApplicationRefundsDirectly(id);
       }
 
-      const deletedJob = await this.marketplaceRepository.deleteJob(id, clientId);
+      const deletedJob = await this.marketplaceRepository.deleteJob(id, client_id);
       if (!deletedJob) {
         return createResponse(false, 'Failed to delete job', null);
       }
@@ -322,17 +322,17 @@ export class MarketplaceService extends EventEmitter {
       await this.publishJobDeletedEvent(deletedJob);
       await this.cleanupJobRelatedData(id);
 
-      logger.info('Marketplace job deleted successfully', { jobId: id, clientId });
+      logger.info('Marketplace job deleted successfully', { jobId: id, client_id });
 
       return createResponse(true, 'Job deleted successfully', true);
     } catch (error) {
-      logger.error('Error deleting marketplace job', { error, jobId: id, clientId });
+      logger.error('Error deleting marketplace job', { error, jobId: id, client_id });
       return createResponse(false, 'Failed to delete job', null, [error]);
     }
   }
 
   async getClientJobs(
-    clientId: number, 
+    client_id: number, 
     params: { page: number; limit: number; status?: string }
   ): Promise<ApiResponse<{
     jobs: MarketplaceJobSummary[];
@@ -340,22 +340,22 @@ export class MarketplaceService extends EventEmitter {
     hasMore: boolean;
   }>> {
     try {
-      const clientUser = await this.userService.getUserById(this.convertUserIdToString(clientId));
+      const clientUser = await this.userService.getUserById(this.convertUserIdToString(client_id));
       if (!clientUser) {
         return createResponse(false, 'Client not found', null);
       }
 
-      const result = await this.marketplaceRepository.findJobsByClient(clientId, params);
+      const result = await this.marketplaceRepository.findJobsByClient(client_id, params);
 
       logger.debug('Client jobs retrieved', {
-        clientId,
+        client_id,
         totalCount: result.totalCount,
         returnedCount: result.jobs.length
       });
 
       return createResponse(true, 'Client jobs retrieved successfully', result);
     } catch (error) {
-      logger.error('Error getting client jobs', { error, clientId, params });
+      logger.error('Error getting client jobs', { error, client_id, params });
       return createResponse(false, 'Failed to retrieve client jobs', null, [error]);
     }
   }
@@ -391,31 +391,31 @@ export class MarketplaceService extends EventEmitter {
     }
   }
 
-  async getRecommendedJobs(tradieId: number, limit: number = 10): Promise<ApiResponse<MarketplaceJobSummary[]>> {
+  async getRecommendedJobs(tradie_id: number, limit: number = 10): Promise<ApiResponse<MarketplaceJobSummary[]>> {
     try {
-      const tradieUser = await this.userService.getUserById(this.convertUserIdToString(tradieId));
+      const tradieUser = await this.userService.getUserById(this.convertUserIdToString(tradie_id));
       if (!tradieUser) {
         return createResponse(false, 'Tradie not found', null);
       }
 
-      const tradieProfile = await this.profileService.getProfileByUserId(this.convertUserIdToString(tradieId));
+      const tradieProfile = await this.profileService.getProfileByUserId(this.convertUserIdToString(tradie_id));
       
-      const recommendedJobs = await this.marketplaceRepository.getRecommendedJobs(tradieId, limit);
+      const recommendedJobs = await this.marketplaceRepository.getRecommendedJobs(tradie_id, limit);
 
       for (const job of recommendedJobs) {
-        const creditCost = calculateCreditCost(job.jobType, job.urgencyLevel).finalCost;
-        const creditCheck = await this.creditService.checkCreditSufficiency(tradieId, creditCost);
+        const creditCost = calculateCreditCost(job.job_type, job.urgencyLevel).finalCost;
+        const creditCheck = await this.creditService.checkCreditSufficiency(tradie_id, creditCost);
         (job as any).canAfford = creditCheck.sufficient;
       }
 
       logger.debug('Recommended jobs retrieved', {
-        tradieId,
+        tradie_id,
         count: recommendedJobs.length
       });
 
       return createResponse(true, 'Recommended jobs retrieved successfully', recommendedJobs);
     } catch (error) {
-      logger.error('Error getting recommended jobs', { error, tradieId });
+      logger.error('Error getting recommended jobs', { error, tradie_id });
       return createResponse(false, 'Failed to retrieve recommended jobs', null, [error]);
     }
   }
@@ -507,7 +507,7 @@ export class MarketplaceService extends EventEmitter {
       const jobManagementData: CreateJobData = {
         title: marketplaceJob.title,
         description: marketplaceJob.description,
-        jobType: marketplaceJob.jobType as JobType,
+        job_type: marketplaceJob.job_type as job_type,
         priority: JobPriority.MEDIUM,
         clientName: marketplaceJob.clientName,
         clientEmail: marketplaceJob.clientEmail,
@@ -523,22 +523,22 @@ export class MarketplaceService extends EventEmitter {
         notes: [`Created from marketplace job #${marketplaceJob.id}`]
       };
 
-      const createdJob = await this.jobService.createJob(marketplaceJob.selectedTradieId, jobManagementData);
+      const createdJob = await this.jobService.createJob(marketplaceJob.selectedtradie_id, jobManagementData);
 
       await this.redis.publish('job_management:job_created_from_marketplace', JSON.stringify({
-        marketplaceJobId: marketplaceJob.id,
+        marketplace_job_id : marketplaceJob.id,
         newJobId: createdJob.id,
         timestamp: new Date().toISOString()
       }));
 
       logger.debug('Job created in job management system', { 
-        marketplaceJobId: marketplaceJob.id,
+        marketplace_job_id : marketplaceJob.id,
         newJobId: createdJob.id
       });
     } catch (error) {
       logger.error('Error creating job in job management system', { 
         error, 
-        marketplaceJobId: marketplaceJob.id 
+        marketplace_job_id : marketplaceJob.id 
       });
     }
   }
@@ -548,11 +548,11 @@ export class MarketplaceService extends EventEmitter {
       const notificationData = {
         jobId: job.id,
         title: job.title,
-        jobType: job.jobType,
+        job_type: job.job_type,
         location: job.location,
         urgencyLevel: job.urgencyLevel,
         estimatedBudget: job.estimatedBudget,
-        creditCost: calculateCreditCost(job.jobType, job.urgencyLevel).finalCost
+        creditCost: calculateCreditCost(job.job_type, job.urgencyLevel).finalCost
       };
 
       await this.emailService.sendJobNotificationEmail(
@@ -586,15 +586,15 @@ export class MarketplaceService extends EventEmitter {
     }
   }
 
-  private async updateClientCRMDirectly(clientId: number, job: MarketplaceJobEntity): Promise<void> {
+  private async updateClientCRMDirectly(client_id: number, job: MarketplaceJobEntity): Promise<void> {
     try {
-      const clientUser = await this.userService.getUserById(this.convertUserIdToString(clientId));
-      const clientProfile = await this.profileService.getProfileByUserId(this.convertUserIdToString(clientId));
+      const clientUser = await this.userService.getUserById(this.convertUserIdToString(client_id));
+      const clientProfile = await this.profileService.getProfileByUserId(this.convertUserIdToString(client_id));
 
       const crmData = {
-        clientId,
+        client_id,
         jobId: job.id,
-        jobType: job.jobType,
+        job_type: job.job_type,
         estimatedValue: job.estimatedBudget,
         location: job.location,
         source: 'marketplace',
@@ -605,18 +605,18 @@ export class MarketplaceService extends EventEmitter {
 
       await this.redis.publish('crm:client_activity', JSON.stringify(crmData));
 
-      logger.debug('Client CRM updated', { clientId, jobId: job.id });
+      logger.debug('Client CRM updated', { client_id, jobId: job.id });
     } catch (error) {
-      logger.error('Error updating client CRM', { error, clientId, jobId: job.id });
+      logger.error('Error updating client CRM', { error, client_id, jobId: job.id });
     }
   }
 
   private async updateClientCRMCompletionDirectly(job: MarketplaceJobEntity): Promise<void> {
     try {
-      const clientUser = await this.userService.getUserById(this.convertUserIdToString(job.clientId));
+      const clientUser = await this.userService.getUserById(this.convertUserIdToString(job.client_id));
 
       const crmData = {
-        clientId: job.clientId,
+        client_id: job.client_id,
         jobId: job.id,
         status: 'completed',
         completionDate: new Date().toISOString(),
@@ -625,7 +625,7 @@ export class MarketplaceService extends EventEmitter {
 
       await this.redis.publish('crm:job_completed', JSON.stringify(crmData));
 
-      logger.debug('Client CRM completion updated', { clientId: job.clientId, jobId: job.id });
+      logger.debug('Client CRM completion updated', { client_id: job.client_id, jobId: job.id });
     } catch (error) {
       logger.error('Error updating client CRM completion', { error, jobId: job.id });
     }
@@ -633,7 +633,7 @@ export class MarketplaceService extends EventEmitter {
 
   private async notifySelectedTradieDirectly(job: MarketplaceJobEntity): Promise<void> {
     try {
-      const tradieUser = await this.userService.getUserById(this.convertUserIdToString(job.selectedTradieId));
+      const tradieUser = await this.userService.getUserById(this.convertUserIdToString(job.selectedtradie_id));
       
       if (tradieUser) {
         await this.emailService.sendJobNotificationEmail(
@@ -655,13 +655,13 @@ export class MarketplaceService extends EventEmitter {
         jobId: job.id,
         jobTitle: job.title,
         clientName: job.clientName,
-        tradieId: job.selectedTradieId,
+        tradie_id: job.selectedtradie_id,
         timestamp: new Date().toISOString()
       };
 
       await this.redis.publish('notifications:application_selected', JSON.stringify(notificationData));
 
-      logger.debug('Selected tradie notified', { jobId: job.id, tradieId: job.selectedTradieId });
+      logger.debug('Selected tradie notified', { jobId: job.id, tradie_id: job.selectedtradie_id });
     } catch (error) {
       logger.error('Error notifying selected tradie', { error, jobId: job.id });
     }
@@ -686,28 +686,28 @@ export class MarketplaceService extends EventEmitter {
 
   private async updateTradieStatsDirectly(job: MarketplaceJobEntity): Promise<void> {
     try {
-      const tradieUser = await this.userService.getUserById(this.convertUserIdToString(job.selectedTradieId));
+      const tradieUser = await this.userService.getUserById(this.convertUserIdToString(job.selectedtradie_id));
       
       if (tradieUser) {
-        const tradieProfile = await this.profileService.getProfileByUserId(this.convertUserIdToString(job.selectedTradieId));
+        const tradieProfile = await this.profileService.getProfileByUserId(this.convertUserIdToString(job.selectedtradie_id));
         
         if (tradieProfile) {
-          await this.profileService.updateProfile(this.convertUserIdToString(job.selectedTradieId), {
+          await this.profileService.updateProfile(this.convertUserIdToString(job.selectedtradie_id), {
             bio: tradieProfile.bio ? `${tradieProfile.bio} | Completed marketplace job: ${job.title}` : `Completed marketplace job: ${job.title}`
           });
         }
       }
 
       const statsData = {
-        tradieId: job.selectedTradieId,
+        tradie_id: job.selectedtradie_id,
         jobId: job.id,
-        jobType: job.jobType,
+        job_type: job.job_type,
         completionDate: new Date().toISOString()
       };
 
       await this.redis.publish('tradie_stats:job_completed', JSON.stringify(statsData));
 
-      logger.debug('Tradie stats updated', { jobId: job.id, tradieId: job.selectedTradieId });
+      logger.debug('Tradie stats updated', { jobId: job.id, tradie_id: job.selectedtradie_id });
     } catch (error) {
       logger.error('Error updating tradie stats', { error, jobId: job.id });
     }
@@ -719,7 +719,7 @@ export class MarketplaceService extends EventEmitter {
       
       if (bonusCredits > 0) {
         await this.creditService.addCredits(
-          job.selectedTradieId,
+          job.selectedtradie_id,
           bonusCredits,
           'job_completion_bonus'
         );
@@ -727,8 +727,8 @@ export class MarketplaceService extends EventEmitter {
 
       const rewardData = {
         jobId: job.id,
-        clientId: job.clientId,
-        tradieId: job.selectedTradieId,
+        client_id: job.client_id,
+        tradie_id: job.selectedtradie_id,
         jobValue: job.estimatedBudget,
         bonusCredits,
         timestamp: new Date().toISOString()
@@ -748,17 +748,17 @@ export class MarketplaceService extends EventEmitter {
       
       for (const application of applications) {
         if (application.status !== 'selected') {
-          const refundAmount = application.creditsUsed;
+          const refundAmount = application.credits_used;
           
           await this.creditService.refundCredits(
-            application.tradieId,
+            application.tradie_id,
             refundAmount,
             `Job cancelled - refund for application to job #${jobId}`
           );
 
           logger.debug('Credits refunded for application', {
             jobId,
-            tradieId: application.tradieId,
+            tradie_id: application.tradie_id,
             refundAmount
           });
         }
@@ -780,7 +780,7 @@ export class MarketplaceService extends EventEmitter {
 
   private async notifyAffectedPartiesDirectly(job: MarketplaceJobEntity): Promise<void> {
     try {
-      const clientUser = await this.userService.getUserById(this.convertUserIdToString(job.clientId));
+      const clientUser = await this.userService.getUserById(this.convertUserIdToString(job.client_id));
       
       if (clientUser) {
         await this.emailService.sendJobNotificationEmail(
@@ -809,8 +809,8 @@ export class MarketplaceService extends EventEmitter {
     try {
       const eventData = {
         jobId: job.id,
-        clientId: job.clientId,
-        jobType: job.jobType,
+        client_id: job.client_id,
+        job_type: job.job_type,
         location: job.location,
         urgencyLevel: job.urgencyLevel,
         estimatedBudget: job.estimatedBudget,
@@ -833,7 +833,7 @@ export class MarketplaceService extends EventEmitter {
     try {
       const eventData = {
         jobId: updatedJob.id,
-        clientId: updatedJob.clientId,
+        client_id: updatedJob.client_id,
         previousData: {
           title: previousJob.title,
           description: previousJob.description,
@@ -864,7 +864,7 @@ export class MarketplaceService extends EventEmitter {
     try {
       const eventData = {
         jobId: updatedJob.id,
-        clientId: updatedJob.clientId,
+        client_id: updatedJob.client_id,
         previousStatus: previousJob.status,
         newStatus: updatedJob.status,
         reason,
@@ -888,8 +888,8 @@ export class MarketplaceService extends EventEmitter {
     try {
       const eventData = {
         jobId: job.id,
-        clientId: job.clientId,
-        jobType: job.jobType,
+        client_id: job.client_id,
+        job_type: job.job_type,
         applicationCount: job.applicationCount,
         timestamp: new Date().toISOString()
       };
@@ -939,14 +939,14 @@ export class MarketplaceService extends EventEmitter {
 
   private extractFiltersFromSearch(searchParams: MarketplaceJobSearchParams): MarketplaceJobFilters {
     return {
-      jobType: searchParams.jobType,
+      job_type: searchParams.job_type,
       location: searchParams.location,
       urgencyLevel: searchParams.urgencyLevel,
       minBudget: searchParams.minBudget,
       maxBudget: searchParams.maxBudget,
       dateRange: searchParams.dateRange,
       excludeApplied: searchParams.excludeApplied,
-      tradieId: searchParams.tradieId
+      tradie_id: searchParams.tradie_id
     };
   }
 

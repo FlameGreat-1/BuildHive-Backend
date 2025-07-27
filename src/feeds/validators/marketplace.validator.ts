@@ -40,7 +40,7 @@ export const validateCreateMarketplaceJob = [
     .isLength({ min: MARKETPLACE_LIMITS.JOB_DESCRIPTION_MIN_LENGTH, max: MARKETPLACE_LIMITS.JOB_DESCRIPTION_MAX_LENGTH })
     .withMessage(`Job description must be between ${MARKETPLACE_LIMITS.JOB_DESCRIPTION_MIN_LENGTH} and ${MARKETPLACE_LIMITS.JOB_DESCRIPTION_MAX_LENGTH} characters`),
 
-  body('jobType')
+  body('job_type')
     .isIn(Object.values(MARKETPLACE_JOB_TYPES))
     .withMessage('Invalid job type'),
 
@@ -177,7 +177,7 @@ export const validateUpdateMarketplaceJob = [
   handleValidationErrors
 ];
 
-export const validateMarketplaceJobId = [
+export const validatemarketplace_job_id  = [
   param('id')
     .isInt({ min: 1 })
     .withMessage('Invalid job ID'),
@@ -192,7 +192,7 @@ export const validateMarketplaceJobSearch = [
     .isLength({ max: 200 })
     .withMessage('Search query must be less than 200 characters'),
 
-  query('jobType')
+  query('job_type')
     .optional()
     .isIn(Object.values(MARKETPLACE_JOB_TYPES))
     .withMessage('Invalid job type'),
@@ -297,7 +297,7 @@ export const validateTradieSelection = [
 ];
 
 export const validateMarketplaceJobFilters = [
-    query('jobType')
+    query('job_type')
       .optional()
       .isIn(Object.values(MARKETPLACE_JOB_TYPES))
       .withMessage('Invalid job type filter'),
@@ -410,7 +410,7 @@ export const validateMarketplaceJobFilters = [
   
     query('groupBy')
       .optional()
-      .isIn(['day', 'week', 'month', 'jobType', 'location', 'urgency'])
+      .isIn(['day', 'week', 'month', 'job_type', 'location', 'urgency'])
       .withMessage('Invalid groupBy parameter'),
   
     handleValidationErrors
@@ -432,9 +432,9 @@ export const validateMarketplaceJobFilters = [
   export const validateClientJobAccess = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const jobId = parseInt(req.params.id);
-      const clientId = req.user?.id;
+      const client_id = req.user?.id;
   
-      if (!clientId) {
+      if (!client_id) {
         return res.status(401).json(createValidationError('Authentication required'));
       }
   
@@ -443,7 +443,7 @@ export const validateMarketplaceJobFilters = [
       }
   
       req.jobId = jobId;
-      req.clientId = clientId;
+      req.client_id = client_id;
       next();
     } catch (error) {
       return res.status(500).json(createValidationError('Server error during validation'));
@@ -540,7 +540,7 @@ export const validateMarketplaceJobFilters = [
   export const validateSearchFilters = (req: Request, res: Response, next: NextFunction) => {
     try {
       const filters: MarketplaceJobFilters = {
-        jobType: req.query.jobType as any,
+        job_type: req.query.job_type as any,
         location: req.query.location as string,
         urgencyLevel: req.query.urgencyLevel as any,
         minBudget: req.query.minBudget ? parseFloat(req.query.minBudget as string) : undefined,
@@ -550,7 +550,7 @@ export const validateMarketplaceJobFilters = [
           endDate: new Date(req.query.endDate as string)
         } : undefined,
         excludeApplied: req.query.excludeApplied === 'true',
-        tradieId: req.user?.role === 'tradie' ? req.user.id : undefined
+        tradie_id: req.user?.role === 'tradie' ? req.user.id : undefined
       };
   
       const filterValidation = validateJobFilters(filters);

@@ -42,7 +42,7 @@ export class ApplicationRepository {
 
   async createApplication(
     applicationData: JobApplicationCreateData, 
-    tradieId: number
+    tradie_id: number
   ): Promise<JobApplicationEntity> {
     const client = await this.db.connect();
     
@@ -50,8 +50,8 @@ export class ApplicationRepository {
       await client.query('BEGIN');
       
       const existingApplication = await this.applicationModel.checkExistingApplication(
-        applicationData.marketplaceJobId, 
-        tradieId
+        applicationData.marketplace_job_id , 
+        tradie_id
       );
       
       if (existingApplication) {
@@ -64,7 +64,7 @@ export class ApplicationRepository {
         FROM marketplace_jobs 
         WHERE id = $1
       `;
-      const jobResult = await client.query(marketplaceJobQuery, [applicationData.marketplaceJobId]);
+      const jobResult = await client.query(marketplaceJobQuery, [applicationData.marketplace_job_id ]);
       
       if (jobResult.rows.length === 0) {
         await client.query('ROLLBACK');
@@ -82,37 +82,37 @@ export class ApplicationRepository {
         marketplaceJob.urgency_level
       );
 
-      await this.validateTradieCredits(client, tradieId, creditCost);
+      await this.validateTradieCredits(client, tradie_id, creditCost);
 
-      const application = await this.applicationModel.create(applicationData, tradieId);
+      const application = await this.applicationModel.create(applicationData, tradie_id);
 
-      await this.deductApplicationCredits(client, tradieId, application.id, creditCost);
+      await this.deductApplicationCredits(client, tradie_id, application.id, creditCost);
       
       await client.query(
         'UPDATE marketplace_jobs SET application_count = application_count + 1 WHERE id = $1',
-        [applicationData.marketplaceJobId]
+        [applicationData.marketplace_job_id ]
       );
 
       await this.logApplicationActivity(client, application.id, 'APPLICATION_CREATED', {
-        tradieId,
-        marketplaceJobId: applicationData.marketplaceJobId,
-        customQuote: applicationData.customQuote,
-        creditsUsed: creditCost
+        tradie_id,
+        marketplace_job_id : applicationData.marketplace_job_id ,
+        custom_quote: applicationData.custom_quote,
+        credits_used: creditCost
       });
 
       await client.query('COMMIT');
       
       logger.info('Job application created successfully', {
         applicationId: application.id,
-        tradieId,
-        marketplaceJobId: applicationData.marketplaceJobId,
-        creditsUsed: creditCost
+        tradie_id,
+        marketplace_job_id : applicationData.marketplace_job_id ,
+        credits_used: creditCost
       });
 
       return application;
     } catch (error) {
       await client.query('ROLLBACK');
-      logger.error('Error creating job application', { error, applicationData, tradieId });
+      logger.error('Error creating job application', { error, applicationData, tradie_id });
       throw new DatabaseError('Failed to create job application', error);
     } finally {
       client.release();
@@ -144,7 +144,7 @@ export class ApplicationRepository {
         FROM marketplace_jobs 
         WHERE id = $1
       `;
-      const jobResult = await this.db.query(jobQuery, [application.marketplaceJobId]);
+      const jobResult = await this.db.query(jobQuery, [application.marketplace_job_id ]);
       
       if (jobResult.rows.length === 0) return null;
 
@@ -161,7 +161,7 @@ export class ApplicationRepository {
         WHERE u.id = $1
       `;
 
-      const tradieResult = await this.db.query(tradieProfileQuery, [application.tradieId]);
+      const tradieResult = await this.db.query(tradieProfileQuery, [application.tradie_id]);
       
       if (tradieResult.rows.length === 0) {
         throw new DatabaseError('Tradie profile not found');
@@ -174,14 +174,14 @@ export class ApplicationRepository {
         job: {
           id: parseInt(marketplaceJob.id),
           title: marketplaceJob.title,
-          jobType: marketplaceJob.job_type,
+          job_type: marketplaceJob.job_type,
           location: marketplaceJob.location,
           estimatedBudget: parseFloat(marketplaceJob.estimated_budget) || 0,
           urgencyLevel: marketplaceJob.urgency_level,
           dateRequired: new Date(marketplaceJob.date_required)
         },
         tradie: {
-          id: application.tradieId,
+          id: application.tradie_id,
           username: tradieProfile.username,
           profile: {
             firstName: tradieProfile.first_name,
@@ -212,24 +212,24 @@ export class ApplicationRepository {
     }
   }
 
-  async findApplicationsByJob(marketplaceJobId: number): Promise<JobApplicationSummary[]> {
+  async findApplicationsByJob(marketplace_job_id : number): Promise<JobApplicationSummary[]> {
     try {
-      const applications = await this.applicationModel.findByJobId(marketplaceJobId);
+      const applications = await this.applicationModel.findByJobId(marketplace_job_id );
       
       logger.debug('Applications by job retrieved', {
-        marketplaceJobId,
+        marketplace_job_id ,
         count: applications.length
       });
 
       return applications;
     } catch (error) {
-      logger.error('Error finding applications by job', { error, marketplaceJobId });
+      logger.error('Error finding applications by job', { error, marketplace_job_id  });
       throw new DatabaseError('Failed to find applications by job', error);
     }
   }
 
   async findApplicationsByTradie(
-    tradieId: number, 
+    tradie_id: number, 
     params: { page: number; limit: number; status?: string }
   ): Promise<{
     applications: JobApplicationSummary[];
@@ -238,7 +238,7 @@ export class ApplicationRepository {
   }> {
     try {
       const offset = (params.page - 1) * params.limit;
-      const applications = await this.applicationModel.findByTradieId(tradieId, {
+      const applications = await this.applicationModel.findBytradie_id(tradie_id, {
         limit: params.limit,
         offset
       });
@@ -250,14 +250,14 @@ export class ApplicationRepository {
         ${params.status ? 'AND status = $2' : ''}
       `;
       
-      const countParams = params.status ? [tradieId, params.status] : [tradieId];
+      const countParams = params.status ? [tradie_id, params.status] : [tradie_id];
       const countResult = await this.db.query(countQuery, countParams);
       const totalCount = parseInt(countResult.rows[0].total);
 
       const hasMore = totalCount > (params.page * params.limit);
 
       logger.debug('Tradie applications retrieved', {
-        tradieId,
+        tradie_id,
         totalCount,
         returnedCount: applications.length
       });
@@ -268,7 +268,7 @@ export class ApplicationRepository {
         hasMore
       };
     } catch (error) {
-      logger.error('Error finding applications by tradie', { error, tradieId, params });
+      logger.error('Error finding applications by tradie', { error, tradie_id, params });
       throw new DatabaseError('Failed to find applications by tradie', error);
     }
   }
@@ -304,7 +304,7 @@ export class ApplicationRepository {
   async updateApplication(
     id: number, 
     updateData: JobApplicationUpdateData, 
-    tradieId: number
+    tradie_id: number
   ): Promise<JobApplicationEntity | null> {
     const client = await this.db.connect();
     
@@ -317,7 +317,7 @@ export class ApplicationRepository {
         return null;
       }
 
-      if (existingApplication.tradieId !== tradieId) {
+      if (existingApplication.tradie_id !== tradie_id) {
         await client.query('ROLLBACK');
         throw new DatabaseError('Unauthorized application update attempt');
       }
@@ -331,7 +331,7 @@ export class ApplicationRepository {
       
       if (updatedApplication) {
         await this.logApplicationActivity(client, id, 'APPLICATION_UPDATED', {
-          tradieId,
+          tradie_id,
           changes: updateData,
           previousStatus: existingApplication.status
         });
@@ -341,7 +341,7 @@ export class ApplicationRepository {
       
       logger.info('Job application updated successfully', {
         applicationId: id,
-        tradieId,
+        tradie_id,
         changes: Object.keys(updateData)
       });
 
@@ -408,7 +408,7 @@ export class ApplicationRepository {
 
   async withdrawApplication(
     id: number, 
-    tradieId: number, 
+    tradie_id: number, 
     withdrawalData: ApplicationWithdrawal
   ): Promise<JobApplicationEntity | null> {
     const client = await this.db.connect();
@@ -422,7 +422,7 @@ export class ApplicationRepository {
         return null;
       }
 
-      if (existingApplication.tradieId !== tradieId) {
+      if (existingApplication.tradie_id !== tradie_id) {
         await client.query('ROLLBACK');
         throw new DatabaseError('Unauthorized withdrawal attempt');
       }
@@ -435,15 +435,15 @@ export class ApplicationRepository {
       const withdrawnApplication = await this.applicationModel.updateStatus(id, APPLICATION_STATUS.WITHDRAWN);
       
       if (withdrawnApplication && withdrawalData.refundCredits) {
-        await this.refundApplicationCredits(client, tradieId, id, existingApplication.creditsUsed);
+        await this.refundApplicationCredits(client, tradie_id, id, existingApplication.credits_used);
       }
 
       if (withdrawnApplication) {
         await this.logApplicationActivity(client, id, 'APPLICATION_WITHDRAWN', {
-          tradieId,
+          tradie_id,
           reason: withdrawalData.reason,
           refundCredits: withdrawalData.refundCredits,
-          creditsRefunded: withdrawalData.refundCredits ? existingApplication.creditsUsed : 0
+          creditsRefunded: withdrawalData.refundCredits ? existingApplication.credits_used : 0
         });
       }
 
@@ -451,7 +451,7 @@ export class ApplicationRepository {
       
       logger.info('Application withdrawn successfully', {
         applicationId: id,
-        tradieId,
+        tradie_id,
         reason: withdrawalData.reason,
         refundCredits: withdrawalData.refundCredits
       });
@@ -459,26 +459,26 @@ export class ApplicationRepository {
       return withdrawnApplication;
     } catch (error) {
       await client.query('ROLLBACK');
-      logger.error('Error withdrawing application', { error, applicationId: id, tradieId });
+      logger.error('Error withdrawing application', { error, applicationId: id, tradie_id });
       throw new DatabaseError('Failed to withdraw application', error);
     } finally {
       client.release();
     }
   }
 
-  async getTradieApplicationHistory(tradieId: number): Promise<TradieApplicationHistory> {
+  async getTradieApplicationHistory(tradie_id: number): Promise<TradieApplicationHistory> {
     try {
-      const history = await this.applicationModel.getTradieApplicationHistory(tradieId);
+      const history = await this.applicationModel.getTradieApplicationHistory(tradie_id);
       
       logger.debug('Tradie application history retrieved', {
-        tradieId,
+        tradie_id,
         totalApplications: history.totalApplications,
         conversionRate: history.conversionRate
       });
 
       return history;
     } catch (error) {
-      logger.error('Error getting tradie application history', { error, tradieId });
+      logger.error('Error getting tradie application history', { error, tradie_id });
       throw new DatabaseError('Failed to get tradie application history', error);
     }
   }
@@ -541,7 +541,7 @@ export class ApplicationRepository {
   }
 
   async getApplicationAnalytics(params: {
-    tradieId?: number;
+    tradie_id?: number;
     startDate?: Date;
     endDate?: Date;
     groupBy?: 'day' | 'week' | 'month' | 'status';
@@ -551,9 +551,9 @@ export class ApplicationRepository {
       const queryParams: any[] = [];
       let paramIndex = 1;
 
-      if (params.tradieId) {
+      if (params.tradie_id) {
         whereClause += ` AND tradie_id = $${paramIndex}`;
-        queryParams.push(params.tradieId);
+        queryParams.push(params.tradie_id);
         paramIndex++;
       }
 
@@ -659,16 +659,16 @@ export class ApplicationRepository {
     }
   }
 
-  async validateApplicationOwnership(applicationId: number, tradieId: number): Promise<boolean> {
+  async validateApplicationOwnership(applicationId: number, tradie_id: number): Promise<boolean> {
     try {
       const result = await this.db.query(
         'SELECT 1 FROM job_applications WHERE id = $1 AND tradie_id = $2',
-        [applicationId, tradieId]
+        [applicationId, tradie_id]
       );
 
       return result.rows.length > 0;
     } catch (error) {
-      logger.error('Error validating application ownership', { error, applicationId, tradieId });
+      logger.error('Error validating application ownership', { error, applicationId, tradie_id });
       return false;
     }
   }
@@ -702,18 +702,18 @@ export class ApplicationRepository {
     }
   }
 
-  private async calculateApplicationCreditCost(jobType: string, urgencyLevel: string): Promise<number> {
+  private async calculateApplicationCreditCost(job_type: string, urgencyLevel: string): Promise<number> {
     const baseCost = MARKETPLACE_CREDIT_COSTS.BASE_APPLICATION_COST;
     const urgencyMultiplier = MARKETPLACE_CREDIT_COSTS.URGENCY_MULTIPLIERS[urgencyLevel as keyof typeof MARKETPLACE_CREDIT_COSTS.URGENCY_MULTIPLIERS] || 1.0;
-    const jobTypeMultiplier = MARKETPLACE_CREDIT_COSTS.JOB_TYPE_MULTIPLIERS[jobType as keyof typeof MARKETPLACE_CREDIT_COSTS.JOB_TYPE_MULTIPLIERS] || 1.0;
+    const job_typeMultiplier = MARKETPLACE_CREDIT_COSTS.JOB_TYPE_MULTIPLIERS[job_type as keyof typeof MARKETPLACE_CREDIT_COSTS.JOB_TYPE_MULTIPLIERS] || 1.0;
     
-    return Math.ceil(baseCost * urgencyMultiplier * jobTypeMultiplier);
+    return Math.ceil(baseCost * urgencyMultiplier * job_typeMultiplier);
   }
 
-  private async validateTradieCredits(client: PoolClient, tradieId: number, requiredCredits: number): Promise<void> {
+  private async validateTradieCredits(client: PoolClient, tradie_id: number, requiredCredits: number): Promise<void> {
     const creditResult = await client.query(
       'SELECT balance FROM credits WHERE user_id = $1',
-      [tradieId]
+      [tradie_id]
     );
 
     if (creditResult.rows.length === 0 || parseInt(creditResult.rows[0].balance) < requiredCredits) {
@@ -723,41 +723,41 @@ export class ApplicationRepository {
 
   private async deductApplicationCredits(
     client: PoolClient, 
-    tradieId: number, 
+    tradie_id: number, 
     applicationId: number, 
     creditAmount: number
   ): Promise<void> {
     await client.query(
       'UPDATE credits SET balance = balance - $1, updated_at = NOW() WHERE user_id = $2',
-      [creditAmount, tradieId]
+      [creditAmount, tradie_id]
     );
 
     await client.query(
       `INSERT INTO credit_transactions 
        (user_id, transaction_type, amount, description, reference_id, created_at) 
        VALUES ($1, 'job_application', $2, 'Job application fee', $3, NOW())`,
-      [tradieId, -creditAmount, applicationId]
+      [tradie_id, -creditAmount, applicationId]
     );
 
-    await this.applicationModel.updateCreditsUsed(applicationId, creditAmount);
+    await this.applicationModel.updatecredits_used(applicationId, creditAmount);
   }
 
   private async refundApplicationCredits(
     client: PoolClient, 
-    tradieId: number, 
+    tradie_id: number, 
     applicationId: number, 
     creditAmount: number
   ): Promise<void> {
     await client.query(
       'UPDATE credits SET balance = balance + $1, updated_at = NOW() WHERE user_id = $2',
-      [creditAmount, tradieId]
+      [creditAmount, tradie_id]
     );
 
     await client.query(
       `INSERT INTO credit_transactions 
        (user_id, transaction_type, amount, description, reference_id, created_at) 
        VALUES ($1, 'application_refund', $2, 'Application withdrawal refund', $3, NOW())`,
-      [tradieId, creditAmount, applicationId]
+      [tradie_id, creditAmount, applicationId]
     );
   }
 
@@ -766,14 +766,14 @@ export class ApplicationRepository {
       `UPDATE job_applications 
        SET status = 'rejected' 
        WHERE marketplace_job_id = $1 AND id != $2 AND status IN ('submitted', 'under_review')`,
-      [application.marketplaceJobId, application.id]
+      [application.marketplace_job_id , application.id]
     );
 
     await client.query(
       `UPDATE marketplace_jobs 
        SET status = 'assigned' 
        WHERE id = $1`,
-      [application.marketplaceJobId]
+      [application.marketplace_job_id ]
     );
   }
 

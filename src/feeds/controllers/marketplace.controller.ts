@@ -5,7 +5,7 @@ import {
   MarketplaceJobUpdateData,
   MarketplaceJobSearchParams
 } from '../types';
-import { MarketplaceJobType, UrgencyLevel } from '../../shared/types';
+import { Marketplacejob_type, UrgencyLevel } from '../../shared/types';
 import { MarketplaceSortOption } from '../../config/feeds/constants';
 import { logger, createResponse } from '../../shared/utils';
 
@@ -32,15 +32,15 @@ export class MarketplaceController {
   createMarketplaceJob = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const jobData: MarketplaceJobCreateData = req.body;
-      const clientId = this.convertUserIdToNumber(req.user?.id);
+      const client_id = this.convertUserIdToNumber(req.user?.id);
 
-      const result = await this.marketplaceService.createMarketplaceJob(jobData, clientId!);
+      const result = await this.marketplaceService.createMarketplaceJob(jobData, client_id!);
 
       if (result.success) {
         logger.info('Marketplace job created successfully', {
           jobId: result.data?.id,
-          clientId,
-          jobType: result.data?.job_type,
+          client_id,
+          job_type: result.data?.job_type,
           location: result.data?.location
         });
       }
@@ -56,9 +56,9 @@ export class MarketplaceController {
   getMarketplaceJob = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const { jobId } = req.params;
-      const tradieId = this.convertUserIdToNumber(req.user?.id);
+      const tradie_id = this.convertUserIdToNumber(req.user?.id);
 
-      const result = await this.marketplaceService.getMarketplaceJob(parseInt(jobId), tradieId);
+      const result = await this.marketplaceService.getMarketplaceJob(parseInt(jobId), tradie_id);
 
       res.status(result.success ? 200 : 404).json(result);
     } catch (error) {
@@ -70,12 +70,12 @@ export class MarketplaceController {
 
   searchMarketplaceJobs = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
-      const tradieId = this.convertUserIdToNumber(req.user?.id);
+      const tradie_id = this.convertUserIdToNumber(req.user?.id);
       
       const searchParams: MarketplaceJobSearchParams = {
         page: parseInt(req.query.page as string) || 1,
         limit: parseInt(req.query.limit as string) || 20,
-        jobType: req.query.jobType as MarketplaceJobType | undefined,
+        job_type: req.query.job_type as Marketplacejob_type | undefined,
         location: req.query.location as string,
         urgencyLevel: req.query.urgencyLevel as UrgencyLevel | undefined,
         minBudget: req.query.minBudget ? parseFloat(req.query.minBudget as string) : undefined,
@@ -85,7 +85,7 @@ export class MarketplaceController {
           endDate: new Date(req.query.endDate as string)
         } : undefined,
         excludeApplied: req.query.excludeApplied === 'true',
-        tradieId: tradieId,
+        tradie_id: tradie_id,
         searchTerm: req.query.searchTerm as string,
         sortBy: req.query.sortBy as MarketplaceSortOption | undefined,
         sortOrder: req.query.sortOrder as 'asc' | 'desc'
@@ -105,12 +105,12 @@ export class MarketplaceController {
     try {
       const { jobId } = req.params;
       const updateData: MarketplaceJobUpdateData = req.body;
-      const clientId = this.convertUserIdToNumber(req.user?.id);
+      const client_id = this.convertUserIdToNumber(req.user?.id);
 
       const result = await this.marketplaceService.updateMarketplaceJob(
         parseInt(jobId),
         updateData,
-        clientId!
+        client_id!
       );
 
       res.status(result.success ? 200 : 400).json(result);
@@ -129,13 +129,13 @@ export class MarketplaceController {
     try {
       const { jobId } = req.params;
       const { status, reason } = req.body;
-      const clientId = this.convertUserIdToNumber(req.user?.id);
+      const client_id = this.convertUserIdToNumber(req.user?.id);
 
       const result = await this.marketplaceService.updateJobStatus(
         parseInt(jobId),
         status,
         reason,
-        clientId!
+        client_id!
       );
 
       res.status(result.success ? 200 : 400).json(result);
@@ -153,9 +153,9 @@ export class MarketplaceController {
   deleteMarketplaceJob = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const { jobId } = req.params;
-      const clientId = this.convertUserIdToNumber(req.user?.id);
+      const client_id = this.convertUserIdToNumber(req.user?.id);
 
-      const result = await this.marketplaceService.deleteMarketplaceJob(parseInt(jobId), clientId!);
+      const result = await this.marketplaceService.deleteMarketplaceJob(parseInt(jobId), client_id!);
 
       res.status(result.success ? 200 : 400).json(result);
     } catch (error) {
@@ -171,12 +171,12 @@ export class MarketplaceController {
 
   getClientJobs = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
-      const clientId = this.convertUserIdToNumber(req.user?.id);
+      const client_id = this.convertUserIdToNumber(req.user?.id);
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 20;
       const status = req.query.status as string;
 
-      const result = await this.marketplaceService.getClientJobs(clientId!, {
+      const result = await this.marketplaceService.getClientJobs(client_id!, {
         page,
         limit,
         status
@@ -218,10 +218,10 @@ export class MarketplaceController {
 
   getRecommendedJobs = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
-      const tradieId = this.convertUserIdToNumber(req.user?.id);
+      const tradie_id = this.convertUserIdToNumber(req.user?.id);
       const limit = parseInt(req.query.limit as string) || 10;
 
-      const result = await this.marketplaceService.getRecommendedJobs(tradieId!, limit);
+      const result = await this.marketplaceService.getRecommendedJobs(tradie_id!, limit);
 
       res.status(result.success ? 200 : 400).json(result);
     } catch (error) {
@@ -246,7 +246,7 @@ export class MarketplaceController {
   bulkUpdateJobStatus = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const { jobIds, status, reason } = req.body;
-      const clientId = this.convertUserIdToNumber(req.user?.id);
+      const client_id = this.convertUserIdToNumber(req.user?.id);
 
       const results = [];
       for (const jobId of jobIds) {
@@ -255,7 +255,7 @@ export class MarketplaceController {
             parseInt(jobId),
             status,
             reason,
-            clientId!
+            client_id!
           );
           results.push({ jobId, success: result.success, message: result.message });
         } catch (error) {
@@ -283,7 +283,7 @@ export class MarketplaceController {
       const params = {
         startDate: req.query.startDate ? new Date(req.query.startDate as string) : undefined,
         endDate: req.query.endDate ? new Date(req.query.endDate as string) : undefined,
-        groupBy: req.query.groupBy as 'day' | 'week' | 'month' | 'jobType' | 'location' | undefined
+        groupBy: req.query.groupBy as 'day' | 'week' | 'month' | 'job_type' | 'location' | undefined
       };
 
       const result = await this.marketplaceService.getMarketplaceStats();

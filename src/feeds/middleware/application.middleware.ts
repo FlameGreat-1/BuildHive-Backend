@@ -59,7 +59,7 @@ export class ApplicationMiddleware {
         return;
       }
 
-      const jobResult = await this.marketplaceService.getMarketplaceJob(body.marketplaceJobId);
+      const jobResult = await this.marketplaceService.getMarketplaceJob(body.marketplace_job_id );
       if (!jobResult.success || !jobResult.data) {
         const response = createResponse(false, 'Job not found', null);
         res.status(404).json(response);
@@ -481,10 +481,10 @@ export class ApplicationMiddleware {
 
   checkDuplicateApplication = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { marketplaceJobId } = req.body;
+      const { marketplace_job_id  } = req.body;
       const userId = req.user?.id;
 
-      if (!marketplaceJobId || !userId) {
+      if (!marketplace_job_id  || !userId) {
         next();
         return;
       }
@@ -496,7 +496,7 @@ export class ApplicationMiddleware {
 
       if (existingApplications.success && existingApplications.data) {
         const duplicateApplication = existingApplications.data.applications.find(
-          app => app.marketplaceJobId === marketplaceJobId && 
+          app => app.marketplace_job_id  === marketplace_job_id  && 
                  app.status !== APPLICATION_STATUS.WITHDRAWN
         );
 

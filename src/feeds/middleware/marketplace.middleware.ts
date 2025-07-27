@@ -81,7 +81,7 @@ export class MarketplaceMiddleware {
       }
 
       const job = jobResult.data;
-      if (job.job.clientId !== userId) {
+      if (job.job.client_id !== userId) {
         const response = createResponse(false, 'Unauthorized access', null);
         res.status(403).json(response);
         return;
@@ -152,7 +152,7 @@ export class MarketplaceMiddleware {
       }
 
       const job = jobResult.data;
-      if (job.job.clientId !== userId) {
+      if (job.job.client_id !== userId) {
         const response = createResponse(false, 'Unauthorized access', null);
         res.status(403).json(response);
         return;
@@ -192,7 +192,7 @@ export class MarketplaceMiddleware {
       }
 
       const job = jobResult.data;
-      if (job.job.clientId !== userId) {
+      if (job.job.client_id !== userId) {
         const response = createResponse(false, 'Unauthorized access', null);
         res.status(403).json(response);
         return;
@@ -416,7 +416,7 @@ export class MarketplaceMiddleware {
         }
   
         const job = jobResult.data;
-        if (job.job.clientId !== userId) {
+        if (job.job.client_id !== userId) {
           const response = createResponse(false, 'Unauthorized access', null);
           res.status(403).json(response);
           return;
@@ -438,11 +438,11 @@ export class MarketplaceMiddleware {
   
     validateJobFilters = (req: Request, res: Response, next: NextFunction): void => {
       try {
-        const { jobType, location, urgencyLevel, minBudget, maxBudget } = req.query;
+        const { job_type, location, urgencyLevel, minBudget, maxBudget } = req.query;
   
-        if (jobType && typeof jobType === 'string') {
-          const validJobTypes = Object.values(MARKETPLACE_JOB_STATUS);
-          if (!validJobTypes.includes(jobType as any)) {
+        if (job_type && typeof job_type === 'string') {
+          const validjob_types = Object.values(MARKETPLACE_JOB_STATUS);
+          if (!validjob_types.includes(job_type as any)) {
             const response = createResponse(false, 'Invalid job type filter', null);
             res.status(400).json(response);
             return;
@@ -573,7 +573,7 @@ export class MarketplaceMiddleware {
           }
   
           const job = jobResult.data;
-          const isOwner = job.job.clientId === userId;
+          const isOwner = job.job.client_id === userId;
           const isTradie = userRole === 'tradie';
   
           switch (accessType) {

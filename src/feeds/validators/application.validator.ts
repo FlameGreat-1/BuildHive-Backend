@@ -27,11 +27,11 @@ import {
 } from '../utils';
 
 export const validateCreateJobApplication = [
-  body('marketplaceJobId')
+  body('marketplace_job_id ')
     .isInt({ min: 1 })
     .withMessage('Invalid marketplace job ID'),
 
-  body('customQuote')
+  body('custom_quote')
     .isFloat({ min: MARKETPLACE_LIMITS.MIN_CUSTOM_QUOTE, max: MARKETPLACE_LIMITS.MAX_CUSTOM_QUOTE })
     .withMessage(`Custom quote must be between $${MARKETPLACE_LIMITS.MIN_CUSTOM_QUOTE} and $${MARKETPLACE_LIMITS.MAX_CUSTOM_QUOTE}`),
 
@@ -114,7 +114,7 @@ export const validateUpdateJobApplication = [
     .isInt({ min: 1 })
     .withMessage('Invalid application ID'),
 
-  body('customQuote')
+  body('custom_quote')
     .optional()
     .isFloat({ min: MARKETPLACE_LIMITS.MIN_CUSTOM_QUOTE, max: MARKETPLACE_LIMITS.MAX_CUSTOM_QUOTE })
     .withMessage(`Custom quote must be between $${MARKETPLACE_LIMITS.MIN_CUSTOM_QUOTE} and $${MARKETPLACE_LIMITS.MAX_CUSTOM_QUOTE}`),
@@ -207,17 +207,17 @@ export const validateApplicationSearch = [
     .isIn(Object.values(APPLICATION_STATUS))
     .withMessage('Invalid application status'),
 
-  query('marketplaceJobId')
+  query('marketplace_job_id ')
     .optional()
     .isInt({ min: 1 })
     .withMessage('Invalid marketplace job ID'),
 
-  query('tradieId')
+  query('tradie_id')
     .optional()
     .isInt({ min: 1 })
     .withMessage('Invalid tradie ID'),
 
-  query('jobType')
+  query('job_type')
     .optional()
     .isIn(Object.values(MARKETPLACE_JOB_TYPES))
     .withMessage('Invalid job type'),
@@ -385,12 +385,12 @@ export const validateBulkApplicationOperation = [
         return true;
       }),
   
-    query('tradieId')
+    query('tradie_id')
       .optional()
       .isInt({ min: 1 })
       .withMessage('Invalid tradie ID'),
   
-    query('jobType')
+    query('job_type')
       .optional()
       .isIn(Object.values(MARKETPLACE_JOB_TYPES))
       .withMessage('Invalid job type'),
@@ -401,10 +401,10 @@ export const validateBulkApplicationOperation = [
   export const validateTradieApplicationAccess = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const applicationId = parseInt(req.params.id);
-      const tradieId = req.user?.id;
+      const tradie_id = req.user?.id;
       const userRole = req.user?.role;
   
-      if (!tradieId) {
+      if (!tradie_id) {
         return res.status(401).json(createValidationError('Authentication required'));
       }
   
@@ -417,7 +417,7 @@ export const validateBulkApplicationOperation = [
       }
   
       req.applicationId = applicationId;
-      req.tradieId = tradieId;
+      req.tradie_id = tradie_id;
       next();
     } catch (error) {
       return res.status(500).json(createValidationError('Server error during validation'));
@@ -427,10 +427,10 @@ export const validateBulkApplicationOperation = [
   export const validateClientApplicationAccess = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const applicationId = parseInt(req.params.id);
-      const clientId = req.user?.id;
+      const client_id = req.user?.id;
       const userRole = req.user?.role;
   
-      if (!clientId) {
+      if (!client_id) {
         return res.status(401).json(createValidationError('Authentication required'));
       }
   
@@ -443,7 +443,7 @@ export const validateBulkApplicationOperation = [
       }
   
       req.applicationId = applicationId;
-      req.clientId = clientId;
+      req.client_id = client_id;
       next();
     } catch (error) {
       return res.status(500).json(createValidationError('Server error during validation'));
@@ -593,9 +593,9 @@ export const validateBulkApplicationOperation = [
     try {
       const filters: JobApplicationFilters = {
         status: req.query.status as any,
-        marketplaceJobId: req.query.marketplaceJobId ? parseInt(req.query.marketplaceJobId as string) : undefined,
-        tradieId: req.query.tradieId ? parseInt(req.query.tradieId as string) : undefined,
-        jobType: req.query.jobType as any,
+        marketplace_job_id : req.query.marketplace_job_id  ? parseInt(req.query.marketplace_job_id  as string) : undefined,
+        tradie_id: req.query.tradie_id ? parseInt(req.query.tradie_id as string) : undefined,
+        job_type: req.query.job_type as any,
         dateRange: req.query.startDate && req.query.endDate ? {
           startDate: new Date(req.query.startDate as string),
           endDate: new Date(req.query.endDate as string)
@@ -648,16 +648,16 @@ export const validateBulkApplicationOperation = [
   
   export const validateCreditBalance = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const tradieId = req.user?.id;
-      const marketplaceJobId = req.body.marketplaceJobId;
+      const tradie_id = req.user?.id;
+      const marketplace_job_id  = req.body.marketplace_job_id ;
   
-      if (!tradieId) {
+      if (!tradie_id) {
         return res.status(401).json(createValidationError('Authentication required'));
       }
   
       req.creditValidationRequired = {
-        tradieId,
-        marketplaceJobId
+        tradie_id,
+        marketplace_job_id 
       };
   
       next();
@@ -668,16 +668,16 @@ export const validateBulkApplicationOperation = [
   
   export const validateDuplicateApplication = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const tradieId = req.user?.id;
-      const marketplaceJobId = req.body.marketplaceJobId;
+      const tradie_id = req.user?.id;
+      const marketplace_job_id  = req.body.marketplace_job_id ;
   
-      if (!tradieId || !marketplaceJobId) {
+      if (!tradie_id || !marketplace_job_id ) {
         return res.status(400).json(createValidationError('Missing required data for duplicate check'));
       }
   
       req.duplicateCheckRequired = {
-        tradieId,
-        marketplaceJobId
+        tradie_id,
+        marketplace_job_id 
       };
   
       next();

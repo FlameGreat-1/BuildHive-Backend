@@ -26,13 +26,13 @@ export class ApplicationModel {
     this.db = database;
   }
 
-  async create(applicationData: JobApplicationCreateData, tradieId: number): Promise<JobApplicationEntity> {
+  async create(applicationData: JobApplicationCreateData, tradie_id: number): Promise<JobApplicationEntity> {
     const result = await this.db.query(
       MARKETPLACE_QUERIES.CREATE_JOB_APPLICATION,
       [
-        applicationData.marketplaceJobId,
-        tradieId,
-        applicationData.customQuote,
+        applicationData.marketplace_job_id ,
+        tradie_id,
+        applicationData.custom_quote,
         applicationData.proposedTimeline,
         applicationData.approachDescription,
         applicationData.materialsList || null,
@@ -62,28 +62,28 @@ export class ApplicationModel {
     return this.transformToEntity(result.rows[0]);
   }
 
-  async findByJobId(marketplaceJobId: number): Promise<JobApplicationSummary[]> {
+  async findByJobId(marketplace_job_id : number): Promise<JobApplicationSummary[]> {
     const result = await this.db.query(
       MARKETPLACE_QUERIES.GET_APPLICATIONS_BY_JOB,
-      [marketplaceJobId]
+      [marketplace_job_id ]
     );
 
     return result.rows.map(row => this.transformToSummary(row));
   }
 
-  async findByTradieId(tradieId: number, params: { limit: number; offset: number }): Promise<JobApplicationSummary[]> {
+  async findBytradie_id(tradie_id: number, params: { limit: number; offset: number }): Promise<JobApplicationSummary[]> {
     const result = await this.db.query(
       MARKETPLACE_QUERIES.GET_APPLICATIONS_BY_TRADIE,
-      [tradieId, params.limit, params.offset]
+      [tradie_id, params.limit, params.offset]
     );
 
     return result.rows.map(row => this.transformToSummary(row));
   }
 
-  async checkExistingApplication(marketplaceJobId: number, tradieId: number): Promise<boolean> {
+  async checkExistingApplication(marketplace_job_id : number, tradie_id: number): Promise<boolean> {
     const result = await this.db.query(
       MARKETPLACE_QUERIES.CHECK_EXISTING_APPLICATION,
-      [marketplaceJobId, tradieId]
+      [marketplace_job_id , tradie_id]
     );
 
     return result.rows.length > 0;
@@ -99,9 +99,9 @@ export class ApplicationModel {
     const updateValues: any[] = [];
     let paramIndex = 2;
 
-    if (updateData.customQuote !== undefined) {
+    if (updateData.custom_quote !== undefined) {
       updateFields.push(`custom_quote = $${paramIndex}`);
-      updateValues.push(updateData.customQuote);
+      updateValues.push(updateData.custom_quote);
       paramIndex++;
     }
 
@@ -195,10 +195,10 @@ export class ApplicationModel {
     return this.transformToEntity(result.rows[0]);
   }
 
-  async updateCreditsUsed(id: number, creditsUsed: number): Promise<void> {
+  async updatecredits_used(id: number, credits_used: number): Promise<void> {
     await this.db.query(
       'UPDATE job_applications SET credits_used = $2, updated_at = NOW() WHERE id = $1',
-      [id, creditsUsed]
+      [id, credits_used]
     );
   }
 
@@ -221,21 +221,21 @@ export class ApplicationModel {
       paramIndex++;
     }
 
-    if (searchParams.marketplaceJobId) {
+    if (searchParams.marketplace_job_id ) {
       whereConditions.push(`ja.marketplace_job_id = $${paramIndex}`);
-      queryParams.push(searchParams.marketplaceJobId);
+      queryParams.push(searchParams.marketplace_job_id );
       paramIndex++;
     }
 
-    if (searchParams.tradieId) {
+    if (searchParams.tradie_id) {
       whereConditions.push(`ja.tradie_id = $${paramIndex}`);
-      queryParams.push(searchParams.tradieId);
+      queryParams.push(searchParams.tradie_id);
       paramIndex++;
     }
 
-    if (searchParams.jobType) {
+    if (searchParams.job_type) {
       whereConditions.push(`mj.job_type = $${paramIndex}`);
-      queryParams.push(searchParams.jobType);
+      queryParams.push(searchParams.job_type);
       paramIndex++;
     }
 
@@ -298,7 +298,7 @@ export class ApplicationModel {
     };
   }
 
-  async getTradieApplicationHistory(tradieId: number): Promise<TradieApplicationHistory> {
+  async getTradieApplicationHistory(tradie_id: number): Promise<TradieApplicationHistory> {
     const statsQuery = `
       SELECT 
         COUNT(*) as total_applications,
@@ -322,8 +322,8 @@ export class ApplicationModel {
     `;
 
     const [statsResult, activityResult] = await Promise.all([
-      this.db.query(statsQuery, [tradieId]),
-      this.db.query(recentActivityQuery, [tradieId])
+      this.db.query(statsQuery, [tradie_id]),
+      this.db.query(recentActivityQuery, [tradie_id])
     ]);
 
     const stats = statsResult.rows[0];
@@ -447,18 +447,18 @@ export class ApplicationModel {
   private transformToSummary(row: any): JobApplicationSummary {
     return {
       id: row.id,
-      marketplaceJobId: row.marketplace_job_id,
-      tradieId: row.tradie_id,
-      customQuote: parseFloat(row.custom_quote),
+      marketplace_job_id : row.marketplace_job_id,
+      tradie_id: row.tradie_id,
+      custom_quote: parseFloat(row.custom_quote),
       proposedTimeline: row.proposed_timeline,
       status: row.status,
       applicationTimestamp: new Date(row.application_timestamp),
-      creditsUsed: parseInt(row.credits_used) || 0,
+      credits_used: parseInt(row.credits_used) || 0,
       tradieName: row.first_name && row.last_name ? `${row.first_name} ${row.last_name}` : row.username,
       tradieRating: row.rating ? parseFloat(row.rating) : undefined,
       tradieCompletedJobs: parseInt(row.completed_jobs) || 0,
       jobTitle: row.title,
-      jobType: row.job_type,
+      job_type: row.job_type,
       jobLocation: row.location,
       isSelected: row.status === 'selected',
       canWithdraw: row.status === 'submitted'

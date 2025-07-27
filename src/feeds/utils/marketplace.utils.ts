@@ -56,9 +56,9 @@ import {
       });
     }
   
-    if (!jobData.jobType || !Object.values(MARKETPLACE_JOB_TYPES).includes(jobData.jobType as any)) {
+    if (!jobData.job_type || !Object.values(MARKETPLACE_JOB_TYPES).includes(jobData.job_type as any)) {
       errors.push({
-        field: 'jobType',
+        field: 'job_type',
         message: 'Invalid job type',
         code: 'INVALID_JOB_TYPE'
       });
@@ -167,24 +167,24 @@ import {
     };
   };
   
-  export const calculateCreditCost = (jobType: string, urgencyLevel: string): MarketplaceCreditCost => {
+  export const calculateCreditCost = (job_type: string, urgencyLevel: string): MarketplaceCreditCost => {
     const baseCost = MARKETPLACE_CREDIT_COSTS.BASE_APPLICATION_COST;
     const urgencyMultiplier = MARKETPLACE_CREDIT_COSTS.URGENCY_MULTIPLIERS[urgencyLevel as keyof typeof MARKETPLACE_CREDIT_COSTS.URGENCY_MULTIPLIERS] || 1.0;
-    const jobTypeMultiplier = MARKETPLACE_CREDIT_COSTS.JOB_TYPE_MULTIPLIERS[jobType as keyof typeof MARKETPLACE_CREDIT_COSTS.JOB_TYPE_MULTIPLIERS] || 1.0;
-    const finalCost = Math.ceil(baseCost * urgencyMultiplier * jobTypeMultiplier);
+    const job_typeMultiplier = MARKETPLACE_CREDIT_COSTS.JOB_TYPE_MULTIPLIERS[job_type as keyof typeof MARKETPLACE_CREDIT_COSTS.JOB_TYPE_MULTIPLIERS] || 1.0;
+    const finalCost = Math.ceil(baseCost * urgencyMultiplier * job_typeMultiplier);
   
     return {
-      marketplaceJobId: 0,
-      jobType: jobType as any,
+      marketplace_job_id : 0,
+      job_type: job_type as any,
       urgencyLevel: urgencyLevel as any,
       baseCost,
       urgencyMultiplier,
-      jobTypeMultiplier,
+      job_typeMultiplier,
       finalCost,
       calculation: {
         step1: `Base cost: ${baseCost} credits`,
         step2: `Urgency multiplier (${urgencyLevel}): ${urgencyMultiplier}x`,
-        step3: `Job type multiplier (${jobType}): ${jobTypeMultiplier}x`
+        step3: `Job type multiplier (${job_type}): ${job_typeMultiplier}x`
       }
     };
   };
@@ -204,9 +204,9 @@ import {
       paramIndex++;
     }
   
-    if (searchParams.jobType) {
+    if (searchParams.job_type) {
       conditions.push(`mj.job_type = $${paramIndex}`);
-      parameters.push(searchParams.jobType);
+      parameters.push(searchParams.job_type);
       paramIndex++;
     }
   
@@ -243,13 +243,13 @@ import {
       paramIndex++;
     }
   
-    if (searchParams.excludeApplied && searchParams.tradieId) {
+    if (searchParams.excludeApplied && searchParams.tradie_id) {
       conditions.push(`NOT EXISTS (
         SELECT 1 FROM job_applications ja 
         WHERE ja.marketplace_job_id = mj.id 
         AND ja.tradie_id = $${paramIndex}
       )`);
-      parameters.push(searchParams.tradieId);
+      parameters.push(searchParams.tradie_id);
       paramIndex++;
     }
   
@@ -290,7 +290,7 @@ import {
     return {
       id: job.id,
       title: job.title,
-      jobType: job.jobType,
+      job_type: job.job_type,
       location: job.location,
       estimatedBudget: job.estimatedBudget,
       urgencyLevel: job.urgencyLevel,
@@ -307,7 +307,7 @@ import {
     return {
       ...job,
       client: {
-        id: job.clientId,
+        id: job.client_id,
         name: job.clientName,
         email: job.clientEmail,
         phone: job.clientPhone,
@@ -322,7 +322,7 @@ import {
       creditCost: {
         baseCost: creditCost.baseCost,
         urgencyMultiplier: creditCost.urgencyMultiplier,
-        jobTypeMultiplier: creditCost.jobTypeMultiplier,
+        job_typeMultiplier: creditCost.job_typeMultiplier,
         finalCost: creditCost.finalCost
       },
       relatedJobs: []
@@ -359,8 +359,8 @@ import {
     return urgencyColors[urgencyLevel] || '#6c757d';
   };
   
-  export const getJobTypeIcon = (jobType: string): string => {
-    const jobTypeIcons: Record<string, string> = {
+  export const getjob_typeIcon = (job_type: string): string => {
+    const job_typeIcons: Record<string, string> = {
       [MARKETPLACE_JOB_TYPES.ELECTRICAL]: 'electrical-services',
       [MARKETPLACE_JOB_TYPES.PLUMBING]: 'plumbing',
       [MARKETPLACE_JOB_TYPES.CARPENTRY]: 'carpenter',
@@ -372,7 +372,7 @@ import {
       [MARKETPLACE_JOB_TYPES.HANDYMAN]: 'handyman',
       [MARKETPLACE_JOB_TYPES.GENERAL]: 'construction'
     };
-    return jobTypeIcons[jobType] || 'work';
+    return job_typeIcons[job_type] || 'work';
   };
   
   export const formatCurrency = (amount?: number): string => {
@@ -488,7 +488,7 @@ import {
   
   export const groupJobsByType = (jobs: MarketplaceJobSummary[]): Record<string, MarketplaceJobSummary[]> => {
     return jobs.reduce((groups, job) => {
-      const type = job.jobType;
+      const type = job.job_type;
       if (!groups[type]) {
         groups[type] = [];
       }
@@ -517,8 +517,8 @@ import {
       let scoreA = 0;
       let scoreB = 0;
   
-      if (tradieProfile.serviceTypes.includes(a.jobType)) scoreA += 10;
-      if (tradieProfile.serviceTypes.includes(b.jobType)) scoreB += 10;
+      if (tradieProfile.serviceTypes.includes(a.job_type)) scoreA += 10;
+      if (tradieProfile.serviceTypes.includes(b.job_type)) scoreB += 10;
   
       if (a.location.toLowerCase().includes(tradieProfile.location.toLowerCase())) scoreA += 5;
       if (b.location.toLowerCase().includes(tradieProfile.location.toLowerCase())) scoreB += 5;
@@ -579,8 +579,8 @@ import {
   export const buildFilterSummary = (filters: MarketplaceJobFilters): string => {
     const parts: string[] = [];
   
-    if (filters.jobType) {
-      parts.push(`Type: ${filters.jobType}`);
+    if (filters.job_type) {
+      parts.push(`Type: ${filters.job_type}`);
     }
   
     if (filters.location) {

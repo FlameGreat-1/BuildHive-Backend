@@ -8,7 +8,7 @@ import {
 
 import {
   ApplicationStatus,
-  MarketplaceJobType,
+  Marketplacejob_type,
   UrgencyLevel,
   MarketplaceNotificationType,
   APPLICATION_STATUS
@@ -26,8 +26,8 @@ export interface JobApplicationEntity extends Omit<JobApplicationDatabaseRecord,
 }
 
 export interface JobApplicationCreateData {
-  marketplaceJobId: number;
-  customQuote: number;
+  marketplace_job_id : number;
+  custom_quote: number;
   proposedTimeline: string;
   approachDescription: string;
   materialsList?: string;
@@ -40,7 +40,7 @@ export interface JobApplicationCreateData {
 }
 
 export interface JobApplicationUpdateData {
-  customQuote?: number;
+  custom_quote?: number;
   proposedTimeline?: string;
   approachDescription?: string;
   materialsList?: string;
@@ -58,7 +58,7 @@ export interface JobApplicationDetails extends JobApplicationEntity {
     id: number;
     title: string;
     description: string;
-    jobType: MarketplaceJobType;
+    job_type: Marketplacejob_type;
     location: string;
     estimatedBudget?: number;
     urgencyLevel: UrgencyLevel;
@@ -101,10 +101,10 @@ export interface JobApplicationDetails extends JobApplicationEntity {
   };
   creditTransaction: {
     transactionId: number;
-    creditsUsed: number;
+    credits_used: number;
     baseCost: number;
     urgencyMultiplier: number;
-    jobTypeMultiplier: number;
+    job_typeMultiplier: number;
     finalCost: number;
   };
   timeline: Array<{
@@ -117,18 +117,18 @@ export interface JobApplicationDetails extends JobApplicationEntity {
 
 export interface JobApplicationSummary {
   id: number;
-  marketplaceJobId: number;
-  tradieId: number;
-  customQuote: number;
+  marketplace_job_id : number;
+  tradie_id: number;
+  custom_quote: number;
   proposedTimeline: string;
   status: ApplicationStatus;
   applicationTimestamp: Date;
-  creditsUsed: number;
+  credits_used: number;
   tradieName: string;
   tradieRating?: number;
   tradieCompletedJobs: number;
   jobTitle: string;
-  jobType: MarketplaceJobType;
+  job_type: Marketplacejob_type;
   jobLocation: string;
   isSelected: boolean;
   canWithdraw: boolean;
@@ -136,9 +136,9 @@ export interface JobApplicationSummary {
 
 export interface JobApplicationFilters {
   status?: ApplicationStatus;
-  marketplaceJobId?: number;
-  tradieId?: number;
-  jobType?: MarketplaceJobType;
+  marketplace_job_id ?: number;
+  tradie_id?: number;
+  job_type?: Marketplacejob_type;
   dateRange?: {
     startDate: Date;
     endDate: Date;
@@ -184,7 +184,7 @@ export interface TradieApplicationHistory {
 }
 
 export interface ClientApplicationReview {
-  marketplaceJobId: number;
+  marketplace_job_id : number;
   jobTitle: string;
   totalApplications: number;
   newApplications: number;
@@ -201,7 +201,7 @@ export interface ClientApplicationReview {
       location: string;
     };
     application: {
-      customQuote: number;
+      custom_quote: number;
       proposedTimeline: string;
       approachDescription: string;
       coverMessage?: string;
@@ -291,7 +291,7 @@ export interface ApplicationAnalytics {
       count: number;
       successCount: number;
     }>;
-    quotesByJobType: Record<MarketplaceJobType, {
+    quotesByjob_type: Record<Marketplacejob_type, {
       averageQuote: number;
       applicationCount: number;
       successRate: number;
@@ -303,7 +303,7 @@ export interface ApplicationAnalytics {
     }>;
   };
   insights: {
-    bestPerformingJobTypes: MarketplaceJobType[];
+    bestPerformingjob_types: Marketplacejob_type[];
     optimalQuoteRange: {
       min: number;
       max: number;
@@ -322,15 +322,15 @@ export interface ApplicationAnalytics {
 
 export interface ApplicationNotificationData {
   applicationId: number;
-  tradieId: number;
-  clientId: number;
-  marketplaceJobId: number;
+  tradie_id: number;
+  client_id: number;
+  marketplace_job_id : number;
   notificationType: MarketplaceNotificationType;
   data: {
     jobTitle: string;
     tradieName: string;
     clientName: string;
-    customQuote?: number;
+    custom_quote?: number;
     status?: ApplicationStatus;
     reason?: string;
     feedback?: string;
@@ -364,9 +364,9 @@ export type ApplicationEventType =
 export interface ApplicationEvent {
   type: ApplicationEventType;
   applicationId: number;
-  marketplaceJobId: number;
-  tradieId: number;
-  clientId?: number;
+  marketplace_job_id : number;
+  tradie_id: number;
+  client_id?: number;
   timestamp: Date;
   data: Record<string, any>;
   metadata: {
@@ -388,7 +388,7 @@ export interface ApplicationPermissions {
 }
 
 export interface ApplicationMatchingCriteria {
-  jobType: MarketplaceJobType;
+  job_type: Marketplacejob_type;
   location: string;
   maxDistance: number;
   budgetRange: {

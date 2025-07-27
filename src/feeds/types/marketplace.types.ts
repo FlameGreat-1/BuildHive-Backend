@@ -11,7 +11,7 @@ import {
   } from '../../shared/types';
   
   import {
-    MarketplaceJobType,
+    Marketplacejob_type,
     MarketplaceJobStatus,
     UrgencyLevel,
     MarketplaceSortOption,
@@ -35,7 +35,7 @@ import {
   export interface MarketplaceJobCreateData {
     title: string;
     description: string;
-    jobType: MarketplaceJobType;
+    job_type: Marketplacejob_type;
     location: string;
     estimatedBudget?: number;
     dateRequired: Date;
@@ -58,7 +58,7 @@ import {
   }
   
   export interface MarketplaceJobFilters {
-    jobType?: MarketplaceJobType;
+    job_type?: Marketplacejob_type;
     location?: string;
     urgencyLevel?: UrgencyLevel;
     minBudget?: number;
@@ -68,7 +68,7 @@ import {
       endDate: Date;
     };
     excludeApplied?: boolean;
-    tradieId?: number;
+    tradie_id?: number;
   }
   
   export interface MarketplaceJobSearchParams extends MarketplaceJobFilters {
@@ -91,7 +91,7 @@ import {
   export interface MarketplaceJobSummary {
     id: number;
     title: string;
-    jobType: MarketplaceJobType;
+    job_type: Marketplacejob_type;
     location: string;
     estimatedBudget?: number;
     urgencyLevel: UrgencyLevel;
@@ -120,7 +120,7 @@ import {
     creditCost: {
       baseCost: number;
       urgencyMultiplier: number;
-      jobTypeMultiplier: number;
+      job_typeMultiplier: number;
       finalCost: number;
     };
     relatedJobs?: MarketplaceJobSummary[];
@@ -134,8 +134,8 @@ import {
     averageApplicationsPerJob: number;
     totalApplications: number;
     conversionRate: number;
-    topJobTypes: Array<{
-      jobType: MarketplaceJobType;
+    topjob_types: Array<{
+      job_type: Marketplacejob_type;
       count: number;
       percentage: number;
     }>;
@@ -175,7 +175,7 @@ import {
       }>;
     };
     demographics: {
-      jobTypeDistribution: Record<MarketplaceJobType, number>;
+      job_typeDistribution: Record<Marketplacejob_type, number>;
       locationDistribution: Record<string, number>;
       urgencyDistribution: Record<UrgencyLevel, number>;
       budgetDistribution: Array<{
@@ -219,8 +219,8 @@ import {
   
   export interface MarketplaceJobAssignment {
     id: number;
-    marketplaceJobId: number;
-    selectedTradieId: number;
+    marketplace_job_id : number;
+    selectedtradie_id: number;
     selectedApplicationId: number;
     existingJobId: number;
     selectionReason?: string;
@@ -230,7 +230,7 @@ import {
     createdAt: Date;
     job: {
       title: string;
-      jobType: MarketplaceJobType;
+      job_type: Marketplacejob_type;
       location: string;
     };
     tradie: {
@@ -243,7 +243,7 @@ import {
   }
   
   export interface TradieSelectionData {
-    marketplaceJobId: number;
+    marketplace_job_id : number;
     selectedApplicationId: number;
     selectionReason?: string;
     negotiatedQuote?: number;
@@ -259,12 +259,12 @@ import {
   }
   
   export interface MarketplaceCreditCost {
-    marketplaceJobId: number;
-    jobType: MarketplaceJobType;
+    marketplace_job_id : number;
+    job_type: Marketplacejob_type;
     urgencyLevel: UrgencyLevel;
     baseCost: number;
     urgencyMultiplier: number;
-    jobTypeMultiplier: number;
+    job_typeMultiplier: number;
     finalCost: number;
     calculation: {
       step1: string;
@@ -278,7 +278,7 @@ import {
     notificationType: string;
     title: string;
     message: string;
-    marketplaceJobId?: number;
+    marketplace_job_id ?: number;
     applicationId?: number;
     assignmentId?: number;
     data?: Record<string, any>;

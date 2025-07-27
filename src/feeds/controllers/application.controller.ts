@@ -7,7 +7,7 @@ import {
   ApplicationStatusUpdate,
   ApplicationWithdrawal
 } from '../types';
-import { ApplicationStatus, MarketplaceJobType } from '../../shared/types';
+import { ApplicationStatus, Marketplacejob_type } from '../../shared/types';
 import { logger, createResponse } from '../../shared/utils';
 
 interface AuthenticatedRequest extends Request {
@@ -35,16 +35,16 @@ export class ApplicationController {
   createApplication = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const applicationData: JobApplicationCreateData = req.body;
-      const tradieId = this.convertUserIdToNumber(req.user?.id);
+      const tradie_id = this.convertUserIdToNumber(req.user?.id);
 
-      const result = await this.applicationService.createApplication(applicationData, tradieId!);
+      const result = await this.applicationService.createApplication(applicationData, tradie_id!);
 
       if (result.success) {
         logger.info('Job application created successfully', {
           applicationId: result.data?.id,
-          tradieId,
-          marketplaceJobId: applicationData.marketplaceJobId,
-          creditsUsed: result.data?.creditsUsed
+          tradie_id,
+          marketplace_job_id : applicationData.marketplace_job_id ,
+          credits_used: result.data?.credits_used
         });
       }
 
@@ -77,9 +77,9 @@ export class ApplicationController {
   getApplicationsByJob = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const { jobId } = req.params;
-      const clientId = this.convertUserIdToNumber(req.user?.id);
+      const client_id = this.convertUserIdToNumber(req.user?.id);
 
-      const result = await this.applicationService.getApplicationsByJob(parseInt(jobId), clientId);
+      const result = await this.applicationService.getApplicationsByJob(parseInt(jobId), client_id);
 
       res.status(result.success ? 200 : 403).json(result);
     } catch (error) {
@@ -95,12 +95,12 @@ export class ApplicationController {
 
   getTradieApplications = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
-      const tradieId = this.convertUserIdToNumber(req.user?.id);
+      const tradie_id = this.convertUserIdToNumber(req.user?.id);
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 20;
       const status = req.query.status as ApplicationStatus | undefined;
 
-      const result = await this.applicationService.getTradieApplications(tradieId!, {
+      const result = await this.applicationService.getTradieApplications(tradie_id!, {
         page,
         limit,
         status
@@ -120,9 +120,9 @@ export class ApplicationController {
         page: parseInt(req.query.page as string) || 1,
         limit: parseInt(req.query.limit as string) || 20,
         status: req.query.status as ApplicationStatus | undefined,
-        tradieId: req.query.tradieId ? parseInt(req.query.tradieId as string) : undefined,
-        marketplaceJobId: req.query.marketplaceJobId ? parseInt(req.query.marketplaceJobId as string) : undefined,
-        jobType: req.query.jobType as MarketplaceJobType | undefined,
+        tradie_id: req.query.tradie_id ? parseInt(req.query.tradie_id as string) : undefined,
+        marketplace_job_id : req.query.marketplace_job_id  ? parseInt(req.query.marketplace_job_id  as string) : undefined,
+        job_type: req.query.job_type as Marketplacejob_type | undefined,
         location: req.query.location as string,
         minQuote: req.query.minQuote ? parseFloat(req.query.minQuote as string) : undefined,
         maxQuote: req.query.maxQuote ? parseFloat(req.query.maxQuote as string) : undefined,
@@ -149,12 +149,12 @@ export class ApplicationController {
     try {
       const { applicationId } = req.params;
       const updateData: JobApplicationUpdateData = req.body;
-      const tradieId = this.convertUserIdToNumber(req.user?.id);
+      const tradie_id = this.convertUserIdToNumber(req.user?.id);
 
       const result = await this.applicationService.updateApplication(
         parseInt(applicationId),
         updateData,
-        tradieId!
+        tradie_id!
       );
 
       res.status(result.success ? 200 : 400).json(result);
@@ -173,12 +173,12 @@ export class ApplicationController {
     try {
       const { applicationId } = req.params;
       const statusUpdate: ApplicationStatusUpdate = req.body;
-      const clientId = this.convertUserIdToNumber(req.user?.id);
+      const client_id = this.convertUserIdToNumber(req.user?.id);
 
       const result = await this.applicationService.updateApplicationStatus(
         parseInt(applicationId),
         statusUpdate,
-        clientId
+        client_id
       );
 
       res.status(result.success ? 200 : 400).json(result);
@@ -197,11 +197,11 @@ export class ApplicationController {
     try {
       const { applicationId } = req.params;
       const withdrawalData: ApplicationWithdrawal = req.body;
-      const tradieId = this.convertUserIdToNumber(req.user?.id);
+      const tradie_id = this.convertUserIdToNumber(req.user?.id);
 
       const result = await this.applicationService.withdrawApplication(
         parseInt(applicationId),
-        tradieId!,
+        tradie_id!,
         withdrawalData
       );
 
@@ -219,9 +219,9 @@ export class ApplicationController {
 
   getTradieApplicationHistory = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
-      const tradieId = this.convertUserIdToNumber(req.user?.id);
+      const tradie_id = this.convertUserIdToNumber(req.user?.id);
 
-      const result = await this.applicationService.getTradieApplicationHistory(tradieId!);
+      const result = await this.applicationService.getTradieApplicationHistory(tradie_id!);
 
       res.status(result.success ? 200 : 400).json(result);
     } catch (error) {
@@ -233,15 +233,15 @@ export class ApplicationController {
 
   getApplicationAnalytics = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
-      const tradieId = req.query.tradieId ? 
-        parseInt(req.query.tradieId as string) : 
+      const tradie_id = req.query.tradie_id ? 
+        parseInt(req.query.tradie_id as string) : 
         this.convertUserIdToNumber(req.user?.id);
       const startDate = req.query.startDate ? new Date(req.query.startDate as string) : undefined;
       const endDate = req.query.endDate ? new Date(req.query.endDate as string) : undefined;
       const groupBy = req.query.groupBy as 'day' | 'week' | 'month' | 'status';
 
       const params = {
-        tradieId,
+        tradie_id,
         startDate,
         endDate,
         groupBy
@@ -260,7 +260,7 @@ export class ApplicationController {
   bulkUpdateApplicationStatus = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const { applicationIds, status, reason, feedback } = req.body;
-      const clientId = this.convertUserIdToNumber(req.user?.id);
+      const client_id = this.convertUserIdToNumber(req.user?.id);
 
       const results = [];
       for (const applicationId of applicationIds) {
@@ -268,7 +268,7 @@ export class ApplicationController {
           const result = await this.applicationService.updateApplicationStatus(
             parseInt(applicationId),
             { newStatus: status, reason, feedback },
-            clientId
+            client_id
           );
           results.push({ 
             applicationId, 
@@ -311,7 +311,7 @@ export class ApplicationController {
         page,
         limit,
         status: status as ApplicationStatus | undefined,
-        tradieId: userRole === 'tradie' ? userId : undefined
+        tradie_id: userRole === 'tradie' ? userId : undefined
       };
 
       const result = await this.applicationService.searchApplications(searchParams);
@@ -345,8 +345,8 @@ export class ApplicationController {
         applicationId: parseInt(applicationId),
         submissionDate: application.applicationTimestamp,
         status: application.status,
-        creditsUsed: application.credits_used,
-        customQuote: application.custom_quote,
+        credits_used: application.credits_used,
+        custom_quote: application.custom_quote,
         proposedTimeline: application.proposed_timeline,
         competitorCount: 0,
         averageQuote: 0,
@@ -364,7 +364,7 @@ export class ApplicationController {
         metrics.competitorCount = allApplications.length;
 
         const quotes = allApplications
-          .map(app => app.customQuote || 0)
+          .map(app => app.custom_quote || 0)
           .filter(quote => quote > 0);
         
         if (quotes.length > 0) {
@@ -372,8 +372,8 @@ export class ApplicationController {
         }
         
         const sortedByQuote = allApplications
-          .filter(app => app.customQuote && app.customQuote > 0)
-          .sort((a, b) => (a.customQuote || 0) - (b.customQuote || 0));
+          .filter(app => app.custom_quote && app.custom_quote > 0)
+          .sort((a, b) => (a.custom_quote || 0) - (b.custom_quote || 0));
         
         metrics.rankPosition = sortedByQuote.findIndex(app => app.id === application.id) + 1;
       }

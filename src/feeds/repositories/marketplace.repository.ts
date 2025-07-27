@@ -38,17 +38,17 @@ export class MarketplaceRepository {
     this.marketplaceJobModel = new MarketplaceJobModel();
   }
 
-  async createJob(jobData: MarketplaceJobCreateData, clientId: number): Promise<MarketplaceJobEntity> {
+  async createJob(jobData: MarketplaceJobCreateData, client_id: number): Promise<MarketplaceJobEntity> {
     const client = await this.db.connect();
     
     try {
       await client.query('BEGIN');
       
-      const job = await this.marketplaceJobModel.create(jobData, clientId);
+      const job = await this.marketplaceJobModel.create(jobData, client_id);
       
       await this.logJobActivity(client, job.id, 'JOB_CREATED', {
-        clientId: job.clientId,
-        jobType: job.jobType,
+        client_id: job.client_id,
+        job_type: job.job_type,
         location: job.location,
         estimatedBudget: job.estimatedBudget
       });
@@ -57,8 +57,8 @@ export class MarketplaceRepository {
       
       logger.info('Marketplace job created successfully', {
         jobId: job.id,
-        clientId: job.clientId,
-        jobType: job.jobType
+        client_id: job.client_id,
+        job_type: job.job_type
       });
 
       return job;
@@ -86,19 +86,19 @@ export class MarketplaceRepository {
     }
   }
 
-  async findJobDetails(id: number, tradieId?: number): Promise<MarketplaceJobDetails | null> {
+  async findJobDetails(id: number, tradie_id?: number): Promise<MarketplaceJobDetails | null> {
     try {
       const job = await this.findJobById(id);
       if (!job) return null;
 
-      const creditCost = calculateCreditCost(job.jobType, job.urgencyLevel);
-      const hasApplied = tradieId ? await this.checkTradieApplication(id, tradieId) : false;
+      const creditCost = calculateCreditCost(job.job_type, job.urgencyLevel);
+      const hasApplied = tradie_id ? await this.checkTradieApplication(id, tradie_id) : false;
       
       const jobDetails = formatJobDetails(job, creditCost);
       jobDetails.applications.hasUserApplied = hasApplied;
       
-      if (hasApplied && tradieId) {
-        const applicationId = await this.getTradieApplicationId(id, tradieId);
+      if (hasApplied && tradie_id) {
+        const applicationId = await this.getTradieApplicationId(id, tradie_id);
         jobDetails.applications.userApplicationId = applicationId;
       }
 
@@ -119,9 +119,9 @@ export class MarketplaceRepository {
       
       const jobsWithCreditCost = await Promise.all(
         result.jobs.map(async (job) => {
-          const creditCost = calculateCreditCost(job.jobType, job.urgencyLevel);
-          const hasApplied = searchParams.tradieId ? 
-            await this.checkTradieApplication(job.id, searchParams.tradieId) : false;
+          const creditCost = calculateCreditCost(job.job_type, job.urgencyLevel);
+          const hasApplied = searchParams.tradie_id ? 
+            await this.checkTradieApplication(job.id, searchParams.tradie_id) : false;
           
           return formatJobSummary({
             ...job,
@@ -150,7 +150,7 @@ export class MarketplaceRepository {
     }
   }
 
-  async updateJob(id: number, updateData: MarketplaceJobUpdateData, clientId: number): Promise<MarketplaceJobEntity | null> {
+  async updateJob(id: number, updateData: MarketplaceJobUpdateData, client_id: number): Promise<MarketplaceJobEntity | null> {
     const client = await this.db.connect();
     
     try {
@@ -162,7 +162,7 @@ export class MarketplaceRepository {
         return null;
       }
 
-      if (existingJob.clientId !== clientId) {
+      if (existingJob.client_id !== client_id) {
         await client.query('ROLLBACK');
         throw new DatabaseError('Unauthorized job update attempt');
       }
@@ -181,7 +181,7 @@ export class MarketplaceRepository {
       
       logger.info('Marketplace job updated successfully', {
         jobId: id,
-        clientId,
+        client_id,
         changes: Object.keys(updateData)
       });
 
@@ -247,7 +247,7 @@ export class MarketplaceRepository {
     }
   }
 
-  async findJobsByClient(clientId: number, params: { 
+  async findJobsByClient(client_id: number, params: { 
     page: number; 
     limit: number; 
     status?: string;
@@ -258,7 +258,7 @@ export class MarketplaceRepository {
   }> {
     try {
       const offset = (params.page - 1) * params.limit;
-      const jobs = await this.marketplaceJobModel.findByClient(clientId, {
+      const jobs = await this.marketplaceJobModel.findByClient(client_id, {
         limit: params.limit,
         offset
       });
@@ -270,7 +270,7 @@ export class MarketplaceRepository {
         ${params.status ? 'AND status = $2' : ''}
       `;
       
-      const countParams = params.status ? [clientId, params.status] : [clientId];
+      const countParams = params.status ? [client_id, params.status] : [client_id];
       const countResult = await this.db.query(countQuery, countParams);
       const totalCount = parseInt(countResult.rows[0].total);
 
@@ -278,7 +278,7 @@ export class MarketplaceRepository {
       const hasMore = totalCount > (params.page * params.limit);
 
       logger.debug('Client jobs retrieved', {
-        clientId,
+        client_id,
         totalCount,
         returnedCount: jobSummaries.length
       });
@@ -289,12 +289,12 @@ export class MarketplaceRepository {
         hasMore
       };
     } catch (error) {
-      logger.error('Error finding jobs by client', { error, clientId, params });
+      logger.error('Error finding jobs by client', { error, client_id, params });
       throw new DatabaseError('Failed to find jobs by client', error);
     }
   }
 
-  async deleteJob(id: number, clientId: number): Promise<MarketplaceJobEntity | null> {
+  async deleteJob(id: number, client_id: number): Promise<MarketplaceJobEntity | null> {
     const client = await this.db.connect();
     
     try {
@@ -311,12 +311,12 @@ export class MarketplaceRepository {
         throw new DatabaseError('Cannot delete job with existing applications');
       }
 
-      const deletedJob = await this.marketplaceJobModel.delete(id, clientId);
+      const deletedJob = await this.marketplaceJobModel.delete(id, client_id);
       
       if (deletedJob) {
         await this.logJobActivity(client, id, 'JOB_DELETED', {
-          clientId,
-          jobType: deletedJob.jobType,
+          client_id,
+          job_type: deletedJob.job_type,
           applicationCount: deletedJob.applicationCount
         });
       }
@@ -325,13 +325,13 @@ export class MarketplaceRepository {
       
       logger.info('Marketplace job deleted successfully', {
         jobId: id,
-        clientId
+        client_id
       });
 
       return deletedJob;
     } catch (error) {
       await client.query('ROLLBACK');
-      logger.error('Error deleting marketplace job', { error, jobId: id, clientId });
+      logger.error('Error deleting marketplace job', { error, jobId: id, client_id });
       throw new DatabaseError('Failed to delete marketplace job', error);
     } finally {
       client.release();
@@ -425,13 +425,13 @@ export class MarketplaceRepository {
   async getJobAnalytics(params: {
     startDate?: Date;
     endDate?: Date;
-    groupBy?: 'day' | 'week' | 'month' | 'jobType' | 'location';
+    groupBy?: 'day' | 'week' | 'month' | 'job_type' | 'location';
   }): Promise<{
     totalJobs: number;
     activeJobs: number;
     completedJobs: number;
     averageApplicationsPerJob: number;
-    topJobTypes: Array<{ jobType: string; count: number; percentage: number }>;
+    topjob_types: Array<{ job_type: string; count: number; percentage: number }>;
     topLocations: Array<{ location: string; count: number; percentage: number }>;
     trendData: Array<{ period: string; count: number; applications: number }>;
   }> {
@@ -468,7 +468,7 @@ export class MarketplaceRepository {
         activeJobs: baseStats.activeJobs,
         completedJobs: baseStats.assignedJobs,
         averageApplicationsPerJob: baseStats.averageApplicationsPerJob,
-        topJobTypes: baseStats.topJobTypes,
+        topjob_types: baseStats.topjob_types,
         topLocations: baseStats.topLocations,
         trendData: trendResult.rows.map(row => ({
           period: row.period,
@@ -507,10 +507,10 @@ export class MarketplaceRepository {
     }
   }
 
-  async getJobsByJobType(jobType: string, limit: number = 20): Promise<MarketplaceJobSummary[]> {
+  async getJobsByjob_type(job_type: string, limit: number = 20): Promise<MarketplaceJobSummary[]> {
     try {
       const searchParams: MarketplaceJobSearchParams = {
-        jobType,
+        job_type,
         page: 1,
         limit,
         sortBy: 'date_posted',
@@ -520,18 +520,18 @@ export class MarketplaceRepository {
       const result = await this.searchJobs(searchParams);
       
       logger.debug('Jobs by job type retrieved', {
-        jobType,
+        job_type,
         count: result.jobs.length
       });
 
       return result.jobs;
     } catch (error) {
-      logger.error('Error getting jobs by job type', { error, jobType });
+      logger.error('Error getting jobs by job type', { error, job_type });
       throw new DatabaseError('Failed to get jobs by job type', error);
     }
   }
 
-  async getRecommendedJobs(tradieId: number, limit: number = 10): Promise<MarketplaceJobSummary[]> {
+  async getRecommendedJobs(tradie_id: number, limit: number = 10): Promise<MarketplaceJobSummary[]> {
     try {
       const tradieProfileQuery = `
         SELECT service_types, location, hourly_rate, completed_jobs, rating
@@ -540,7 +540,7 @@ export class MarketplaceRepository {
         WHERE tp.user_id = $1
       `;
       
-      const profileResult = await this.db.query(tradieProfileQuery, [tradieId]);
+      const profileResult = await this.db.query(tradieProfileQuery, [tradie_id]);
       
       if (profileResult.rows.length === 0) {
         return [];
@@ -578,7 +578,7 @@ export class MarketplaceRepository {
       `;
 
       const result = await this.db.query(recommendationQuery, [
-        tradieId,
+        tradie_id,
         serviceTypes,
         profile.location || '',
         limit
@@ -587,20 +587,20 @@ export class MarketplaceRepository {
       const recommendedJobs = await Promise.all(
         result.rows.map(async (row) => {
           const job = this.transformRowToEntity(row);
-          const creditCost = calculateCreditCost(job.jobType, job.urgencyLevel);
+          const creditCost = calculateCreditCost(job.job_type, job.urgencyLevel);
           return formatJobSummary(job, creditCost.finalCost, false);
         })
       );
 
       logger.debug('Recommended jobs retrieved', {
-        tradieId,
+        tradie_id,
         count: recommendedJobs.length,
         serviceTypes
       });
 
       return recommendedJobs;
     } catch (error) {
-      logger.error('Error getting recommended jobs', { error, tradieId });
+      logger.error('Error getting recommended jobs', { error, tradie_id });
       throw new DatabaseError('Failed to get recommended jobs', error);
     }
   }
@@ -639,16 +639,16 @@ export class MarketplaceRepository {
     }
   }
 
-  async validateJobOwnership(jobId: number, clientId: number): Promise<boolean> {
+  async validateJobOwnership(jobId: number, client_id: number): Promise<boolean> {
     try {
       const result = await this.db.query(
         'SELECT 1 FROM marketplace_jobs WHERE id = $1 AND client_id = $2',
-        [jobId, clientId]
+        [jobId, client_id]
       );
 
       return result.rows.length > 0;
     } catch (error) {
-      logger.error('Error validating job ownership', { error, jobId, clientId });
+      logger.error('Error validating job ownership', { error, jobId, client_id });
       return false;
     }
   }
@@ -658,7 +658,7 @@ export class MarketplaceRepository {
       const job = await this.findJobById(jobId);
       if (!job) return null;
 
-      return calculateCreditCost(job.jobType, job.urgencyLevel);
+      return calculateCreditCost(job.job_type, job.urgencyLevel);
     } catch (error) {
       logger.error('Error getting job credit cost', { error, jobId });
       throw new DatabaseError('Failed to get job credit cost', error);
@@ -683,13 +683,13 @@ export class MarketplaceRepository {
 
       return result.rows.map(row => ({
         id: parseInt(row.id),
-        tradieId: parseInt(row.tradie_id),
-        marketplaceJobId: parseInt(row.marketplace_job_id),
-        customQuote: parseFloat(row.custom_quote) || 0,
+        tradie_id: parseInt(row.tradie_id),
+        marketplace_job_id : parseInt(row.marketplace_job_id),
+        custom_quote: parseFloat(row.custom_quote) || 0,
         proposedTimeline: row.proposed_timeline,
         coverLetter: row.cover_letter,
         status: row.status,
-        creditsUsed: parseInt(row.credits_used) || 0,
+        credits_used: parseInt(row.credits_used) || 0,
         applicationTimestamp: new Date(row.application_timestamp),
         tradie: {
           firstName: row.first_name,
@@ -751,30 +751,30 @@ export class MarketplaceRepository {
     }
   }
 
-  private async checkTradieApplication(jobId: number, tradieId: number): Promise<boolean> {
+  private async checkTradieApplication(jobId: number, tradie_id: number): Promise<boolean> {
     try {
       const result = await this.db.query(
         'SELECT 1 FROM job_applications WHERE marketplace_job_id = $1 AND tradie_id = $2 LIMIT 1',
-        [jobId, tradieId]
+        [jobId, tradie_id]
       );
       
       return result.rows.length > 0;
     } catch (error) {
-      logger.error('Error checking tradie application', { error, jobId, tradieId });
+      logger.error('Error checking tradie application', { error, jobId, tradie_id });
       return false;
     }
   }
 
-  private async getTradieApplicationId(jobId: number, tradieId: number): Promise<number | undefined> {
+  private async getTradieApplicationId(jobId: number, tradie_id: number): Promise<number | undefined> {
     try {
       const result = await this.db.query(
         'SELECT id FROM job_applications WHERE marketplace_job_id = $1 AND tradie_id = $2 LIMIT 1',
-        [jobId, tradieId]
+        [jobId, tradie_id]
       );
       
       return result.rows.length > 0 ? parseInt(result.rows[0].id) : undefined;
     } catch (error) {
-      logger.error('Error getting tradie application ID', { error, jobId, tradieId });
+      logger.error('Error getting tradie application ID', { error, jobId, tradie_id });
       return undefined;
     }
   }
@@ -802,7 +802,7 @@ export class MarketplaceRepository {
       day: "DATE_TRUNC('day', created_at)",
       week: "DATE_TRUNC('week', created_at)",
       month: "DATE_TRUNC('month', created_at)",
-      jobType: 'job_type',
+      job_type: 'job_type',
       location: 'location'
     }[groupBy] || "DATE_TRUNC('day', created_at)";
 
@@ -822,10 +822,10 @@ export class MarketplaceRepository {
   private transformRowToEntity(row: any): MarketplaceJobEntity {
     return {
       id: parseInt(row.id),
-      clientId: parseInt(row.client_id),
+      client_id: parseInt(row.client_id),
       title: row.title,
       description: row.description,
-      jobType: row.job_type,
+      job_type: row.job_type,
       location: row.location,
       estimatedBudget: parseFloat(row.estimated_budget) || 0,
       dateRequired: new Date(row.date_required),
