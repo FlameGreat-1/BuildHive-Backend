@@ -1,6 +1,7 @@
 import { PaymentStatus, PaymentMethod, PaymentType, RefundStatus, QuoteStatus, QuoteItemType, DeliveryMethod, CreditTransactionType, CreditTransactionStatus, CreditUsageType, CreditPackageType, AutoTopupStatus } from './database.types';
 import { JobType } from './database.types';
 import { CreditTransactionResponse } from '../../credits/types';
+mport { MarketplaceJobStatus, ApplicationStatus, UrgencyLevel } from './database.types';
 
 export interface ApiResponse<T = any> {
   success: boolean;

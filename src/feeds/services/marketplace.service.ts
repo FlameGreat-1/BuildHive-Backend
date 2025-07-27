@@ -38,7 +38,7 @@ import { UserService } from '../../auth/services/user.service';
 import { ProfileService } from '../../auth/services/profile.service';
 import { PaymentService } from '../../payment/services/payment.service';
 import { EmailService } from '../../auth/services/email.service';
-import { SMSService } from '../../auth/services/sms.service';
+import { SmsService } from '../../auth/services/sms.service';
 
 import { job_type, JobStatus, JobPriority, CreateJobData } from '../../jobs/types';
 import { CreditUsageType } from '../../credits/types';
@@ -54,7 +54,7 @@ export class MarketplaceService extends EventEmitter {
   private profileService: ProfileService;
   private paymentService: PaymentService;
   private emailService: EmailService;
-  private smsService: SMSService;
+  private SmsService: SmsService;
 
   private readonly REDIS_CHANNELS = {
     JOB_CREATED: 'marketplace:job:created',
@@ -83,7 +83,7 @@ export class MarketplaceService extends EventEmitter {
     this.profileService = new ProfileService();
     this.paymentService = new PaymentService();
     this.emailService = new EmailService();
-    this.smsService = new SMSService();
+    this.SmsService = new SmsService();
 
     this.setupEventListeners();
   }
@@ -643,7 +643,7 @@ export class MarketplaceService extends EventEmitter {
         );
 
         if (tradieUser.username) {
-          await this.smsService.sendSMS(
+          await this.SmsService.sendSMS(
             tradieUser.username,
             `Your application for "${job.title}" has been selected. Check your email for details.`
           );

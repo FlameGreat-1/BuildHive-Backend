@@ -7,7 +7,7 @@ import {
   ApplicationStatusUpdate,
   ApplicationWithdrawal
 } from '../types';
-import { ApplicationStatus, Marketplacejob_type } from '../../shared/types';
+import { ApplicationStatus, MarketplaceJobType } from '../../shared/types';
 import { logger, createResponse } from '../../shared/utils';
 
 interface AuthenticatedRequest extends Request {
@@ -122,7 +122,7 @@ export class ApplicationController {
         status: req.query.status as ApplicationStatus | undefined,
         tradie_id: req.query.tradie_id ? parseInt(req.query.tradie_id as string) : undefined,
         marketplace_job_id : req.query.marketplace_job_id  ? parseInt(req.query.marketplace_job_id  as string) : undefined,
-        job_type: req.query.job_type as Marketplacejob_type | undefined,
+        job_type: req.query.job_type as MarketplaceJobType | undefined,
         location: req.query.location as string,
         minQuote: req.query.minQuote ? parseFloat(req.query.minQuote as string) : undefined,
         maxQuote: req.query.maxQuote ? parseFloat(req.query.maxQuote as string) : undefined,
