@@ -9,7 +9,7 @@ import {
   canModifyApplication,
   validateApplicationStatusTransition
 } from '../utils';
-import { APPLICATION_STATUS } from '../../config/feeds';
+import { APPLICATION_STATUS, MARKETPLACE_LIMITS } from '../../config/feeds';
 import { ValidationError } from '../../shared/types';
 import { createErrorResponse, logger, AppError } from '../../shared/utils';
 import { HTTP_STATUS_CODES } from '../../config/auth/constants';
@@ -96,7 +96,7 @@ export class ApplicationMiddleware {
       }
 
       const job = jobResult.data;
-      if (job.client_id === userId) {
+      if (job.client_id === parseInt(userId)) {
         return next(new AppError('Cannot apply to your own job', HTTP_STATUS_CODES.BAD_REQUEST));
       }
 
@@ -593,11 +593,10 @@ export class ApplicationMiddleware {
             code: 'REQUIRED_FIELD'
           });
         }
-
-        if (applicationIds.length > MARKETPLACE_CONFIG.APPLICATION_SETTINGS.MAX_BULK_OPERATIONS) {
+          if (applicationIds.length > MARKETPLACE_LIMITS.MAX_BULK_OPERATIONS) {
           errors.push({
             field: 'applicationIds',
-            message: `Maximum ${MARKETPLACE_CONFIG.APPLICATION_SETTINGS.MAX_BULK_OPERATIONS} applications allowed per bulk operation`,
+            message: `Maximum ${MARKETPLACE_LIMITS.MAX_BULK_OPERATIONS} applications allowed per bulk operation`,
             code: 'FIELD_TOO_LARGE'
           });
         }

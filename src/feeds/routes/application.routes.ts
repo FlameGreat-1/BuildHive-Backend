@@ -30,17 +30,12 @@ import {
   sanitizeApplicationData,
   validatePagination,
   validateApplicationFilters,
-  checkDuplicateApplication,
-  validateJobApplicationAccess,
-  cacheApplicationData,
   trackApplicationViews,
   requireApplicationAccess,
-  validateBulkApplicationOperations,
-  validateWithdrawalData,
-  checkApplicationLimit,
+  validateBulkOperations,
   handleApplicationErrors
 } from '../middleware';
-import { authenticate, authorize } from '../../shared/middleware';
+import { authenticate } from '../../auth/middleware/auth.middleware';
 
 const router = Router();
 
@@ -50,8 +45,6 @@ router.post(
   validateTradieRole,
   sanitizeApplicationData,
   validateApplicationCreation,
-  checkDuplicateApplication,
-  checkApplicationLimit,
   rateLimitApplicationCreation,
   logApplicationActivity('application_creation'),
   createApplication
@@ -64,7 +57,6 @@ router.get(
   validateApplicationFilters,
   validatePagination,
   rateLimitApplicationSearch,
-  cacheApplicationData(300),
   logApplicationActivity('application_search'),
   searchApplications
 );
@@ -73,7 +65,6 @@ router.get(
   '/tradie/history',
   authenticate,
   validateTradieRole,
-  cacheApplicationData(300),
   logApplicationActivity('tradie_application_history'),
   getTradieApplicationHistory
 );
@@ -91,7 +82,6 @@ router.get(
   '/analytics',
   authenticate,
   validatePagination,
-  cacheApplicationData(600),
   logApplicationActivity('application_analytics'),
   getApplicationAnalytics
 );
@@ -100,7 +90,6 @@ router.get(
   '/status/:status',
   authenticate,
   validatePagination,
-  cacheApplicationData(180),
   logApplicationActivity('applications_by_status'),
   getApplicationsByStatus
 );
@@ -109,7 +98,7 @@ router.post(
   '/bulk/status',
   authenticate,
   validateClientRole,
-  validateBulkApplicationOperations,
+  validateBulkOperations,
   logApplicationActivity('bulk_application_status_update'),
   bulkUpdateApplicationStatus
 );
@@ -118,7 +107,6 @@ router.get(
   '/job/:jobId',
   authenticate,
   validateClientRole,
-  validateJobApplicationAccess,
   validatePagination,
   logApplicationActivity('job_applications'),
   getApplicationsByJob
@@ -128,8 +116,6 @@ router.get(
   '/job/:jobId/analytics',
   authenticate,
   validateClientRole,
-  validateJobApplicationAccess,
-  cacheApplicationData(300),
   logApplicationActivity('job_application_analytics'),
   getApplicationAnalytics
 );
@@ -139,7 +125,6 @@ router.get(
   authenticate,
   requireApplicationAccess('read'),
   trackApplicationViews,
-  cacheApplicationData(300),
   logApplicationActivity('application_view'),
   getApplication
 );
@@ -171,7 +156,6 @@ router.post(
   validateTradieRole,
   checkApplicationOwnership,
   checkApplicationWithdrawal,
-  validateWithdrawalData,
   logApplicationActivity('application_withdrawal'),
   withdrawApplication
 );
@@ -180,7 +164,6 @@ router.get(
   '/:applicationId/metrics',
   authenticate,
   requireApplicationAccess('read'),
-  cacheApplicationData(300),
   logApplicationActivity('application_metrics'),
   getApplicationMetrics
 );

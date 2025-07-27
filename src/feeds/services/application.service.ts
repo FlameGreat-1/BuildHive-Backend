@@ -35,7 +35,7 @@ import { DatabaseError, ApiResponse } from '../../shared/types';
 import { UserService } from '../../auth/services/user.service';
 import { ProfileService } from '../../auth/services/profile.service';
 import { EmailService } from '../../auth/services/email.service';
-import { SmsService } from '../../auth/services/sms.service';
+import { SMSService } from '../../auth/services/sms.service';
 
 export class ApplicationService extends EventEmitter {
   private applicationRepository: ApplicationRepository;
@@ -45,7 +45,7 @@ export class ApplicationService extends EventEmitter {
   private userService: UserService;
   private profileService: ProfileService;
   private emailService: EmailService;
-  private SmsService: SmsService;
+  private smsService: SMSService;
 
   private readonly REDIS_CHANNELS = {
     APPLICATION_CREATED: 'marketplace:application:created',
@@ -72,7 +72,7 @@ export class ApplicationService extends EventEmitter {
     this.userService = new UserService();
     this.profileService = new ProfileService();
     this.emailService = new EmailService();
-    this.SmsService = new SmsService();
+    this.smsService = new SMSService();
 
     this.setupEventListeners();
   }
@@ -588,8 +588,8 @@ export class ApplicationService extends EventEmitter {
 
         const tradieUser = await this.userService.getUserById(this.convertUserIdToString(application.tradie_id));
         if (tradieUser) {
-          const message = `New application received for "${marketplaceJob.title}" from ${tradieUser.username}. Quote: $${application.custom_quote}`;
-          await this.SmsService.sendSMS(marketplaceJob.client_phone || clientUser.username, message);
+          const message = `New application received for "${marketplaceJob.title}" from ${tradieUser.username}. Quote: $${application.customQuote}`;
+          await this.smsService.sendSMS(marketplaceJob.clientPhone || clientUser.username, message);
         }
       }
 
@@ -599,8 +599,8 @@ export class ApplicationService extends EventEmitter {
         jobId: marketplaceJob.id,
         jobTitle: marketplaceJob.title,
         tradie_id: application.tradie_id,
-        custom_quote: application.custom_quote,
-        proposed_timeline: application.proposed_timeline,
+        customQuote: application.customQuote,
+        proposedTimeline: application.proposedTimeline,
         timestamp: new Date().toISOString()
       };
 
@@ -631,8 +631,8 @@ export class ApplicationService extends EventEmitter {
             'client'
           );
 
-          const message = `Application for "${marketplaceJob.title}" has been updated. New quote: $${application.custom_quote}`;
-          await this.SmsService.sendSMS(marketplaceJob.client_phone || clientUser.username, message);
+          const message = `Application for "${marketplaceJob.title}" has been updated. New quote: $${application.customQuote}`;
+          await this.smsService.sendSMS(marketplaceJob.clientPhone || clientUser.username, message);
         }
       }
 
@@ -669,7 +669,7 @@ export class ApplicationService extends EventEmitter {
           );
 
           const message = `An application for "${marketplaceJob.title}" has been withdrawn.`;
-          await this.SmsService.sendSMS(marketplaceJob.client_phone || clientUser.username, message);
+          await this.smsService.sendSMS(marketplaceJob.clientPhone || clientUser.username, message);
         }
       }
 
@@ -733,7 +733,7 @@ export class ApplicationService extends EventEmitter {
         );
 
         const message = `Congratulations! Your application for "${marketplaceJob.title}" has been selected. Check your email for details.`;
-        await this.SmsService.sendSMS(tradieUser.username, message);
+        await this.smsService.sendSMS(tradieUser.username, message);
       }
 
       const notificationData = {
@@ -771,7 +771,7 @@ export class ApplicationService extends EventEmitter {
         );
 
         const message = `Your application for "${marketplaceJob.title}" was not selected this time. Keep applying for more opportunities!`;
-        await this.SmsService.sendSMS(tradieUser.username, message);
+        await this.smsService.sendSMS(tradieUser.username, message);
       }
 
       const notificationData = {
@@ -809,7 +809,7 @@ export class ApplicationService extends EventEmitter {
         );
 
         const message = `Your application for "${marketplaceJob.title}" is now under review. We'll notify you of any updates.`;
-        await this.SmsService.sendSMS(tradieUser.username, message);
+        await this.smsService.sendSMS(tradieUser.username, message);
       }
 
       const notificationData = {
@@ -943,7 +943,7 @@ export class ApplicationService extends EventEmitter {
         tradie_id: application.tradie_id,
         marketplace_job_id : application.marketplace_job_id ,
         jobTitle: marketplaceJob.title,
-        custom_quote: application.custom_quote,
+        customQuote: application.customQuote,
         credits_used: application.credits_used,
         timestamp: new Date().toISOString()
       };
@@ -967,12 +967,12 @@ export class ApplicationService extends EventEmitter {
         tradie_id: updatedApplication.tradie_id,
         marketplace_job_id : updatedApplication.marketplace_job_id ,
         previousData: {
-          custom_quote: previousApplication.custom_quote,
-          proposed_timeline: previousApplication.proposed_timeline
+          customQuote: previousApplication.customQuote,
+          proposedTimeline: previousApplication.proposedTimeline
         },
         updatedData: {
-          custom_quote: updatedApplication.custom_quote,
-          proposed_timeline: updatedApplication.proposed_timeline
+          customQuote: updatedApplication.customQuote,
+          proposedTimeline: updatedApplication.proposedTimeline
         },
         timestamp: new Date().toISOString()
       };

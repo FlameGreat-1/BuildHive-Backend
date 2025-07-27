@@ -149,8 +149,13 @@ export class MarketplaceMiddleware {
       };
 
       const validationResult = validateJobSearchParams(searchParams);
-      if (!validationResult.isValid) {
-        return sendValidationError(res, 'Invalid search parameters', validationResult.errors);
+      if (!validationResult) {
+        const errors: ValidationError[] = [{
+          field: 'searchParams',
+          message: 'Invalid search parameters',
+          code: 'INVALID_VALUE'
+        }];
+        return sendValidationError(res, 'Invalid search parameters', errors);
       }
 
       req.query = searchParams as any;

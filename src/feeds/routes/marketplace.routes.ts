@@ -38,7 +38,7 @@ import {
   validateBulkOperations,
   handleJobErrors
 } from '../middleware';
-import { authenticate, authorize } from '../../shared/middleware';
+import { authenticate } from '../../auth/middleware/auth.middleware';
 
 const router = Router();
 
@@ -76,7 +76,7 @@ router.get(
 router.get(
   '/stats',
   authenticate,
-  authorize(['admin']),
+  validateClientRole,
   cacheJobData(600),
   logJobActivity('marketplace_stats'),
   getMarketplaceStats
@@ -104,7 +104,7 @@ router.get(
 router.post(
   '/process-expired',
   authenticate,
-  authorize(['admin', 'system']),
+  validateClientRole,
   logJobActivity('process_expired_jobs'),
   processExpiredJobs
 );
@@ -172,7 +172,7 @@ router.get(
 router.get(
   '/analytics',
   authenticate,
-  authorize(['admin']),
+  validateClientRole,
   cacheJobData(600),
   logJobActivity('marketplace_analytics'),
   getMarketplaceAnalytics
