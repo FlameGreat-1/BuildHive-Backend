@@ -9,7 +9,7 @@ import {
 import {
   ApplicationStatus,
   Marketplacejob_type,
-  UrgencyLevel,
+  urgency_level,
   MarketplaceNotificationType,
   APPLICATION_STATUS
 } from '../../config/feeds';
@@ -28,7 +28,7 @@ export interface JobApplicationEntity extends Omit<JobApplicationDatabaseRecord,
 export interface JobApplicationCreateData {
   marketplace_job_id : number;
   custom_quote: number;
-  proposedTimeline: string;
+  proposed_timeline: string;
   approachDescription: string;
   materialsList?: string;
   availabilityDates: Date[];
@@ -41,7 +41,7 @@ export interface JobApplicationCreateData {
 
 export interface JobApplicationUpdateData {
   custom_quote?: number;
-  proposedTimeline?: string;
+  proposed_timeline?: string;
   approachDescription?: string;
   materialsList?: string;
   availabilityDates?: Date[];
@@ -60,10 +60,10 @@ export interface JobApplicationDetails extends JobApplicationEntity {
     description: string;
     job_type: Marketplacejob_type;
     location: string;
-    estimatedBudget?: number;
-    urgencyLevel: UrgencyLevel;
-    dateRequired: Date;
-    clientName: string;
+    estimated_budget?: number;
+    urgency_level: urgency_level;
+    date_required: Date;
+    client_name: string;
     clientCompany?: string;
   };
   tradie: {
@@ -120,7 +120,7 @@ export interface JobApplicationSummary {
   marketplace_job_id : number;
   tradie_id: number;
   custom_quote: number;
-  proposedTimeline: string;
+  proposed_timeline: string;
   status: ApplicationStatus;
   applicationTimestamp: Date;
   credits_used: number;
@@ -202,7 +202,7 @@ export interface ClientApplicationReview {
     };
     application: {
       custom_quote: number;
-      proposedTimeline: string;
+      proposed_timeline: string;
       approachDescription: string;
       coverMessage?: string;
       relevantExperience?: string;
@@ -329,7 +329,7 @@ export interface ApplicationNotificationData {
   data: {
     jobTitle: string;
     tradieName: string;
-    clientName: string;
+    client_name: string;
     custom_quote?: number;
     status?: ApplicationStatus;
     reason?: string;
@@ -395,7 +395,7 @@ export interface ApplicationMatchingCriteria {
     min?: number;
     max?: number;
   };
-  urgencyLevel: UrgencyLevel;
+  urgency_level: urgency_level;
   requiredSkills: string[];
   preferredQualifications: string[];
   minimumRating?: number;

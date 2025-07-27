@@ -38,13 +38,13 @@ export class MarketplaceJobModel {
         jobData.description,
         jobData.job_type,
         jobData.location,
-        jobData.estimatedBudget || null,
-        jobData.dateRequired,
-        jobData.urgencyLevel,
+        jobData.estimated_budget || null,
+        jobData.date_required,
+        jobData.urgency_level,
         JSON.stringify(jobData.photos || []),
-        jobData.clientName,
-        jobData.clientEmail,
-        jobData.clientPhone || null,
+        jobData.client_name,
+        jobData.client_email ,
+        jobData.client_phone || null,
         jobData.clientCompany || null,
         expiresAt
       ]
@@ -91,7 +91,7 @@ export class MarketplaceJobModel {
         searchParams.query || null,
         searchParams.job_type || null,
         searchParams.location || null,
-        searchParams.urgencyLevel || null,
+        searchParams.urgency_level || null,
         searchParams.minBudget || null,
         searchParams.maxBudget || null,
         sortBy
@@ -113,7 +113,7 @@ export class MarketplaceJobModel {
         searchParams.query || null,
         searchParams.job_type || null,
         searchParams.location || null,
-        searchParams.urgencyLevel || null,
+        searchParams.urgency_level || null,
         searchParams.minBudget || null,
         searchParams.maxBudget || null
       ]
@@ -147,21 +147,21 @@ export class MarketplaceJobModel {
       paramIndex++;
     }
 
-    if (updateData.estimatedBudget !== undefined) {
+    if (updateData.estimated_budget !== undefined) {
       updateFields.push(`estimated_budget = $${paramIndex}`);
-      updateValues.push(updateData.estimatedBudget);
+      updateValues.push(updateData.estimated_budget);
       paramIndex++;
     }
 
-    if (updateData.dateRequired !== undefined) {
+    if (updateData.date_required !== undefined) {
       updateFields.push(`date_required = $${paramIndex}`);
-      updateValues.push(updateData.dateRequired);
+      updateValues.push(updateData.date_required);
       paramIndex++;
     }
 
-    if (updateData.urgencyLevel !== undefined) {
+    if (updateData.urgency_level !== undefined) {
       updateFields.push(`urgency_level = $${paramIndex}`);
-      updateValues.push(updateData.urgencyLevel);
+      updateValues.push(updateData.urgency_level);
       paramIndex++;
     }
 
@@ -318,9 +318,9 @@ export class MarketplaceJobModel {
     };
   }
 
-  async calculateCreditCost(job_type: string, urgencyLevel: string): Promise<number> {
+  async calculateCreditCost(job_type: string, urgency_level: string): Promise<number> {
     const baseCost = MARKETPLACE_CREDIT_COSTS.BASE_APPLICATION_COST;
-    const urgencyMultiplier = MARKETPLACE_CREDIT_COSTS.URGENCY_MULTIPLIERS[urgencyLevel as keyof typeof MARKETPLACE_CREDIT_COSTS.URGENCY_MULTIPLIERS] || 1.0;
+    const urgencyMultiplier = MARKETPLACE_CREDIT_COSTS.URGENCY_MULTIPLIERS[urgency_level as keyof typeof MARKETPLACE_CREDIT_COSTS.URGENCY_MULTIPLIERS] || 1.0;
     const job_typeMultiplier = MARKETPLACE_CREDIT_COSTS.JOB_TYPE_MULTIPLIERS[job_type as keyof typeof MARKETPLACE_CREDIT_COSTS.JOB_TYPE_MULTIPLIERS] || 1.0;
 
     return Math.ceil(baseCost * urgencyMultiplier * job_typeMultiplier);
@@ -362,8 +362,8 @@ export class MarketplaceJobModel {
       title: entity.title,
       job_type: entity.job_type,
       location: entity.location,
-      estimatedBudget: entity.estimated_budget,
-      urgencyLevel: entity.urgency_level,
+      estimated_budget: entity.estimated_budget,
+      urgency_level: entity.urgency_level,
       applicationCount: entity.application_count,
       status: entity.status,
       createdAt: entity.createdAt,

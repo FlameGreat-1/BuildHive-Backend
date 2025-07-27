@@ -41,17 +41,17 @@ import {
       });
     }
   
-    if (!applicationData.proposedTimeline || applicationData.proposedTimeline.trim().length < MARKETPLACE_LIMITS.APPLICATION_TIMELINE_MIN_LENGTH) {
+    if (!applicationData.proposed_timeline || applicationData.proposed_timeline.trim().length < MARKETPLACE_LIMITS.APPLICATION_TIMELINE_MIN_LENGTH) {
       errors.push({
-        field: 'proposedTimeline',
+        field: 'proposed_timeline',
         message: `Proposed timeline must be at least ${MARKETPLACE_LIMITS.APPLICATION_TIMELINE_MIN_LENGTH} characters`,
         code: 'TIMELINE_TOO_SHORT'
       });
     }
   
-    if (applicationData.proposedTimeline && applicationData.proposedTimeline.length > MARKETPLACE_LIMITS.APPLICATION_TIMELINE_MAX_LENGTH) {
+    if (applicationData.proposed_timeline && applicationData.proposed_timeline.length > MARKETPLACE_LIMITS.APPLICATION_TIMELINE_MAX_LENGTH) {
       errors.push({
-        field: 'proposedTimeline',
+        field: 'proposed_timeline',
         message: `Proposed timeline cannot exceed ${MARKETPLACE_LIMITS.APPLICATION_TIMELINE_MAX_LENGTH} characters`,
         code: 'TIMELINE_TOO_LONG'
       });
@@ -170,7 +170,7 @@ import {
   export const sanitizeApplicationData = (applicationData: JobApplicationCreateData): JobApplicationCreateData => {
     return {
       ...applicationData,
-      proposedTimeline: sanitizeString(applicationData.proposedTimeline.trim()),
+      proposed_timeline: sanitizeString(applicationData.proposed_timeline.trim()),
       approachDescription: sanitizeString(applicationData.approachDescription.trim()),
       materialsList: applicationData.materialsList ? sanitizeString(applicationData.materialsList.trim()) : undefined,
       coverMessage: applicationData.coverMessage ? sanitizeString(applicationData.coverMessage.trim()) : undefined,
@@ -224,7 +224,7 @@ import {
       marketplace_job_id : application.marketplace_job_id ,
       tradie_id: application.tradie_id,
       custom_quote: application.custom_quote,
-      proposedTimeline: application.proposedTimeline,
+      proposed_timeline: application.proposed_timeline,
       status: application.status,
       applicationTimestamp: application.applicationTimestamp,
       credits_used: application.credits_used,
@@ -240,15 +240,15 @@ import {
   };
   
   export const calculateApplicationScore = (application: JobApplicationDetails, jobRequirements: {
-    estimatedBudget?: number;
-    urgencyLevel: string;
+    estimated_budget?: number;
+    urgency_level: string;
     job_type: string;
     location: string;
   }): number => {
     let score = 0;
   
-    if (jobRequirements.estimatedBudget && application.custom_quote) {
-      const budgetDifference = Math.abs(application.custom_quote - jobRequirements.estimatedBudget) / jobRequirements.estimatedBudget;
+    if (jobRequirements.estimated_budget && application.custom_quote) {
+      const budgetDifference = Math.abs(application.custom_quote - jobRequirements.estimated_budget) / jobRequirements.estimated_budget;
       if (budgetDifference <= 0.1) score += 20;
       else if (budgetDifference <= 0.2) score += 15;
       else if (budgetDifference <= 0.3) score += 10;
@@ -284,8 +284,8 @@ import {
   };
   
   export const rankApplications = (applications: JobApplicationDetails[], jobRequirements: {
-    estimatedBudget?: number;
-    urgencyLevel: string;
+    estimated_budget?: number;
+    urgency_level: string;
     job_type: string;
     location: string;
   }): JobApplicationDetails[] => {
@@ -298,8 +298,8 @@ import {
   };
   
   export const getRecommendedApplications = (applications: JobApplicationDetails[], jobRequirements: {
-    estimatedBudget?: number;
-    urgencyLevel: string;
+    estimated_budget?: number;
+    urgency_level: string;
     job_type: string;
     location: string;
   }, limit: number = 3): JobApplicationDetails[] => {

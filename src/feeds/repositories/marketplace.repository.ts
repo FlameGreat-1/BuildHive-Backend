@@ -50,7 +50,7 @@ export class MarketplaceRepository {
         client_id: job.client_id,
         job_type: job.job_type,
         location: job.location,
-        estimatedBudget: job.estimatedBudget
+        estimated_budget: job.estimated_budget
       });
 
       await client.query('COMMIT');
@@ -91,7 +91,7 @@ export class MarketplaceRepository {
       const job = await this.findJobById(id);
       if (!job) return null;
 
-      const creditCost = calculateCreditCost(job.job_type, job.urgencyLevel);
+      const creditCost = calculateCreditCost(job.job_type, job.urgency_level);
       const hasApplied = tradie_id ? await this.checkTradieApplication(id, tradie_id) : false;
       
       const jobDetails = formatJobDetails(job, creditCost);
@@ -119,7 +119,7 @@ export class MarketplaceRepository {
       
       const jobsWithCreditCost = await Promise.all(
         result.jobs.map(async (job) => {
-          const creditCost = calculateCreditCost(job.job_type, job.urgencyLevel);
+          const creditCost = calculateCreditCost(job.job_type, job.urgency_level);
           const hasApplied = searchParams.tradie_id ? 
             await this.checkTradieApplication(job.id, searchParams.tradie_id) : false;
           
@@ -587,7 +587,7 @@ export class MarketplaceRepository {
       const recommendedJobs = await Promise.all(
         result.rows.map(async (row) => {
           const job = this.transformRowToEntity(row);
-          const creditCost = calculateCreditCost(job.job_type, job.urgencyLevel);
+          const creditCost = calculateCreditCost(job.job_type, job.urgency_level);
           return formatJobSummary(job, creditCost.finalCost, false);
         })
       );
@@ -658,7 +658,7 @@ export class MarketplaceRepository {
       const job = await this.findJobById(jobId);
       if (!job) return null;
 
-      return calculateCreditCost(job.job_type, job.urgencyLevel);
+      return calculateCreditCost(job.job_type, job.urgency_level);
     } catch (error) {
       logger.error('Error getting job credit cost', { error, jobId });
       throw new DatabaseError('Failed to get job credit cost', error);
@@ -686,7 +686,7 @@ export class MarketplaceRepository {
         tradie_id: parseInt(row.tradie_id),
         marketplace_job_id : parseInt(row.marketplace_job_id),
         custom_quote: parseFloat(row.custom_quote) || 0,
-        proposedTimeline: row.proposed_timeline,
+        proposed_timeline: row.proposed_timeline,
         coverLetter: row.cover_letter,
         status: row.status,
         credits_used: parseInt(row.credits_used) || 0,
@@ -713,7 +713,7 @@ export class MarketplaceRepository {
       let userId: number;
       const userResult = await client.query(
         'SELECT id FROM users WHERE email = $1',
-        [jobData.clientEmail]
+        [jobData.client_email ]
       );
 
       if (userResult.rows.length > 0) {
@@ -722,7 +722,7 @@ export class MarketplaceRepository {
         const newUserResult = await client.query(
           `INSERT INTO users (email, username, role, created_at) 
            VALUES ($1, $2, 'client', NOW()) RETURNING id`,
-          [jobData.clientEmail, jobData.clientEmail.split('@')[0]]
+          [jobData.client_email , jobData.client_email .split('@')[0]]
         );
         userId = parseInt(newUserResult.rows[0].id);
       }
@@ -734,12 +734,12 @@ export class MarketplaceRepository {
          phone = EXCLUDED.phone, 
          company = EXCLUDED.company, 
          updated_at = NOW()`,
-        [userId, jobData.clientName, jobData.clientPhone, jobData.clientCompany]
+        [userId, jobData.client_name, jobData.client_phone, jobData.clientCompany]
       );
 
       await client.query('COMMIT');
 
-      logger.debug('Client profile created/updated', { userId, email: jobData.clientEmail });
+      logger.debug('Client profile created/updated', { userId, email: jobData.client_email  });
 
       return userId;
     } catch (error) {
@@ -827,13 +827,13 @@ export class MarketplaceRepository {
       description: row.description,
       job_type: row.job_type,
       location: row.location,
-      estimatedBudget: parseFloat(row.estimated_budget) || 0,
-      dateRequired: new Date(row.date_required),
-      urgencyLevel: row.urgency_level,
+      estimated_budget: parseFloat(row.estimated_budget) || 0,
+      date_required: new Date(row.date_required),
+      urgency_level: row.urgency_level,
       photos: row.photos ? JSON.parse(row.photos) : [],
-      clientName: row.client_name,
-      clientEmail: row.client_email,
-      clientPhone: row.client_phone,
+      client_name: row.client_name,
+      client_email : row.client_email,
+      client_phone: row.client_phone,
       clientCompany: row.client_company,
       status: row.status,
       applicationCount: parseInt(row.application_count) || 0,

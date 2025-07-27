@@ -589,7 +589,7 @@ export class ApplicationService extends EventEmitter {
         const tradieUser = await this.userService.getUserById(this.convertUserIdToString(application.tradie_id));
         if (tradieUser) {
           const message = `New application received for "${marketplaceJob.title}" from ${tradieUser.username}. Quote: $${application.custom_quote}`;
-          await this.smsService.sendSMS(marketplaceJob.clientPhone || clientUser.username, message);
+          await this.smsService.sendSMS(marketplaceJob.client_phone || clientUser.username, message);
         }
       }
 
@@ -600,7 +600,7 @@ export class ApplicationService extends EventEmitter {
         jobTitle: marketplaceJob.title,
         tradie_id: application.tradie_id,
         custom_quote: application.custom_quote,
-        proposedTimeline: application.proposedTimeline,
+        proposed_timeline: application.proposed_timeline,
         timestamp: new Date().toISOString()
       };
 
@@ -632,7 +632,7 @@ export class ApplicationService extends EventEmitter {
           );
 
           const message = `Application for "${marketplaceJob.title}" has been updated. New quote: $${application.custom_quote}`;
-          await this.smsService.sendSMS(marketplaceJob.clientPhone || clientUser.username, message);
+          await this.smsService.sendSMS(marketplaceJob.client_phone || clientUser.username, message);
         }
       }
 
@@ -669,7 +669,7 @@ export class ApplicationService extends EventEmitter {
           );
 
           const message = `An application for "${marketplaceJob.title}" has been withdrawn.`;
-          await this.smsService.sendSMS(marketplaceJob.clientPhone || clientUser.username, message);
+          await this.smsService.sendSMS(marketplaceJob.client_phone || clientUser.username, message);
         }
       }
 
@@ -968,11 +968,11 @@ export class ApplicationService extends EventEmitter {
         marketplace_job_id : updatedApplication.marketplace_job_id ,
         previousData: {
           custom_quote: previousApplication.custom_quote,
-          proposedTimeline: previousApplication.proposedTimeline
+          proposed_timeline: previousApplication.proposed_timeline
         },
         updatedData: {
           custom_quote: updatedApplication.custom_quote,
-          proposedTimeline: updatedApplication.proposedTimeline
+          proposed_timeline: updatedApplication.proposed_timeline
         },
         timestamp: new Date().toISOString()
       };

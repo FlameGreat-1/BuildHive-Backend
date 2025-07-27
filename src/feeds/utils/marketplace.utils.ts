@@ -72,69 +72,69 @@ import {
       });
     }
   
-    if (jobData.estimatedBudget !== undefined) {
-      if (jobData.estimatedBudget < MARKETPLACE_LIMITS.MIN_ESTIMATED_BUDGET) {
+    if (jobData.estimated_budget !== undefined) {
+      if (jobData.estimated_budget < MARKETPLACE_LIMITS.MIN_ESTIMATED_BUDGET) {
         errors.push({
-          field: 'estimatedBudget',
+          field: 'estimated_budget',
           message: `Estimated budget must be at least $${MARKETPLACE_LIMITS.MIN_ESTIMATED_BUDGET}`,
           code: 'BUDGET_TOO_LOW'
         });
       }
   
-      if (jobData.estimatedBudget > MARKETPLACE_LIMITS.MAX_ESTIMATED_BUDGET) {
+      if (jobData.estimated_budget > MARKETPLACE_LIMITS.MAX_ESTIMATED_BUDGET) {
         errors.push({
-          field: 'estimatedBudget',
+          field: 'estimated_budget',
           message: `Estimated budget cannot exceed $${MARKETPLACE_LIMITS.MAX_ESTIMATED_BUDGET}`,
           code: 'BUDGET_TOO_HIGH'
         });
       }
     }
   
-    if (!jobData.dateRequired) {
+    if (!jobData.date_required) {
       errors.push({
-        field: 'dateRequired',
+        field: 'date_required',
         message: 'Date required is mandatory',
         code: 'DATE_REQUIRED_MISSING'
       });
     } else {
-      const dateRequired = new Date(jobData.dateRequired);
+      const date_required = new Date(jobData.date_required);
       const now = new Date();
-      if (dateRequired <= now) {
+      if (date_required <= now) {
         errors.push({
-          field: 'dateRequired',
+          field: 'date_required',
           message: 'Date required must be in the future',
           code: 'INVALID_DATE_REQUIRED'
         });
       }
     }
   
-    if (!jobData.urgencyLevel || !Object.values(URGENCY_LEVEL).includes(jobData.urgencyLevel as any)) {
+    if (!jobData.urgency_level || !Object.values(URGENCY_LEVEL).includes(jobData.urgency_level as any)) {
       errors.push({
-        field: 'urgencyLevel',
+        field: 'urgency_level',
         message: 'Invalid urgency level',
         code: 'INVALID_URGENCY_LEVEL'
       });
     }
   
-    if (!jobData.clientName || jobData.clientName.trim().length === 0) {
+    if (!jobData.client_name || jobData.client_name.trim().length === 0) {
       errors.push({
-        field: 'clientName',
+        field: 'client_name',
         message: 'Client name is required',
         code: 'CLIENT_NAME_REQUIRED'
       });
     }
   
-    if (!jobData.clientEmail || !MARKETPLACE_VALIDATION_RULES.EMAIL_REGEX.test(jobData.clientEmail)) {
+    if (!jobData.client_email  || !MARKETPLACE_VALIDATION_RULES.EMAIL_REGEX.test(jobData.client_email )) {
       errors.push({
-        field: 'clientEmail',
+        field: 'client_email ',
         message: 'Valid client email is required',
         code: 'INVALID_CLIENT_EMAIL'
       });
     }
   
-    if (jobData.clientPhone && !MARKETPLACE_VALIDATION_RULES.PHONE_REGEX.test(jobData.clientPhone)) {
+    if (jobData.client_phone && !MARKETPLACE_VALIDATION_RULES.PHONE_REGEX.test(jobData.client_phone)) {
       warnings.push({
-        field: 'clientPhone',
+        field: 'client_phone',
         message: 'Client phone number format may be invalid'
       });
     }
@@ -160,30 +160,30 @@ import {
       title: sanitizeString(jobData.title.trim()),
       description: sanitizeString(jobData.description.trim()),
       location: sanitizeString(jobData.location.trim()),
-      clientName: sanitizeString(jobData.clientName.trim()),
-      clientEmail: jobData.clientEmail.trim().toLowerCase(),
-      clientPhone: jobData.clientPhone?.trim(),
+      client_name: sanitizeString(jobData.client_name.trim()),
+      client_email : jobData.client_email .trim().toLowerCase(),
+      client_phone: jobData.client_phone?.trim(),
       clientCompany: jobData.clientCompany ? sanitizeString(jobData.clientCompany.trim()) : undefined
     };
   };
   
-  export const calculateCreditCost = (job_type: string, urgencyLevel: string): MarketplaceCreditCost => {
+  export const calculateCreditCost = (job_type: string, urgency_level: string): MarketplaceCreditCost => {
     const baseCost = MARKETPLACE_CREDIT_COSTS.BASE_APPLICATION_COST;
-    const urgencyMultiplier = MARKETPLACE_CREDIT_COSTS.URGENCY_MULTIPLIERS[urgencyLevel as keyof typeof MARKETPLACE_CREDIT_COSTS.URGENCY_MULTIPLIERS] || 1.0;
+    const urgencyMultiplier = MARKETPLACE_CREDIT_COSTS.URGENCY_MULTIPLIERS[urgency_level as keyof typeof MARKETPLACE_CREDIT_COSTS.URGENCY_MULTIPLIERS] || 1.0;
     const job_typeMultiplier = MARKETPLACE_CREDIT_COSTS.JOB_TYPE_MULTIPLIERS[job_type as keyof typeof MARKETPLACE_CREDIT_COSTS.JOB_TYPE_MULTIPLIERS] || 1.0;
     const finalCost = Math.ceil(baseCost * urgencyMultiplier * job_typeMultiplier);
   
     return {
       marketplace_job_id : 0,
       job_type: job_type as any,
-      urgencyLevel: urgencyLevel as any,
+      urgency_level: urgency_level as any,
       baseCost,
       urgencyMultiplier,
       job_typeMultiplier,
       finalCost,
       calculation: {
         step1: `Base cost: ${baseCost} credits`,
-        step2: `Urgency multiplier (${urgencyLevel}): ${urgencyMultiplier}x`,
+        step2: `Urgency multiplier (${urgency_level}): ${urgencyMultiplier}x`,
         step3: `Job type multiplier (${job_type}): ${job_typeMultiplier}x`
       }
     };
@@ -216,9 +216,9 @@ import {
       paramIndex++;
     }
   
-    if (searchParams.urgencyLevel) {
+    if (searchParams.urgency_level) {
       conditions.push(`mj.urgency_level = $${paramIndex}`);
-      parameters.push(searchParams.urgencyLevel);
+      parameters.push(searchParams.urgency_level);
       paramIndex++;
     }
   
@@ -292,8 +292,8 @@ import {
       title: job.title,
       job_type: job.job_type,
       location: job.location,
-      estimatedBudget: job.estimatedBudget,
-      urgencyLevel: job.urgencyLevel,
+      estimated_budget: job.estimated_budget,
+      urgency_level: job.urgency_level,
       applicationCount: job.applicationCount,
       status: job.status,
       createdAt: job.createdAt,
@@ -308,9 +308,9 @@ import {
       ...job,
       client: {
         id: job.client_id,
-        name: job.clientName,
-        email: job.clientEmail,
-        phone: job.clientPhone,
+        name: job.client_name,
+        email: job.client_email ,
+        phone: job.client_phone,
         company: job.clientCompany,
         isVerified: false
       },
@@ -349,14 +349,14 @@ import {
     return statusColors[status] || '#6c757d';
   };
   
-  export const getUrgencyColor = (urgencyLevel: string): string => {
+  export const getUrgencyColor = (urgency_level: string): string => {
     const urgencyColors: Record<string, string> = {
       [URGENCY_LEVEL.LOW]: '#28a745',
       [URGENCY_LEVEL.MEDIUM]: '#ffc107',
       [URGENCY_LEVEL.HIGH]: '#fd7e14',
       [URGENCY_LEVEL.URGENT]: '#dc3545'
     };
-    return urgencyColors[urgencyLevel] || '#6c757d';
+    return urgencyColors[urgency_level] || '#6c757d';
   };
   
   export const getjob_typeIcon = (job_type: string): string => {
@@ -499,7 +499,7 @@ import {
   
   export const groupJobsByUrgency = (jobs: MarketplaceJobSummary[]): Record<string, MarketplaceJobSummary[]> => {
     return jobs.reduce((groups, job) => {
-      const urgency = job.urgencyLevel;
+      const urgency = job.urgency_level;
       if (!groups[urgency]) {
         groups[urgency] = [];
       }
@@ -529,8 +529,8 @@ import {
         [URGENCY_LEVEL.MEDIUM]: 2,
         [URGENCY_LEVEL.LOW]: 1
       };
-      scoreA += urgencyScores[a.urgencyLevel] || 0;
-      scoreB += urgencyScores[b.urgencyLevel] || 0;
+      scoreA += urgencyScores[a.urgency_level] || 0;
+      scoreB += urgencyScores[b.urgency_level] || 0;
   
       return scoreB - scoreA;
     });
@@ -587,8 +587,8 @@ import {
       parts.push(`Location: ${filters.location}`);
     }
   
-    if (filters.urgencyLevel) {
-      parts.push(`Urgency: ${filters.urgencyLevel}`);
+    if (filters.urgency_level) {
+      parts.push(`Urgency: ${filters.urgency_level}`);
     }
   
     if (filters.minBudget !== undefined || filters.maxBudget !== undefined) {

@@ -35,7 +35,7 @@ export const validateCreateJobApplication = [
     .isFloat({ min: MARKETPLACE_LIMITS.MIN_CUSTOM_QUOTE, max: MARKETPLACE_LIMITS.MAX_CUSTOM_QUOTE })
     .withMessage(`Custom quote must be between $${MARKETPLACE_LIMITS.MIN_CUSTOM_QUOTE} and $${MARKETPLACE_LIMITS.MAX_CUSTOM_QUOTE}`),
 
-  body('proposedTimeline')
+  body('proposed_timeline')
     .trim()
     .isLength({ min: MARKETPLACE_LIMITS.APPLICATION_TIMELINE_MIN_LENGTH, max: MARKETPLACE_LIMITS.APPLICATION_TIMELINE_MAX_LENGTH })
     .withMessage(`Proposed timeline must be between ${MARKETPLACE_LIMITS.APPLICATION_TIMELINE_MIN_LENGTH} and ${MARKETPLACE_LIMITS.APPLICATION_TIMELINE_MAX_LENGTH} characters`),
@@ -119,7 +119,7 @@ export const validateUpdateJobApplication = [
     .isFloat({ min: MARKETPLACE_LIMITS.MIN_CUSTOM_QUOTE, max: MARKETPLACE_LIMITS.MAX_CUSTOM_QUOTE })
     .withMessage(`Custom quote must be between $${MARKETPLACE_LIMITS.MIN_CUSTOM_QUOTE} and $${MARKETPLACE_LIMITS.MAX_CUSTOM_QUOTE}`),
 
-  body('proposedTimeline')
+  body('proposed_timeline')
     .optional()
     .trim()
     .isLength({ min: MARKETPLACE_LIMITS.APPLICATION_TIMELINE_MIN_LENGTH, max: MARKETPLACE_LIMITS.APPLICATION_TIMELINE_MAX_LENGTH })
@@ -474,8 +474,8 @@ export const validateBulkApplicationOperation = [
   
   export const sanitizeApplicationInput = (req: Request, res: Response, next: NextFunction) => {
     try {
-      if (req.body.proposedTimeline) {
-        req.body.proposedTimeline = sanitizeString(req.body.proposedTimeline.trim());
+      if (req.body.proposed_timeline) {
+        req.body.proposed_timeline = sanitizeString(req.body.proposed_timeline.trim());
       }
   
       if (req.body.approachDescription) {

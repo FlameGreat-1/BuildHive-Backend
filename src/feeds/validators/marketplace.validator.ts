@@ -51,24 +51,24 @@ export const validateCreateMarketplaceJob = [
     .matches(MARKETPLACE_VALIDATION_RULES.LOCATION_REGEX)
     .withMessage('Invalid location format'),
 
-  body('estimatedBudget')
+  body('estimated_budget')
     .optional()
     .isFloat({ min: MARKETPLACE_LIMITS.MIN_ESTIMATED_BUDGET, max: MARKETPLACE_LIMITS.MAX_ESTIMATED_BUDGET })
     .withMessage(`Estimated budget must be between $${MARKETPLACE_LIMITS.MIN_ESTIMATED_BUDGET} and $${MARKETPLACE_LIMITS.MAX_ESTIMATED_BUDGET}`),
 
-  body('dateRequired')
+  body('date_required')
     .isISO8601()
     .withMessage('Invalid date format')
     .custom((value) => {
-      const dateRequired = new Date(value);
+      const date_required = new Date(value);
       const now = new Date();
-      if (dateRequired <= now) {
+      if (date_required <= now) {
         throw new Error('Date required must be in the future');
       }
       return true;
     }),
 
-  body('urgencyLevel')
+  body('urgency_level')
     .isIn(Object.values(URGENCY_LEVEL))
     .withMessage('Invalid urgency level'),
 
@@ -88,14 +88,14 @@ export const validateCreateMarketplaceJob = [
       return true;
     }),
 
-  body('clientName')
+  body('client_name')
     .trim()
     .isLength({ min: 1, max: 100 })
     .withMessage('Client name is required and must be less than 100 characters')
     .matches(MARKETPLACE_VALIDATION_RULES.NAME_REGEX)
     .withMessage('Client name contains invalid characters'),
 
-  body('clientEmail')
+  body('client_email ')
     .isEmail()
     .withMessage('Valid client email is required')
     .normalizeEmail()
@@ -106,7 +106,7 @@ export const validateCreateMarketplaceJob = [
       return true;
     }),
 
-  body('clientPhone')
+  body('client_phone')
     .optional()
     .matches(MARKETPLACE_VALIDATION_RULES.PHONE_REGEX)
     .withMessage('Invalid phone number format'),
@@ -139,27 +139,27 @@ export const validateUpdateMarketplaceJob = [
     .isLength({ min: MARKETPLACE_LIMITS.JOB_DESCRIPTION_MIN_LENGTH, max: MARKETPLACE_LIMITS.JOB_DESCRIPTION_MAX_LENGTH })
     .withMessage(`Job description must be between ${MARKETPLACE_LIMITS.JOB_DESCRIPTION_MIN_LENGTH} and ${MARKETPLACE_LIMITS.JOB_DESCRIPTION_MAX_LENGTH} characters`),
 
-  body('estimatedBudget')
+  body('estimated_budget')
     .optional()
     .isFloat({ min: MARKETPLACE_LIMITS.MIN_ESTIMATED_BUDGET, max: MARKETPLACE_LIMITS.MAX_ESTIMATED_BUDGET })
     .withMessage(`Estimated budget must be between $${MARKETPLACE_LIMITS.MIN_ESTIMATED_BUDGET} and $${MARKETPLACE_LIMITS.MAX_ESTIMATED_BUDGET}`),
 
-  body('dateRequired')
+  body('date_required')
     .optional()
     .isISO8601()
     .withMessage('Invalid date format')
     .custom((value) => {
       if (value) {
-        const dateRequired = new Date(value);
+        const date_required = new Date(value);
         const now = new Date();
-        if (dateRequired <= now) {
+        if (date_required <= now) {
           throw new Error('Date required must be in the future');
         }
       }
       return true;
     }),
 
-  body('urgencyLevel')
+  body('urgency_level')
     .optional()
     .isIn(Object.values(URGENCY_LEVEL))
     .withMessage('Invalid urgency level'),
@@ -203,7 +203,7 @@ export const validateMarketplaceJobSearch = [
     .isLength({ max: 100 })
     .withMessage('Location must be less than 100 characters'),
 
-  query('urgencyLevel')
+  query('urgency_level')
     .optional()
     .isIn(Object.values(URGENCY_LEVEL))
     .withMessage('Invalid urgency level'),
@@ -308,7 +308,7 @@ export const validateMarketplaceJobFilters = [
       .isLength({ max: 100 })
       .withMessage('Location filter must be less than 100 characters'),
   
-    query('urgencyLevel')
+    query('urgency_level')
       .optional()
       .isIn(Object.values(URGENCY_LEVEL))
       .withMessage('Invalid urgency level filter'),
@@ -486,16 +486,16 @@ export const validateMarketplaceJobFilters = [
         req.body.location = sanitizeString(req.body.location.trim());
       }
   
-      if (req.body.clientName) {
-        req.body.clientName = sanitizeString(req.body.clientName.trim());
+      if (req.body.client_name) {
+        req.body.client_name = sanitizeString(req.body.client_name.trim());
       }
   
-      if (req.body.clientEmail) {
-        req.body.clientEmail = req.body.clientEmail.trim().toLowerCase();
+      if (req.body.client_email ) {
+        req.body.client_email  = req.body.client_email .trim().toLowerCase();
       }
   
-      if (req.body.clientPhone) {
-        req.body.clientPhone = req.body.clientPhone.trim();
+      if (req.body.client_phone) {
+        req.body.client_phone = req.body.client_phone.trim();
       }
   
       if (req.body.clientCompany) {
@@ -542,7 +542,7 @@ export const validateMarketplaceJobFilters = [
       const filters: MarketplaceJobFilters = {
         job_type: req.query.job_type as any,
         location: req.query.location as string,
-        urgencyLevel: req.query.urgencyLevel as any,
+        urgency_level: req.query.urgency_level as any,
         minBudget: req.query.minBudget ? parseFloat(req.query.minBudget as string) : undefined,
         maxBudget: req.query.maxBudget ? parseFloat(req.query.maxBudget as string) : undefined,
         dateRange: req.query.startDate && req.query.endDate ? {

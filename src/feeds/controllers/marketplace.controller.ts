@@ -5,7 +5,7 @@ import {
   MarketplaceJobUpdateData,
   MarketplaceJobSearchParams
 } from '../types';
-import { Marketplacejob_type, UrgencyLevel } from '../../shared/types';
+import { Marketplacejob_type, urgency_level } from '../../shared/types';
 import { MarketplaceSortOption } from '../../config/feeds/constants';
 import { logger, createResponse } from '../../shared/utils';
 
@@ -77,7 +77,7 @@ export class MarketplaceController {
         limit: parseInt(req.query.limit as string) || 20,
         job_type: req.query.job_type as Marketplacejob_type | undefined,
         location: req.query.location as string,
-        urgencyLevel: req.query.urgencyLevel as UrgencyLevel | undefined,
+        urgency_level: req.query.urgency_level as urgency_level | undefined,
         minBudget: req.query.minBudget ? parseFloat(req.query.minBudget as string) : undefined,
         maxBudget: req.query.maxBudget ? parseFloat(req.query.maxBudget as string) : undefined,
         dateRange: req.query.startDate && req.query.endDate ? {

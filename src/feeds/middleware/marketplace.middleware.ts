@@ -438,7 +438,7 @@ export class MarketplaceMiddleware {
   
     validateJobFilters = (req: Request, res: Response, next: NextFunction): void => {
       try {
-        const { job_type, location, urgencyLevel, minBudget, maxBudget } = req.query;
+        const { job_type, location, urgency_level, minBudget, maxBudget } = req.query;
   
         if (job_type && typeof job_type === 'string') {
           const validjob_types = Object.values(MARKETPLACE_JOB_STATUS);

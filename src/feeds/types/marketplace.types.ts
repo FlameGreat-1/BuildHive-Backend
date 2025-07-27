@@ -13,7 +13,7 @@ import {
   import {
     Marketplacejob_type,
     MarketplaceJobStatus,
-    UrgencyLevel,
+    urgency_level,
     MarketplaceSortOption,
     MarketplaceAnalyticsPeriod,
     MARKETPLACE_JOB_TYPES,
@@ -37,22 +37,22 @@ import {
     description: string;
     job_type: Marketplacejob_type;
     location: string;
-    estimatedBudget?: number;
-    dateRequired: Date;
-    urgencyLevel: UrgencyLevel;
+    estimated_budget?: number;
+    date_required: Date;
+    urgency_level: urgency_level;
     photos?: string[];
-    clientName: string;
-    clientEmail: string;
-    clientPhone?: string;
+    client_name: string;
+    client_email : string;
+    client_phone?: string;
     clientCompany?: string;
   }
   
   export interface MarketplaceJobUpdateData {
     title?: string;
     description?: string;
-    estimatedBudget?: number;
-    dateRequired?: Date;
-    urgencyLevel?: UrgencyLevel;
+    estimated_budget?: number;
+    date_required?: Date;
+    urgency_level?: urgency_level;
     photos?: string[];
     status?: MarketplaceJobStatus;
   }
@@ -60,7 +60,7 @@ import {
   export interface MarketplaceJobFilters {
     job_type?: Marketplacejob_type;
     location?: string;
-    urgencyLevel?: UrgencyLevel;
+    urgency_level?: urgency_level;
     minBudget?: number;
     maxBudget?: number;
     dateRange?: {
@@ -93,8 +93,8 @@ import {
     title: string;
     job_type: Marketplacejob_type;
     location: string;
-    estimatedBudget?: number;
-    urgencyLevel: UrgencyLevel;
+    estimated_budget?: number;
+    urgency_level: urgency_level;
     applicationCount: number;
     status: MarketplaceJobStatus;
     createdAt: Date;
@@ -177,7 +177,7 @@ import {
     demographics: {
       job_typeDistribution: Record<Marketplacejob_type, number>;
       locationDistribution: Record<string, number>;
-      urgencyDistribution: Record<UrgencyLevel, number>;
+      urgencyDistribution: Record<urgency_level, number>;
       budgetDistribution: Array<{
         range: string;
         count: number;
@@ -261,7 +261,7 @@ import {
   export interface MarketplaceCreditCost {
     marketplace_job_id : number;
     job_type: Marketplacejob_type;
-    urgencyLevel: UrgencyLevel;
+    urgency_level: urgency_level;
     baseCost: number;
     urgencyMultiplier: number;
     job_typeMultiplier: number;

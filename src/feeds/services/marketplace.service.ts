@@ -157,7 +157,7 @@ export class MarketplaceService extends EventEmitter {
       }
 
       if (tradie_id) {
-        const creditCost = calculateCreditCost(jobDetails.job_type, jobDetails.urgencyLevel).finalCost;
+        const creditCost = calculateCreditCost(jobDetails.job_type, jobDetails.urgency_level).finalCost;
         const creditCheck = await this.creditService.checkCreditSufficiency(tradie_id, creditCost);
         
         (jobDetails as any).creditSufficient = creditCheck.sufficient;
@@ -403,7 +403,7 @@ export class MarketplaceService extends EventEmitter {
       const recommendedJobs = await this.marketplaceRepository.getRecommendedJobs(tradie_id, limit);
 
       for (const job of recommendedJobs) {
-        const creditCost = calculateCreditCost(job.job_type, job.urgencyLevel).finalCost;
+        const creditCost = calculateCreditCost(job.job_type, job.urgency_level).finalCost;
         const creditCheck = await this.creditService.checkCreditSufficiency(tradie_id, creditCost);
         (job as any).canAfford = creditCheck.sufficient;
       }
@@ -509,16 +509,16 @@ export class MarketplaceService extends EventEmitter {
         description: marketplaceJob.description,
         job_type: marketplaceJob.job_type as job_type,
         priority: JobPriority.MEDIUM,
-        clientName: marketplaceJob.clientName,
-        clientEmail: marketplaceJob.clientEmail,
-        clientPhone: marketplaceJob.clientPhone,
+        client_name: marketplaceJob.client_name,
+        client_email : marketplaceJob.client_email ,
+        client_phone: marketplaceJob.client_phone,
         clientCompany: marketplaceJob.clientCompany,
         siteAddress: marketplaceJob.location,
         siteCity: marketplaceJob.location,
         siteState: '',
         sitePostcode: '',
         startDate: new Date(),
-        dueDate: marketplaceJob.dateRequired,
+        dueDate: marketplaceJob.date_required,
         estimatedDuration: 8,
         notes: [`Created from marketplace job #${marketplaceJob.id}`]
       };
@@ -550,13 +550,13 @@ export class MarketplaceService extends EventEmitter {
         title: job.title,
         job_type: job.job_type,
         location: job.location,
-        urgencyLevel: job.urgencyLevel,
-        estimatedBudget: job.estimatedBudget,
-        creditCost: calculateCreditCost(job.job_type, job.urgencyLevel).finalCost
+        urgency_level: job.urgency_level,
+        estimated_budget: job.estimated_budget,
+        creditCost: calculateCreditCost(job.job_type, job.urgency_level).finalCost
       };
 
       await this.emailService.sendJobNotificationEmail(
-        job.clientEmail,
+        job.client_email ,
         'New Job Posted',
         `Your job "${job.title}" has been posted to the marketplace.`
       );
@@ -595,11 +595,11 @@ export class MarketplaceService extends EventEmitter {
         client_id,
         jobId: job.id,
         job_type: job.job_type,
-        estimatedValue: job.estimatedBudget,
+        estimatedValue: job.estimated_budget,
         location: job.location,
         source: 'marketplace',
-        clientName: clientUser?.username || job.clientName,
-        clientEmail: clientUser?.email || job.clientEmail,
+        client_name: clientUser?.username || job.client_name,
+        client_email : clientUser?.email || job.client_email ,
         timestamp: new Date().toISOString()
       };
 
@@ -620,7 +620,7 @@ export class MarketplaceService extends EventEmitter {
         jobId: job.id,
         status: 'completed',
         completionDate: new Date().toISOString(),
-        clientEmail: clientUser?.email || job.clientEmail
+        client_email : clientUser?.email || job.client_email 
       };
 
       await this.redis.publish('crm:job_completed', JSON.stringify(crmData));
@@ -654,7 +654,7 @@ export class MarketplaceService extends EventEmitter {
         type: 'application_selected',
         jobId: job.id,
         jobTitle: job.title,
-        clientName: job.clientName,
+        client_name: job.client_name,
         tradie_id: job.selectedtradie_id,
         timestamp: new Date().toISOString()
       };
@@ -715,7 +715,7 @@ export class MarketplaceService extends EventEmitter {
 
   private async processJobCompletionRewardsDirectly(job: MarketplaceJobEntity): Promise<void> {
     try {
-      const bonusCredits = Math.floor(job.estimatedBudget / 100);
+      const bonusCredits = Math.floor(job.estimated_budget / 100);
       
       if (bonusCredits > 0) {
         await this.creditService.addCredits(
@@ -729,7 +729,7 @@ export class MarketplaceService extends EventEmitter {
         jobId: job.id,
         client_id: job.client_id,
         tradie_id: job.selectedtradie_id,
-        jobValue: job.estimatedBudget,
+        jobValue: job.estimated_budget,
         bonusCredits,
         timestamp: new Date().toISOString()
       };
@@ -812,8 +812,8 @@ export class MarketplaceService extends EventEmitter {
         client_id: job.client_id,
         job_type: job.job_type,
         location: job.location,
-        urgencyLevel: job.urgencyLevel,
-        estimatedBudget: job.estimatedBudget,
+        urgency_level: job.urgency_level,
+        estimated_budget: job.estimated_budget,
         timestamp: new Date().toISOString()
       };
 
@@ -837,12 +837,12 @@ export class MarketplaceService extends EventEmitter {
         previousData: {
           title: previousJob.title,
           description: previousJob.description,
-          estimatedBudget: previousJob.estimatedBudget
+          estimated_budget: previousJob.estimated_budget
         },
         updatedData: {
           title: updatedJob.title,
           description: updatedJob.description,
-          estimatedBudget: updatedJob.estimatedBudget
+          estimated_budget: updatedJob.estimated_budget
         },
         timestamp: new Date().toISOString()
       };
@@ -941,7 +941,7 @@ export class MarketplaceService extends EventEmitter {
     return {
       job_type: searchParams.job_type,
       location: searchParams.location,
-      urgencyLevel: searchParams.urgencyLevel,
+      urgency_level: searchParams.urgency_level,
       minBudget: searchParams.minBudget,
       maxBudget: searchParams.maxBudget,
       dateRange: searchParams.dateRange,

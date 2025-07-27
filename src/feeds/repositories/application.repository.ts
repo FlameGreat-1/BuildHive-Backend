@@ -176,9 +176,9 @@ export class ApplicationRepository {
           title: marketplaceJob.title,
           job_type: marketplaceJob.job_type,
           location: marketplaceJob.location,
-          estimatedBudget: parseFloat(marketplaceJob.estimated_budget) || 0,
-          urgencyLevel: marketplaceJob.urgency_level,
-          dateRequired: new Date(marketplaceJob.date_required)
+          estimated_budget: parseFloat(marketplaceJob.estimated_budget) || 0,
+          urgency_level: marketplaceJob.urgency_level,
+          date_required: new Date(marketplaceJob.date_required)
         },
         tradie: {
           id: application.tradie_id,
@@ -702,9 +702,9 @@ export class ApplicationRepository {
     }
   }
 
-  private async calculateApplicationCreditCost(job_type: string, urgencyLevel: string): Promise<number> {
+  private async calculateApplicationCreditCost(job_type: string, urgency_level: string): Promise<number> {
     const baseCost = MARKETPLACE_CREDIT_COSTS.BASE_APPLICATION_COST;
-    const urgencyMultiplier = MARKETPLACE_CREDIT_COSTS.URGENCY_MULTIPLIERS[urgencyLevel as keyof typeof MARKETPLACE_CREDIT_COSTS.URGENCY_MULTIPLIERS] || 1.0;
+    const urgencyMultiplier = MARKETPLACE_CREDIT_COSTS.URGENCY_MULTIPLIERS[urgency_level as keyof typeof MARKETPLACE_CREDIT_COSTS.URGENCY_MULTIPLIERS] || 1.0;
     const job_typeMultiplier = MARKETPLACE_CREDIT_COSTS.JOB_TYPE_MULTIPLIERS[job_type as keyof typeof MARKETPLACE_CREDIT_COSTS.JOB_TYPE_MULTIPLIERS] || 1.0;
     
     return Math.ceil(baseCost * urgencyMultiplier * job_typeMultiplier);

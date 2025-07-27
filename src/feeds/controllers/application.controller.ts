@@ -347,7 +347,7 @@ export class ApplicationController {
         status: application.status,
         credits_used: application.credits_used,
         custom_quote: application.custom_quote,
-        proposedTimeline: application.proposed_timeline,
+        proposed_timeline: application.proposed_timeline,
         competitorCount: 0,
         averageQuote: 0,
         rankPosition: 0,

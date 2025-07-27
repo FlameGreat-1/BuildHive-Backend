@@ -33,7 +33,7 @@ export class ApplicationModel {
         applicationData.marketplace_job_id ,
         tradie_id,
         applicationData.custom_quote,
-        applicationData.proposedTimeline,
+        applicationData.proposed_timeline,
         applicationData.approachDescription,
         applicationData.materialsList || null,
         JSON.stringify(applicationData.availabilityDates),
@@ -105,9 +105,9 @@ export class ApplicationModel {
       paramIndex++;
     }
 
-    if (updateData.proposedTimeline !== undefined) {
+    if (updateData.proposed_timeline !== undefined) {
       updateFields.push(`proposed_timeline = $${paramIndex}`);
-      updateValues.push(updateData.proposedTimeline);
+      updateValues.push(updateData.proposed_timeline);
       paramIndex++;
     }
 
@@ -450,7 +450,7 @@ export class ApplicationModel {
       marketplace_job_id : row.marketplace_job_id,
       tradie_id: row.tradie_id,
       custom_quote: parseFloat(row.custom_quote),
-      proposedTimeline: row.proposed_timeline,
+      proposed_timeline: row.proposed_timeline,
       status: row.status,
       applicationTimestamp: new Date(row.application_timestamp),
       credits_used: parseInt(row.credits_used) || 0,
