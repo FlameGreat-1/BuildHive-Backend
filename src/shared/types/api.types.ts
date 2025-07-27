@@ -1,5 +1,5 @@
 import { PaymentStatus, PaymentMethod, PaymentType, RefundStatus, QuoteStatus, QuoteItemType, DeliveryMethod, CreditTransactionType, CreditTransactionStatus, CreditUsageType, CreditPackageType, AutoTopupStatus } from './database.types';
-
+import { JobType } from './database.types';
 import { CreditTransactionResponse } from '../../credits/types';
 
 export interface ApiResponse<T = any> {
@@ -1566,4 +1566,28 @@ export interface TradieMarketplaceDashboardResponse {
     creditsUsed: number;
   }[];
   recommendedJobs: MarketplaceJobPreviewResponse[];
+}
+
+export type MarketplaceJobType = JobType;
+
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public statusCode: number = 500,
+    public code: string = 'API_ERROR'
+  ) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
+export class DatabaseError extends Error {
+  constructor(
+    message: string,
+    public code: string = 'DATABASE_ERROR',
+    public detail?: string
+  ) {
+    super(message);
+    this.name = 'DatabaseError';
+  }
 }
